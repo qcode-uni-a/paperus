@@ -76,3 +76,12 @@ def test_expired_session(client: TestClient, db: Session) -> None:
     )
     db.commit()
     assert client.get("/api/auth/me").status_code == 401
+
+
+def test_cookie_is_secure_by_default(client: TestClient, db: Session) -> None:
+    make_user(db)
+    response = client.post(
+        "/api/auth/login", json={"username": "ada", "password": "secret"}
+    )
+    cookie = response.headers["set-cookie"].lower()
+    assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie

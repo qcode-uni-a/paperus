@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PAPERUS_", env_file=".env")
 
     database_url: str = "postgresql+psycopg://paperus:paperus@localhost:5432/paperus"
+    # Session cookies only over HTTPS (browsers also accept them on
+    # http://localhost). Turn off only to test from other devices on a local
+    # network over plain HTTP.
+    cookie_secure: bool = True
     # Sent to metadata services (Crossref asks for one), e.g. admin@example.org.
     contact_email: str | None = None
     # File contents, stored by SHA-256: "filesystem" (any mounted path: local

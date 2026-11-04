@@ -51,6 +51,10 @@ npm run dev                                # website on http://localhost:5173
 npm run api                                # after API changes: regenerate the client
 ```
 
+To try it from a phone on the same network: start the API with
+`PAPERUS_COOKIE_SECURE=false` (plain HTTP outside localhost) and the website
+with `npm run dev -- --host 0.0.0.0`, then open `http://<this PC's IP>:5173`.
+
 `npm run build` writes the website to `web/build`, which `paperus serve`
 serves on its own port as well. Checks: `uv run pytest`, `uvx pre-commit run --all-files`.
 
