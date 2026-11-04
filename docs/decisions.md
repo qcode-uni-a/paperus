@@ -42,6 +42,25 @@
 - Paperless-ngx (office documents) and its MCP servers.
 - Immich (architecture and operations, see [operations.md](operations.md)).
 
+## Lessons from Zotero
+
+Checked against Zotero's docs and source (2026-11-04).
+
+- **Copied**: a change number per library stamped on every change, `since`
+  queries, version checks on writes (412/428); a trash instead of deleting;
+  separate manual and automatic tags (plus "suggested by AI").
+- **Improved**: deduplication on add by any identifier (Zotero only finds
+  duplicates afterwards); versions of a work (preprint, published, editions)
+  instead of separate items; metadata as CSL-JSON, so no "Extra" catch-all
+  field; storage not charged to a group's owner.
+- **Still to copy**: merging duplicates keeps a "replaces" link so old IDs
+  keep working, the losing item goes to the trash, tags and collections are
+  united; batch writes with per-object results; `Backoff`/`Retry-After`
+  headers for clients.
+- **Avoid**: permissions only per library (users ask for per-collection
+  permissions; plan for them early); no way to mark "not a duplicate";
+  silent partial failures in identifier lookup.
+
 ## Licences of things we might reuse (verify)
 
 | What | Licence |

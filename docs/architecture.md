@@ -98,6 +98,21 @@ Item: the work; notes, tags, collections, citation metadata
 Every chunk and note carries owner and visibility, so permission filters run
 inside the search query itself.
 
+### Changes, sync and trash
+
+- **Change numbers**: each transaction that changes an item (or its
+  versions, identifiers, files) stamps it with the next number of a
+  per-library counter. The counter row stays locked until commit, so
+  numbers appear in order. `GET /api/items?since=N` returns everything
+  changed after N; the `Last-Change` header is the next N. Notes,
+  annotations and collections get change numbers the same way.
+- **Concurrent edits**: responses carry `ETag` (the change number); edits
+  need `If-Match` (428 without, 412 if someone changed the item meanwhile).
+  The client then re-reads and merges, like Zotero's per-field merge.
+- **Trash**: deleting moves items and files to the trash (`deleted_at`);
+  sync clients see that as a change. Emptying the trash later must leave
+  tombstones (id + change number) so sync clients learn about it.
+
 ## Scaling notes
 
 - pgvector limits (from memory, verify): `vector` indexable up to 2,000

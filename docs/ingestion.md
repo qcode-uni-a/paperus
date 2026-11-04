@@ -66,6 +66,26 @@ Details:
   otherwise, or the one the user pinned.
 - Adding an identifier that belongs to a version of an existing item finds
   that item; adding a known preprint's published DOI adds a version.
+
+### Finding published versions of preprints
+
+A background job checks items whose preferred version is a preprint, on
+ingest and then periodically (e.g. weekly, like the open-access check).
+Sources, all free, checked 2026-11-04 with arXiv 2006.10256 (NumPy paper):
+
+| Source | What it gives | Result for the example |
+| --- | --- | --- |
+| arXiv API (`export.arxiv.org/api/query`) | `doi` and `journal_ref`, entered by authors | Nature DOI, "Nature 585, 357 (2020)" |
+| DataCite (`api.datacite.org/dois/…`), for arXiv DOIs | `relatedIdentifiers`, `IsVersionOf` | Nature DOI |
+| OpenAlex (`api.openalex.org/works/doi:…`) | One work with all locations, each with `version` (submitted, accepted, published) | Nature, PubMed Central as published; arXiv as submitted |
+| Crossref (`api.crossref.org/works/…`) | `relation`: `is-preprint-of` / `has-preprint`, deposited by bioRxiv, SSRN, publishers | Depends on deposits; empty for the bioRxiv example checked |
+
+When a published DOI is found: look up its metadata and add it as a new
+version labelled with where it came from, or, if the published DOI already
+belongs to another item, suggest merging the two. Shown as "Published version
+available" on the item (and in the AI inbox when an AI client is connected).
+Fallback without links: Crossref search by title and first author, only as a
+suggestion with a confidence score, never added automatically.
 - Link preprint ↔ published automatically via arXiv `journal-ref` and
   Crossref/OpenAlex relations; offer to merge when both are added.
 - Annotations stay on their version, anchored by text quote, so they can be
