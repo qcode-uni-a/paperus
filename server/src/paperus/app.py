@@ -1,27 +1,18 @@
 """FastAPI application."""
 
-from fastapi import FastAPI, HTTPException
-from sqlalchemy.exc import OperationalError
+from fastapi import FastAPI
 
+from paperus.api import auth, health
 from paperus.config import Settings
-from paperus.db import check_connection, make_engine
+from paperus.db import make_engine, make_sessionmaker
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(settings.database_url)
     app = FastAPI(title="paperUs")
-
-    @app.get("/api/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
-
-    @app.get("/api/health/db")
-    def health_db() -> dict[str, str]:
-        try:
-            check_connection(engine)
-        except OperationalError as error:
-            raise HTTPException(503, "database unreachable") from error
-        return {"status": "ok"}
-
+    app.state.engine = engine
+    app.state.sessionmaker = make_sessionmaker(engine)
+    app.include_router(health.router)
+    app.include_router(auth.router)
     return app
