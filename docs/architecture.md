@@ -47,18 +47,43 @@ ordered, so indexes stay compact; not guessable; no collisions when merging
 or importing libraries. Content hashes are used only where content is the
 identity: blobs and chunks.
 
+Three levels: an **item** is the work, a **version** is one edition of it,
+a **file** is concrete bytes.
+
+```
+Item: the work; notes, tags, collections, citation metadata
+├─ Version: preprint    identifiers (arXiv, DOI), metadata from the registry
+│    └─ File (main): preprint.pdf
+└─ Version: published   identifiers (DOI), metadata from the registry
+     ├─ File (main): published.pdf
+     └─ File (supplementary): data.zip
+```
+
 - **Item**: one work (paper, book, thesis, report, lecture notes, slides,
-  meeting notes, method, dataset, code). Citation metadata optional;
-  item types follow CSL where possible.
-- **Blob**: the bytes of a file, stored once by SHA-256, with a reference
-  count; garbage-collected when no file record uses it.
-- **File**: a record with its own UUID that belongs to an item and points to
-  a blob. The same blob can back several files (different items, owners,
-  version types), each with its own permissions, provenance and
-  annotations. Has a version type:
-  internal draft, submitted, preprint, accepted, published, supplementary,
-  synced (git). Can carry its own DOI or arXiv ID.
-- **Version manifest**: ordered list of chunk hashes for a file version.
+  meeting notes, method, dataset, code). Metadata is CSL-JSON; item types
+  follow CSL (e.g. meeting notes: `document` with `genre`). The metadata for
+  citing is the preferred version's metadata plus the item's manual edits
+  (per field, never overwritten by a lookup). Notes, tags and collections
+  belong to the item.
+- **Version**: one edition of the work. Kind: draft, submitted, preprint,
+  accepted, published, edition (with a label such as "WS 2025/26" or
+  "2nd edition"), other. Own metadata (CSL-JSON) and where it came from
+  (identifier lookup, manual, import, sync). Can exist without files
+  (metadata only). Preferred version: pinned by the user, otherwise
+  published > accepted > edition > submitted > preprint > draft > other,
+  newest first. Items with one form (meeting notes) have one version.
+- **Identifier**: (scheme, value) of a version, normalized: DOI, arXiv,
+  ISBN, PMID, URL, git (repo + path). Unique across the library, so adding a
+  known identifier finds the existing item, whatever the scheme.
+- **File**: a record with its own UUID, belongs to a version, points to a
+  blob. Role: main, supplementary, slides, transcript, recording, other.
+  The same blob can back several files, each with its own permissions,
+  provenance and annotations.
+- **Blob**: the bytes of a file, stored once by SHA-256;
+  garbage-collected when no file record uses it.
+- **Content manifest**: ordered list of chunk hashes for a file; one per
+  revision for synced files (e.g. lecture notes from git), so frequent
+  updates stay cheap.
 - **Chunk**: paragraph-sized text, stored once per content hash, with page and
   position anchors, section path and type (body, caption, abstract, note,
   annotation).

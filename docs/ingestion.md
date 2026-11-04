@@ -58,8 +58,14 @@ Details:
 
 ## Versions of a document
 
-- One item, several files with version types (see architecture).
-- Citations use the published version by default, the preprint otherwise.
+- One item, several versions, each with its own identifiers, metadata and
+  files (see architecture). Works the same for papers (preprint,
+  published), lecture notes (editions per semester), books (editions) and
+  single-version sources (meeting notes).
+- Citations use the preferred version: published by default, the preprint
+  otherwise, or the one the user pinned.
+- Adding an identifier that belongs to a version of an existing item finds
+  that item; adding a known preprint's published DOI adds a version.
 - Link preprint ↔ published automatically via arXiv `journal-ref` and
   Crossref/OpenAlex relations; offer to merge when both are added.
 - Annotations stay on their version, anchored by text quote, so they can be
