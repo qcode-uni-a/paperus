@@ -8,7 +8,9 @@ emptied after each test. Without a reachable database these tests are skipped.
 import os
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
+import httpx2
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -18,6 +20,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from paperus.app import create_app
+from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 
@@ -76,9 +79,45 @@ def db(engine: Engine) -> Iterator[Session]:
             connection.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
 
 
+class FakeDOIRegistry:
+    """Stands in for doi.org: answers with the CSL-JSON in ``records``."""
+
+    def __init__(self) -> None:
+        self.records: dict[str, Any] = {}
+        self.requests: list[httpx2.Request] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        self.requests.append(request)
+        doi = request.url.path.removeprefix("/")
+        if doi not in self.records:
+            return httpx2.Response(404)
+        return httpx2.Response(200, json=self.records[doi])
+
+
 @pytest.fixture
-def client(database_url: str, db: Session) -> TestClient:
-    # https, so the client sends the Secure session cookie back.
-    return TestClient(
-        create_app(Settings(database_url=database_url)), base_url="https://testserver"
+def doi_registry() -> FakeDOIRegistry:
+    return FakeDOIRegistry()
+
+
+@pytest.fixture
+def client(
+    database_url: str, db: Session, doi_registry: FakeDOIRegistry
+) -> Iterator[TestClient]:
+    app = create_app(
+        Settings(database_url=database_url),
+        http_client=httpx2.Client(transport=httpx2.MockTransport(doi_registry)),
     )
+    # https, so the client sends the Secure session cookie back.
+    with TestClient(app, base_url="https://testserver") as client:
+        yield client
+
+
+@pytest.fixture
+def logged_in(client: TestClient, db: Session) -> TestClient:
+    create_user(db, "ada", "secret")
+    db.commit()
+    response = client.post(
+        "/api/auth/login", json={"username": "ada", "password": "secret"}
+    )
+    assert response.status_code == 200
+    return client

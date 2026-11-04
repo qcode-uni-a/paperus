@@ -7,3 +7,5 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PAPERUS_", env_file=".env")
 
     database_url: str = "postgresql+psycopg://paperus:paperus@localhost:5432/paperus"
+    # Sent to metadata services (Crossref asks for one), e.g. admin@example.org.
+    contact_email: str | None = None
