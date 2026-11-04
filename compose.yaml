@@ -1,0 +1,19 @@
+# Stage 0: database for local development, reachable from this machine only.
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: paperus
+      POSTGRES_PASSWORD: paperus
+      POSTGRES_DB: paperus
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "paperus"]
+      interval: 2s
+      retries: 15
+
+volumes:
+  db-data:
