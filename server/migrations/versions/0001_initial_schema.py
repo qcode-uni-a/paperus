@@ -2,8 +2,10 @@
 
 Revision ID: 0001
 Revises:
-Create Date: 2026-11-04 23:05:42.760512
+Create Date: 2026-11-04 23:12:15.010151
 """
+
+from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import op
@@ -12,9 +14,36 @@ from sqlalchemy.dialects import postgresql
 revision: str = "0001"
 down_revision: str | None = None
 
+# Procrastinate's schema for the version we started with; later versions
+# bring their own migration files.
+PROCRASTINATE_SCHEMA = Path(__file__).parent.parent / "procrastinate_3.10.0.sql"
+
+DROP_PROCRASTINATE = """
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT tablename FROM pg_tables
+             WHERE schemaname = 'public' AND tablename LIKE 'procrastinate%' LOOP
+        EXECUTE format('DROP TABLE IF EXISTS %I CASCADE', r.tablename);
+    END LOOP;
+    FOR r IN SELECT p.oid::regprocedure AS signature FROM pg_proc p
+             JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'public' AND p.proname LIKE 'procrastinate%' LOOP
+        EXECUTE format('DROP FUNCTION IF EXISTS %s CASCADE', r.signature);
+    END LOOP;
+    FOR r IN SELECT t.typname FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             WHERE n.nspname = 'public' AND t.typname LIKE 'procrastinate%'
+               AND t.typtype IN ('e', 'c') LOOP
+        EXECUTE format('DROP TYPE IF EXISTS %I CASCADE', r.typname);
+    END LOOP;
+END $$;
+"""
+
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    op.execute(PROCRASTINATE_SCHEMA.read_text())
     op.create_table(
         "blobs",
         sa.Column("sha256", sa.LargeBinary(length=32), nullable=False),
@@ -32,6 +61,21 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=32), nullable=False),
         sa.Column("value", sa.BigInteger(), nullable=False),
         sa.PrimaryKeyConstraint("name"),
+    )
+    op.create_table(
+        "chunks",
+        sa.Column("sha256", sa.LargeBinary(length=32), nullable=False),
+        sa.Column("text", sa.String(), nullable=False),
+        sa.Column(
+            "tsv",
+            postgresql.TSVECTOR(),
+            sa.Computed("to_tsvector('simple', text)", persisted=True),
+            nullable=False,
+        ),
+        sa.PrimaryKeyConstraint("sha256"),
+    )
+    op.create_index(
+        "ix_chunks_tsv", "chunks", ["tsv"], unique=False, postgresql_using="gin"
     )
     op.create_table(
         "users",
@@ -141,6 +185,13 @@ def upgrade() -> None:
         sa.Column("media_type", sa.String(length=255), nullable=False),
         sa.Column("source", sa.String(length=32), nullable=False),
         sa.Column("uploaded_by", sa.Uuid(), nullable=True),
+        sa.Column(
+            "text_status",
+            sa.String(length=16),
+            server_default="pending",
+            nullable=False,
+        ),
+        sa.Column("text_error", sa.String(), nullable=True),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_by", sa.Uuid(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -154,6 +205,9 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_files_blob_sha256"), "files", ["blob_sha256"], unique=False
+    )
+    op.create_index(
+        op.f("ix_files_text_status"), "files", ["text_status"], unique=False
     )
     op.create_index(op.f("ix_files_version_id"), "files", ["version_id"], unique=False)
     op.create_table(
@@ -175,13 +229,36 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_identifiers_version_id"), "identifiers", ["version_id"], unique=False
     )
+    op.create_table(
+        "file_chunks",
+        sa.Column("file_id", sa.Uuid(), nullable=False),
+        sa.Column("position", sa.Integer(), nullable=False),
+        sa.Column("chunk_sha256", sa.LargeBinary(length=32), nullable=False),
+        sa.Column("page", sa.Integer(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["chunk_sha256"],
+            ["chunks.sha256"],
+        ),
+        sa.ForeignKeyConstraint(["file_id"], ["files.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("file_id", "position"),
+    )
+    op.create_index(
+        op.f("ix_file_chunks_chunk_sha256"),
+        "file_chunks",
+        ["chunk_sha256"],
+        unique=False,
+    )
     op.execute("INSERT INTO change_counters (name, value) VALUES ('library', 0)")
 
 
 def downgrade() -> None:
+    op.execute(DROP_PROCRASTINATE)
+    op.drop_index(op.f("ix_file_chunks_chunk_sha256"), table_name="file_chunks")
+    op.drop_table("file_chunks")
     op.drop_index(op.f("ix_identifiers_version_id"), table_name="identifiers")
     op.drop_table("identifiers")
     op.drop_index(op.f("ix_files_version_id"), table_name="files")
+    op.drop_index(op.f("ix_files_text_status"), table_name="files")
     op.drop_index(op.f("ix_files_blob_sha256"), table_name="files")
     op.drop_table("files")
     op.drop_index(
@@ -196,6 +273,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_items_change"), table_name="items")
     op.drop_table("items")
     op.drop_table("users")
+    op.drop_index("ix_chunks_tsv", table_name="chunks", postgresql_using="gin")
+    op.drop_table("chunks")
     op.drop_table("change_counters")
     op.drop_table("blobs")
     op.execute("DROP EXTENSION IF EXISTS vector")

@@ -15,6 +15,8 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from procrastinate import App
+from procrastinate.testing import InMemoryConnector
 from sqlalchemy import Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -23,6 +25,8 @@ from paperus.app import create_app
 from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.jobs import tasks
+from paperus.storage import BlobStore
 
 TEST_DATABASE_URL = os.environ.get(
     "PAPERUS_TEST_DATABASE_URL",
@@ -108,12 +112,26 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
 
 
 @pytest.fixture
+def job_app() -> App:
+    """Jobs are recorded in memory; tests run them with ``process_file``."""
+    app = App(connector=InMemoryConnector())
+    app.add_tasks_from(tasks, namespace="paperus")
+    return app
+
+
+@pytest.fixture
+def blobs(settings: Settings) -> BlobStore:
+    return BlobStore(settings.storage_path)
+
+
+@pytest.fixture
 def client(
-    settings: Settings, db: Session, doi_registry: FakeDOIRegistry
+    settings: Settings, db: Session, doi_registry: FakeDOIRegistry, job_app: App
 ) -> Iterator[TestClient]:
     app = create_app(
         settings,
         http_client=httpx2.Client(transport=httpx2.MockTransport(doi_registry)),
+        job_app=job_app,
     )
     # https, so the client sends the Secure session cookie back.
     with TestClient(app, base_url="https://testserver") as client:

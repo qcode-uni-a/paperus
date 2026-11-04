@@ -9,16 +9,18 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     String,
     UniqueConstraint,
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -100,6 +102,15 @@ class FileRole(StrEnum):
     TRANSCRIPT = "transcript"
     RECORDING = "recording"
     OTHER = "other"
+
+
+class TextStatus(StrEnum):
+    PENDING = "pending"
+    DONE = "done"
+    NO_TEXT = "no_text"
+    """E.g. a scanned PDF without a text layer; OCR later."""
+    UNSUPPORTED = "unsupported"
+    FAILED = "failed"
 
 
 class FileSource(StrEnum):
@@ -223,6 +234,38 @@ class File(Record, Trashable, Base):
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    text_status: Mapped[str] = mapped_column(
+        String(16), server_default=TextStatus.PENDING.value, index=True
+    )
+    text_error: Mapped[str | None]
 
     version: Mapped[Version] = relationship(back_populates="files")
-    blob: Mapped[Blob] = relationship(lazy="joined")
+    blob: Mapped[Blob] = relationship(lazy="joined", innerjoin=True)
+
+
+class Chunk(Base):
+    """A passage of text, stored once per content hash."""
+
+    __tablename__ = "chunks"
+    __table_args__ = (Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),)
+
+    sha256: Mapped[bytes] = mapped_column(LargeBinary(32), primary_key=True)
+    text: Mapped[str]
+    # "simple": no stemming, so exact terms (gene names, acronyms) match;
+    # search by meaning covers paraphrases.
+    tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('simple', text)", persisted=True)
+    )
+
+
+class FileChunk(Base):
+    """The content manifest of a file: its chunks in order, with pages."""
+
+    __tablename__ = "file_chunks"
+
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
+    page: Mapped[int | None]

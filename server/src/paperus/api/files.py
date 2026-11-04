@@ -1,5 +1,6 @@
 """Files of versions: upload and download."""
 
+import logging
 import mimetypes
 import uuid
 from collections.abc import Iterator
@@ -13,9 +14,19 @@ from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library
 from paperus.api.deps import DB, CurrentUser
-from paperus.models import Blob, File, FileRole, FileSource, Item, Version
+from paperus.jobs import queue_text_extraction
+from paperus.models import (
+    Blob,
+    File,
+    FileRole,
+    FileSource,
+    Item,
+    TextStatus,
+    Version,
+)
 from paperus.storage import BlobStore, TooLarge
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["files"])
 
 CHUNK_SIZE = 1024 * 1024
@@ -31,6 +42,7 @@ class FileOut(BaseModel):
     size: int
     sha256: str
     source: FileSource
+    text_status: TextStatus
     created_at: datetime
     deleted_at: datetime | None
 
@@ -45,6 +57,7 @@ def file_out(file: File) -> FileOut:
         size=file.blob.size,
         sha256=file.blob_sha256.hex(),
         source=FileSource(file.source),
+        text_status=TextStatus(file.text_status),
         created_at=file.created_at,
         deleted_at=file.deleted_at,
     )
@@ -106,6 +119,11 @@ def _store_upload(
     db.add(file)
     db.commit()
     db.refresh(file)
+    try:
+        queue_text_extraction(request.app.state.jobs, file.id)
+    except Exception:
+        # The worker's periodic sweep picks up pending files.
+        log.warning("could not queue text extraction for %s", file.id, exc_info=True)
     return file_out(file)
 
 

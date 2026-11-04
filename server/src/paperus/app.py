@@ -5,25 +5,31 @@ from contextlib import asynccontextmanager
 
 import httpx2
 from fastapi import FastAPI
+from procrastinate import App
 
-from paperus.api import auth, files, health, items
+from paperus.api import auth, files, health, items, search
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.jobs import make_job_app
 from paperus.metadata import make_http_client
 from paperus.storage import BlobStore
 
 
 def create_app(
-    settings: Settings | None = None, http_client: httpx2.Client | None = None
+    settings: Settings | None = None,
+    http_client: httpx2.Client | None = None,
+    job_app: App | None = None,
 ) -> FastAPI:
-    """Build the app; tests pass their own ``http_client`` for external lookups."""
+    """Build the app; tests pass their own ``http_client`` and ``job_app``."""
     settings = settings or Settings()
     engine = make_engine(settings.database_url)
     http = http_client or make_http_client(settings)
+    jobs = job_app or make_job_app(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-        yield
+        with jobs.open():
+            yield
         http.close()
         engine.dispose()
 
@@ -33,8 +39,10 @@ def create_app(
     app.state.http = http
     app.state.blobs = BlobStore(settings.storage_path)
     app.state.settings = settings
+    app.state.jobs = jobs
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(items.router)
     app.include_router(files.router)
+    app.include_router(search.router)
     return app

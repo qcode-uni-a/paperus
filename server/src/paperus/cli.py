@@ -1,7 +1,8 @@
-"""Command line interface: ``paperus serve``, ``paperus user create``."""
+"""Command line interface: ``paperus serve``, ``worker``, ``user create``."""
 
 import argparse
 import getpass
+import logging
 import sys
 
 import uvicorn
@@ -10,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.jobs import run_worker
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -20,6 +22,8 @@ def main(argv: list[str] | None = None) -> None:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--reload", action="store_true")
+
+    commands.add_parser("worker", help="run background jobs (text extraction, …)")
 
     user = commands.add_parser("user", help="manage users")
     user_commands = user.add_subparsers(dest="user_command", required=True)
@@ -37,6 +41,9 @@ def main(argv: list[str] | None = None) -> None:
             port=args.port,
             reload=args.reload,
         )
+    elif args.command == "worker":
+        logging.basicConfig(level=logging.INFO)
+        run_worker(Settings())
     elif args.command == "user" and args.user_command == "create":
         sys.exit(create_user_command(args.username, is_admin=args.admin))
 
