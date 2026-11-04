@@ -75,7 +75,11 @@
 		<ul class="passages">
 			{#each passages as passage (passage.passage_id)}
 				<li>
-					<a href={resolve('/items/[id]', { id: passage.item_id })}>{passage.item_title}</a>
+					<a
+						href="{resolve('/items/[id]', { id: passage.item_id })}{passage.page
+							? `?page=${passage.page}`
+							: ''}">{passage.item_title}</a
+					>
 					{#if passage.page}<span class="badge">p. {passage.page}</span>{/if}
 					<!-- Snippets are HTML-escaped on the server; only <mark> is added. -->
 					<p>{@html passage.snippet}</p>

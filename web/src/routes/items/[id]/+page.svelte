@@ -20,8 +20,11 @@
 		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
+	import PdfViewer from '#lib/PdfViewer.svelte';
 
 	const id = $derived(page.params.id ?? '');
+	// Search results link to the page with the matching passage.
+	const startPage = $derived(Number(page.url.searchParams.get('page')) || 1);
 
 	let item = $state<ItemDetail | null>(null);
 	let etag = $state<string | undefined>();
@@ -38,6 +41,21 @@
 	let versionLabel = $state('');
 
 	let uploadRole = $state<FileRole>('main');
+	let showDetails = $state(false);
+
+	/** The PDF to show: the cited version's main PDF, else any PDF. */
+	const pdfFile = $derived.by(() => {
+		if (!item) return null;
+		const pdfs = (files: ItemDetail['versions'][number]['files']) =>
+			files.filter((f) => !f.deleted_at && f.media_type === 'application/pdf');
+		const preferred = item.versions.find((v) => v.id === item?.preferred_version_id);
+		const candidates = [
+			...pdfs(preferred?.files ?? []).filter((f) => f.role === 'main'),
+			...item.versions.flatMap((v) => pdfs(v.files).filter((f) => f.role === 'main')),
+			...item.versions.flatMap((v) => pdfs(v.files))
+		];
+		return candidates[0] ?? null;
+	});
 
 	async function load() {
 		const { data, response } = await getItem({ path: { item_id: id } });
@@ -150,25 +168,13 @@
 			{#if item.year}· {item.year}{/if}
 			{#if item.container_title}· <em>{item.container_title}</em>{/if}
 		</p>
-		<div class="row">
-			<span class="badge">{item.type}</span>
-			{#each item.identifiers as identifier (identifier.scheme + identifier.value)}
-				{#if identifier.scheme === 'doi'}
-					<a
-						class="badge"
-						href="https://doi.org/{identifier.value}"
-						target="_blank"
-						rel="noreferrer"
-					>
-						DOI {identifier.value}
-					</a>
-				{:else}
-					<span class="badge">{identifier.scheme} {identifier.value}</span>
-				{/if}
-			{/each}
-		</div>
 		{#if !item.deleted_at}
 			<div class="row actions">
+				{#if pdfFile}
+					<button onclick={() => (showDetails = !showDetails)}>
+						{showDetails ? 'Hide details' : 'Details'}
+					</button>
+				{/if}
 				<button
 					onclick={() => {
 						titleDraft = item?.title ?? '';
@@ -181,116 +187,143 @@
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
 
-	<section>
-		<div class="row heading">
-			<h2>Versions</h2>
-			{#if !item.deleted_at}
-				<button onclick={() => (addingVersion = !addingVersion)}>
-					{addingVersion ? 'Close' : 'Add version'}
-				</button>
-			{/if}
-		</div>
-
-		{#if addingVersion}
-			<form class="card version-form" onsubmit={submitVersion}>
-				<label
-					>DOI <input
-						bind:value={versionDoi}
-						placeholder="Leave empty to enter details by hand"
-					/></label
-				>
-				{#if !versionDoi.trim()}
-					<label>Title <input bind:value={versionTitle} placeholder={item.title} /></label>
-				{/if}
-				<div class="row">
-					<label
-						>Kind
-						<select bind:value={versionKind}>
-							{#each VERSION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
-						</select>
-					</label>
-					<label>Label <input bind:value={versionLabel} placeholder="e.g. WS 2026/27" /></label>
-				</div>
-				<div><button class="primary">Add version</button></div>
-			</form>
-		{/if}
-
-		{#each item.versions as version (version.id)}
-			<article class="card">
-				<div class="row">
-					<strong>{version.kind}</strong>
-					{#if version.label}<span>{version.label}</span>{/if}
-					{#if version.id === item.preferred_version_id}
-						<span class="badge">cited{version.pinned ? ' (pinned)' : ''}</span>
-					{:else if !item.deleted_at}
-						<button onclick={() => act(() => pinVersion({ path: { version_id: version.id } }))}>
-							Cite this version
-						</button>
-					{/if}
-					<span class="muted"
-						>{version.metadata_source === 'lookup' ? 'from registry' : 'entered by hand'}</span
-					>
-				</div>
-				{#if version.identifiers.length}
-					<div class="row">
-						{#each version.identifiers as identifier (identifier.scheme + identifier.value)}
-							<span class="badge">{identifier.scheme} {identifier.value}</span>
-						{/each}
-					</div>
-				{/if}
-
-				<ul class="files">
-					{#each version.files as file (file.id)}
-						<li class="row" class:deleted={file.deleted_at}>
-							<a href="/api/files/{file.id}/content" target="_blank" rel="noreferrer"
-								>{file.filename}</a
-							>
-							<span class="badge">{file.role}</span>
-							<span class="muted">{size(file.size)} · {TEXT_STATUS[file.text_status]}</span>
-							{#if file.deleted_at}
-								<button onclick={() => act(() => restoreFile({ path: { file_id: file.id } }))}
-									>Restore</button
-								>
-							{:else if !item.deleted_at}
-								<button
-									class="danger"
-									onclick={() => act(() => trashFile({ path: { file_id: file.id } }))}
-								>
-									Remove
-								</button>
-							{/if}
-						</li>
+	{#if showDetails || !pdfFile}
+		<section>
+			<div class="row">
+				<span class="badge">{item.type}</span>
+				{#each item.identifiers as identifier (identifier.scheme + identifier.value)}
+					{#if identifier.scheme === 'doi'}
+						<a
+							class="badge"
+							href="https://doi.org/{identifier.value}"
+							target="_blank"
+							rel="noreferrer"
+						>
+							DOI {identifier.value}
+						</a>
 					{:else}
-						<li class="muted">No files.</li>
-					{/each}
-				</ul>
-
+						<span class="badge">{identifier.scheme} {identifier.value}</span>
+					{/if}
+				{/each}
+			</div>
+			<div class="row heading">
+				<h2>Versions</h2>
 				{#if !item.deleted_at}
-					<div class="row">
-						<select bind:value={uploadRole} aria-label="Role of the uploaded file">
-							{#each FILE_ROLES as role (role)}<option value={role}>{role}</option>{/each}
-						</select>
-						<label class="upload">
-							<input
-								type="file"
-								multiple
-								onchange={(event) => uploadFiles(version.id, event.currentTarget.files)}
-							/>
-							<span>Upload files</span>
-						</label>
-					</div>
+					<button onclick={() => (addingVersion = !addingVersion)}>
+						{addingVersion ? 'Close' : 'Add version'}
+					</button>
 				{/if}
-			</article>
-		{/each}
-	</section>
+			</div>
+
+			{#if addingVersion}
+				<form class="card version-form" onsubmit={submitVersion}>
+					<label
+						>DOI <input
+							bind:value={versionDoi}
+							placeholder="Leave empty to enter details by hand"
+						/></label
+					>
+					{#if !versionDoi.trim()}
+						<label>Title <input bind:value={versionTitle} placeholder={item.title} /></label>
+					{/if}
+					<div class="row">
+						<label
+							>Kind
+							<select bind:value={versionKind}>
+								{#each VERSION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
+							</select>
+						</label>
+						<label>Label <input bind:value={versionLabel} placeholder="e.g. WS 2026/27" /></label>
+					</div>
+					<div><button class="primary">Add version</button></div>
+				</form>
+			{/if}
+
+			{#each item.versions as version (version.id)}
+				<article class="card">
+					<div class="row">
+						<strong>{version.kind}</strong>
+						{#if version.label}<span>{version.label}</span>{/if}
+						{#if version.id === item.preferred_version_id}
+							<span class="badge">cited{version.pinned ? ' (pinned)' : ''}</span>
+						{:else if !item.deleted_at}
+							<button onclick={() => act(() => pinVersion({ path: { version_id: version.id } }))}>
+								Cite this version
+							</button>
+						{/if}
+						<span class="muted"
+							>{version.metadata_source === 'lookup' ? 'from registry' : 'entered by hand'}</span
+						>
+					</div>
+					{#if version.identifiers.length}
+						<div class="row">
+							{#each version.identifiers as identifier (identifier.scheme + identifier.value)}
+								<span class="badge">{identifier.scheme} {identifier.value}</span>
+							{/each}
+						</div>
+					{/if}
+
+					<ul class="files">
+						{#each version.files as file (file.id)}
+							<li class="row" class:deleted={file.deleted_at}>
+								<a href="/api/files/{file.id}/content" target="_blank" rel="noreferrer"
+									>{file.filename}</a
+								>
+								<span class="badge">{file.role}</span>
+								<span class="muted">{size(file.size)} · {TEXT_STATUS[file.text_status]}</span>
+								{#if file.deleted_at}
+									<button onclick={() => act(() => restoreFile({ path: { file_id: file.id } }))}
+										>Restore</button
+									>
+								{:else if !item.deleted_at}
+									<button
+										class="danger"
+										onclick={() => act(() => trashFile({ path: { file_id: file.id } }))}
+									>
+										Remove
+									</button>
+								{/if}
+							</li>
+						{:else}
+							<li class="muted">No files.</li>
+						{/each}
+					</ul>
+
+					{#if !item.deleted_at}
+						<div class="row">
+							<select bind:value={uploadRole} aria-label="Role of the uploaded file">
+								{#each FILE_ROLES as role (role)}<option value={role}>{role}</option>{/each}
+							</select>
+							<label class="upload">
+								<input
+									type="file"
+									multiple
+									onchange={(event) => uploadFiles(version.id, event.currentTarget.files)}
+								/>
+								<span>Upload files</span>
+							</label>
+						</div>
+					{/if}
+				</article>
+			{/each}
+		</section>
+	{/if}
+
+	{#if pdfFile}
+		<PdfViewer url="/api/files/{pdfFile.id}/content" {startPage} />
+	{/if}
 {/if}
 
 <style>
 	header {
-		margin-bottom: 24px;
+		margin-bottom: 16px;
 	}
 	h1 {
-		margin-bottom: 4px;
+		margin: 0 0 4px;
+		font-size: 1.5em;
+	}
+	header p {
+		margin: 0;
 	}
 	header form input {
 		flex: 1;
@@ -310,6 +343,7 @@
 	section {
 		display: grid;
 		gap: 12px;
+		margin-bottom: 24px;
 	}
 	article {
 		display: grid;
