@@ -4,7 +4,6 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
@@ -32,13 +31,15 @@ class ModelManager:
         self._keep = set(settings.preload)
 
     def _download_and_load(self, spec: ModelSpec) -> Encoder:
-        model_dir = Path(
-            snapshot_download(
-                spec.repo,
-                revision=spec.revision,
-                cache_dir=self.settings.cache_path,
-                allow_patterns=[f"{spec.onnx_file}*", spec.tokenizer_file],
-            )
+        # Plain files in a folder per model and revision: the shared Hugging
+        # Face cache uses symlinks, and ONNX Runtime refuses weight files
+        # that resolve outside the model's folder.
+        model_dir = self.settings.cache_path / spec.name / spec.revision
+        snapshot_download(
+            spec.repo,
+            revision=spec.revision,
+            local_dir=model_dir,
+            allow_patterns=[f"{spec.onnx_file}*", spec.tokenizer_file],
         )
         return Encoder(
             spec,
