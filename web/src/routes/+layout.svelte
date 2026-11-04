@@ -3,7 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import DropZone from '#lib/DropZone.svelte';
 	import { loadUser, logout, session } from '#lib/session.svelte.ts';
+	import UploadTray from '#lib/UploadTray.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -43,6 +45,11 @@
 <main>
 	{@render children()}
 </main>
+
+{#if session.user && !onLoginPage}
+	<DropZone />
+	<UploadTray />
+{/if}
 
 <style>
 	header {

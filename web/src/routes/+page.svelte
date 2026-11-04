@@ -1,16 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import {
-		addItem,
-		errorMessage,
-		listItems,
-		search,
-		uploadToItem,
-		type Item,
-		type Passage
-	} from '#lib/api/client.ts';
+	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import AddItem from '#lib/AddItem.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { addFiles, uploads } from '#lib/uploads.svelte.ts';
 
 	const PAGE = 50;
 
@@ -19,9 +12,6 @@
 	let query = $state('');
 	let passages = $state<Passage[] | null>(null);
 	let adding = $state(false);
-	let dragging = $state(false);
-	let uploads = $state<string[]>([]);
-	let error = $state('');
 
 	async function loadItems(before?: string) {
 		const { data } = await listItems({ query: { limit: PAGE, before } });
@@ -48,42 +38,13 @@
 		return () => clearTimeout(timer);
 	});
 
-	/** Each dropped file becomes an item titled after the file. */
-	async function drop(event: DragEvent) {
-		event.preventDefault();
-		dragging = false;
-		error = '';
-		for (const file of event.dataTransfer?.files ?? []) {
-			uploads = [...uploads, file.name];
-			const title = file.name.replace(/\.[^.]+$/, '');
-			const { data: item, error: failure } = await addItem({ body: { metadata: { title } } });
-			if (item) {
-				const { error: uploadFailure } = await uploadToItem({
-					path: { item_id: item.id },
-					body: { upload: file, role: 'main' }
-				});
-				if (uploadFailure) error = `${file.name}: ${errorMessage(uploadFailure)}`;
-			} else {
-				error = `${file.name}: ${errorMessage(failure)}`;
-			}
-			uploads = uploads.filter((name) => name !== file.name);
-		}
-		await loadItems();
-	}
+	// Reload when uploads (dropped anywhere, or picked below) finish.
+	$effect(() => {
+		if (uploads.finished) loadItems();
+	});
 </script>
 
-<div
-	class="library"
-	class:dragging
-	role="region"
-	aria-label="Library; drop files here to add them"
-	ondragover={(event) => {
-		event.preventDefault();
-		dragging = true;
-	}}
-	ondragleave={() => (dragging = false)}
-	ondrop={drop}
->
+<div class="library">
 	<div class="top row">
 		<input
 			type="search"
@@ -91,12 +52,21 @@
 			placeholder="Search the full text of the library…"
 			aria-label="Search"
 		/>
+		<label class="pick">
+			<input
+				type="file"
+				multiple
+				onchange={(event) => {
+					addFiles(event.currentTarget.files ?? []);
+					event.currentTarget.value = '';
+				}}
+			/>
+			<span>Upload files</span>
+		</label>
 		<button class="primary" onclick={() => (adding = !adding)}>{adding ? 'Close' : 'Add'}</button>
 	</div>
 
 	{#if adding}<AddItem />{/if}
-	{#if uploads.length}<p class="muted">Adding {uploads.join(', ')}…</p>{/if}
-	{#if error}<p class="error">{error}</p>{/if}
 
 	{#if passages !== null}
 		{#if passages.length === 0}
@@ -115,7 +85,7 @@
 	{:else if items.length === 0}
 		<div class="empty card">
 			<h2>Your library is empty</h2>
-			<p>Drop PDFs anywhere on this page, or add a paper by its DOI.</p>
+			<p>Drop files anywhere in this window, or add a paper by its DOI.</p>
 		</div>
 	{:else}
 		<ul class="items">
@@ -131,13 +101,22 @@
 	.library {
 		display: grid;
 		gap: var(--gap);
-		min-height: 60vh;
-		border-radius: var(--radius);
-		outline: 2px dashed transparent;
-		outline-offset: 8px;
 	}
-	.dragging {
-		outline-color: var(--accent);
+	.pick input {
+		position: absolute;
+		opacity: 0;
+		width: 1px;
+	}
+	.pick span {
+		display: inline-block;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 7px 14px;
+		cursor: pointer;
+		background: var(--surface);
+	}
+	.pick:focus-within span {
+		outline: 2px solid var(--accent);
 	}
 	.top input {
 		flex: 1;
