@@ -39,7 +39,10 @@ publisher blocking the whole campus IP range, and cookie-bound links.
 Details:
 
 - Check for `%PDF` magic bytes; a 200 response is often a login page.
-- The extension sends the SHA-256 first; skip the upload if the server has it.
+- The extension sends the SHA-256 first and skips the upload if the user can
+  already see a file with that content. Never answer for files the user
+  cannot see (that would reveal private drafts or licensed PDFs of other
+  groups); upload anyway and deduplicate the blob on the server.
 - Resumable uploads (e.g. tus) for large scans.
 - Record where each PDF came from (open access, user upload, manual), which
   matters for sharing rules.

@@ -29,7 +29,9 @@ Figure and table captions, abstracts and equations are separate chunk types.
 1. Hybrid: Postgres full-text search + pgvector, merged with reciprocal rank
    fusion. Exact terms (gene names, acronyms, dataset names) need keywords.
 2. Rerank the top ~50 with a cross-encoder (e.g. bge-reranker).
-3. Return passages with stable IDs (`doc_123#p5.para3`), page, snippet, score
+3. Return passages with stable IDs (file UUID + chunk position, e.g.
+   `0194f3c2-…#p5.para3`; not the bare chunk hash, which several files can
+   share), page, snippet, score
    and a deep link that opens the reader at the highlighted passage.
 
 Query rewriting (HyDE, multi-query) is left to the user's AI client, which can

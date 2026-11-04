@@ -13,6 +13,7 @@
 | Server language | Python (FastAPI); TypeScript for frontend and extension; Rust via PyO3 later if measured | The processing and model ecosystem is Python |
 | Database | Postgres + pgvector, queue in Postgres | One service to run; permission filters in SQL |
 | PDF fetching | Server: open access only; browser: user's session; manual fallback | Licences, campus IP blocks |
+| IDs | UUIDv7 for every record; SHA-256 only for blobs and chunks | Same bytes can be different files; IDs needed before an upload ends; hashes reveal content; stable links |
 | Licence | Apache-2.0 for everything (server and integrations) | Allows every later use (hosted version, other universities, companies); can still move to AGPL later, not the other way round; patent grant over MIT |
 | Hosting | Stage 0: local on the developer's machine. Stage 1: a group machine at the university, VPN only, username and password login. Stage 2: a small VM from the computing centre for the pilot | Start without waiting for IT; same compose setup throughout |
 
