@@ -6,10 +6,11 @@ from contextlib import asynccontextmanager
 import httpx2
 from fastapi import FastAPI
 
-from paperus.api import auth, health, items
+from paperus.api import auth, files, health, items
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.metadata import make_http_client
+from paperus.storage import BlobStore
 
 
 def create_app(
@@ -30,7 +31,10 @@ def create_app(
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
     app.state.http = http
+    app.state.blobs = BlobStore(settings.storage_path)
+    app.state.settings = settings
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(items.router)
+    app.include_router(files.router)
     return app

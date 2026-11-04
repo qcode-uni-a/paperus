@@ -12,6 +12,7 @@ dependencies = [
     "pgvector>=0.5.1",
     "psycopg[binary]>=3.3.8",
     "pydantic-settings>=2.16.2",
+    "python-multipart>=0.0.33",
     "sqlalchemy>=2.1.8",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -31,6 +32,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = ["error"]
 
 [dependency-groups]
 dev = [

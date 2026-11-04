@@ -35,9 +35,11 @@ def _recreate_database(url: str) -> None:
     test_url = make_url(url)
     admin = make_engine(
         test_url.set(database="postgres").render_as_string(hide_password=False)
-    ).execution_options(isolation_level="AUTOCOMMIT")
+    )
     try:
-        with admin.connect() as connection:
+        with admin.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as connection:
             name = test_url.database
             connection.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
             connection.execute(text(f'CREATE DATABASE "{name}"'))
@@ -100,11 +102,16 @@ def doi_registry() -> FakeDOIRegistry:
 
 
 @pytest.fixture
+def settings(database_url: str, tmp_path: Path) -> Settings:
+    return Settings(database_url=database_url, storage_path=tmp_path / "files")
+
+
+@pytest.fixture
 def client(
-    database_url: str, db: Session, doi_registry: FakeDOIRegistry
+    settings: Settings, db: Session, doi_registry: FakeDOIRegistry
 ) -> Iterator[TestClient]:
     app = create_app(
-        Settings(database_url=database_url),
+        settings,
         http_client=httpx2.Client(transport=httpx2.MockTransport(doi_registry)),
     )
     # https, so the client sends the Secure session cookie back.
