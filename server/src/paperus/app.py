@@ -13,6 +13,7 @@ from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import make_job_app
 from paperus.metadata import make_http_client
 from paperus.storage import make_blob_store
+from paperus.web import FALLBACK, mount_web
 
 
 def create_app(
@@ -33,7 +34,13 @@ def create_app(
         http.close()
         engine.dispose()
 
-    app = FastAPI(title="paperUs", lifespan=lifespan)
+    app = FastAPI(
+        title="paperus",
+        lifespan=lifespan,
+        # Operation IDs are the route functions' names, e.g. "get_item", so
+        # generated clients get readable names.
+        generate_unique_id_function=lambda route: route.name,
+    )
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
     app.state.http = http
@@ -45,4 +52,6 @@ def create_app(
     app.include_router(items.router)
     app.include_router(files.router)
     app.include_router(search.router)
+    if settings.web_path is not None and (settings.web_path / FALLBACK).is_file():
+        mount_web(app, settings.web_path)
     return app

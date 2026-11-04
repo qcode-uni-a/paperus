@@ -1,7 +1,7 @@
 # AI integration
 
 Principle: the server does retrieval, permissions and provenance; reasoning
-happens in the user's own AI client. paperUs never calls an LLM vendor.
+happens in the user's own AI client. paperus never calls an LLM vendor.
 
 | On the server | In the user's AI client |
 | --- | --- |
@@ -15,7 +15,7 @@ happens in the user's own AI client. paperUs never calls an LLM vendor.
 
 - Transport: Streamable HTTP (remote connectors in Claude, ChatGPT, …); small
   stdio bridge/CLI for local clients.
-- Auth: OAuth 2.1 against paperUs, delegating to university OIDC. Tokens act as
+- Auth: OAuth 2.1 against paperus, delegating to university OIDC. Tokens act as
   the user; scopes: read-only by default, write separately; admins can disable
   write tools per group.
 
@@ -80,7 +80,7 @@ services support MCP; that is the easiest channel to get approved.
 ```markdown
 ---
 name: research-library
-description: Search, read and cite papers, notes and annotations from the group's paperUs library. Use when the user asks about papers, literature, their notes, group knowledge or citations.
+description: Search, read and cite papers, notes and annotations from the group's paperus library. Use when the user asks about papers, literature, their notes, group knowledge or citations.
 ---
 - Start with `search`; use `get_passage` for context instead of fetching whole documents.
 - Cite every claim with the returned deep link; never cite from memory.

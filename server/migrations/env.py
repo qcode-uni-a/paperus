@@ -1,4 +1,4 @@
-"""Alembic environment: the database URL comes from paperUs settings."""
+"""Alembic environment: the database URL comes from paperus settings."""
 
 from logging.config import fileConfig
 

@@ -1,4 +1,4 @@
-# paperUs
+# paperus
 
 *Papers, for us.* A self-hosted research library for groups: think Zotero, but
 with group sharing, search by meaning and integration with whatever AI
@@ -33,9 +33,30 @@ assistant you already use.
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |
 | [Pilot](docs/pilot.md) | Pilot plan and questions for testers |
 
+## Development
+
+Needs Docker, [uv](https://docs.astral.sh/uv/) and Node.js.
+
+```sh
+docker compose up -d                       # Postgres with pgvector on localhost
+cd server
+uv run alembic upgrade head
+uv run paperus user create alice --admin   # asks for a password
+uv run paperus serve --reload              # API on http://localhost:8000
+uv run paperus worker                      # background jobs, in a second terminal
+
+cd web
+npm install
+npm run dev                                # website on http://localhost:5173
+npm run api                                # after API changes: regenerate the client
+```
+
+`npm run build` writes the website to `web/build`, which `paperus serve`
+serves on its own port as well. Checks: `uv run pytest`, `uvx pre-commit run --all-files`.
+
 ## Name
 
-paperUs: "papers for us", and it sounds like *papyrus*. `paperus` is free on
+paperus: "papers for us", and it sounds like *papyrus*. `paperus` is free on
 PyPI and npm (checked 2026-11-04).
 
 ## Licence

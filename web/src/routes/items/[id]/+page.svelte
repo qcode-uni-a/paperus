@@ -1,0 +1,360 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import {
+		addVersion,
+		errorMessage,
+		etagOf,
+		FILE_ROLES,
+		getItem,
+		pinVersion,
+		restoreFile,
+		restoreItem,
+		setOverrides,
+		trashFile,
+		trashItem,
+		uploadToVersion,
+		VERSION_KINDS,
+		type FileRole,
+		type ItemDetail,
+		type VersionKind
+	} from '#lib/api/client.ts';
+
+	const id = $derived(page.params.id ?? '');
+
+	let item = $state<ItemDetail | null>(null);
+	let etag = $state<string | undefined>();
+	let notFound = $state(false);
+	let error = $state('');
+
+	let editing = $state(false);
+	let titleDraft = $state('');
+
+	let addingVersion = $state(false);
+	let versionDoi = $state('');
+	let versionTitle = $state('');
+	let versionKind = $state<VersionKind>('published');
+	let versionLabel = $state('');
+
+	let uploadRole = $state<FileRole>('main');
+
+	async function load() {
+		const { data, response } = await getItem({ path: { item_id: id } });
+		notFound = !data;
+		item = data ?? null;
+		etag = etagOf(response);
+	}
+
+	$effect(() => {
+		if (id) load();
+	});
+
+	/** Run an action; show its error or reload the item. */
+	async function act(action: () => Promise<{ error?: unknown; response?: Response }>) {
+		error = '';
+		const { error: failure, response } = await action();
+		if (failure !== undefined && response && !response.ok) {
+			error = errorMessage(failure);
+		}
+		await load();
+	}
+
+	async function saveTitle(event: SubmitEvent) {
+		event.preventDefault();
+		if (!item) return;
+		const { error: failure, response } = await setOverrides({
+			path: { item_id: id },
+			body: { ...item.overrides, title: titleDraft },
+			headers: { 'if-match': etag }
+		});
+		if (response?.status === 412) {
+			error = 'Someone changed this item in the meantime. Here is the current version.';
+		} else if (failure) {
+			error = errorMessage(failure);
+		} else {
+			editing = false;
+		}
+		await load();
+	}
+
+	async function submitVersion(event: SubmitEvent) {
+		event.preventDefault();
+		const body = versionDoi.trim()
+			? { doi: versionDoi.trim(), kind: versionKind, label: versionLabel || null }
+			: {
+					metadata: { title: versionTitle || item?.title },
+					kind: versionKind,
+					label: versionLabel || null
+				};
+		await act(() => addVersion({ path: { item_id: id }, body }));
+		if (!error) {
+			addingVersion = false;
+			versionDoi = versionTitle = versionLabel = '';
+		}
+	}
+
+	async function uploadFiles(versionId: string, files: FileList | null) {
+		for (const file of files ?? []) {
+			await act(() =>
+				uploadToVersion({
+					path: { version_id: versionId },
+					body: { upload: file, role: uploadRole }
+				})
+			);
+		}
+	}
+
+	async function moveToTrash() {
+		await trashItem({ path: { item_id: id } });
+		await goto(resolve('/'));
+	}
+
+	function size(bytes: number): string {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`;
+		return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+	}
+
+	const TEXT_STATUS: Record<string, string> = {
+		pending: 'Reading text…',
+		done: 'Searchable',
+		no_text: 'No text (scan?)',
+		unsupported: 'Not searchable',
+		failed: 'Text extraction failed'
+	};
+</script>
+
+{#if notFound}
+	<p>This item does not exist. <a href={resolve('/')}>Back to the library</a></p>
+{:else if item}
+	{#if item.deleted_at}
+		<div class="card row trashed">
+			<span>This item is in the trash.</span>
+			<button onclick={() => act(() => restoreItem({ path: { item_id: id } }))}>Restore</button>
+		</div>
+	{/if}
+
+	<header>
+		{#if editing}
+			<form class="row" onsubmit={saveTitle}>
+				<input bind:value={titleDraft} aria-label="Title" required />
+				<button class="primary">Save</button>
+				<button type="button" onclick={() => (editing = false)}>Cancel</button>
+			</form>
+		{:else}
+			<h1>{item.title}</h1>
+		{/if}
+		<p class="muted">
+			{item.authors.join('; ')}
+			{#if item.year}· {item.year}{/if}
+			{#if item.container_title}· <em>{item.container_title}</em>{/if}
+		</p>
+		<div class="row">
+			<span class="badge">{item.type}</span>
+			{#each item.identifiers as identifier (identifier.scheme + identifier.value)}
+				{#if identifier.scheme === 'doi'}
+					<a
+						class="badge"
+						href="https://doi.org/{identifier.value}"
+						target="_blank"
+						rel="noreferrer"
+					>
+						DOI {identifier.value}
+					</a>
+				{:else}
+					<span class="badge">{identifier.scheme} {identifier.value}</span>
+				{/if}
+			{/each}
+		</div>
+		{#if !item.deleted_at}
+			<div class="row actions">
+				<button
+					onclick={() => {
+						titleDraft = item?.title ?? '';
+						editing = true;
+					}}>Edit title</button
+				>
+				<button class="danger" onclick={moveToTrash}>Move to trash</button>
+			</div>
+		{/if}
+		{#if error}<p class="error">{error}</p>{/if}
+	</header>
+
+	<section>
+		<div class="row heading">
+			<h2>Versions</h2>
+			{#if !item.deleted_at}
+				<button onclick={() => (addingVersion = !addingVersion)}>
+					{addingVersion ? 'Close' : 'Add version'}
+				</button>
+			{/if}
+		</div>
+
+		{#if addingVersion}
+			<form class="card version-form" onsubmit={submitVersion}>
+				<label
+					>DOI <input
+						bind:value={versionDoi}
+						placeholder="Leave empty to enter details by hand"
+					/></label
+				>
+				{#if !versionDoi.trim()}
+					<label>Title <input bind:value={versionTitle} placeholder={item.title} /></label>
+				{/if}
+				<div class="row">
+					<label
+						>Kind
+						<select bind:value={versionKind}>
+							{#each VERSION_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
+						</select>
+					</label>
+					<label>Label <input bind:value={versionLabel} placeholder="e.g. WS 2026/27" /></label>
+				</div>
+				<div><button class="primary">Add version</button></div>
+			</form>
+		{/if}
+
+		{#each item.versions as version (version.id)}
+			<article class="card">
+				<div class="row">
+					<strong>{version.kind}</strong>
+					{#if version.label}<span>{version.label}</span>{/if}
+					{#if version.id === item.preferred_version_id}
+						<span class="badge">cited{version.pinned ? ' (pinned)' : ''}</span>
+					{:else if !item.deleted_at}
+						<button onclick={() => act(() => pinVersion({ path: { version_id: version.id } }))}>
+							Cite this version
+						</button>
+					{/if}
+					<span class="muted"
+						>{version.metadata_source === 'lookup' ? 'from registry' : 'entered by hand'}</span
+					>
+				</div>
+				{#if version.identifiers.length}
+					<div class="row">
+						{#each version.identifiers as identifier (identifier.scheme + identifier.value)}
+							<span class="badge">{identifier.scheme} {identifier.value}</span>
+						{/each}
+					</div>
+				{/if}
+
+				<ul class="files">
+					{#each version.files as file (file.id)}
+						<li class="row" class:deleted={file.deleted_at}>
+							<a href="/api/files/{file.id}/content" target="_blank" rel="noreferrer"
+								>{file.filename}</a
+							>
+							<span class="badge">{file.role}</span>
+							<span class="muted">{size(file.size)} · {TEXT_STATUS[file.text_status]}</span>
+							{#if file.deleted_at}
+								<button onclick={() => act(() => restoreFile({ path: { file_id: file.id } }))}
+									>Restore</button
+								>
+							{:else if !item.deleted_at}
+								<button
+									class="danger"
+									onclick={() => act(() => trashFile({ path: { file_id: file.id } }))}
+								>
+									Remove
+								</button>
+							{/if}
+						</li>
+					{:else}
+						<li class="muted">No files.</li>
+					{/each}
+				</ul>
+
+				{#if !item.deleted_at}
+					<div class="row">
+						<select bind:value={uploadRole} aria-label="Role of the uploaded file">
+							{#each FILE_ROLES as role (role)}<option value={role}>{role}</option>{/each}
+						</select>
+						<label class="upload">
+							<input
+								type="file"
+								multiple
+								onchange={(event) => uploadFiles(version.id, event.currentTarget.files)}
+							/>
+							<span>Upload files</span>
+						</label>
+					</div>
+				{/if}
+			</article>
+		{/each}
+	</section>
+{/if}
+
+<style>
+	header {
+		margin-bottom: 24px;
+	}
+	h1 {
+		margin-bottom: 4px;
+	}
+	header form input {
+		flex: 1;
+		min-width: 200px;
+		font-size: 1.4em;
+	}
+	.actions {
+		margin-top: 12px;
+	}
+	.trashed {
+		justify-content: space-between;
+		margin-bottom: 16px;
+	}
+	.heading {
+		justify-content: space-between;
+	}
+	section {
+		display: grid;
+		gap: 12px;
+	}
+	article {
+		display: grid;
+		gap: 10px;
+	}
+	.files {
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 6px;
+	}
+	.files li {
+		list-style: none;
+	}
+	.files a {
+		word-break: break-all;
+	}
+	.deleted a {
+		text-decoration: line-through;
+	}
+	.version-form {
+		display: grid;
+		gap: 10px;
+	}
+	.version-form label {
+		display: grid;
+		gap: 4px;
+	}
+	select {
+		width: auto;
+	}
+	.upload input {
+		position: absolute;
+		opacity: 0;
+		width: 1px;
+	}
+	.upload span {
+		display: inline-block;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		padding: 7px 14px;
+		cursor: pointer;
+		background: var(--surface);
+	}
+	.upload:focus-within span {
+		outline: 2px solid var(--accent);
+	}
+</style>

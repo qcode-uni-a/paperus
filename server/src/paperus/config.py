@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     s3_prefix: str = ""
     s3_endpoint_url: str | None = None
     s3_region: str | None = None
+    # The built website (web/build); by default the one in this checkout.
+    web_path: Path | None = Path(__file__).parents[3] / "web" / "build"
     # Temporary files for the s3 backend (uploads, text extraction).
     temp_path: Path | None = None
     max_upload_bytes: int = 512 * 1024 * 1024

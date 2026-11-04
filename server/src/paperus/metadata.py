@@ -19,7 +19,7 @@ class MetadataUnavailable(RuntimeError):
 
 
 def make_http_client(settings: Settings) -> httpx2.Client:
-    user_agent = f"paperUs/{__version__}"
+    user_agent = f"paperus/{__version__}"
     if settings.contact_email:
         user_agent += f" (mailto:{settings.contact_email})"
     return httpx2.Client(

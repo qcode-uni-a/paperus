@@ -4,13 +4,14 @@
 
 | Topic | Decision | Why |
 | --- | --- | --- |
-| Name | paperUs (`paperus`) | "papers for us", sounds like papyrus; free on PyPI and npm. Domains not registered yet, on purpose. A small, unrelated GitHub project `Naridon-Inc/paperus` exists |
+| Name | paperus | "papers for us", sounds like papyrus; free on PyPI and npm. Domains not registered yet, on purpose. A small, unrelated GitHub project `Naridon-Inc/paperus` exists |
 | Repository | In the university group's GitHub organization, repo `paperus` | Can be transferred later; redirects keep working |
 | Relation to Zotero | Standalone, not built on Zotero; full Zotero import | Own data model for groups, versions, search; borrow ideas freely |
 | Scope | Sources first (papers, lectures, meetings) and notes about them | Avoid becoming a Notion/Obsidian clone |
 | AI | Bring your own AI via MCP; no LLM calls from the server | Vendor neutral, data stays on the server, cheaper |
 | Server-side models | Embeddings, reranker, OCR only, open models, configurable | Needed for search; runs on CPU |
 | Server language | Python (FastAPI); TypeScript for frontend and extension; Rust via PyO3 later if measured | The processing and model ecosystem is Python |
+| Website | SvelteKit (static single-page app served by the server); API client generated with @hey-api/openapi-ts | One container to deploy; typed client from the OpenAPI schema. openapi-typescript was considered but is unmaintained |
 | Database | Postgres + pgvector, queue in Postgres | One service to run; permission filters in SQL |
 | PDF fetching | Server: open access only; browser: user's session; manual fallback | Licences, campus IP blocks |
 | IDs | UUIDv7 for every record; SHA-256 only for blobs and chunks | Same bytes can be different files; IDs needed before an upload ends; hashes reveal content; stable links |

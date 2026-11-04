@@ -1,4 +1,4 @@
-"""paperUs: a self-hosted research library for groups."""
+"""paperus: a self-hosted research library for groups."""
 
 from importlib.metadata import version
 

@@ -27,3 +27,15 @@ repos:
         language: system
         files: ^server/.*\.py$
         pass_filenames: false
+      - id: prettier
+        name: prettier (web)
+        entry: npm --prefix web run lint
+        language: system
+        files: ^web/
+        pass_filenames: false
+      - id: svelte-check
+        name: svelte-check (web)
+        entry: npm --prefix web run check
+        language: system
+        files: ^web/
+        pass_filenames: false

@@ -1,4 +1,4 @@
-# paperUs: notes for coding agents
+# paperus: notes for coding agents
 
 Design phase: start with `README.md` and `docs/`. `docs/decisions.md` lists
 what is decided and what is still open; don't re-open decided points without

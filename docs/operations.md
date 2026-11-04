@@ -10,7 +10,7 @@
 
 ## Stage 1: test server on the university VPN
 
-Before the computing centre hosts it, run paperUs on an always-on machine of
+Before the computing centre hosts it, run paperus on an always-on machine of
 the group at the university, reachable only through the university VPN.
 
 - Same `docker compose up` as later: a test of the self-hosting setup.
@@ -87,5 +87,5 @@ restore.
   warnings, clear backup instructions (database + upload folder).
 - External libraries (index a folder read-only), checksum deduplication,
   shared albums/links, mobile background upload, bulk-upload CLI: all map to
-  paperUs features.
+  paperus features.
 - Honest maturity warnings early on; export working from day one.
