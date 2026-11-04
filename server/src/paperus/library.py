@@ -1,14 +1,23 @@
 """Items, versions and identifiers: the rules that keep them consistent."""
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from paperus import changes  # noqa: F401  (registers the change stamping)
 from paperus.identifiers import Scheme
 from paperus.metadata import csl_title, csl_type
-from paperus.models import Identifier, Item, MetadataSource, Version, VersionKind
+from paperus.models import (
+    Identifier,
+    Item,
+    MetadataSource,
+    Trashable,
+    Version,
+    VersionKind,
+)
 
 # Which version is cited when none is pinned; newest first within a kind.
 KIND_PREFERENCE = [
@@ -118,7 +127,7 @@ def create_item(
     added_by: uuid.UUID | None,
 ) -> Item:
     """A new item with its first version."""
-    item = Item(type="", title="", overrides={}, added_by=added_by)
+    item = Item(type="", title="", overrides={}, added_by=added_by, change=0)
     db.add(item)
     add_version(
         db,
@@ -140,3 +149,20 @@ def pin_version(db: Session, item: Item, version: Version) -> None:
     db.flush()
     version.pinned = True
     refresh_item(item)
+
+
+def set_overrides(item: Item, overrides: dict[str, Any]) -> None:
+    """Replace the manual edits; ``None`` hides a field from citations."""
+    item.overrides = overrides
+    refresh_item(item)
+
+
+def trash(obj: Trashable, user_id: uuid.UUID | None) -> None:
+    if obj.deleted_at is None:
+        obj.deleted_at = datetime.now(UTC)
+        obj.deleted_by = user_id
+
+
+def restore(obj: Trashable) -> None:
+    obj.deleted_at = None
+    obj.deleted_by = None

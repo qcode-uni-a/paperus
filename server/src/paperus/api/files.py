@@ -32,6 +32,7 @@ class FileOut(BaseModel):
     sha256: str
     source: FileSource
     created_at: datetime
+    deleted_at: datetime | None
 
 
 def file_out(file: File) -> FileOut:
@@ -45,6 +46,7 @@ def file_out(file: File) -> FileOut:
         sha256=file.blob_sha256.hex(),
         source=FileSource(file.source),
         created_at=file.created_at,
+        deleted_at=file.deleted_at,
     )
 
 
@@ -75,6 +77,8 @@ def _store_upload(
     db: DB,
     user_id: uuid.UUID,
 ) -> FileOut:
+    if version.item.deleted_at is not None:
+        raise HTTPException(409, "item is in the trash")
     blobs: BlobStore = request.app.state.blobs
     try:
         stored = blobs.put(
@@ -91,7 +95,7 @@ def _store_upload(
         .on_conflict_do_nothing()
     )
     file = File(
-        version_id=version.id,
+        version=version,
         blob_sha256=stored.sha256,
         role=role,
         filename=filename,
@@ -153,3 +157,25 @@ def download_file(
         filename=file.filename,
         content_disposition_type="inline",
     )
+
+
+def _get_file(db: DB, file_id: uuid.UUID) -> File:
+    file = db.get(File, file_id)
+    if file is None:
+        raise HTTPException(404, "file not found")
+    return file
+
+
+@router.delete("/api/files/{file_id}", status_code=204)
+def trash_file(file_id: uuid.UUID, db: DB, user: CurrentUser) -> None:
+    """Move to the trash; restorable with ``POST …/restore``."""
+    library.trash(_get_file(db, file_id), user.id)
+    db.commit()
+
+
+@router.post("/api/files/{file_id}/restore")
+def restore_file(file_id: uuid.UUID, db: DB, user: CurrentUser) -> FileOut:
+    file = _get_file(db, file_id)
+    library.restore(file)
+    db.commit()
+    return file_out(file)

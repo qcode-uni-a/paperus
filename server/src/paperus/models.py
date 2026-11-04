@@ -57,6 +57,24 @@ class LoginSession(Record, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class ChangeCounter(Base):
+    """The library's change number; see ``paperus.changes``."""
+
+    __tablename__ = "change_counters"
+
+    name: Mapped[str] = mapped_column(String(32), primary_key=True)
+    value: Mapped[int] = mapped_column(BigInteger)
+
+
+class Trashable:
+    """Objects in the trash have ``deleted_at`` set and can be restored."""
+
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
 class VersionKind(StrEnum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
@@ -92,7 +110,7 @@ class FileSource(StrEnum):
     BROWSER = "browser"
 
 
-class Item(Record, Base):
+class Item(Record, Trashable, Base):
     """One work (paper, book, lecture notes, meeting notes, …).
 
     ``type`` and ``title`` are cached from the metadata for citing: the
@@ -110,6 +128,8 @@ class Item(Record, Base):
     added_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    change: Mapped[int] = mapped_column(BigInteger, index=True)
+    """Change number of the last change to the item or its versions and files."""
 
     versions: Mapped[list[Version]] = relationship(
         back_populates="item",
@@ -187,7 +207,7 @@ class Blob(Base):
     )
 
 
-class File(Record, Base):
+class File(Record, Trashable, Base):
     """A file of a version; several files can share one blob."""
 
     __tablename__ = "files"

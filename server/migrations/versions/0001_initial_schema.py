@@ -2,7 +2,7 @@
 
 Revision ID: 0001
 Revises:
-Create Date: 2026-11-04 23:02:58.128378
+Create Date: 2026-11-04 23:05:42.760512
 """
 
 import sqlalchemy as sa
@@ -26,6 +26,12 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("sha256"),
+    )
+    op.create_table(
+        "change_counters",
+        sa.Column("name", sa.String(length=32), nullable=False),
+        sa.Column("value", sa.BigInteger(), nullable=False),
+        sa.PrimaryKeyConstraint("name"),
     )
     op.create_table(
         "users",
@@ -62,9 +68,14 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("added_by", sa.Uuid(), nullable=True),
+        sa.Column("change", sa.BigInteger(), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("deleted_by", sa.Uuid(), nullable=True),
         sa.ForeignKeyConstraint(["added_by"], ["users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["deleted_by"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index(op.f("ix_items_change"), "items", ["change"], unique=False)
     op.create_table(
         "login_sessions",
         sa.Column("id", sa.Uuid(), server_default=sa.text("uuidv7()"), nullable=False),
@@ -130,10 +141,13 @@ def upgrade() -> None:
         sa.Column("media_type", sa.String(length=255), nullable=False),
         sa.Column("source", sa.String(length=32), nullable=False),
         sa.Column("uploaded_by", sa.Uuid(), nullable=True),
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("deleted_by", sa.Uuid(), nullable=True),
         sa.ForeignKeyConstraint(
             ["blob_sha256"],
             ["blobs.sha256"],
         ),
+        sa.ForeignKeyConstraint(["deleted_by"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["uploaded_by"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["version_id"], ["versions.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -161,6 +175,7 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_identifiers_version_id"), "identifiers", ["version_id"], unique=False
     )
+    op.execute("INSERT INTO change_counters (name, value) VALUES ('library', 0)")
 
 
 def downgrade() -> None:
@@ -178,7 +193,9 @@ def downgrade() -> None:
     op.drop_table("versions")
     op.drop_index(op.f("ix_login_sessions_user_id"), table_name="login_sessions")
     op.drop_table("login_sessions")
+    op.drop_index(op.f("ix_items_change"), table_name="items")
     op.drop_table("items")
     op.drop_table("users")
+    op.drop_table("change_counters")
     op.drop_table("blobs")
     op.execute("DROP EXTENSION IF EXISTS vector")

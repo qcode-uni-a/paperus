@@ -74,11 +74,12 @@ def db(engine: Engine) -> Iterator[Session]:
         tables = connection.scalars(
             text(
                 "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-                " AND tablename != 'alembic_version'"
+                " AND tablename NOT IN ('alembic_version', 'change_counters')"
             )
         ).all()
         if tables:
             connection.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
+        connection.execute(text("UPDATE change_counters SET value = 0"))
 
 
 class FakeDOIRegistry:

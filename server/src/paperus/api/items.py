@@ -5,12 +5,12 @@ from datetime import datetime
 from typing import Annotated, Any, Self
 
 import httpx2
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from paperus import library, metadata
+from paperus import changes, library, metadata
 from paperus.api.deps import DB, CurrentUser
 from paperus.api.files import FileOut, file_out
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
@@ -73,6 +73,8 @@ class ItemOut(BaseModel):
     container_title: str | None
     identifiers: list[IdentifierOut]
     created_at: datetime
+    change: int
+    deleted_at: datetime | None
 
 
 class ItemDetail(ItemOut):
@@ -129,6 +131,8 @@ def item_out(item: Item) -> ItemOut:
         container_title=_container_title(csl),
         identifiers=[i for v in item.versions for i in _identifiers(v)],
         created_at=item.created_at,
+        change=item.change,
+        deleted_at=item.deleted_at,
     )
 
 
@@ -146,7 +150,10 @@ def version_out(version: Version) -> VersionOut:
     )
 
 
-def item_detail(item: Item) -> ItemDetail:
+def item_detail(item: Item, response: Response | None = None) -> ItemDetail:
+    """The item; also sets its ``ETag`` (the change number) on ``response``."""
+    if response is not None:
+        response.headers["ETag"] = f'"{item.change}"'
     preferred = library.preferred_version(item)
     return ItemDetail(
         **item_out(item).model_dump(),
@@ -228,8 +235,12 @@ def add_item(
     identifiers = _normalized_identifiers(body)
     known = library.find_identifier(db, identifiers)
     if known is not None:
+        existing = known.version.item
+        if existing.deleted_at is not None:
+            library.restore(existing)
+            db.commit()
         response.status_code = 200
-        return item_detail(known.version.item)
+        return item_detail(existing, response)
 
     resolved = _resolve(body, identifiers, request.app.state.http)
     try:
@@ -250,9 +261,18 @@ def add_item(
         if known is None:
             raise
         response.status_code = 200
-        return item_detail(known.version.item)
+        return item_detail(known.version.item, response)
     db.refresh(item)
-    return item_detail(item)
+    return item_detail(item, response)
+
+
+def _get_item(db: DB, item_id: uuid.UUID, *, allow_trashed: bool = True) -> Item:
+    item = db.get(Item, item_id)
+    if item is None:
+        raise HTTPException(404, "item not found")
+    if not allow_trashed and item.deleted_at is not None:
+        raise HTTPException(409, "item is in the trash")
+    return item
 
 
 @router.post("/api/items/{item_id}/versions", status_code=201)
@@ -265,9 +285,7 @@ def add_version(
     user: CurrentUser,
 ) -> ItemDetail:
     """Another version of an item, e.g. the published one of a preprint."""
-    item = db.get(Item, item_id)
-    if item is None:
-        raise HTTPException(404, "item not found")
+    item = _get_item(db, item_id, allow_trashed=False)
     identifiers = _normalized_identifiers(body)
     known = library.find_identifier(db, identifiers)
     if known is not None:
@@ -278,7 +296,7 @@ def add_version(
                 )
             )
         response.status_code = 200
-        return item_detail(item)
+        return item_detail(item, response)
 
     resolved = _resolve(body, identifiers, request.app.state.http)
     try:
@@ -299,37 +317,108 @@ def add_version(
         db.rollback()
         raise HTTPException(409, "identifier was added meanwhile") from error
     db.refresh(item)
-    return item_detail(item)
+    return item_detail(item, response)
 
 
 @router.post("/api/versions/{version_id}/pin")
-def pin_version(version_id: uuid.UUID, db: DB, user: CurrentUser) -> ItemDetail:
+def pin_version(
+    version_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+) -> ItemDetail:
     """Cite this version, whatever its kind."""
     version = db.get(Version, version_id)
     if version is None:
         raise HTTPException(404, "version not found")
     library.pin_version(db, version.item, version)
     db.commit()
-    return item_detail(version.item)
+    return item_detail(version.item, response)
+
+
+def _parse_if_match(value: str | None) -> int:
+    """The change number from ``If-Match: "42"``; 428 without it."""
+    if value is None:
+        raise HTTPException(428, "If-Match header with the item's ETag required")
+    try:
+        return int(value.removeprefix("W/").strip().strip('"'))
+    except ValueError as error:
+        raise HTTPException(412, "If-Match does not match") from error
+
+
+@router.put("/api/items/{item_id}/overrides")
+def set_overrides(
+    item_id: uuid.UUID,
+    overrides: dict[str, Any],
+    response: Response,
+    db: DB,
+    user: CurrentUser,
+    if_match: Annotated[str | None, Header()] = None,
+) -> ItemDetail:
+    """Replace the manual edits to the metadata for citing.
+
+    Fields set here win over every version's metadata and survive new
+    lookups; ``null`` hides a field. Needs ``If-Match`` with the ETag from the
+    last read, so concurrent edits are not lost (412 if the item changed).
+    """
+    expected = _parse_if_match(if_match)
+    item = db.get(Item, item_id, with_for_update=True)
+    if item is None:
+        raise HTTPException(404, "item not found")
+    if item.change != expected:
+        raise HTTPException(412, "item changed since it was read")
+    library.set_overrides(item, overrides)
+    db.commit()
+    return item_detail(item, response)
+
+
+@router.delete("/api/items/{item_id}", status_code=204)
+def trash_item(item_id: uuid.UUID, db: DB, user: CurrentUser) -> None:
+    """Move to the trash; restorable with ``POST …/restore``."""
+    library.trash(_get_item(db, item_id), user.id)
+    db.commit()
+
+
+@router.post("/api/items/{item_id}/restore")
+def restore_item(
+    item_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+) -> ItemDetail:
+    item = _get_item(db, item_id)
+    library.restore(item)
+    db.commit()
+    return item_detail(item, response)
 
 
 @router.get("/api/items")
 def list_items(
+    response: Response,
     db: DB,
     user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     before: uuid.UUID | None = None,
+    trashed: bool = False,
+    since: Annotated[int | None, Query(ge=0)] = None,
 ) -> list[ItemOut]:
-    """Newest first; pass the last ``id`` as ``before`` for the next page."""
+    """Items, newest first; ``before`` = last ``id`` for the next page.
+
+    ``trashed=true`` lists the trash instead. ``since=N`` is for syncing:
+    every item changed after change number N, trashed or not, in change
+    order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
+    is the number to pass as ``since`` next time.
+    """
+    response.headers["Last-Change"] = str(changes.current_change(db))
+    if since is not None:
+        query = select(Item).where(Item.change > since).order_by(Item.change, Item.id)
+        return [item_out(item) for item in db.scalars(query)]
     query = select(Item).order_by(Item.id.desc()).limit(limit)
+    if trashed:
+        query = query.where(Item.deleted_at.is_not(None))
+    else:
+        query = query.where(Item.deleted_at.is_(None))
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item) for item in db.scalars(query)]
 
 
 @router.get("/api/items/{item_id}")
-def get_item(item_id: uuid.UUID, db: DB, user: CurrentUser) -> ItemDetail:
-    item = db.get(Item, item_id)
-    if item is None:
-        raise HTTPException(404, "item not found")
-    return item_detail(item)
+def get_item(
+    item_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+) -> ItemDetail:
+    return item_detail(_get_item(db, item_id), response)
