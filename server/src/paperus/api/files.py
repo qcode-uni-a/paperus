@@ -1,4 +1,4 @@
-"""Files of items: upload, list and download."""
+"""Files of versions: upload and download."""
 
 import mimetypes
 import uuid
@@ -9,11 +9,11 @@ from typing import Annotated, BinaryIO
 from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
+from paperus import library
 from paperus.api.deps import DB, CurrentUser
-from paperus.models import Blob, File, FileSource, Item, VersionType
+from paperus.models import Blob, File, FileRole, FileSource, Item, Version
 from paperus.storage import BlobStore, TooLarge
 
 router = APIRouter(tags=["files"])
@@ -24,25 +24,25 @@ PDF = "application/pdf"
 
 class FileOut(BaseModel):
     id: uuid.UUID
-    item_id: uuid.UUID
+    version_id: uuid.UUID
+    role: FileRole
     filename: str
     media_type: str
     size: int
     sha256: str
-    version_type: VersionType
     source: FileSource
     created_at: datetime
 
 
-def file_out(file: File, size: int) -> FileOut:
+def file_out(file: File) -> FileOut:
     return FileOut(
         id=file.id,
-        item_id=file.item_id,
+        version_id=file.version_id,
+        role=FileRole(file.role),
         filename=file.filename,
         media_type=file.media_type,
-        size=size,
+        size=file.blob.size,
         sha256=file.blob_sha256.hex(),
-        version_type=VersionType(file.version_type),
         source=FileSource(file.source),
         created_at=file.created_at,
     )
@@ -67,17 +67,14 @@ def _media_type(head: bytes, filename: str, declared: str | None) -> str:
     return guessed or "application/octet-stream"
 
 
-@router.post("/api/items/{item_id}/files", status_code=201)
-def upload_file(
-    item_id: uuid.UUID,
+def _store_upload(
+    version: Version,
     upload: UploadFile,
+    role: FileRole,
     request: Request,
     db: DB,
-    user: CurrentUser,
-    version_type: Annotated[VersionType, Form()] = VersionType.PUBLISHED,
+    user_id: uuid.UUID,
 ) -> FileOut:
-    if db.get(Item, item_id) is None:
-        raise HTTPException(404, "item not found")
     blobs: BlobStore = request.app.state.blobs
     try:
         stored = blobs.put(
@@ -94,31 +91,52 @@ def upload_file(
         .on_conflict_do_nothing()
     )
     file = File(
-        item_id=item_id,
+        version_id=version.id,
         blob_sha256=stored.sha256,
+        role=role,
         filename=filename,
         media_type=media_type,
-        version_type=version_type,
         source=FileSource.UPLOAD,
-        uploaded_by=user.id,
+        uploaded_by=user_id,
     )
     db.add(file)
     db.commit()
     db.refresh(file)
-    return file_out(file, stored.size)
+    return file_out(file)
 
 
-@router.get("/api/items/{item_id}/files")
-def list_files(item_id: uuid.UUID, db: DB, user: CurrentUser) -> list[FileOut]:
-    if db.get(Item, item_id) is None:
+@router.post("/api/versions/{version_id}/files", status_code=201)
+def upload_to_version(
+    version_id: uuid.UUID,
+    upload: UploadFile,
+    request: Request,
+    db: DB,
+    user: CurrentUser,
+    role: Annotated[FileRole, Form()] = FileRole.MAIN,
+) -> FileOut:
+    version = db.get(Version, version_id)
+    if version is None:
+        raise HTTPException(404, "version not found")
+    return _store_upload(version, upload, role, request, db, user.id)
+
+
+@router.post("/api/items/{item_id}/files", status_code=201)
+def upload_to_item(
+    item_id: uuid.UUID,
+    upload: UploadFile,
+    request: Request,
+    db: DB,
+    user: CurrentUser,
+    role: Annotated[FileRole, Form()] = FileRole.MAIN,
+) -> FileOut:
+    """Upload to the item's preferred version."""
+    item = db.get(Item, item_id)
+    if item is None:
         raise HTTPException(404, "item not found")
-    rows = db.execute(
-        select(File, Blob.size)
-        .join(Blob, Blob.sha256 == File.blob_sha256)
-        .where(File.item_id == item_id)
-        .order_by(File.id)
-    )
-    return [file_out(file, size) for file, size in rows]
+    version = library.preferred_version(item)
+    if version is None:
+        raise HTTPException(409, "item has no version")
+    return _store_upload(version, upload, role, request, db, user.id)
 
 
 @router.get("/api/files/{file_id}/content")

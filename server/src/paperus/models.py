@@ -1,13 +1,25 @@
 """Database tables."""
 
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, LargeBinary, String, func, text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -45,18 +57,122 @@ class LoginSession(Record, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class VersionKind(StrEnum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    PREPRINT = "preprint"
+    ACCEPTED = "accepted"
+    PUBLISHED = "published"
+    EDITION = "edition"
+    """E.g. lecture notes of one semester, or a book's 2nd edition (see label)."""
+    OTHER = "other"
+
+
+class MetadataSource(StrEnum):
+    LOOKUP = "lookup"
+    MANUAL = "manual"
+    IMPORT = "import"
+    SYNC = "sync"
+
+
+class FileRole(StrEnum):
+    MAIN = "main"
+    SUPPLEMENTARY = "supplementary"
+    SLIDES = "slides"
+    TRANSCRIPT = "transcript"
+    RECORDING = "recording"
+    OTHER = "other"
+
+
+class FileSource(StrEnum):
+    """Where a file came from; matters for sharing rules."""
+
+    UPLOAD = "upload"
+    OPEN_ACCESS = "open_access"
+    BROWSER = "browser"
+
+
 class Item(Record, Base):
-    """One work (paper, book, lecture notes, …); metadata as CSL-JSON."""
+    """One work (paper, book, lecture notes, meeting notes, …).
+
+    ``type`` and ``title`` are cached from the metadata for citing: the
+    preferred version's CSL-JSON plus ``overrides`` (manual edits per field;
+    ``None`` removes a field). See ``paperus.library``.
+    """
 
     __tablename__ = "items"
 
     type: Mapped[str] = mapped_column(String(64))
     title: Mapped[str]
-    doi: Mapped[str | None] = mapped_column(unique=True)
-    csl: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    overrides: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, server_default=text("'{}'::jsonb")
+    )
     added_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+
+    versions: Mapped[list[Version]] = relationship(
+        back_populates="item",
+        order_by="Version.id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class Version(Record, Base):
+    """One edition of an item, with its own identifiers, metadata and files."""
+
+    __tablename__ = "versions"
+    __table_args__ = (
+        Index(
+            "ix_versions_one_pinned_per_item",
+            "item_id",
+            unique=True,
+            postgresql_where=text("pinned"),
+        ),
+    )
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    label: Mapped[str | None]
+    csl: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    metadata_source: Mapped[str] = mapped_column(String(32))
+    pinned: Mapped[bool] = mapped_column(server_default=text("false"))
+    """Use this version for citing, whatever its kind."""
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    item: Mapped[Item] = relationship(back_populates="versions")
+    identifiers: Mapped[list[Identifier]] = relationship(
+        back_populates="version",
+        order_by="Identifier.id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    files: Mapped[list[File]] = relationship(
+        back_populates="version",
+        order_by="File.id",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class Identifier(Record, Base):
+    """A normalized identifier of a version, unique in the library."""
+
+    __tablename__ = "identifiers"
+    __table_args__ = (UniqueConstraint("scheme", "value"),)
+
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("versions.id", ondelete="CASCADE"), index=True
+    )
+    scheme: Mapped[str] = mapped_column(String(16))
+    value: Mapped[str]
+
+    version: Mapped[Version] = relationship(back_populates="identifiers")
 
 
 class Blob(Base):
@@ -71,37 +187,22 @@ class Blob(Base):
     )
 
 
-class VersionType(StrEnum):
-    INTERNAL_DRAFT = "internal_draft"
-    SUBMITTED = "submitted"
-    PREPRINT = "preprint"
-    ACCEPTED = "accepted"
-    PUBLISHED = "published"
-    SUPPLEMENTARY = "supplementary"
-    SYNCED = "synced"
-
-
-class FileSource(StrEnum):
-    """Where a file came from; matters for sharing rules."""
-
-    UPLOAD = "upload"
-    OPEN_ACCESS = "open_access"
-    BROWSER = "browser"
-
-
 class File(Record, Base):
-    """A file of an item; several files can share one blob."""
+    """A file of a version; several files can share one blob."""
 
     __tablename__ = "files"
 
-    item_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("items.id", ondelete="CASCADE"), index=True
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("versions.id", ondelete="CASCADE"), index=True
     )
     blob_sha256: Mapped[bytes] = mapped_column(ForeignKey("blobs.sha256"), index=True)
+    role: Mapped[str] = mapped_column(String(32))
     filename: Mapped[str]
     media_type: Mapped[str] = mapped_column(String(255))
-    version_type: Mapped[str] = mapped_column(String(32))
     source: Mapped[str] = mapped_column(String(32))
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+
+    version: Mapped[Version] = relationship(back_populates="files")
+    blob: Mapped[Blob] = relationship(lazy="joined")

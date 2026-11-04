@@ -1,19 +1,13 @@
 """Bibliographic metadata from DOIs."""
 
-import re
 from typing import Any
 
 import httpx2
 
 from paperus import __version__
 from paperus.config import Settings
-
-_DOI = re.compile(r"^10\.\d{4,9}/\S+$")
-_DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/", "doi:")
-
-
-class InvalidDOI(ValueError):
-    pass
+from paperus.identifiers import is_arxiv_doi
+from paperus.models import VersionKind
 
 
 class DOINotFound(LookupError):
@@ -22,19 +16,6 @@ class DOINotFound(LookupError):
 
 class MetadataUnavailable(RuntimeError):
     """The registry could not be reached or returned something unusable."""
-
-
-def normalize_doi(value: str) -> str:
-    """Strip common prefixes and lowercase; DOIs are case-insensitive."""
-    doi = value.strip()
-    for prefix in _DOI_PREFIXES:
-        if doi.lower().startswith(prefix):
-            doi = doi[len(prefix) :]
-            break
-    doi = doi.lower()
-    if not _DOI.match(doi):
-        raise InvalidDOI(value)
-    return doi
 
 
 def make_http_client(settings: Settings) -> httpx2.Client:
@@ -101,3 +82,12 @@ def csl_title(csl: dict[str, Any]) -> str:
     if isinstance(title, list):
         title = title[0] if title else None
     return title if isinstance(title, str) and title else "(untitled)"
+
+
+def version_kind(doi: str, csl: dict[str, Any]) -> VersionKind:
+    """Guess the kind of version a DOI's metadata describes."""
+    if is_arxiv_doi(doi) or csl.get("subtype") == "preprint":
+        return VersionKind.PREPRINT
+    if csl.get("type") == "posted-content":
+        return VersionKind.PREPRINT
+    return VersionKind.PUBLISHED

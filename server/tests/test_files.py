@@ -7,14 +7,12 @@ from sqlalchemy.orm import Session
 
 from paperus.config import Settings
 from paperus.models import Blob
-from tests.conftest import FakeDOIRegistry
 
 PDF_BYTES = b"%PDF-1.7\n" + b"x" * 5000 + b"\n%%EOF\n"
 
 
-def add_item(client: TestClient, registry: FakeDOIRegistry, doi: str) -> str:
-    registry.records[doi] = {"type": "article-journal", "title": doi}
-    response = client.post("/api/items", json={"doi": doi})
+def add_item(client: TestClient, title: str) -> str:
+    response = client.post("/api/items", json={"metadata": {"title": title}})
     assert response.status_code == 201
     item_id: str = response.json()["id"]
     return item_id
@@ -39,15 +37,15 @@ def upload(
 
 
 @pytest.fixture
-def item_id(logged_in: TestClient, doi_registry: FakeDOIRegistry) -> str:
-    return add_item(logged_in, doi_registry, "10.1234/a")
+def item_id(logged_in: TestClient) -> str:
+    return add_item(logged_in, "A")
 
 
 def test_upload_and_download(logged_in: TestClient, item_id: str) -> None:
-    file = upload(logged_in, item_id, version_type="preprint")
+    file = upload(logged_in, item_id, role="supplementary")
     assert file["media_type"] == "application/pdf"
     assert file["size"] == len(PDF_BYTES)
-    assert file["version_type"] == "preprint"
+    assert file["role"] == "supplementary"
     assert file["source"] == "upload"
     assert file["filename"] == "paper.pdf"
 
@@ -57,18 +55,26 @@ def test_upload_and_download(logged_in: TestClient, item_id: str) -> None:
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"].startswith("inline")
 
-    listed = logged_in.get(f"/api/items/{item_id}/files").json()
-    assert [f["id"] for f in listed] == [file["id"]]
+    [version] = logged_in.get(f"/api/items/{item_id}").json()["versions"]
+    assert version["files"] == [file]
+    assert file["version_id"] == version["id"]
+
+    second = logged_in.post(
+        f"/api/versions/{version['id']}/files",
+        files={"upload": ("slides.pdf", PDF_BYTES, "application/pdf")},
+        data={"role": "slides"},
+    )
+    assert second.status_code == 201
+    assert second.json()["role"] == "slides"
 
 
 def test_same_content_is_stored_once(
     logged_in: TestClient,
-    doi_registry: FakeDOIRegistry,
     item_id: str,
     db: Session,
     settings: Settings,
 ) -> None:
-    other_item = add_item(logged_in, doi_registry, "10.1234/b")
+    other_item = add_item(logged_in, "B")
     first = upload(logged_in, item_id)
     second = upload(logged_in, other_item, filename="copy.pdf")
     assert first["id"] != second["id"]
@@ -103,7 +109,7 @@ def test_upload_errors(logged_in: TestClient, item_id: str) -> None:
     unknown = "00000000-0000-7000-8000-000000000000"
     assert logged_in.post(f"/api/items/{unknown}/files", files=files).status_code == 404
     response = logged_in.post(
-        f"/api/items/{item_id}/files", files=files, data={"version_type": "final"}
+        f"/api/items/{item_id}/files", files=files, data={"role": "final"}
     )
     assert response.status_code == 422
     assert logged_in.get(f"/api/files/{unknown}/content").status_code == 404
@@ -123,5 +129,6 @@ def test_too_large(
 
 def test_files_need_login(client: TestClient) -> None:
     unknown = "00000000-0000-7000-8000-000000000000"
-    assert client.get(f"/api/items/{unknown}/files").status_code == 401
+    files = {"upload": ("paper.pdf", PDF_BYTES, "application/pdf")}
+    assert client.post(f"/api/items/{unknown}/files", files=files).status_code == 401
     assert client.get(f"/api/files/{unknown}/content").status_code == 401

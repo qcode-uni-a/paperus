@@ -1,38 +1,86 @@
-"""Items: adding by DOI, listing and reading."""
+"""Items and their versions: adding by identifier or by hand, reading."""
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
+import httpx2
 from fastapi import APIRouter, HTTPException, Query, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from paperus import metadata
+from paperus import library, metadata
 from paperus.api.deps import DB, CurrentUser
-from paperus.models import Item
+from paperus.api.files import FileOut, file_out
+from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
+from paperus.models import Item, MetadataSource, Version, VersionKind
 
-router = APIRouter(prefix="/api/items", tags=["items"])
+router = APIRouter(tags=["items"])
 
 
-class AddItemRequest(BaseModel):
-    doi: str
+class IdentifierIn(BaseModel):
+    scheme: Scheme
+    value: str
+
+
+class VersionIn(BaseModel):
+    """A version by DOI (metadata is looked up) or with metadata typed in.
+
+    Examples: ``{"doi": "10.1038/…"}``; meeting notes:
+    ``{"metadata": {"type": "document", "genre": "Meeting notes",
+    "title": "Group meeting", "issued": {"date-parts": [[2026, 11, 4]]}}}``.
+    """
+
+    doi: str | None = None
+    metadata: dict[str, Any] | None = None
+    identifiers: list[IdentifierIn] = Field(default_factory=list)
+    kind: VersionKind | None = None
+    label: str | None = None
+
+    @model_validator(mode="after")
+    def doi_or_metadata(self) -> Self:
+        if (self.doi is None) == (self.metadata is None):
+            raise ValueError("give either doi or metadata")
+        if self.metadata is not None and not self.metadata.get("title"):
+            raise ValueError("metadata needs a title")
+        return self
+
+
+class IdentifierOut(BaseModel):
+    scheme: Scheme
+    value: str
+
+
+class VersionOut(BaseModel):
+    id: uuid.UUID
+    kind: VersionKind
+    label: str | None
+    pinned: bool
+    metadata_source: MetadataSource
+    identifiers: list[IdentifierOut]
+    csl: dict[str, Any]
+    files: list[FileOut]
+    created_at: datetime
 
 
 class ItemOut(BaseModel):
     id: uuid.UUID
     type: str
     title: str
-    doi: str | None
     authors: list[str]
     year: int | None
     container_title: str | None
+    identifiers: list[IdentifierOut]
     created_at: datetime
 
 
 class ItemDetail(ItemOut):
     csl: dict[str, Any]
+    """Metadata for citing: the preferred version's plus manual edits."""
+    overrides: dict[str, Any]
+    preferred_version_id: uuid.UUID | None
+    versions: list[VersionOut]
 
 
 def _authors(csl: dict[str, Any]) -> list[str]:
@@ -63,70 +111,209 @@ def _container_title(csl: dict[str, Any]) -> str | None:
     return value or None
 
 
+def _identifiers(version: Version) -> list[IdentifierOut]:
+    return [
+        IdentifierOut(scheme=Scheme(i.scheme), value=i.value)
+        for i in version.identifiers
+    ]
+
+
 def item_out(item: Item) -> ItemOut:
+    csl = library.citation_csl(item)
     return ItemOut(
         id=item.id,
         type=item.type,
         title=item.title,
-        doi=item.doi,
-        authors=_authors(item.csl),
-        year=_year(item.csl),
-        container_title=_container_title(item.csl),
+        authors=_authors(csl),
+        year=_year(csl),
+        container_title=_container_title(csl),
+        identifiers=[i for v in item.versions for i in _identifiers(v)],
         created_at=item.created_at,
     )
 
 
+def version_out(version: Version) -> VersionOut:
+    return VersionOut(
+        id=version.id,
+        kind=VersionKind(version.kind),
+        label=version.label,
+        pinned=version.pinned,
+        metadata_source=MetadataSource(version.metadata_source),
+        identifiers=_identifiers(version),
+        csl=version.csl,
+        files=[file_out(f) for f in version.files],
+        created_at=version.created_at,
+    )
+
+
 def item_detail(item: Item) -> ItemDetail:
-    return ItemDetail(**item_out(item).model_dump(), csl=item.csl)
+    preferred = library.preferred_version(item)
+    return ItemDetail(
+        **item_out(item).model_dump(),
+        csl=library.citation_csl(item),
+        overrides=item.overrides,
+        preferred_version_id=preferred.id if preferred else None,
+        versions=[version_out(v) for v in item.versions],
+    )
 
 
-@router.post("", status_code=201)
+class ResolvedVersion(BaseModel):
+    kind: VersionKind
+    label: str | None
+    csl: dict[str, Any]
+    source: MetadataSource
+    identifiers: list[tuple[Scheme, str]]
+
+
+def _normalized_identifiers(body: VersionIn) -> list[tuple[Scheme, str]]:
+    try:
+        identifiers = [
+            (i.scheme, normalize(i.scheme, i.value)) for i in body.identifiers
+        ]
+        if body.doi is not None:
+            doi = normalize(Scheme.DOI, body.doi)
+            identifiers = [(Scheme.DOI, doi), *implied_by_doi(doi), *identifiers]
+    except InvalidIdentifier as error:
+        raise HTTPException(422, str(error)) from error
+    return identifiers
+
+
+def _resolve(
+    body: VersionIn, identifiers: list[tuple[Scheme, str]], http: httpx2.Client
+) -> ResolvedVersion:
+    """Metadata for the version: looked up for a DOI, otherwise as given."""
+    if body.metadata is not None:
+        return ResolvedVersion(
+            kind=body.kind or VersionKind.OTHER,
+            label=body.label,
+            csl=body.metadata,
+            source=MetadataSource.MANUAL,
+            identifiers=identifiers,
+        )
+    doi = identifiers[0][1]
+    try:
+        csl = metadata.fetch_csl(http, doi)
+    except metadata.DOINotFound as error:
+        raise HTTPException(404, "DOI not found") from error
+    except metadata.MetadataUnavailable as error:
+        raise HTTPException(502, "metadata lookup failed") from error
+    kind = body.kind or metadata.version_kind(doi, csl)
+    if kind == VersionKind.PREPRINT:
+        # CSL's type for preprints; arXiv reports "article-journal".
+        csl = {**csl, "type": "article"}
+    return ResolvedVersion(
+        kind=kind,
+        label=body.label,
+        csl=csl,
+        source=MetadataSource.LOOKUP,
+        identifiers=identifiers,
+    )
+
+
+def _identifier_conflict(error: library.IdentifierTaken) -> HTTPException:
+    return HTTPException(
+        409,
+        {
+            "message": "identifier belongs to another item",
+            "item_id": str(error.item_id),
+        },
+    )
+
+
+@router.post("/api/items", status_code=201)
 def add_item(
-    body: AddItemRequest,
+    body: VersionIn, request: Request, response: Response, db: DB, user: CurrentUser
+) -> ItemDetail:
+    """A new item; if one of its identifiers is known, the existing item."""
+    identifiers = _normalized_identifiers(body)
+    known = library.find_identifier(db, identifiers)
+    if known is not None:
+        response.status_code = 200
+        return item_detail(known.version.item)
+
+    resolved = _resolve(body, identifiers, request.app.state.http)
+    try:
+        item = library.create_item(
+            db,
+            kind=resolved.kind,
+            label=resolved.label,
+            csl=resolved.csl,
+            source=resolved.source,
+            identifiers=resolved.identifiers,
+            added_by=user.id,
+        )
+        db.commit()
+    except IntegrityError:
+        # Someone added the same identifier meanwhile.
+        db.rollback()
+        known = library.find_identifier(db, identifiers)
+        if known is None:
+            raise
+        response.status_code = 200
+        return item_detail(known.version.item)
+    db.refresh(item)
+    return item_detail(item)
+
+
+@router.post("/api/items/{item_id}/versions", status_code=201)
+def add_version(
+    item_id: uuid.UUID,
+    body: VersionIn,
     request: Request,
     response: Response,
     db: DB,
     user: CurrentUser,
 ) -> ItemDetail:
-    """Add an item by DOI; returns the existing item if the DOI is already there."""
-    try:
-        doi = metadata.normalize_doi(body.doi)
-    except metadata.InvalidDOI as error:
-        raise HTTPException(422, "not a valid DOI") from error
-
-    existing = db.scalar(select(Item).where(Item.doi == doi))
-    if existing is not None:
+    """Another version of an item, e.g. the published one of a preprint."""
+    item = db.get(Item, item_id)
+    if item is None:
+        raise HTTPException(404, "item not found")
+    identifiers = _normalized_identifiers(body)
+    known = library.find_identifier(db, identifiers)
+    if known is not None:
+        if known.version.item_id != item.id:
+            raise _identifier_conflict(
+                library.IdentifierTaken(
+                    known.scheme, known.value, known.version.item_id
+                )
+            )
         response.status_code = 200
-        return item_detail(existing)
+        return item_detail(item)
 
+    resolved = _resolve(body, identifiers, request.app.state.http)
     try:
-        csl = metadata.fetch_csl(request.app.state.http, doi)
-    except metadata.DOINotFound as error:
-        raise HTTPException(404, "DOI not found") from error
-    except metadata.MetadataUnavailable as error:
-        raise HTTPException(502, "metadata lookup failed") from error
-
-    csl = {**csl, "type": metadata.csl_type(csl)}
-    item = Item(
-        type=csl["type"],
-        title=metadata.csl_title(csl),
-        doi=doi,
-        csl=csl,
-        added_by=user.id,
-    )
-    db.add(item)
-    try:
+        library.add_version(
+            db,
+            item,
+            kind=resolved.kind,
+            label=resolved.label,
+            csl=resolved.csl,
+            source=resolved.source,
+            identifiers=resolved.identifiers,
+            created_by=user.id,
+        )
         db.commit()
-    except IntegrityError:
-        # Someone added the same DOI meanwhile.
+    except library.IdentifierTaken as error:
+        raise _identifier_conflict(error) from error
+    except IntegrityError as error:
         db.rollback()
-        response.status_code = 200
-        return item_detail(db.scalars(select(Item).where(Item.doi == doi)).one())
+        raise HTTPException(409, "identifier was added meanwhile") from error
     db.refresh(item)
     return item_detail(item)
 
 
-@router.get("")
+@router.post("/api/versions/{version_id}/pin")
+def pin_version(version_id: uuid.UUID, db: DB, user: CurrentUser) -> ItemDetail:
+    """Cite this version, whatever its kind."""
+    version = db.get(Version, version_id)
+    if version is None:
+        raise HTTPException(404, "version not found")
+    library.pin_version(db, version.item, version)
+    db.commit()
+    return item_detail(version.item)
+
+
+@router.get("/api/items")
 def list_items(
     db: DB,
     user: CurrentUser,
@@ -140,7 +327,7 @@ def list_items(
     return [item_out(item) for item in db.scalars(query)]
 
 
-@router.get("/{item_id}")
+@router.get("/api/items/{item_id}")
 def get_item(item_id: uuid.UUID, db: DB, user: CurrentUser) -> ItemDetail:
     item = db.get(Item, item_id)
     if item is None:
