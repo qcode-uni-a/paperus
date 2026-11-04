@@ -12,7 +12,7 @@ from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import make_job_app
 from paperus.metadata import make_http_client
-from paperus.storage import BlobStore
+from paperus.storage import make_blob_store
 
 
 def create_app(
@@ -37,7 +37,7 @@ def create_app(
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
     app.state.http = http
-    app.state.blobs = BlobStore(settings.storage_path)
+    app.state.blobs = make_blob_store(settings)
     app.state.settings = settings
     app.state.jobs = jobs
     app.include_router(health.router)

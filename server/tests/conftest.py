@@ -26,7 +26,7 @@ from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import tasks
-from paperus.storage import BlobStore
+from paperus.storage import BlobStore, make_blob_store
 
 TEST_DATABASE_URL = os.environ.get(
     "PAPERUS_TEST_DATABASE_URL",
@@ -121,7 +121,7 @@ def job_app() -> App:
 
 @pytest.fixture
 def blobs(settings: Settings) -> BlobStore:
-    return BlobStore(settings.storage_path)
+    return make_blob_store(settings)
 
 
 @pytest.fixture

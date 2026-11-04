@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.processing import pending_files, process_file
-from paperus.storage import BlobStore
+from paperus.storage import BlobStore, make_blob_store
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def run_worker(settings: Settings) -> None:
     global _context
     _context = WorkerContext(
         sessions=make_sessionmaker(make_engine(settings.database_url)),
-        blobs=BlobStore(settings.storage_path),
+        blobs=make_blob_store(settings),
     )
     app = make_job_app(settings)
     with app.open():

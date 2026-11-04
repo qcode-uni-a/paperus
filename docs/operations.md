@@ -65,6 +65,12 @@ restore.
 - Minimal dependencies: Postgres, object storage (or filesystem), the app
   container, the model container. One `docker compose up`.
 - Settings in the web UI, not config files (login, storage, models, jobs).
+- File storage: `PAPERUS_STORAGE_BACKEND=filesystem` (default) for any
+  mounted path (local disk, NFS, SMB; temporary files on the same mount, so
+  renames stay atomic) or `s3` for S3-compatible storage (AWS, MinIO, Ceph,
+  a university service) with `PAPERUS_S3_BUCKET`, `PAPERUS_S3_ENDPOINT_URL`,
+  `PAPERUS_S3_PREFIX` and the usual AWS credentials. Contents are stored
+  once per SHA-256 either way, so moving between backends is a copy.
 - One-command backup and restore; full export in open formats.
 - Helm chart later for university IT.
 

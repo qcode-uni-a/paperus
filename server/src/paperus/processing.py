@@ -20,11 +20,12 @@ TEXT_TYPES = ("text/", "application/json", "application/x-tex")
 
 def _chunks_for(file: File, blobs: BlobStore) -> list[TextChunk] | None:
     """Chunks of the file's text; ``None`` for unsupported file types."""
-    path = blobs.path(file.blob_sha256)
     if file.media_type == PDF:
-        return chunk_pages(extract_pdf_pages(path))
+        with blobs.local_file(file.blob_sha256) as path:
+            return chunk_pages(extract_pdf_pages(path))
     if file.media_type.startswith(TEXT_TYPES):
-        return chunk_text(path.read_text(errors="replace"))
+        data = b"".join(blobs.iter_bytes(file.blob_sha256))
+        return chunk_text(data.decode(errors="replace"))
     return None
 
 

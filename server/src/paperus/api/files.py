@@ -6,9 +6,10 @@ import uuid
 from collections.abc import Iterator
 from datetime import datetime
 from typing import Annotated, BinaryIO
+from urllib.parse import quote
 
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.dialects.postgresql import insert
 
@@ -24,7 +25,7 @@ from paperus.models import (
     TextStatus,
     Version,
 )
-from paperus.storage import BlobStore, TooLarge
+from paperus.storage import BlobStore, FilesystemStore, TooLarge
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["files"])
@@ -164,16 +165,26 @@ def upload_to_item(
 @router.get("/api/files/{file_id}/content")
 def download_file(
     file_id: uuid.UUID, request: Request, db: DB, user: CurrentUser
-) -> FileResponse:
+) -> Response:
     file = db.get(File, file_id)
     if file is None:
         raise HTTPException(404, "file not found")
     blobs: BlobStore = request.app.state.blobs
-    return FileResponse(
-        blobs.path(file.blob_sha256),
+    if isinstance(blobs, FilesystemStore):
+        # Supports range requests, which PDF.js uses for large files.
+        return FileResponse(
+            blobs.path(file.blob_sha256),
+            media_type=file.media_type,
+            filename=file.filename,
+            content_disposition_type="inline",
+        )
+    return StreamingResponse(
+        blobs.iter_bytes(file.blob_sha256),
         media_type=file.media_type,
-        filename=file.filename,
-        content_disposition_type="inline",
+        headers={
+            "Content-Disposition": f"inline; filename*=utf-8''{quote(file.filename)}",
+            "Content-Length": str(file.blob.size),
+        },
     )
 
 

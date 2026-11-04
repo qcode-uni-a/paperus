@@ -1,6 +1,7 @@
 """Server settings, read from environment variables prefixed with ``PAPERUS_``."""
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,6 +12,15 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://paperus:paperus@localhost:5432/paperus"
     # Sent to metadata services (Crossref asks for one), e.g. admin@example.org.
     contact_email: str | None = None
-    # File contents, stored by SHA-256.
+    # File contents, stored by SHA-256: "filesystem" (any mounted path: local
+    # disk, NFS, SMB) or "s3" (S3, MinIO, Ceph, …; credentials the usual AWS
+    # way, e.g. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY).
+    storage_backend: Literal["filesystem", "s3"] = "filesystem"
     storage_path: Path = Path("data/files")
+    s3_bucket: str | None = None
+    s3_prefix: str = ""
+    s3_endpoint_url: str | None = None
+    s3_region: str | None = None
+    # Temporary files for the s3 backend (uploads, text extraction).
+    temp_path: Path | None = None
     max_upload_bytes: int = 512 * 1024 * 1024
