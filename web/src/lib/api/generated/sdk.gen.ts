@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddVersionData, AddVersionErrors, AddVersionResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, SearchData, SearchErrors, SearchResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddVersionData, AddVersionErrors, AddVersionResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, SearchData, SearchErrors, SearchResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -131,6 +131,24 @@ export const getItem = <ThrowOnError extends boolean = false>(options: Options<G
  * Restore Item
  */
 export const restoreItem = <ThrowOnError extends boolean = false>(options: Options<RestoreItemData, ThrowOnError>): RequestResult<RestoreItemResponses, RestoreItemErrors, ThrowOnError> => (options.client ?? client).post<RestoreItemResponses, RestoreItemErrors, ThrowOnError>({ url: '/api/items/{item_id}/restore', ...options });
+
+/**
+ * Upload New Item
+ *
+ * A new item from a file, titled after the file until its text tells more.
+ *
+ * The background job looks for a DOI or arXiv ID in the file and replaces
+ * the placeholder metadata (see ``paperus.identify``).
+ */
+export const uploadNewItem = <ThrowOnError extends boolean = false>(options: Options<UploadNewItemData, ThrowOnError>): RequestResult<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError> => (options.client ?? client).post<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/uploads',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options.headers
+    }
+});
 
 /**
  * Upload To Version

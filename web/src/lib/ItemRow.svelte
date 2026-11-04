@@ -19,6 +19,7 @@
 		{/if}{item.year ?? ''}
 		{#if item.container_title}<em>{item.container_title}</em>{/if}
 		<span class="badge">{item.type}</span>
+		{#if item.processing}<span class="badge">Looking up details…</span>{/if}
 	</div>
 </li>
 

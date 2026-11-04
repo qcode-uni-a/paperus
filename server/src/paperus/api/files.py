@@ -5,6 +5,7 @@ import mimetypes
 import uuid
 from collections.abc import Iterator
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, BinaryIO
 from urllib.parse import quote
 
@@ -22,8 +23,10 @@ from paperus.models import (
     FileRole,
     FileSource,
     Item,
+    MetadataSource,
     TextStatus,
     Version,
+    VersionKind,
 )
 from paperus.storage import BlobStore, FilesystemStore, TooLarge
 
@@ -126,6 +129,34 @@ def _store_upload(
         # The worker's periodic sweep picks up pending files.
         log.warning("could not queue text extraction for %s", file.id, exc_info=True)
     return file_out(file)
+
+
+class NewItemUpload(BaseModel):
+    item_id: uuid.UUID
+    file: FileOut
+
+
+@router.post("/api/uploads", status_code=201)
+def upload_new_item(
+    upload: UploadFile, request: Request, db: DB, user: CurrentUser
+) -> NewItemUpload:
+    """A new item from a file, titled after the file until its text tells more.
+
+    The background job looks for a DOI or arXiv ID in the file and replaces
+    the placeholder metadata (see ``paperus.identify``).
+    """
+    title = Path(upload.filename or "").stem or "Untitled"
+    item = library.create_item(
+        db,
+        kind=VersionKind.OTHER,
+        label=None,
+        csl={"type": "document", "title": title},
+        source=MetadataSource.FILE,
+        identifiers=[],
+        added_by=user.id,
+    )
+    file = _store_upload(item.versions[0], upload, FileRole.MAIN, request, db, user.id)
+    return NewItemUpload(item_id=item.id, file=file)
 
 
 @router.post("/api/versions/{version_id}/files", status_code=201)

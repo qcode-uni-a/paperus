@@ -93,6 +93,9 @@ class MetadataSource(StrEnum):
     MANUAL = "manual"
     IMPORT = "import"
     SYNC = "sync"
+    FILE = "file"
+    """A placeholder from the uploaded file (its name or embedded title),
+    replaced when a DOI or arXiv ID is found in it."""
 
 
 class FileRole(StrEnum):

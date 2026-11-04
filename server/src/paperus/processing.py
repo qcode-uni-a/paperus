@@ -4,10 +4,12 @@ import hashlib
 import logging
 import uuid
 
+import httpx2
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, TextStatus
 from paperus.storage import BlobStore
 from paperus.text import TextChunk, chunk_pages, chunk_text, extract_pdf_pages
@@ -71,13 +73,38 @@ def _copy_manifest(db: Session, file: File) -> bool:
     return True
 
 
-def process_file(db: Session, blobs: BlobStore, file_id: uuid.UUID) -> None:
-    """Extract and chunk the text of a pending file, and commit."""
+def _identify(
+    db: Session, blobs: BlobStore, http: httpx2.Client | None, file: File
+) -> None:
+    """Metadata from the text, in the same transaction, so the item is only
+    shown as done when its title is too. Failures keep the text."""
+    if http is None:
+        return
+    db.flush()
+    try:
+        with db.begin_nested():
+            identify(db, blobs, http, file.id)
+    except Exception:
+        log.warning("identifying file %s failed", file.id, exc_info=True)
+
+
+def process_file(
+    db: Session,
+    blobs: BlobStore,
+    file_id: uuid.UUID,
+    http: httpx2.Client | None = None,
+) -> None:
+    """Extract and chunk the text of a pending file, identify it, and commit.
+
+    ``http`` is for looking up identifiers found in the text; without it,
+    uploads keep their placeholder metadata.
+    """
     file = db.get(File, file_id, with_for_update=True)
     if file is None or file.text_status != TextStatus.PENDING:
         return
     if _copy_manifest(db, file):
         file.text_status = TextStatus.DONE
+        _identify(db, blobs, http, file)
         db.commit()
         return
     try:
@@ -95,6 +122,7 @@ def process_file(db: Session, blobs: BlobStore, file_id: uuid.UUID) -> None:
     else:
         _store_manifest(db, file, chunks)
         file.text_status = TextStatus.DONE
+        _identify(db, blobs, http, file)
     db.commit()
 
 

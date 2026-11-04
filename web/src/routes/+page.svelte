@@ -38,6 +38,13 @@
 		return () => clearTimeout(timer);
 	});
 
+	// While the server reads new files, refresh to show their real titles.
+	$effect(() => {
+		if (!items.some((item) => item.processing)) return;
+		const timer = setInterval(() => loadItems(), 2000);
+		return () => clearInterval(timer);
+	});
+
 	// Reload when uploads (dropped anywhere, or picked below) finish.
 	$effect(() => {
 		if (uploads.finished) loadItems();

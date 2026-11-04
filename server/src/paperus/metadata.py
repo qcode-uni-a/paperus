@@ -91,3 +91,15 @@ def version_kind(doi: str, csl: dict[str, Any]) -> VersionKind:
     if csl.get("type") == "posted-content":
         return VersionKind.PREPRINT
     return VersionKind.PUBLISHED
+
+
+def lookup_doi(
+    client: httpx2.Client, doi: str, kind: VersionKind | None = None
+) -> tuple[dict[str, Any], VersionKind]:
+    """CSL-JSON and version kind for a DOI (raises DOINotFound, MetadataUnavailable)."""
+    csl = fetch_csl(client, doi)
+    kind = kind or version_kind(doi, csl)
+    if kind == VersionKind.PREPRINT:
+        # CSL's type for preprints; arXiv reports "article-journal".
+        csl = {**csl, "type": "article"}
+    return csl, kind

@@ -1,4 +1,5 @@
-import { addItem, errorMessage, type FileInfo } from '#lib/api/client.ts';
+import { errorMessage } from '#lib/api/client.ts';
+import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
 
@@ -12,7 +13,7 @@ export interface Upload {
 	itemId?: string;
 }
 
-/** Files being added; each becomes a new item titled after the file. */
+/** Files being added; each becomes a new item, identified by the server. */
 export const uploads = $state<{ list: Upload[]; finished: number }>({ list: [], finished: 0 });
 
 const PARALLEL = 2;
@@ -60,11 +61,8 @@ function pump(): void {
 async function run(upload: Upload, file: File): Promise<void> {
 	upload.status = 'uploading';
 	try {
-		const title = file.name.replace(/\.[^.]+$/, '') || file.name;
-		const { data: item, error } = await addItem({ body: { metadata: { title } } });
-		if (!item) throw new Error(errorMessage(error));
-		upload.itemId = item.id;
-		await send(`/api/items/${item.id}/files`, file, (loaded) => (upload.loaded = loaded));
+		const result = await send('/api/uploads', file, (loaded) => (upload.loaded = loaded));
+		upload.itemId = result.item_id;
 		upload.loaded = upload.size;
 		upload.status = 'done';
 		uploads.finished++;
@@ -76,14 +74,14 @@ async function run(upload: Upload, file: File): Promise<void> {
 }
 
 /** POST a file with progress reports (fetch cannot report upload progress). */
-function send(url: string, file: File, progress: (loaded: number) => void): Promise<FileInfo> {
+function send(url: string, file: File, progress: (loaded: number) => void): Promise<NewItemUpload> {
 	return new Promise((resolve, reject) => {
 		const request = new XMLHttpRequest();
 		request.open('POST', url);
 		request.responseType = 'json';
 		request.upload.onprogress = (event) => progress(event.loaded);
 		request.onload = () => {
-			if (request.status >= 200 && request.status < 300) resolve(request.response as FileInfo);
+			if (request.status >= 200 && request.status < 300) resolve(request.response as NewItemUpload);
 			else if (request.status === 401) reject(new Error('Not logged in any more.'));
 			else if (request.status === 413) reject(new Error('File too large.'));
 			else reject(new Error(errorMessage(request.response)));
@@ -91,7 +89,6 @@ function send(url: string, file: File, progress: (loaded: number) => void): Prom
 		request.onerror = () => reject(new Error('Network error.'));
 		const form = new FormData();
 		form.append('upload', file);
-		form.append('role', 'main');
 		request.send(form);
 	});
 }

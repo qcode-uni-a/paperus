@@ -166,3 +166,29 @@ def trash(obj: Trashable, user_id: uuid.UUID | None) -> None:
 def restore(obj: Trashable) -> None:
     obj.deleted_at = None
     obj.deleted_by = None
+
+
+def replace_metadata(
+    db: Session,
+    version: Version,
+    *,
+    kind: VersionKind,
+    csl: dict[str, Any],
+    source: MetadataSource,
+    identifiers: list[IdentifierValue],
+) -> None:
+    """Give a version new metadata and identifiers (e.g. found in its file)."""
+    taken = find_identifier(db, identifiers)
+    if taken is not None and taken.version_id != version.id:
+        raise IdentifierTaken(taken.scheme, taken.value, taken.version.item_id)
+    known = {(i.scheme, i.value) for i in version.identifiers}
+    version.identifiers.extend(
+        Identifier(scheme=scheme, value=value)
+        for scheme, value in dict.fromkeys(identifiers)
+        if (scheme, value) not in known
+    )
+    version.kind = kind
+    version.csl = {**csl, "type": csl_type(csl)}
+    version.metadata_source = source
+    db.flush()
+    refresh_item(version.item)

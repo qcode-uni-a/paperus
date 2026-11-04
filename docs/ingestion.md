@@ -20,6 +20,20 @@
     lookup never overwrites a manual edit.
 - Never let AI change bibliographic metadata without the user seeing it.
 
+## Identifying uploaded files
+
+A dropped file becomes an item titled after the file, marked as a
+placeholder. After text extraction, in the same transaction:
+
+1. DOIs and arXiv IDs on the first two pages are looked up; the first whose
+   registry title also appears on those pages wins (papers cite other DOIs).
+2. Otherwise a plausible title embedded in the PDF replaces the file name.
+3. A DOI that is already in the library is left alone for now; merging
+   duplicates comes later. Later: title search (Crossref) as a suggestion,
+   GROBID for files without identifiers.
+
+Manual metadata is never replaced; only placeholders are.
+
 ## PDFs
 
 Order when an item has no PDF yet:

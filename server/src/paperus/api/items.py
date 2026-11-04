@@ -14,7 +14,7 @@ from paperus import changes, library, metadata
 from paperus.api.deps import DB, CurrentUser
 from paperus.api.files import FileOut, file_out
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
-from paperus.models import Item, MetadataSource, Version, VersionKind
+from paperus.models import Item, MetadataSource, TextStatus, Version, VersionKind
 
 router = APIRouter(tags=["items"])
 
@@ -75,6 +75,8 @@ class ItemOut(BaseModel):
     created_at: datetime
     change: int
     deleted_at: datetime | None
+    processing: bool
+    """Files are still being read (text, and metadata for uploads)."""
 
 
 class ItemDetail(ItemOut):
@@ -133,6 +135,11 @@ def item_out(item: Item) -> ItemOut:
         created_at=item.created_at,
         change=item.change,
         deleted_at=item.deleted_at,
+        processing=any(
+            f.text_status == TextStatus.PENDING and f.deleted_at is None
+            for v in item.versions
+            for f in v.files
+        ),
     )
 
 
@@ -199,15 +206,11 @@ def _resolve(
         )
     doi = identifiers[0][1]
     try:
-        csl = metadata.fetch_csl(http, doi)
+        csl, kind = metadata.lookup_doi(http, doi, body.kind)
     except metadata.DOINotFound as error:
         raise HTTPException(404, "DOI not found") from error
     except metadata.MetadataUnavailable as error:
         raise HTTPException(502, "metadata lookup failed") from error
-    kind = body.kind or metadata.version_kind(doi, csl)
-    if kind == VersionKind.PREPRINT:
-        # CSL's type for preprints; arXiv reports "article-journal".
-        csl = {**csl, "type": "article"}
     return ResolvedVersion(
         kind=kind,
         label=body.label,

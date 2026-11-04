@@ -5,6 +5,16 @@ export type ClientOptions = {
 };
 
 /**
+ * Body_upload_new_item
+ */
+export type BodyUploadNewItem = {
+    /**
+     * Upload
+     */
+    upload: Blob | File;
+};
+
+/**
  * Body_upload_to_item
  */
 export type BodyUploadToItem = {
@@ -156,6 +166,10 @@ export type ItemDetail = {
      */
     deleted_at: string | null;
     /**
+     * Processing
+     */
+    processing: boolean;
+    /**
      * Csl
      */
     csl: {
@@ -221,6 +235,10 @@ export type ItemOut = {
      * Deleted At
      */
     deleted_at: string | null;
+    /**
+     * Processing
+     */
+    processing: boolean;
 };
 
 /**
@@ -251,7 +269,18 @@ export type LoginResponse = {
 /**
  * MetadataSource
  */
-export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync';
+export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
+
+/**
+ * NewItemUpload
+ */
+export type NewItemUpload = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    file: FileOut;
+};
 
 /**
  * Passage
@@ -781,6 +810,31 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type UploadNewItemData = {
+    body: BodyUploadNewItem;
+    path?: never;
+    query?: never;
+    url: '/api/uploads';
+};
+
+export type UploadNewItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadNewItemError = UploadNewItemErrors[keyof UploadNewItemErrors];
+
+export type UploadNewItemResponses = {
+    /**
+     * Successful Response
+     */
+    201: NewItemUpload;
+};
+
+export type UploadNewItemResponse = UploadNewItemResponses[keyof UploadNewItemResponses];
 
 export type UploadToVersionData = {
     body: BodyUploadToVersion;

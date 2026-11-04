@@ -556,6 +556,48 @@
         }
       }
     },
+    "/api/uploads": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload New Item",
+        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``).",
+        "operationId": "upload_new_item",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_new_item"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewItemUpload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/versions/{version_id}/files": {
       "post": {
         "tags": [
@@ -848,6 +890,20 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_new_item": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_upload_new_item"
+      },
       "Body_upload_to_item": {
         "properties": {
           "upload": {
@@ -1096,6 +1152,10 @@
             ],
             "title": "Deleted At"
           },
+          "processing": {
+            "type": "boolean",
+            "title": "Processing"
+          },
           "csl": {
             "additionalProperties": true,
             "type": "object",
@@ -1138,6 +1198,7 @@
           "created_at",
           "change",
           "deleted_at",
+          "processing",
           "csl",
           "overrides",
           "preferred_version_id",
@@ -1216,6 +1277,10 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "processing": {
+            "type": "boolean",
+            "title": "Processing"
           }
         },
         "type": "object",
@@ -1229,7 +1294,8 @@
           "identifiers",
           "created_at",
           "change",
-          "deleted_at"
+          "deleted_at",
+          "processing"
         ],
         "title": "ItemOut"
       },
@@ -1274,9 +1340,28 @@
           "lookup",
           "manual",
           "import",
-          "sync"
+          "sync",
+          "file"
         ],
         "title": "MetadataSource"
+      },
+      "NewItemUpload": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "file": {
+            "$ref": "#/components/schemas/FileOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "file"
+        ],
+        "title": "NewItemUpload"
       },
       "Passage": {
         "properties": {

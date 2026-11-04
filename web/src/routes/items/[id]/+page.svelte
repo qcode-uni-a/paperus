@@ -68,6 +68,13 @@
 		if (id) load();
 	});
 
+	// Refresh while the server reads the files (text, title from the file).
+	$effect(() => {
+		if (!item?.processing) return;
+		const timer = setInterval(load, 2000);
+		return () => clearInterval(timer);
+	});
+
 	/** Run an action; show its error or reload the item. */
 	async function act(action: () => Promise<{ error?: unknown; response?: Response }>) {
 		error = '';
@@ -133,6 +140,14 @@
 		if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`;
 		return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 	}
+
+	const SOURCE: Record<string, string> = {
+		lookup: 'from registry',
+		manual: 'entered by hand',
+		file: 'from the file',
+		import: 'imported',
+		sync: 'synced'
+	};
 
 	const TEXT_STATUS: Record<string, string> = {
 		pending: 'Reading text…',
@@ -251,9 +266,7 @@
 								Cite this version
 							</button>
 						{/if}
-						<span class="muted"
-							>{version.metadata_source === 'lookup' ? 'from registry' : 'entered by hand'}</span
-						>
+						<span class="muted">{SOURCE[version.metadata_source]}</span>
 					</div>
 					{#if version.identifiers.length}
 						<div class="row">

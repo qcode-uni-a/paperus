@@ -9,6 +9,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 
+import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector
 from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import make_url
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.metadata import make_http_client
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
 
@@ -28,6 +30,7 @@ tasks = Blueprint()
 class WorkerContext:
     sessions: sessionmaker[Session]
     blobs: BlobStore
+    http: httpx2.Client
 
 
 _context: WorkerContext | None = None
@@ -43,7 +46,7 @@ def _worker_context() -> WorkerContext:
 def extract_text(file_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
-        process_file(db, context.blobs, uuid.UUID(file_id))
+        process_file(db, context.blobs, uuid.UUID(file_id), context.http)
 
 
 @tasks.periodic(cron="*/5 * * * *")
@@ -85,6 +88,7 @@ def run_worker(settings: Settings) -> None:
     _context = WorkerContext(
         sessions=make_sessionmaker(make_engine(settings.database_url)),
         blobs=make_blob_store(settings),
+        http=make_http_client(settings),
     )
     app = make_job_app(settings)
     with app.open():

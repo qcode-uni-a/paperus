@@ -5,7 +5,7 @@ def _escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def make_pdf(pages: list[list[str]]) -> bytes:
+def make_pdf(pages: list[list[str]], title: str | None = None) -> bytes:
     """A PDF with one page per entry, each entry a list of text lines."""
     objects: list[bytes] = []
     page_count = len(pages)
@@ -30,6 +30,11 @@ def make_pdf(pages: list[list[str]]) -> bytes:
             b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream)
         )
 
+    info = ""
+    if title is not None:
+        objects.append(f"<< /Title ({_escape(title)}) >>".encode())
+        info = f" /Info {len(objects)} 0 R"
+
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
     for number, body in enumerate(objects, 1):
@@ -39,8 +44,9 @@ def make_pdf(pages: list[list[str]]) -> bytes:
     out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
     for offset in offsets:
         out += b"%010d 00000 n \n" % offset
-    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+    out += b"trailer\n<< /Size %d /Root 1 0 R%s >>\nstartxref\n%d\n%%%%EOF\n" % (
         len(objects) + 1,
+        info.encode(),
         xref,
     )
     return bytes(out)
