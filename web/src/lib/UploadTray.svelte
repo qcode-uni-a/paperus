@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { clearFinished, uploads } from '#lib/uploads.svelte.ts';
+	import { fade, slide } from 'svelte/transition';
+	import { clearFinished, remove, uploads } from '#lib/uploads.svelte.ts';
 
 	let collapsed = $state(false);
 
@@ -22,7 +23,12 @@
 </script>
 
 {#if uploads.list.length}
-	<aside class="tray card" aria-live="polite" aria-label="Uploads">
+	<aside
+		class="tray card"
+		aria-live="polite"
+		aria-label="Uploads"
+		transition:fade={{ duration: 200 }}
+	>
 		<div class="head">
 			<strong>{summary}</strong>
 			<div class="row">
@@ -39,7 +45,7 @@
 		{#if !collapsed}
 			<ul>
 				{#each uploads.list as upload (upload.id)}
-					<li>
+					<li out:slide={{ duration: 300 }}>
 						<div class="name">
 							<span title={upload.name}>{upload.name}</span>
 							{#if upload.status === 'done' && upload.itemId}
@@ -51,7 +57,12 @@
 							{/if}
 						</div>
 						{#if upload.status === 'failed'}
-							<div class="error">{upload.error}</div>
+							<div class="failed">
+								<span class="error">{upload.error}</span>
+								<button class="icon" onclick={() => remove(upload.id)} aria-label="Dismiss"
+									>✕</button
+								>
+							</div>
 						{:else}
 							<div class="bar" class:done={upload.status === 'done'}>
 								<div style:width="{percent(upload.loaded, upload.size)}%"></div>
@@ -110,6 +121,12 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.failed {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 8px;
 	}
 	.bar {
 		height: 4px;

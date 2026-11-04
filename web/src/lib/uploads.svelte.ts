@@ -16,6 +16,8 @@ export interface Upload {
 export const uploads = $state<{ list: Upload[]; finished: number }>({ list: [], finished: 0 });
 
 const PARALLEL = 2;
+/** How long a finished upload stays in the list. */
+const SHOW_DONE_MS = 4000;
 const queue: { upload: Upload; file: File }[] = [];
 let running = 0;
 let nextId = 1;
@@ -34,6 +36,10 @@ export function addFiles(files: Iterable<File>): void {
 		queue.push({ upload: uploads.list[uploads.list.length - 1], file });
 	}
 	pump();
+}
+
+export function remove(id: number): void {
+	uploads.list = uploads.list.filter((u) => u.id !== id);
 }
 
 export function clearFinished(): void {
@@ -62,6 +68,7 @@ async function run(upload: Upload, file: File): Promise<void> {
 		upload.loaded = upload.size;
 		upload.status = 'done';
 		uploads.finished++;
+		setTimeout(() => remove(upload.id), SHOW_DONE_MS);
 	} catch (error) {
 		upload.status = 'failed';
 		upload.error = error instanceof Error ? error.message : String(error);
