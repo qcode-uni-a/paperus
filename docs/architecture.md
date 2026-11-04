@@ -91,6 +91,13 @@ Item: the work; notes, tags, collections, citation metadata
 - **Note**: Markdown, linked to items and passages; owner + visibility.
 - **Annotation**: W3C Web Annotation model, anchored by text quote selector
   plus page coordinates.
+- **Person** (later): an author or editor, so people can click a name and
+  see all of that person's items in the library. Linked from items by
+  position and role (author, editor, …); the CSL-JSON stays as it is.
+  Matching: ORCID first (Crossref and DataCite often include it), then
+  OpenAlex author IDs, then normalized names ("Huber, A." vs "Anna Huber")
+  only as a suggestion. Users can merge and split people, since names are
+  ambiguous both ways (two people, one name; one person, several spellings).
 - **Collection, tag, group, membership, role.**
 - **Provenance**: who or what created each object (user, AI via client X,
   import, sync), for labels, the AI inbox and the audit log.
