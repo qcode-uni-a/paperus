@@ -1,0 +1,75 @@
+# Architecture
+
+## Components
+
+```
+Browser extension ─┐
+Web app ───────────┼──► API server (FastAPI) ──► Postgres + pgvector
+Your AI assistant ─┘        │  MCP server            (items, notes, chunks,
+   (via MCP)                │                         vectors, permissions)
+                            ├──► Workers (task queue)
+                            │       metadata lookup, parsing, chunking,
+                            │       open-access checks, related papers
+                            ├──► Model service (separate container, optional GPU)
+                            │       embeddings, reranking, OCR
+                            └──► Object storage (S3-compatible or filesystem)
+                                    PDFs and files, stored by SHA-256
+
+External (read-only): Crossref, OpenAlex, arXiv, PubMed, Unpaywall,
+Semantic Scholar (SPECTER2 vectors), Zotero translation-server (optional)
+```
+
+The server never calls an LLM vendor. AI reasoning happens in the user's own
+client; the server does retrieval, permissions and provenance.
+
+## Stack
+
+| Part | Choice |
+| --- | --- |
+| API | Python, FastAPI + Pydantic; OpenAPI schema generates the TypeScript client |
+| Database | Postgres + pgvector; SQLAlchemy 2 or psycopg; Alembic migrations |
+| Task queue | Procrastinate (queue in Postgres, no Redis); alternatives Dramatiq/Celery |
+| Model service | Separate container like Immich's ML service: embeddings, reranker, OCR |
+| MCP | Official Python SDK, mounted in the same FastAPI app; Streamable HTTP |
+| Frontend | TypeScript, SvelteKit or React, PDF.js |
+| Browser extension | TypeScript, WebExtensions (Chrome + Firefox) |
+| Tooling | uv, ruff, ty, pytest |
+
+Rust via PyO3/maturin is an option later for measured hot spots (chunking,
+hashing, diffing). Keep those parts pure functions with simple inputs and
+outputs. Measure first: the database and models are the likely bottlenecks.
+
+## Data model (first sketch)
+
+- **Item**: one work (paper, book, thesis, report, lecture notes, slides,
+  meeting notes, method, dataset, code). Citation metadata optional;
+  item types follow CSL where possible.
+- **File**: belongs to an item, stored by SHA-256. Has a version type:
+  internal draft, submitted, preprint, accepted, published, supplementary,
+  synced (git). Can carry its own DOI or arXiv ID.
+- **Version manifest**: ordered list of chunk hashes for a file version.
+- **Chunk**: paragraph-sized text, stored once per content hash, with page and
+  position anchors, section path and type (body, caption, abstract, note,
+  annotation).
+- **Embedding**: per (chunk hash, model ID).
+- **Note**: Markdown, linked to items and passages; owner + visibility.
+- **Annotation**: W3C Web Annotation model, anchored by text quote selector
+  plus page coordinates.
+- **Collection, tag, group, membership, role.**
+- **Provenance**: who or what created each object (user, AI via client X,
+  import, sync), for labels, the AI inbox and the audit log.
+
+Every chunk and note carries owner and visibility, so permission filters run
+inside the search query itself.
+
+## Scaling notes
+
+- pgvector limits (from memory, verify): `vector` indexable up to 2,000
+  dimensions, `halfvec` up to 4,000, storable up to 16,000.
+- Rough memory at 1,024 dimensions as `halfvec`: one group (~500k vectors)
+  ~1 GB; a department (~5M) ~10–15 GB; a whole university (~50M) 100+ GB.
+- For a group, exact search without an index is fast (tens of ms) and always
+  correct with permission filters. Add HNSW later, with iterative index scans
+  (pgvector 0.8+), possibly partial indexes per group.
+- Beyond tens of millions of vectors: pgvectorscale (DiskANN) or binary
+  quantization with re-scoring.

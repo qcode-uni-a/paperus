@@ -1,0 +1,103 @@
+# Ingestion
+
+## Adding items
+
+- Paste a DOI, arXiv ID, PubMed ID or URL; drop in PDFs or other files; click
+  the browser extension; import from Zotero, Mendeley or BibTeX.
+- First screen for new users: "Drop PDFs here" or "Import from Zotero".
+  Nothing to configure.
+
+## Metadata
+
+- Easy case (most recent papers): DOI → Crossref/OpenAlex. arXiv and PubMed IDs
+  the same way.
+- Hard cases:
+  - no DOI in the file: extract the title with GROBID, search Crossref/OpenAlex
+    by title (wrong matches happen, so show confidence and ask);
+  - preprint and published version of the same work: link them (see versions);
+  - books and non-STEM: ISBN via Open Library or national library catalogues;
+  - duplicates and manual corrections: keep field-level provenance so a later
+    lookup never overwrites a manual edit.
+- Never let AI change bibliographic metadata without the user seeing it.
+
+## PDFs
+
+Order when an item has no PDF yet:
+
+1. **Server, open access only**: Unpaywall, arXiv, PubMed Central, bioRxiv,
+   publisher OA links. Re-check periodically (e.g. weekly), since open
+   versions often appear later.
+2. **Browser**: the extension downloads the PDF in the user's own session
+   (including the university proxy or Shibboleth) and uploads it.
+3. **Manual**: the item stays metadata-only with status "no PDF"; a
+   "Get PDF" button opens the publisher page through the university's proxy
+   prefix (e.g. EZproxy, configurable) and the extension catches the download.
+
+The server never downloads from publishers itself: licences, the risk of the
+publisher blocking the whole campus IP range, and cookie-bound links.
+
+Details:
+
+- Check for `%PDF` magic bytes; a 200 response is often a login page.
+- The extension sends the SHA-256 first; skip the upload if the server has it.
+- Resumable uploads (e.g. tus) for large scans.
+- Record where each PDF came from (open access, user upload, manual), which
+  matters for sharing rules.
+- Items are deduplicated by DOI, so a PDF one member adds is available to the
+  group, subject to the group's sharing settings.
+
+## Browser extension
+
+- Read `citation_*` meta tags (`citation_title`, `citation_doi`,
+  `citation_pdf_url`, …), DOI patterns, JSON-LD and COinS.
+- Fallback: Zotero's translation-server (AGPL, run unmodified as a separate
+  service) for site-specific translators.
+
+## Versions of a document
+
+- One item, several files with version types (see architecture).
+- Citations use the published version by default, the preprint otherwise.
+- Link preprint ↔ published automatically via arXiv `journal-ref` and
+  Crossref/OpenAlex relations; offer to merge when both are added.
+- Annotations stay on their version, anchored by text quote, so they can be
+  carried over to a newer version on request.
+- Internal drafts: private to authors or the group by default.
+
+## Other kinds of sources
+
+Everything is an item with a type and a source; same pipeline, no separate
+editors.
+
+| Source | How | When |
+| --- | --- | --- |
+| Uploads: PDF, DOCX, PPTX, Markdown, images | Same pipeline; Docling for Office files and slides | First version |
+| Notes written in the app | Markdown | First version |
+| GitLab/GitHub repos (LaTeX/Markdown lecture notes) | Link repo + path; pull on webhook or nightly; index the source text; optionally keep the CI-built PDF | Second step |
+| Overleaf | Via Overleaf's git integration (paid plans, Server Pro), then like a git repo | Second step |
+| Handwritten notes, whiteboard photos | Image + transcription; printed text via server OCR; handwriting via the user's own AI over MCP (no GPU needed); optional server vision model later | Second step |
+| Meeting notes, transcripts | Upload or create via MCP, labelled AI-written if so; Teams/Zoom transcript import | Later |
+
+Meeting notes contain personal data: default visibility to participants, offer
+a retention setting.
+
+## Frequent updates without clutter
+
+- Chunks stored by content hash; a version is a manifest of chunk hashes.
+  A typo fix in 100 pages = 1 new chunk + 1 embedding (~4 KB).
+- Structure-aware chunking keeps boundaries stable; fixed-size sliding windows
+  would shift every chunk after an insertion. Content-defined chunking for
+  unstructured files.
+- For git sources store the commit ID and manifest, not file copies. Keep the
+  built PDF only for the latest and tagged versions.
+- Coalesce frequent syncs (e.g. one visible version per day, or on tags, or
+  when more than a few percent changed).
+- Search covers the latest version by default; unreferenced old chunks are
+  garbage-collected.
+
+## Migration from Zotero
+
+Import via the Zotero Web API or the local `zotero.sqlite` + storage folder.
+Keep items, collections, tags, notes, PDF annotations and Better BibTeX
+citation keys (existing LaTeX documents depend on them). Option: index an
+existing PDF or Zotero storage folder read-only, like Immich's external
+libraries.
