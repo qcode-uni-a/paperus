@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
     BigInteger,
     Computed,
@@ -272,3 +273,17 @@ class FileChunk(Base):
     position: Mapped[int] = mapped_column(Integer, primary_key=True)
     chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
     page: Mapped[int | None]
+
+
+class Embedding(Base):
+    """A chunk's vector from one model; several models can coexist."""
+
+    __tablename__ = "embeddings"
+
+    chunk_sha256: Mapped[bytes] = mapped_column(
+        ForeignKey("chunks.sha256", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    # No fixed dimension: models differ. Exact search is fast at group scale;
+    # an index per model can cast to halfvec(n) later.
+    embedding: Mapped[list[float]] = mapped_column(HALFVEC())

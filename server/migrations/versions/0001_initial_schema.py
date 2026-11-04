@@ -9,6 +9,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 from alembic import op
+from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
@@ -248,10 +249,23 @@ def upgrade() -> None:
         ["chunk_sha256"],
         unique=False,
     )
+    op.create_table(
+        "embeddings",
+        sa.Column("chunk_sha256", sa.LargeBinary(length=32), nullable=False),
+        sa.Column("model", sa.String(length=64), nullable=False),
+        sa.Column("embedding", HALFVEC(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["chunk_sha256"], ["chunks.sha256"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("chunk_sha256", "model"),
+    )
+    op.create_index(op.f("ix_embeddings_model"), "embeddings", ["model"], unique=False)
     op.execute("INSERT INTO change_counters (name, value) VALUES ('library', 0)")
 
 
 def downgrade() -> None:
+    op.drop_index(op.f("ix_embeddings_model"), table_name="embeddings")
+    op.drop_table("embeddings")
     op.execute(DROP_PROCRASTINATE)
     op.drop_index(op.f("ix_file_chunks_chunk_sha256"), table_name="file_chunks")
     op.drop_table("file_chunks")

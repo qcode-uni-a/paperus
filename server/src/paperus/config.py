@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     # http://localhost). Turn off only to test from other devices on a local
     # network over plain HTTP.
     cookie_secure: bool = True
+    # The machine learning service (paperus-ml): addresses tried in order,
+    # e.g. a GPU machine first and the local container as fallback.
+    ml_urls: list[str] = ["http://127.0.0.1:3003"]
+    ml_token: str | None = None
+    ml_timeout: float = 120
+    # Model for search by meaning; changing it re-embeds the library in the
+    # background (keyword search keeps working meanwhile).
+    embedding_model: str = "bge-m3"
     # Sent to metadata services (Crossref asks for one), e.g. admin@example.org.
     contact_email: str | None = None
     # File contents, stored by SHA-256: "filesystem" (any mounted path: local

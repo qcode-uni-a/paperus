@@ -5,10 +5,14 @@ They use the database ``paperus_test`` on the compose Postgres (override with
 emptied after each test. Without a reachable database these tests are skipped.
 """
 
+import hashlib
+import json
+import math
 import os
+import re
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx2
 import pytest
@@ -26,6 +30,7 @@ from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import tasks
+from paperus.ml import MLClient
 from paperus.storage import BlobStore, make_blob_store
 
 TEST_DATABASE_URL = os.environ.get(
@@ -101,6 +106,56 @@ class FakeDOIRegistry:
         return httpx2.Response(200, json=self.records[doi])
 
 
+class FakeML:
+    """Stands in for paperus-ml: a word's vector depends on its meaning group,
+    so "gaps" and "missing" are close without sharing letters."""
+
+    DIMENSIONS = 16
+    SAME_MEANING: ClassVar[dict[str, str]] = {
+        "gaps": "missing",
+        "absent": "missing",
+        "rainfall": "rain",
+    }
+
+    def __init__(self) -> None:
+        self.down = False
+        self.requests: list[dict[str, Any]] = []
+
+    def vector(self, text: str) -> list[float]:
+        vector = [0.0] * self.DIMENSIONS
+        for word in re.findall(r"\w+", text.lower()):
+            word = self.SAME_MEANING.get(word, word)
+            vector[
+                int(hashlib.sha256(word.encode()).hexdigest(), 16) % self.DIMENSIONS
+            ] += 1
+        norm = math.sqrt(sum(x * x for x in vector)) or 1.0
+        return [x / norm for x in vector]
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if self.down:
+            raise httpx2.ConnectError("ML service down")
+        body = json.loads(request.content)
+        self.requests.append(body)
+        vectors = [self.vector(t) for t in body["texts"]]
+        return httpx2.Response(
+            200,
+            json={
+                "model": body["model"],
+                "dimensions": self.DIMENSIONS,
+                "embeddings": vectors,
+            },
+        )
+
+    def client(self) -> MLClient:
+        transport = httpx2.MockTransport(self)
+        return MLClient(["http://ml"], http=httpx2.Client(transport=transport))
+
+
+@pytest.fixture
+def fake_ml() -> FakeML:
+    return FakeML()
+
+
 @pytest.fixture
 def doi_registry() -> FakeDOIRegistry:
     return FakeDOIRegistry()
@@ -126,12 +181,17 @@ def blobs(settings: Settings) -> BlobStore:
 
 @pytest.fixture
 def client(
-    settings: Settings, db: Session, doi_registry: FakeDOIRegistry, job_app: App
+    settings: Settings,
+    db: Session,
+    doi_registry: FakeDOIRegistry,
+    job_app: App,
+    fake_ml: FakeML,
 ) -> Iterator[TestClient]:
     app = create_app(
         settings,
         http_client=httpx2.Client(transport=httpx2.MockTransport(doi_registry)),
         job_app=job_app,
+        ml_client=fake_ml.client(),
     )
     # https, so the client sends the Secure session cookie back.
     with TestClient(app, base_url="https://testserver") as client:

@@ -10,14 +10,16 @@ import uuid
 from dataclasses import dataclass
 
 import httpx2
-from procrastinate import App, Blueprint, JobContext, PsycopgConnector
+from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
 from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.embedding import embed_file, files_missing_embeddings
 from paperus.metadata import make_http_client
+from paperus.ml import MLClient, MLUnavailable, make_ml_client
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
 
@@ -31,6 +33,8 @@ class WorkerContext:
     sessions: sessionmaker[Session]
     blobs: BlobStore
     http: httpx2.Client
+    ml: MLClient
+    embedding_model: str
 
 
 _context: WorkerContext | None = None
@@ -42,11 +46,49 @@ def _worker_context() -> WorkerContext:
     return _context
 
 
-@tasks.task(name="extract_text", queue="text", retry=2)
-def extract_text(file_id: str) -> None:
+@tasks.task(name="extract_text", queue="text", retry=2, pass_context=True)
+def extract_text(job: JobContext, file_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
         process_file(db, context.blobs, uuid.UUID(file_id), context.http)
+    queue_embedding(job.app, uuid.UUID(file_id))
+
+
+# The ML service may be down or busy (model download): retry for about half
+# an hour with growing pauses; the periodic sweep catches the rest.
+@tasks.task(
+    name="embed_file",
+    queue="ml",
+    retry=RetryStrategy(
+        max_attempts=10, exponential_wait=2, retry_exceptions={MLUnavailable}
+    ),
+)
+def embed(file_id: str) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        count = embed_file(db, context.ml, context.embedding_model, uuid.UUID(file_id))
+    log.info("embedded %d chunks of file %s", count, file_id)
+
+
+@tasks.periodic(cron="*/10 * * * *")
+@tasks.task(
+    name="queue_missing_embeddings",
+    queue="ml",
+    queueing_lock="embedding-sweep",
+    pass_context=True,
+)
+def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
+    """Also re-embeds the library after the embedding model changed."""
+    context = _worker_context()
+    with context.sessions() as db:
+        for file_id in files_missing_embeddings(db, context.embedding_model):
+            queue_embedding(job.app, file_id)
+
+
+def queue_embedding(app: App, file_id: uuid.UUID) -> None:
+    task = app.configure_task("paperus:embed_file", queueing_lock=f"embed-{file_id}")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(file_id=str(file_id))
 
 
 @tasks.periodic(cron="*/5 * * * *")
@@ -89,7 +131,9 @@ def run_worker(settings: Settings) -> None:
         sessions=make_sessionmaker(make_engine(settings.database_url)),
         blobs=make_blob_store(settings),
         http=make_http_client(settings),
+        ml=make_ml_client(settings),
+        embedding_model=settings.embedding_model,
     )
     app = make_job_app(settings)
     with app.open():
-        app.run_worker(queues=["text"])
+        app.run_worker(queues=["text", "ml"])
