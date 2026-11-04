@@ -67,10 +67,12 @@ Details:
 - Adding an identifier that belongs to a version of an existing item finds
   that item; adding a known preprint's published DOI adds a version.
 
-### Finding published versions of preprints
+### Finding published versions of preprints (later)
 
-A background job checks items whose preferred version is a preprint, on
-ingest and then periodically (e.g. weekly, like the open-access check).
+A nightly background job checks items whose preferred version is a preprint
+(also once on ingest). When it finds a newer version, it adds it and tries
+to obtain its PDF the usual way (open access on the server, otherwise
+"Get PDF" for the user's browser).
 Sources, all free, checked 2026-11-04 with arXiv 2006.10256 (NumPy paper):
 
 | Source | What it gives | Result for the example |
