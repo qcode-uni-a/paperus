@@ -27,6 +27,12 @@ repos:
         language: system
         files: ^server/.*\.py$
         pass_filenames: false
+      - id: ty-ml
+        name: ty (ml)
+        entry: uv run --directory ml ty check src tests
+        language: system
+        files: ^ml/.*\.py$
+        pass_filenames: false
       - id: prettier
         name: prettier (web)
         entry: npm --prefix web run lint

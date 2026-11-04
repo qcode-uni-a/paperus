@@ -1,0 +1,42 @@
+[project]
+name = "paperus-ml"
+version = "0.0.0"
+description = "Machine learning service of paperus: text embeddings (later reranking, OCR)"
+license = "Apache-2.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.162.0",
+    "huggingface-hub>=2.4.0",
+    "numpy>=2.5.4",
+    "onnxruntime>=1.31.1",
+    "pydantic-settings>=2.16.2",
+    "tokenizers>=0.23.3",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+paperus-ml = "paperus_ml.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+markers = ["download: downloads a real model (set PAPERUS_ML_TEST_DOWNLOAD=1)"]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.0",
+    "onnx>=1.23.2",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+    "ty>=0.0.97",
+]
