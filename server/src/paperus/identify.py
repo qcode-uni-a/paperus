@@ -2,8 +2,9 @@
 
 Runs after text extraction for items whose metadata is only a placeholder
 from the upload (``MetadataSource.FILE``). A DOI or arXiv ID on the first
-pages is looked up, and used only if the registry's title also appears on
-those pages: papers cite other DOIs, and a wrong match renames the paper.
+pages (or an arXiv ID as file name) is looked up, and used only if the
+registry's title also appears on those pages: papers cite other DOIs, and a
+wrong match renames the paper.
 Without an identifier, a plausible title embedded in the PDF is used.
 """
 
@@ -60,6 +61,18 @@ def find_identifiers(text: str) -> list[tuple[Scheme, str]]:
         except InvalidIdentifier:
             continue
     return list(dict.fromkeys(found))
+
+
+# arXiv names downloads by ID ("2101.00001v2.pdf"); DOIs appear in names
+# with "/" replaced, which cannot be undone reliably, so only arXiv here.
+_ARXIV_FILENAME = re.compile(
+    r"^(?:arxiv[_-]?)?(\d{4}\.\d{4,5})(?:v\d+)?$", re.IGNORECASE
+)
+
+
+def identifiers_in_filename(filename: str) -> list[tuple[Scheme, str]]:
+    match = _ARXIV_FILENAME.match(Path(filename).stem)
+    return [(Scheme.ARXIV, match.group(1))] if match else []
 
 
 def _words(text: str) -> list[str]:
@@ -124,7 +137,8 @@ def identify(
         return
 
     text = _first_pages_text(db, file.id)
-    for scheme, value in find_identifiers(text):
+    candidates = find_identifiers(text) + identifiers_in_filename(file.filename)
+    for scheme, value in dict.fromkeys(candidates):
         doi = _doi_for(scheme, value)
         identifiers = [(Scheme.DOI, doi), *implied_by_doi(doi)]
         try:

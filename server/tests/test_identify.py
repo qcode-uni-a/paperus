@@ -7,7 +7,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from paperus.identifiers import Scheme
-from paperus.identify import find_identifiers, plausible_title, title_appears
+from paperus.identify import (
+    find_identifiers,
+    identifiers_in_filename,
+    plausible_title,
+    title_appears,
+)
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
@@ -212,3 +217,31 @@ def test_failing_lookup_keeps_the_text(
     assert item["title"] == "scan_0042"
     hits = logged_in.get("/api/search", params={"q": "Bavarian"}).json()
     assert len(hits) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "found"),
+    [
+        ("2611.04892v1.pdf", [(Scheme.ARXIV, "2611.04892")]),
+        ("arXiv_2101.00001.pdf", [(Scheme.ARXIV, "2101.00001")]),
+        ("paper 2101.00001.pdf", []),
+        ("scan_0042.pdf", []),
+    ],
+)
+def test_identifiers_in_filename(name: str, found: list[tuple[Scheme, str]]) -> None:
+    assert identifiers_in_filename(name) == found
+
+
+def test_arxiv_id_from_filename(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+) -> None:
+    doi_registry.records["10.48550/arxiv.2101.00001"] = CSL
+    pdf = make_pdf([FIRST_PAGE[1:3]])
+    uploaded = upload(logged_in, pdf, name="2101.00001v3.pdf")
+    run_job(db, blobs, doi_registry, uploaded["file"]["id"])
+    item = get_item(logged_in, uploaded["item_id"])
+    assert item["title"] == "Drought indices for Bavarian rivers"
+    assert {"scheme": "arxiv", "value": "2101.00001"} in item["identifiers"]
