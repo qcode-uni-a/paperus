@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     # way, e.g. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY).
     storage_backend: Literal["filesystem", "s3"] = "filesystem"
     storage_path: Path = Path("data/files")
+    backup_path: Path = Path("data/backups")
+    """Where backups go: best another disk or a network share."""
     s3_bucket: str | None = None
     s3_prefix: str = ""
     s3_endpoint_url: str | None = None

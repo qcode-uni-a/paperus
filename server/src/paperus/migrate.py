@@ -11,9 +11,13 @@ from paperus.config import Settings
 MIGRATIONS = Path(__file__).resolve().parent / "migrations"
 
 
-def migrate(settings: Settings) -> None:
+def alembic_config(settings: Settings) -> Config:
     config = Config()
     config.set_main_option("script_location", str(MIGRATIONS))
     # "%" is interpolation syntax in Alembic's config; passwords may contain it.
     config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
-    command.upgrade(config, "head")
+    return config
+
+
+def migrate(settings: Settings, revision: str = "head") -> None:
+    command.upgrade(alembic_config(settings), revision)

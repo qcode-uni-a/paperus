@@ -8,13 +8,15 @@ import contextlib
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
 from procrastinate.exceptions import AlreadyEnqueued
-from sqlalchemy import make_url
+from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
+from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.embedding import embed_file, files_missing_embeddings
@@ -22,7 +24,7 @@ from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLUnavailable, make_ml_client
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
-from paperus.system import load_config
+from paperus.system import load_backup_config, load_config
 
 log = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ tasks = Blueprint()
 
 @dataclass
 class WorkerContext:
+    engine: Engine
     sessions: sessionmaker[Session]
     blobs: BlobStore
     http: httpx2.Client
@@ -146,8 +149,10 @@ def make_job_app(settings: Settings) -> App:
 
 def run_worker(settings: Settings) -> None:
     global _context
+    engine = make_engine(settings.database_url)
     _context = WorkerContext(
-        sessions=make_sessionmaker(make_engine(settings.database_url)),
+        engine=engine,
+        sessions=make_sessionmaker(engine),
         blobs=make_blob_store(settings),
         http=make_http_client(settings),
         ml=make_ml_client(settings),
@@ -155,4 +160,37 @@ def run_worker(settings: Settings) -> None:
     )
     app = make_job_app(settings)
     with app.open():
-        app.run_worker(queues=["text", "ml"])
+        app.run_worker(queues=["text", "ml", "backup"])
+
+
+@tasks.task(name="backup", queue="backup", queueing_lock="backup")
+def run_backup(with_files: bool) -> None:
+    """Write a backup now, then remove the oldest beyond the number kept."""
+    context = _worker_context()
+    root = context.settings.backup_path
+    create_backup(context.engine, context.blobs, root, with_files=with_files)
+    with context.sessions() as db:
+        keep = load_backup_config(db).keep
+    prune(root, keep)
+
+
+@tasks.periodic(cron="7 * * * *")
+@tasks.task(name="scheduled_backup", queue="backup", pass_context=True)
+def scheduled_backup(job: JobContext, timestamp: int) -> None:
+    """Every hour: start a backup if the schedule says so."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_backup_config(db)
+    last = last_backup_time(context.settings.backup_path)
+    if due(last, config.schedule, config.hour, datetime.now(UTC)):
+        queue_backup(job.app, with_files=config.with_files)
+
+
+def queue_backup(app: App, *, with_files: bool) -> bool:
+    """Queue a backup; False if one is queued or running already."""
+    task = app.configure_task("paperus:backup", queueing_lock="backup")
+    try:
+        task.defer(with_files=with_files)
+    except AlreadyEnqueued:
+        return False
+    return True

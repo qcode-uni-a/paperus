@@ -45,8 +45,10 @@ by meaning takes 2–3 GB).
    own; examples for Caddy and nginx are in
    [operations](docs/operations.md#reverse-proxy).
 
-Back up the files folder and the database folder together. To update, change
-`PAPERUS_VERSION` or pull `release` again, then `docker compose up -d`.
+Back up from Administration → Backups (now, or daily or weekly), into
+`BACKUP_LOCATION` on another disk; restoring is described in
+[operations](docs/operations.md#backups). To update, change `PAPERUS_VERSION`
+or pull `release` again, then `docker compose up -d`.
 
 ## Documents
 

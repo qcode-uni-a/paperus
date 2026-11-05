@@ -12,6 +12,7 @@ from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
     auth,
+    backups,
     files,
     groups,
     health,
@@ -73,6 +74,7 @@ def create_app(
     app.include_router(organize.router)
     app.include_router(groups.router)
     app.include_router(users.router)
+    app.include_router(backups.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:

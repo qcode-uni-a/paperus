@@ -17,6 +17,7 @@ services:
     environment: *paperus-env
     volumes:
       - ${UPLOAD_LOCATION}:/data/files
+      - ${BACKUP_LOCATION:-./backups}:/data/backups
     ports:
       - ${PAPERUS_PORT:-8000}:8000
     depends_on:
@@ -33,6 +34,7 @@ services:
       disable: true
     volumes:
       - ${UPLOAD_LOCATION}:/data/files
+      - ${BACKUP_LOCATION:-./backups}:/data/backups
     depends_on:
       server:
         condition: service_healthy

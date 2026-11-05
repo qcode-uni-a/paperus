@@ -19,7 +19,8 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH" \
     PAPERUS_WEB_PATH=/app/web \
-    PAPERUS_STORAGE_PATH=/data/files
+    PAPERUS_STORAGE_PATH=/data/files \
+    PAPERUS_BACKUP_PATH=/data/backups
 
 WORKDIR /app
 COPY server/pyproject.toml server/uv.lock ./
@@ -32,7 +33,7 @@ COPY docker/start.sh /usr/local/bin/paperus-start
 
 RUN groupadd --system --gid 1000 paperus \
     && useradd --system --uid 1000 --gid paperus --create-home --home-dir /home/paperus paperus \
-    && mkdir -p /data/files && chown -R paperus:paperus /data
+    && mkdir -p /data/files /data/backups && chown -R paperus:paperus /data
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]

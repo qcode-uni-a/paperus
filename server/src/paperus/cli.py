@@ -1,4 +1,5 @@
-"""Command line: ``paperus serve``, ``worker``, ``migrate``, ``user create``."""
+"""Command line: ``paperus serve``, ``worker``, ``migrate``, ``user create``,
+``backup create|list|restore``."""
 
 import argparse
 import getpass
@@ -9,10 +10,12 @@ import uvicorn
 from sqlalchemy.exc import IntegrityError
 
 from paperus.auth import create_user
+from paperus.backup import BackupError, create_backup, list_backups, restore_backup
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import run_worker
 from paperus.migrate import migrate
+from paperus.storage import make_blob_store
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -38,6 +41,23 @@ def main(argv: list[str] | None = None) -> None:
         help="read the password from standard input (for scripts)",
     )
 
+    backup = commands.add_parser("backup", help="back up and restore")
+    backup_commands = backup.add_subparsers(dest="backup_command", required=True)
+    backup_create = backup_commands.add_parser("create", help="write a backup now")
+    backup_create.add_argument(
+        "--no-files", action="store_true", help="only the database, not the files"
+    )
+    backup_commands.add_parser("list", help="list backups, newest first")
+    backup_restore = backup_commands.add_parser(
+        "restore", help="restore a backup into the database (and missing files)"
+    )
+    backup_restore.add_argument("name", help="the backup's name, see `backup list`")
+    backup_restore.add_argument(
+        "--replace",
+        action="store_true",
+        help="drop everything in the database first (it must be empty otherwise)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "serve":
@@ -56,6 +76,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "migrate":
         logging.basicConfig(level=logging.INFO)
         migrate(Settings())
+    elif args.command == "backup":
+        logging.basicConfig(level=logging.INFO)
+        sys.exit(backup_command(args))
     elif args.command == "user" and args.user_command == "create":
         sys.exit(
             create_user_command(
@@ -88,4 +111,49 @@ def create_user_command(
     finally:
         engine.dispose()
     print(f"Created user {username!r}.")
+    return 0
+
+
+def backup_command(args: argparse.Namespace) -> int:
+    settings = Settings()
+    root = settings.backup_path
+    engine = make_engine(settings.database_url)
+    try:
+        if args.backup_command == "create":
+            manifest = create_backup(
+                engine, make_blob_store(settings), root, with_files=not args.no_files
+            )
+            print(f"Wrote backup {manifest.name} to {root}.")
+        elif args.backup_command == "list":
+            for manifest in list_backups(root):
+                files = f", {manifest.files} files" if manifest.with_files else ""
+                items = (
+                    manifest.tables["items"].rows if "items" in manifest.tables else 0
+                )
+                print(
+                    f"{manifest.name}  paperus {manifest.paperus_version}, "
+                    f"{items} items{files}"
+                )
+        elif args.backup_command == "restore":
+            if args.replace:
+                answer = input(
+                    "This drops everything in the database first. Type yes: "
+                )
+                if answer.strip().lower() != "yes":
+                    print("Nothing changed.")
+                    return 1
+            restore_backup(
+                settings,
+                engine,
+                make_blob_store(settings),
+                root,
+                args.name,
+                replace=args.replace,
+            )
+            print(f"Restored {args.name}. Start paperus again.")
+    except BackupError as error:
+        print(error, file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
     return 0

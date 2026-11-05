@@ -94,6 +94,39 @@ server {
 Tested with Caddy in front of the container images: HTTPS, login with the
 Secure session cookie, uploads, downloads with range requests.
 
+## Backups
+
+Administration → Backups writes backups now or on a schedule (daily or
+weekly, at a chosen hour, keeping the newest N), into `BACKUP_LOCATION`;
+put that on another disk or a network share. Each backup is a folder with
+every table (compressed, with checksums) and a manifest naming the paperus
+version and database migration. With "files", the files are copied too:
+into one pool shared by all backups, so each backup copies only new files.
+The model cache needs no backup (it is downloaded again).
+
+From the command line (in the container, or with the same settings):
+
+```sh
+docker compose exec server paperus backup create          # with files
+docker compose exec server paperus backup create --no-files
+docker compose exec server paperus backup list
+```
+
+**Restoring** replaces the database, so stop paperus first:
+
+```sh
+docker compose stop server worker
+docker compose run --rm server paperus backup restore 2026-11-05T03-00-00Z --replace
+docker compose up -d
+```
+
+Without `--replace` it restores only into an empty database (e.g. a new
+installation). Restoring checks every table's checksum, creates the schema
+at the backup's migration, loads the data, migrates to the running version
+and copies back files that are missing. A backup from a newer paperus is
+refused: update paperus first. Search data (passages, vectors) is in the
+backup, so search works right away.
+
 ## Releases
 
 Pushing a tag `vX.Y.Z` (matching the versions in `server/pyproject.toml`,
