@@ -74,21 +74,30 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   pypi:
-    name: PyPI (paperus, paperus-ml)
+    name: PyPI (${{ matrix.package }})
     needs: [ci, versions]
     if: vars.PUBLISH_PYPI == 'true'
     runs-on: ubuntu-latest
     # Trusted publishing: pypi.org knows this repository, workflow and
-    # environment; no password is stored here.
-    environment: pypi
+    # environment; no password is stored here. One environment per package,
+    # as PyPI takes each repository/workflow/environment once.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: paperus
+            folder: server
+            environment: pypi
+          - package: paperus-ml
+            folder: ml
+            environment: pypi-ml
+    environment: ${{ matrix.environment }}
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: |
-          (cd server && uv build -o ../dist)
-          (cd ml && uv build -o ../dist)
+      - run: cd ${{ matrix.folder }} && uv build -o ../dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist

@@ -219,7 +219,8 @@ Variables):
 
 - PyPI (`paperus`, `paperus-ml`): a trusted publisher on pypi.org for each
   (owner `qcode-uni-a`, repository `paperus`, workflow `release.yml`,
-  environment `pypi`), then `PUBLISH_PYPI` = `true`.
+  environment `pypi` for `paperus` and `pypi-ml` for `paperus-ml`), then
+  `PUBLISH_PYPI` = `true`.
 - npm (`paperus`): a secret `NPM_TOKEN` for the first release (trusted
   publishing on npmjs.com afterwards), then `PUBLISH_NPM` = `true`.
 
