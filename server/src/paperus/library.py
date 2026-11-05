@@ -37,9 +37,12 @@ IdentifierValue = tuple[Scheme, str]
 class IdentifierTaken(Exception):
     """An identifier already belongs to a version of an item."""
 
-    def __init__(self, scheme: str, value: str, item_id: uuid.UUID) -> None:
+    def __init__(
+        self, scheme: str, value: str, item_id: uuid.UUID, version_id: uuid.UUID
+    ) -> None:
         super().__init__(f"{scheme}:{value} belongs to item {item_id}")
         self.item_id = item_id
+        self.version_id = version_id
 
 
 def preferred_version(item: Item) -> Version | None:
@@ -98,7 +101,9 @@ def add_version(
 ) -> Version:
     taken = find_identifier(db, identifiers)
     if taken is not None:
-        raise IdentifierTaken(taken.scheme, taken.value, taken.version.item_id)
+        raise IdentifierTaken(
+            taken.scheme, taken.value, taken.version.item_id, taken.version_id
+        )
     version = Version(
         kind=kind,
         label=label,
@@ -180,7 +185,9 @@ def replace_metadata(
     """Give a version new metadata and identifiers (e.g. found in its file)."""
     taken = find_identifier(db, identifiers)
     if taken is not None and taken.version_id != version.id:
-        raise IdentifierTaken(taken.scheme, taken.value, taken.version.item_id)
+        raise IdentifierTaken(
+            taken.scheme, taken.value, taken.version.item_id, taken.version_id
+        )
     known = {(i.scheme, i.value) for i in version.identifiers}
     version.identifiers.extend(
         Identifier(scheme=scheme, value=value)

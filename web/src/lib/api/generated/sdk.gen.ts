@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RenameTagData, RenameTagErrors, RenameTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RenameTagData, RenameTagErrors, RenameTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -138,12 +138,22 @@ export const getItem = <ThrowOnError extends boolean = false>(options: Options<G
 export const restoreItem = <ThrowOnError extends boolean = false>(options: Options<RestoreItemData, ThrowOnError>): RequestResult<RestoreItemResponses, RestoreItemErrors, ThrowOnError> => (options.client ?? client).post<RestoreItemResponses, RestoreItemErrors, ThrowOnError>({ url: '/api/items/{item_id}/restore', ...options });
 
 /**
+ * Find Upload
+ *
+ * The item that already has a file with this SHA-256 (hex), so a client
+ * can skip uploading it again; 404 if there is none.
+ */
+export const findUpload = <ThrowOnError extends boolean = false>(options: Options<FindUploadData, ThrowOnError>): RequestResult<FindUploadResponses, FindUploadErrors, ThrowOnError> => (options.client ?? client).get<FindUploadResponses, FindUploadErrors, ThrowOnError>({ url: '/api/uploads/{sha256}', ...options });
+
+/**
  * Upload New Item
  *
  * A new item from a file, titled after the file until its text tells more.
  *
  * The background job looks for a DOI or arXiv ID in the file and replaces
- * the placeholder metadata (see ``paperus.identify``).
+ * the placeholder metadata (see ``paperus.identify``). A file that is
+ * already in the library makes no new item: the answer (200, ``existing``)
+ * names the item that has it.
  */
 export const uploadNewItem = <ThrowOnError extends boolean = false>(options: Options<UploadNewItemData, ThrowOnError>): RequestResult<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError> => (options.client ?? client).post<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError>({
     ...formDataBodySerializer,

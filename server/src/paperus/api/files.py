@@ -12,6 +12,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library
@@ -86,16 +87,14 @@ def _media_type(head: bytes, filename: str, declared: str | None) -> str:
     return guessed or "application/octet-stream"
 
 
-def _store_upload(
-    version: Version,
-    upload: UploadFile,
-    role: FileRole,
-    request: Request,
-    db: DB,
-    user_id: uuid.UUID,
-) -> FileOut:
-    if version.item.deleted_at is not None:
-        raise HTTPException(409, "item is in the trash")
+class _Stored(BaseModel):
+    sha256: bytes
+    filename: str
+    media_type: str
+
+
+def _put_upload(upload: UploadFile, request: Request, db: DB) -> _Stored:
+    """Store the upload's bytes (once per content) and check its type."""
     blobs: BlobStore = request.app.state.blobs
     try:
         stored = blobs.put(
@@ -105,18 +104,30 @@ def _store_upload(
         raise HTTPException(413, "file too large") from error
     filename = upload.filename or "file"
     media_type = _media_type(stored.head, filename, upload.content_type)
-
     db.execute(
         insert(Blob)
         .values(sha256=stored.sha256, size=stored.size)
         .on_conflict_do_nothing()
     )
+    return _Stored(sha256=stored.sha256, filename=filename, media_type=media_type)
+
+
+def _add_file(
+    version: Version,
+    stored: _Stored,
+    role: FileRole,
+    request: Request,
+    db: DB,
+    user_id: uuid.UUID,
+) -> FileOut:
+    if version.item.deleted_at is not None:
+        raise HTTPException(409, "item is in the trash")
     file = File(
         version=version,
         blob_sha256=stored.sha256,
         role=role,
-        filename=filename,
-        media_type=media_type,
+        filename=stored.filename,
+        media_type=stored.media_type,
         source=FileSource.UPLOAD,
         uploaded_by=user_id,
     )
@@ -131,21 +142,82 @@ def _store_upload(
     return file_out(file)
 
 
+def _store_upload(
+    version: Version,
+    upload: UploadFile,
+    role: FileRole,
+    request: Request,
+    db: DB,
+    user_id: uuid.UUID,
+) -> FileOut:
+    if version.item.deleted_at is not None:
+        raise HTTPException(409, "item is in the trash")
+    stored = _put_upload(upload, request, db)
+    return _add_file(version, stored, role, request, db, user_id)
+
+
+def _known_file(db: DB, sha256: bytes) -> File | None:
+    """The first file with this content in an item outside the trash."""
+    return db.scalar(
+        select(File)
+        .join(Version)
+        .join(Item)
+        .where(
+            File.blob_sha256 == sha256,
+            File.deleted_at.is_(None),
+            Item.deleted_at.is_(None),
+        )
+        .order_by(File.created_at)
+        .limit(1)
+    )
+
+
 class NewItemUpload(BaseModel):
+    item_id: uuid.UUID
+    file: FileOut
+    existing: bool = False
+    """The same file was already in the library; nothing new was made."""
+
+
+class KnownFile(BaseModel):
     item_id: uuid.UUID
     file: FileOut
 
 
+@router.get("/api/uploads/{sha256}")
+def find_upload(sha256: str, db: DB, user: CurrentUser) -> KnownFile:
+    """The item that already has a file with this SHA-256 (hex), so a client
+    can skip uploading it again; 404 if there is none."""
+    try:
+        digest = bytes.fromhex(sha256)
+    except ValueError as error:
+        raise HTTPException(422, "not a SHA-256 in hex") from error
+    file = _known_file(db, digest) if len(digest) == 32 else None
+    if file is None:
+        raise HTTPException(404, "no such file in the library")
+    return KnownFile(item_id=file.version.item_id, file=file_out(file))
+
+
 @router.post("/api/uploads", status_code=201)
 def upload_new_item(
-    upload: UploadFile, request: Request, db: DB, user: CurrentUser
+    upload: UploadFile, request: Request, response: Response, db: DB, user: CurrentUser
 ) -> NewItemUpload:
     """A new item from a file, titled after the file until its text tells more.
 
     The background job looks for a DOI or arXiv ID in the file and replaces
-    the placeholder metadata (see ``paperus.identify``).
+    the placeholder metadata (see ``paperus.identify``). A file that is
+    already in the library makes no new item: the answer (200, ``existing``)
+    names the item that has it.
     """
-    title = Path(upload.filename or "").stem or "Untitled"
+    stored = _put_upload(upload, request, db)
+    known = _known_file(db, stored.sha256)
+    if known is not None:
+        db.commit()
+        response.status_code = 200
+        return NewItemUpload(
+            item_id=known.version.item_id, file=file_out(known), existing=True
+        )
+    title = Path(stored.filename).stem or "Untitled"
     item = library.create_item(
         db,
         kind=VersionKind.OTHER,
@@ -155,7 +227,7 @@ def upload_new_item(
         identifiers=[],
         added_by=user.id,
     )
-    file = _store_upload(item.versions[0], upload, FileRole.MAIN, request, db, user.id)
+    file = _add_file(item.versions[0], stored, FileRole.MAIN, request, db, user.id)
     return NewItemUpload(item_id=item.id, file=file)
 
 

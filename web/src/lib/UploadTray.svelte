@@ -49,6 +49,7 @@
 						<div class="name">
 							<span title={upload.name}>{upload.name}</span>
 							{#if upload.status === 'done' && upload.itemId}
+								{#if upload.existing}<span class="muted">Already in the library</span>{/if}
 								<a href={resolve('/items/[id]', { id: upload.itemId })}>Open</a>
 							{:else if upload.status === 'waiting'}
 								<span class="muted">waiting</span>
@@ -117,7 +118,12 @@
 		justify-content: space-between;
 		gap: 8px;
 	}
+	.name .muted {
+		white-space: nowrap;
+	}
 	.name span:first-child {
+		flex: 1;
+		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

@@ -308,7 +308,7 @@ def add_version(
         if known.version.item_id != item.id:
             raise _identifier_conflict(
                 library.IdentifierTaken(
-                    known.scheme, known.value, known.version.item_id
+                    known.scheme, known.value, known.version.item_id, known.version_id
                 )
             )
         response.status_code = 200

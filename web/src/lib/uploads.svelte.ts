@@ -1,4 +1,4 @@
-import { addItems, errorMessage } from '#lib/api/client.ts';
+import { addItems, errorMessage, findUpload } from '#lib/api/client.ts';
 import { loadOrganize } from '#lib/organize.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
@@ -14,6 +14,8 @@ export interface Upload {
 	itemId?: string;
 	/** Also put the new item into this collection. */
 	collection?: string;
+	/** The file was already in the library; no new item was made. */
+	existing?: boolean;
 }
 
 /** Files being added; each becomes a new item, identified by the server. */
@@ -65,8 +67,12 @@ function pump(): void {
 async function run(upload: Upload, file: File): Promise<void> {
 	upload.status = 'uploading';
 	try {
-		const result = await send('/api/uploads', file, (loaded) => (upload.loaded = loaded));
+		const known = await knownItem(file);
+		const result = known
+			? { item_id: known, existing: true }
+			: await send('/api/uploads', file, (loaded) => (upload.loaded = loaded));
 		upload.itemId = result.item_id;
+		upload.existing = result.existing ?? false;
 		if (upload.collection) {
 			const { error } = await addItems({
 				path: { collection_id: upload.collection },
@@ -82,6 +88,26 @@ async function run(upload: Upload, file: File): Promise<void> {
 	} catch (error) {
 		upload.status = 'failed';
 		upload.error = error instanceof Error ? error.message : String(error);
+	}
+}
+
+/** Files up to this size are fingerprinted before uploading. */
+const HASH_LIMIT = 512 * 1024 ** 2;
+
+/** The item that already has this exact file, so it need not be sent again.
+ * Hashing needs a secure context (HTTPS or localhost); elsewhere the server
+ * still recognizes the file after the upload. */
+async function knownItem(file: File): Promise<string | null> {
+	if (!globalThis.crypto?.subtle || file.size > HASH_LIMIT) return null;
+	try {
+		const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+		const sha256 = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join(
+			''
+		);
+		const { data } = await findUpload({ path: { sha256 } });
+		return data?.item_id ?? null;
+	} catch {
+		return null;
 	}
 }
 

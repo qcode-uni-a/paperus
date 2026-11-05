@@ -620,13 +620,56 @@
         }
       }
     },
+    "/api/uploads/{sha256}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Find Upload",
+        "description": "The item that already has a file with this SHA-256 (hex), so a client\ncan skip uploading it again; 404 if there is none.",
+        "operationId": "find_upload",
+        "parameters": [
+          {
+            "name": "sha256",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sha256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnownFile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads": {
       "post": {
         "tags": [
           "files"
         ],
         "summary": "Upload New Item",
-        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``).",
+        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in the library makes no new item: the answer (200, ``existing``)\nnames the item that has it.",
         "operationId": "upload_new_item",
         "requestBody": {
           "content": {
@@ -2303,6 +2346,24 @@
         ],
         "title": "ItemTagOut"
       },
+      "KnownFile": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "file": {
+            "$ref": "#/components/schemas/FileOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "file"
+        ],
+        "title": "KnownFile"
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -2457,6 +2518,11 @@
           },
           "file": {
             "$ref": "#/components/schemas/FileOut"
+          },
+          "existing": {
+            "type": "boolean",
+            "title": "Existing",
+            "default": false
           }
         },
         "type": "object",

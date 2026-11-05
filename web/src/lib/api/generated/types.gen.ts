@@ -365,6 +365,17 @@ export type ItemTagOut = {
 };
 
 /**
+ * KnownFile
+ */
+export type KnownFile = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    file: FileOut;
+};
+
+/**
  * LoginRequest
  */
 export type LoginRequest = {
@@ -465,6 +476,10 @@ export type NewItemUpload = {
      */
     item_id: string;
     file: FileOut;
+    /**
+     * Existing
+     */
+    existing?: boolean;
 };
 
 /**
@@ -1102,6 +1117,36 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type FindUploadData = {
+    body?: never;
+    path: {
+        /**
+         * Sha256
+         */
+        sha256: string;
+    };
+    query?: never;
+    url: '/api/uploads/{sha256}';
+};
+
+export type FindUploadErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FindUploadError = FindUploadErrors[keyof FindUploadErrors];
+
+export type FindUploadResponses = {
+    /**
+     * Successful Response
+     */
+    200: KnownFile;
+};
+
+export type FindUploadResponse = FindUploadResponses[keyof FindUploadResponses];
 
 export type UploadNewItemData = {
     body: BodyUploadNewItem;

@@ -26,7 +26,17 @@ from paperus.identifiers import (
     normalize_arxiv,
     normalize_doi,
 )
-from paperus.models import Chunk, File, FileChunk, MetadataSource, TextStatus
+from paperus.models import (
+    Chunk,
+    CollectionItem,
+    File,
+    FileChunk,
+    FileRole,
+    ItemTag,
+    MetadataSource,
+    TextStatus,
+    Version,
+)
 from paperus.storage import BlobStore
 
 log = logging.getLogger(__name__)
@@ -160,8 +170,8 @@ def identify(
                     identifiers=identifiers,
                 )
         except library.IdentifierTaken as taken:
-            # Already in the library; merging duplicates comes later.
             log.info("file %s is %s, already item %s", file_id, doi, taken.item_id)
+            join_known_item(db, version, taken.version_id)
         return
 
     with blobs.local_file(file.blob_sha256) as path:
@@ -169,3 +179,41 @@ def identify(
     if plausible_title(title, file.filename):
         version.csl = {**version.csl, "title": title}
         library.refresh_item(version.item)
+
+
+def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
+    """An upload turned out to be a paper already in the library: its files
+    join the known version, its collections and tags the known item, and the
+    upload's own item goes (it only ever held the placeholder)."""
+    known = db.get(Version, known_id)
+    item = upload.item
+    if known is None or known.item.deleted_at is not None or len(item.versions) > 1:
+        return
+    target = known.item
+    for file in list(upload.files):
+        live = [f for f in known.files if f.deleted_at is None]
+        if any(f.blob_sha256 == file.blob_sha256 for f in live):
+            continue
+        has_main = any(f.role == FileRole.MAIN for f in live)
+        file.version = known
+        file.role = FileRole.OTHER if has_main else FileRole.MAIN
+    in_collections = {link.collection_id for link in target.collection_links}
+    for link in item.collection_links:
+        if link.collection_id not in in_collections:
+            target.collection_links.append(
+                CollectionItem(collection_id=link.collection_id, added_by=link.added_by)
+            )
+    tagged = {link.tag_id for link in target.tag_links}
+    for link in item.tag_links:
+        if link.tag_id not in tagged:
+            target.tag_links.append(
+                ItemTag(
+                    tag_id=link.tag_id,
+                    tag=link.tag,
+                    source=link.source,
+                    added_by=link.added_by,
+                )
+            )
+    db.flush()
+    db.delete(item)
+    db.flush()

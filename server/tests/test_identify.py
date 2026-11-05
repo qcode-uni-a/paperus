@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from typing import Any
 
@@ -156,7 +157,7 @@ def test_cited_doi_with_other_title_is_ignored(
     assert item["versions"][0]["metadata_source"] == "file"
 
 
-def test_known_doi_is_left_alone(
+def test_known_paper_joins_the_existing_item(
     logged_in: TestClient,
     db: Session,
     blobs: BlobStore,
@@ -165,10 +166,55 @@ def test_known_doi_is_left_alone(
     doi_registry.records[DOI] = CSL
     existing = logged_in.post("/api/items", json={"doi": DOI}).json()
     uploaded = upload(logged_in, make_pdf([FIRST_PAGE]))
+    # Dropped on a collection's page, with a tag, before it was recognized.
+    shelf = logged_in.post("/api/collections", json={"name": "Shelf"}).json()["id"]
+    logged_in.post(
+        f"/api/collections/{shelf}/items", json={"item_ids": [uploaded["item_id"]]}
+    )
+    logged_in.post(f"/api/items/{uploaded['item_id']}/tags", json={"name": "drought"})
     run_job(db, blobs, doi_registry, uploaded["file"]["id"])
-    item = get_item(logged_in, uploaded["item_id"])
-    assert item["title"] == "scan_0042"
-    assert item["id"] != existing["id"]
+    db.expire_all()
+
+    assert logged_in.get(f"/api/items/{uploaded['item_id']}").status_code == 404
+    item = get_item(logged_in, existing["id"])
+    [version] = item["versions"]
+    [file] = version["files"]
+    assert file["id"] == uploaded["file"]["id"]
+    assert file["role"] == "main"
+    assert item["collection_ids"] == [shelf]
+    assert [t["name"] for t in item["tags"]] == ["drought"]
+
+    # Another copy (other bytes) of the same paper is kept as a further file.
+    again = upload(logged_in, make_pdf([FIRST_PAGE, ["Accepted manuscript"]]))
+    run_job(db, blobs, doi_registry, again["file"]["id"])
+    db.expire_all()
+    files = get_item(logged_in, existing["id"])["versions"][0]["files"]
+    assert [f["role"] for f in files] == ["main", "other"]
+
+
+def test_same_file_again_makes_no_new_item(logged_in: TestClient) -> None:
+    content = make_pdf([FIRST_PAGE])
+    first = upload(logged_in, content)
+    response = logged_in.post(
+        "/api/uploads", files={"upload": ("copy.pdf", content, "application/pdf")}
+    )
+    assert response.status_code == 200
+    again = response.json()
+    assert again["existing"] is True
+    assert again["item_id"] == first["item_id"]
+    assert again["file"] == first["file"]
+    assert len(logged_in.get("/api/items").json()) == 1
+
+    sha256 = hashlib.sha256(content).hexdigest()
+    known = logged_in.get(f"/api/uploads/{sha256}").json()
+    assert known["item_id"] == first["item_id"]
+    assert logged_in.get(f"/api/uploads/{'0' * 64}").status_code == 404
+    assert logged_in.get("/api/uploads/xyz").status_code == 422
+
+    # A copy in the trash does not count.
+    logged_in.delete(f"/api/items/{first['item_id']}")
+    assert logged_in.get(f"/api/uploads/{sha256}").status_code == 404
+    assert upload(logged_in, content)["item_id"] != first["item_id"]
 
 
 def test_embedded_title_without_identifier(
