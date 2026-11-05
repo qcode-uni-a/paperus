@@ -96,8 +96,11 @@ class CollectionChange(BaseModel):
     """Only the fields given are changed; ``parent_id: null`` moves to the top.
 
     ``library_id`` gives the collection, with the collections inside it, to
-    another library (at its top level unless ``parent_id`` names a collection
-    there). Papers a group's collection may not hold leave it.
+    another library the person may change, e.g. from their own to a group
+    or back (members may delete a group's collections anyway). It lands at
+    the top level there unless ``parent_id`` names a collection there.
+    Papers a group's collection may not hold leave it, unless
+    ``add_papers`` puts them into the group.
     """
 
     name: Name | None = None

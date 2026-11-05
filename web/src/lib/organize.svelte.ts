@@ -94,3 +94,8 @@ export function libraryForCollection(collectionId: string | undefined): string |
 	const library = libraryById(collection?.library_id);
 	return library?.kind === 'group' ? library.id : undefined;
 }
+
+/** Whether any of these libraries is a group's (the item is shared). */
+export function inGroup(libraryIds: string[]): boolean {
+	return libraryIds.some((id) => libraryById(id)?.kind === 'group');
+}

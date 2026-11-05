@@ -1,11 +1,20 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { addItems, addTag, errorMessage, removeItem, removeTag } from '#lib/api/client.ts';
+	import {
+		addItemToLibrary,
+		addItems,
+		addTag,
+		errorMessage,
+		removeItem,
+		removeItemFromLibrary,
+		removeTag
+	} from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
 	import {
 		collectionPath,
 		flatTree,
 		libraryById,
+		libraryName,
 		loadOrganize,
 		organize
 	} from '#lib/organize.svelte.ts';
@@ -18,10 +27,18 @@
 	let error = $state('');
 
 	const own = $derived(organize.libraries.find((library) => library.kind === 'personal'));
-	const itemWritable = $derived(libraryById(item.library_id)?.writable ?? false);
-	// New tags go into the item's library for its members, else they are
-	// private (the server decides the same way).
-	const tagLibrary = $derived(itemWritable ? item.library_id : own?.id);
+	// The item's libraries the person may change.
+	const writableHere = $derived(item.library_ids.filter((id) => writableLibrary(id)));
+	// New tags: the person's own if the item is in it, else one of the
+	// item's group libraries they may change, else private (as the server).
+	const tagLibrary = $derived(
+		own && item.library_ids.includes(own.id) ? own.id : (writableHere[0] ?? own?.id)
+	);
+	// Libraries the item can still be added to.
+	const otherLibraries = $derived(
+		organize.libraries.filter((l) => l.writable && !item.library_ids.includes(l.id))
+	);
+	let sharing = $state(false);
 
 	const suggestions = $derived(
 		organize.tags
@@ -30,7 +47,7 @@
 	);
 	// A group's collections hold only its items; private ones any item.
 	const choices = $derived(
-		[...(itemWritable ? flatTree(item.library_id) : []), ...flatTree(own?.id)].filter(
+		[...writableHere.flatMap((id) => flatTree(id)), ...flatTree(own?.id)].filter(
 			({ collection }, index, all) =>
 				!item.collection_ids.includes(collection.id) &&
 				all.findIndex((row) => row.collection.id === collection.id) === index
@@ -45,7 +62,7 @@
 	}
 	/** A private tag or collection on an item of a group. */
 	function isPrivate(libraryId: string | undefined): boolean {
-		return libraryId === own?.id && item.library_id !== own?.id;
+		return own !== undefined && libraryId === own.id && !item.library_ids.includes(own.id);
 	}
 
 	async function done(result: { error?: unknown }) {
@@ -80,6 +97,47 @@
 </script>
 
 <div class="organize">
+	<div class="line">
+		<span class="label">Libraries</span>
+		{#each item.library_ids as id (id)}
+			<span class="chip">
+				<span class="name">{libraryName(id)}</span>
+				{#if writableLibrary(id) && !item.deleted_at}
+					<button
+						onclick={async () => {
+							const last = item.library_ids.length === 1;
+							if (last && !confirm('This is its only library: move the item to the trash?')) return;
+							await done(
+								await removeItemFromLibrary({ path: { item_id: item.id, library_id: id } })
+							);
+						}}
+						aria-label="Remove from {libraryName(id)}">×</button
+					>
+				{/if}
+			</span>
+		{/each}
+		{#if sharing}
+			<select
+				{@attach openPicker}
+				aria-label="Add to library"
+				onchange={async (event) => {
+					const id = event.currentTarget.value;
+					sharing = false;
+					if (id)
+						await done(await addItemToLibrary({ path: { item_id: item.id, library_id: id } }));
+				}}
+				onblur={() => (sharing = false)}
+			>
+				<option value="">Choose a library…</option>
+				{#each otherLibraries as library (library.id)}
+					<option value={library.id}>{libraryName(library.id)}</option>
+				{/each}
+			</select>
+		{:else if otherLibraries.length && !item.deleted_at}
+			{@render plus('Add to another library', () => (sharing = true))}
+		{/if}
+	</div>
+
 	<div class="line">
 		<span class="label">Tags</span>
 		{#each item.tags as tag (tag.id)}

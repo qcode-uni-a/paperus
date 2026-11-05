@@ -137,7 +137,7 @@
           "items"
         ],
         "summary": "Add Item",
-        "description": "A new item; if one of its identifiers is known in the library, the\nexisting item.",
+        "description": "A new item; if one of its identifiers is known in a library the person\ncan read, the existing item (put into this library too, 200).",
         "operationId": "add_item",
         "requestBody": {
           "required": true,
@@ -522,7 +522,7 @@
           "items"
         ],
         "summary": "Trash Item",
-        "description": "Move to the trash; restorable with ``POST \u2026/restore``.",
+        "description": "Move to the trash, for everyone; restorable with ``POST \u2026/restore``.\nOnly for people who may change every library the item is in; others\ntake it out of their library (``DELETE \u2026/libraries/{id}``).",
         "operationId": "trash_item",
         "parameters": [
           {
@@ -567,6 +567,112 @@
               "type": "string",
               "format": "uuid",
               "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/libraries/{library_id}": {
+      "put": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Add Item To Library",
+        "description": "Put the item into another library the person may change (share it).",
+        "operationId": "add_item_to_library",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Remove Item From Library",
+        "description": "Take the item out of one library, with that library's tags and\ncollections on it; out of its last library, it goes to the trash.",
+        "operationId": "remove_item_from_library",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library Id"
             }
           }
         ],
@@ -643,7 +749,7 @@
           "files"
         ],
         "summary": "Find Upload",
-        "description": "The item in the library (the person's default if not given) that\nalready has a file with this SHA-256 (hex), so a client can skip\nuploading it again; 404 if there is none.",
+        "description": "The item in a library the person can read that already has a file\nwith this SHA-256 (hex), so a client can skip uploading it again; 404 if\nthere is none.",
         "operationId": "find_upload",
         "parameters": [
           {
@@ -653,23 +759,6 @@
             "schema": {
               "type": "string",
               "title": "Sha256"
-            }
-          },
-          {
-            "name": "library",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Library"
             }
           }
         ],
@@ -703,7 +792,7 @@
           "files"
         ],
         "summary": "Upload New Item",
-        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in the library makes no new item: the answer (200, ``existing``)\nnames the item that has it. ``library_id``: the person's default library\nif not given.",
+        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in a library the person can read makes no new item: the answer\n(200, ``existing``) names the item that has it, now also in this\nlibrary. ``library_id``: the person's default library if not given.",
         "operationId": "upload_new_item",
         "requestBody": {
           "content": {
@@ -1604,7 +1693,7 @@
           "organize"
         ],
         "summary": "Change Collection",
-        "description": "Rename, describe or move a collection (within its library, not into\nitself).",
+        "description": "Rename, describe or move a collection (not into itself), also into\nanother library the person may change.",
         "operationId": "change_collection",
         "parameters": [
           {
@@ -1634,7 +1723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CollectionOut"
+                  "$ref": "#/components/schemas/CollectionChanged"
                 }
               }
             }
@@ -1673,6 +1762,60 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections/{collection_id}/move-preview": {
+      "get": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Preview Move",
+        "description": "Before moving a collection into another library: how many of its\npapers are not in that library yet.",
+        "operationId": "preview_move",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "library",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovePreview"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2332,11 +2475,101 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          },
+          "add_papers": {
+            "type": "boolean",
+            "title": "Add Papers",
+            "default": false
           }
         },
         "type": "object",
         "title": "CollectionChange",
-        "description": "Only the fields given are changed; ``parent_id: null`` moves to the top."
+        "description": "Only the fields given are changed; ``parent_id: null`` moves to the top.\n\n``library_id`` gives the collection, with the collections inside it, to\nanother library (at its top level unless ``parent_id`` names a collection\nthere). Papers a group's collection may not hold leave it."
+      },
+      "CollectionChanged": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "direct": {
+            "type": "integer",
+            "title": "Direct",
+            "default": 0
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/ItemPreview"
+            },
+            "type": "array",
+            "title": "Recent",
+            "default": []
+          },
+          "left_out": {
+            "type": "integer",
+            "title": "Left Out",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "name",
+          "description",
+          "parent_id",
+          "count"
+        ],
+        "title": "CollectionChanged"
       },
       "CollectionIn": {
         "properties": {
@@ -2786,10 +3019,13 @@
             "format": "uuid",
             "title": "Id"
           },
-          "library_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Library Id"
+          "library_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Library Ids"
           },
           "type": {
             "type": "string",
@@ -2908,7 +3144,7 @@
         "type": "object",
         "required": [
           "id",
-          "library_id",
+          "library_ids",
           "type",
           "title",
           "authors",
@@ -3023,10 +3259,13 @@
             "format": "uuid",
             "title": "Id"
           },
-          "library_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Library Id"
+          "library_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Library Ids"
           },
           "type": {
             "type": "string",
@@ -3116,7 +3355,7 @@
         "type": "object",
         "required": [
           "id",
-          "library_id",
+          "library_ids",
           "type",
           "title",
           "authors",
@@ -3194,12 +3433,21 @@
           },
           "file": {
             "$ref": "#/components/schemas/FileOut"
+          },
+          "library_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Library Ids"
           }
         },
         "type": "object",
         "required": [
           "item_id",
-          "file"
+          "file",
+          "library_ids"
         ],
         "title": "KnownFile"
       },
@@ -3475,6 +3723,25 @@
           "file"
         ],
         "title": "MetadataSource"
+      },
+      "MovePreview": {
+        "properties": {
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          },
+          "not_in_library": {
+            "type": "integer",
+            "title": "Not In Library"
+          }
+        },
+        "type": "object",
+        "required": [
+          "papers",
+          "not_in_library"
+        ],
+        "title": "MovePreview",
+        "description": "What moving a collection (with those inside) into a library does."
       },
       "NewItemUpload": {
         "properties": {

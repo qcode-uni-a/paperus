@@ -1,8 +1,14 @@
 <script lang="ts">
-	import { changeCollection, createCollection, errorMessage } from '#lib/api/client.ts';
+	import {
+		changeCollection,
+		createCollection,
+		errorMessage,
+		previewMove
+	} from '#lib/api/client.ts';
 	import {
 		defaultLibrary,
 		flatTree,
+		libraryById,
 		libraryName,
 		loadOrganize,
 		organize,
@@ -28,11 +34,27 @@
 	let library = $state('');
 	let error = $state('');
 	let saving = $state(false);
+	// Moving to another library: how many papers are not there yet, and
+	// whether they join it or leave the collection.
+	let missing = $state<number | null>(null);
+	let addPapers = $state(true);
+	const moving = $derived(collection !== null && library !== collection.library_id);
+	const toGroup = $derived(libraryById(library)?.kind === 'group');
+
+	$effect(() => {
+		const id = collection?.id;
+		const target = library;
+		missing = null;
+		if (!id || !moving) return;
+		previewMove({ path: { collection_id: id }, query: { library: target } }).then(({ data }) => {
+			if (library === target) missing = data?.not_in_library ?? null;
+		});
+	});
 
 	/** Collections of the same library, but not the collection itself or
 	 * anything inside it (collections nest only within one library). */
 	const parents = $derived.by(() => {
-		if (!collection) return flatTree(library || undefined);
+		if (!collection || moving) return flatTree(library || undefined);
 		const excluded = new Set([collection.id]);
 		let grew = true;
 		while (grew) {
@@ -62,8 +84,12 @@
 		event.preventDefault();
 		saving = true;
 		const body = { name, description: description.trim() || null, parent_id: parent || null };
+		const move = moving ? { library_id: library, add_papers: addPapers } : {};
 		const result = collection
-			? await changeCollection({ path: { collection_id: collection.id }, body })
+			? await changeCollection({
+					path: { collection_id: collection.id },
+					body: { ...body, ...move }
+				})
 			: await createCollection({ body: { ...body, library_id: library || null } });
 		saving = false;
 		if (!result.data) {
@@ -84,15 +110,41 @@
 			Description <span class="optional">(optional)</span>
 			<textarea bind:value={description} rows="3"></textarea>
 		</label>
-		{#if !collection && writableLibraries().length > 1}
+		{#if writableLibraries().length > 1}
 			<label>
-				Library
+				{collection ? 'Belongs to' : 'Library'}
 				<select bind:value={library} onchange={() => (parent = '')}>
 					{#each writableLibraries() as option (option.id)}
 						<option value={option.id}>{libraryName(option.id)}</option>
 					{/each}
 				</select>
 			</label>
+			{#if moving}
+				<div class="move">
+					<p>
+						The collection and those inside it move to {libraryName(library)}.
+						{#if !toGroup}
+							The group's tags stay with the group.
+						{/if}
+					</p>
+					{#if toGroup && missing}
+						<p>
+							{missing}
+							{missing === 1 ? 'paper is' : 'papers are'} not in {libraryName(library)} yet:
+						</p>
+						<label class="choice"
+							><input type="radio" bind:group={addPapers} value={true} /> Add {missing === 1
+								? 'it'
+								: 'them'} to {libraryName(library)}</label
+						>
+						<label class="choice"
+							><input type="radio" bind:group={addPapers} value={false} /> Leave {missing === 1
+								? 'it'
+								: 'them'} out of the collection</label
+						>
+					{/if}
+				</div>
+			{/if}
 		{/if}
 		<label>
 			Inside
@@ -141,6 +193,27 @@
 	label :global(textarea),
 	label :global(select) {
 		font-weight: 400;
+	}
+	.move {
+		display: grid;
+		gap: 6px;
+		padding: 10px 12px;
+		border-left: 3px solid var(--highlighter);
+		background: var(--rail);
+		border-radius: 0 6px 6px 0;
+		font-size: var(--step--1);
+	}
+	.move p {
+		margin: 0;
+	}
+	.choice {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 400;
+	}
+	.choice input {
+		width: auto;
 	}
 	.optional {
 		font-weight: 400;

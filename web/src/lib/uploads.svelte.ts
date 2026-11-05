@@ -1,5 +1,5 @@
-import { addItems, errorMessage, findUpload } from '#lib/api/client.ts';
-import { libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
+import { addItemToLibrary, addItems, errorMessage, findUpload } from '#lib/api/client.ts';
+import { defaultLibrary, libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
@@ -108,8 +108,17 @@ async function knownItem(file: File, library?: string): Promise<string | null> {
 		const sha256 = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join(
 			''
 		);
-		const { data } = await findUpload({ path: { sha256 }, query: { library } });
-		return data?.item_id ?? null;
+		const { data } = await findUpload({ path: { sha256 } });
+		if (!data) return null;
+		// Known elsewhere: the paper exists once, so it joins this library too.
+		const target = library ?? defaultLibrary()?.id;
+		if (target && !data.library_ids.includes(target)) {
+			const added = await addItemToLibrary({
+				path: { item_id: data.item_id, library_id: target }
+			});
+			if (added.error) return null;
+		}
+		return data.item_id;
 	} catch {
 		return null;
 	}

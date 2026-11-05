@@ -24,7 +24,7 @@
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
-	import { libraryById, libraryName, severalLibraries } from '#lib/organize.svelte.ts';
+	import { libraryById } from '#lib/organize.svelte.ts';
 	import { fullName } from '#lib/format.ts';
 
 	const id = $derived(page.params.id ?? '');
@@ -73,7 +73,13 @@
 	});
 	const viewed = $derived(pdfFile ?? textFile);
 	// Readers of a group's library see the item but change nothing of it.
-	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
+	const writable = $derived(item?.library_ids.some((id) => libraryById(id)?.writable) ?? false);
+	// Trash is for everyone: only with the right to change all its libraries
+	// (otherwise remove it from one under Libraries).
+	const canTrash = $derived(
+		(item?.library_ids.every((id) => libraryById(id)?.writable) ?? false) &&
+			item?.library_ids.length === 1
+	);
 
 	function isText(mediaType: string, filename: string): boolean {
 		return (
@@ -231,9 +237,7 @@
 				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
 				<em>{item.container_title}</em>{/if}
 		</p>
-		{#if severalLibraries()}
-			<p class="in-library">In {libraryName(item.library_id)}</p>
-		{/if}
+
 		<ItemOrganize {item} onchange={load} />
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
@@ -395,11 +399,6 @@
 	}
 	header p {
 		margin: 0;
-	}
-	.in-library {
-		margin-top: 2px;
-		color: var(--muted);
-		font-size: var(--step--1);
 	}
 	header form input {
 		flex: 1;

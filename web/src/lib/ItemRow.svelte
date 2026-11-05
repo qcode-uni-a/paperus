@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
 	import { shortAuthors, typeName } from '#lib/format.ts';
-	import { libraryName, severalLibraries } from '#lib/organize.svelte.ts';
+	import { inGroup } from '#lib/organize.svelte.ts';
 
 	let { item }: { item: Item } = $props();
 
@@ -20,9 +20,15 @@
 				>{/if}</span
 		>
 		<span class="badge">{typeName(item.type)}</span>
-		{#if severalLibraries()}<span class="library" title="Library"
-				>{libraryName(item.library_id)}</span
-			>{/if}
+		{#if inGroup(item.library_ids)}
+			<svg class="shared" viewBox="0 0 24 24" role="img" aria-label="Shared with a group">
+				<title>Shared with a group</title>
+				<circle cx="9" cy="8" r="3.2" />
+				<path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+				<circle cx="16.5" cy="9" r="2.6" />
+				<path d="M15.5 14.2c2.6-.3 4.6 1.3 5.2 4.3" />
+			</svg>
+		{/if}
 		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
@@ -37,20 +43,14 @@
 		display: grid;
 		gap: 4px;
 	}
-	.library {
-		font-size: var(--step--1);
-		color: var(--muted);
-	}
-	.library::before {
-		content: '';
-		display: inline-block;
-		width: 0.7em;
-		height: 0.55em;
-		margin-right: 5px;
-		border: 1.5px solid currentColor;
-		border-top-width: 3px;
-		border-radius: 2px;
-		vertical-align: 0.02em;
+	.shared {
+		width: 16px;
+		height: 16px;
+		align-self: center;
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 1.8;
+		stroke-linecap: round;
 	}
 	.title {
 		font-family: var(--serif);

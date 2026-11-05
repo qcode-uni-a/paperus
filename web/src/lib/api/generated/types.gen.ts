@@ -44,6 +44,10 @@ export type BodyUploadToVersion = {
  * CollectionChange
  *
  * Only the fields given are changed; ``parent_id: null`` moves to the top.
+ *
+ * ``library_id`` gives the collection, with the collections inside it, to
+ * another library (at its top level unless ``parent_id`` names a collection
+ * there). Papers a group's collection may not hold leave it.
  */
 export type CollectionChange = {
     /**
@@ -58,6 +62,56 @@ export type CollectionChange = {
      * Parent Id
      */
     parent_id?: string | null;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+    /**
+     * Add Papers
+     */
+    add_papers?: boolean;
+};
+
+/**
+ * CollectionChanged
+ */
+export type CollectionChanged = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id: string | null;
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Direct
+     */
+    direct?: number;
+    /**
+     * Recent
+     */
+    recent?: Array<ItemPreview>;
+    /**
+     * Left Out
+     */
+    left_out?: number;
 };
 
 /**
@@ -303,9 +357,9 @@ export type ItemDetail = {
      */
     id: string;
     /**
-     * Library Id
+     * Library Ids
      */
-    library_id: string;
+    library_ids: Array<string>;
     /**
      * Type
      */
@@ -424,9 +478,9 @@ export type ItemOut = {
      */
     id: string;
     /**
-     * Library Id
+     * Library Ids
      */
-    library_id: string;
+    library_ids: Array<string>;
     /**
      * Type
      */
@@ -516,6 +570,10 @@ export type KnownFile = {
      */
     item_id: string;
     file: FileOut;
+    /**
+     * Library Ids
+     */
+    library_ids: Array<string>;
 };
 
 /**
@@ -671,6 +729,22 @@ export type MemberOut = {
  * MetadataSource
  */
 export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
+
+/**
+ * MovePreview
+ *
+ * What moving a collection (with those inside) into a library does.
+ */
+export type MovePreview = {
+    /**
+     * Papers
+     */
+    papers: number;
+    /**
+     * Not In Library
+     */
+    not_in_library: number;
+};
 
 /**
  * NewItemUpload
@@ -1388,6 +1462,74 @@ export type GetItemResponses = {
 
 export type GetItemResponse = GetItemResponses[keyof GetItemResponses];
 
+export type RemoveItemFromLibraryData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+        /**
+         * Library Id
+         */
+        library_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/libraries/{library_id}';
+};
+
+export type RemoveItemFromLibraryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveItemFromLibraryError = RemoveItemFromLibraryErrors[keyof RemoveItemFromLibraryErrors];
+
+export type RemoveItemFromLibraryResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemDetail;
+};
+
+export type RemoveItemFromLibraryResponse = RemoveItemFromLibraryResponses[keyof RemoveItemFromLibraryResponses];
+
+export type AddItemToLibraryData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+        /**
+         * Library Id
+         */
+        library_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/libraries/{library_id}';
+};
+
+export type AddItemToLibraryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddItemToLibraryError = AddItemToLibraryErrors[keyof AddItemToLibraryErrors];
+
+export type AddItemToLibraryResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemDetail;
+};
+
+export type AddItemToLibraryResponse = AddItemToLibraryResponses[keyof AddItemToLibraryResponses];
+
 export type RestoreItemData = {
     body?: never;
     path: {
@@ -1426,12 +1568,7 @@ export type FindUploadData = {
          */
         sha256: string;
     };
-    query?: {
-        /**
-         * Library
-         */
-        library?: string | null;
-    };
+    query?: never;
     url: '/api/uploads/{sha256}';
 };
 
@@ -2080,10 +2217,45 @@ export type ChangeCollectionResponses = {
     /**
      * Successful Response
      */
-    200: CollectionOut;
+    200: CollectionChanged;
 };
 
 export type ChangeCollectionResponse = ChangeCollectionResponses[keyof ChangeCollectionResponses];
+
+export type PreviewMoveData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query: {
+        /**
+         * Library
+         */
+        library: string;
+    };
+    url: '/api/collections/{collection_id}/move-preview';
+};
+
+export type PreviewMoveErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewMoveError = PreviewMoveErrors[keyof PreviewMoveErrors];
+
+export type PreviewMoveResponses = {
+    /**
+     * Successful Response
+     */
+    200: MovePreview;
+};
+
+export type PreviewMoveResponse = PreviewMoveResponses[keyof PreviewMoveResponses];
 
 export type AddItemsData = {
     body: ItemIds;
