@@ -87,6 +87,12 @@
 			<a href={resolve('/manage/groups')} class:current={active(resolve('/manage/groups'))}
 				><span>Groups</span></a
 			>
+			<a href={resolve('/manage/duplicates')} class:current={active(resolve('/manage/duplicates'))}
+				><span>Duplicates</span></a
+			>
+			<a href={resolve('/manage/unsorted')} class:current={active(resolve('/manage/unsorted'))}
+				><span>Unsorted</span></a
+			>
 			<a href={resolve('/trash')} class:current={active(resolve('/trash'))}><span>Trash</span></a>
 			{#if session.user?.is_admin}
 				<a href={adminPath}><span>Administration</span></a>

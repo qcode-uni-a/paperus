@@ -249,7 +249,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead. ``unsorted=true``: only papers\nwhose details could not be found (all guessed from their file; papers\nstill being read are left out). ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -413,6 +413,16 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "unsorted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Unsorted"
             }
           }
         ],
@@ -2301,6 +2311,67 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/duplicates": {
+      "get": {
+        "tags": [
+          "duplicates"
+        ],
+        "summary": "List Duplicates Everywhere",
+        "description": "Pairs of papers that look like the same paper (same identifier or\nfile first, then the same title), with a recommendation which to keep;\npairs marked as different are left out.",
+        "operationId": "list_duplicates_everywhere",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicateOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Duplicates Everywhere"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/duplicates/different": {
+      "post": {
+        "tags": [
+          "duplicates"
+        ],
+        "summary": "Mark Different",
+        "description": "The two are different papers: do not suggest them again (for everyone\nwho sees both).",
+        "operationId": "mark_different",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Pair"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -4656,6 +4727,43 @@
         ],
         "title": "DefaultLibrary"
       },
+      "DuplicateOut": {
+        "properties": {
+          "keep": {
+            "$ref": "#/components/schemas/ItemOut"
+          },
+          "merge": {
+            "$ref": "#/components/schemas/ItemOut"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "why": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Why"
+          },
+          "can_merge": {
+            "type": "boolean",
+            "title": "Can Merge"
+          }
+        },
+        "type": "object",
+        "required": [
+          "keep",
+          "merge",
+          "reasons",
+          "why",
+          "can_merge"
+        ],
+        "title": "DuplicateOut"
+      },
       "FileOut": {
         "properties": {
           "id": {
@@ -6488,6 +6596,26 @@
           "library_id"
         ],
         "title": "Owner"
+      },
+      "Pair": {
+        "properties": {
+          "a": {
+            "type": "string",
+            "format": "uuid",
+            "title": "A"
+          },
+          "b": {
+            "type": "string",
+            "format": "uuid",
+            "title": "B"
+          }
+        },
+        "type": "object",
+        "required": [
+          "a",
+          "b"
+        ],
+        "title": "Pair"
       },
       "Passage": {
         "properties": {

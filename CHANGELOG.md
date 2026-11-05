@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Manage → Duplicates**: papers that look like the same paper twice
+  (same DOI or arXiv ID, same file, or the same title), typical after
+  importing from several programs, with a recommendation which to keep and
+  why. Merging shows beforehand what moves and what stays; "Not the same
+  paper" hides a pair for good.
+- **Manage → Unsorted**: papers whose details could not be found (no DOI
+  or arXiv ID in the file). Enter the DOI or arXiv ID to look them up.
 - **More models for search by meaning** (Administration → Settings →
   Machine learning): Snowflake Arctic Embed M/L v2, GTE multilingual,
   multilingual-e5 base/large and bge-m3 in int8, next to bge-m3 and

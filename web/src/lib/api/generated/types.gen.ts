@@ -331,6 +331,26 @@ export type DefaultLibrary = {
 };
 
 /**
+ * DuplicateOut
+ */
+export type DuplicateOut = {
+    keep: ItemOut;
+    merge: ItemOut;
+    /**
+     * Reasons
+     */
+    reasons: Array<string>;
+    /**
+     * Why
+     */
+    why: Array<string>;
+    /**
+     * Can Merge
+     */
+    can_merge: boolean;
+};
+
+/**
  * FileOut
  */
 export type FileOut = {
@@ -1342,6 +1362,20 @@ export type Owner = {
 };
 
 /**
+ * Pair
+ */
+export type Pair = {
+    /**
+     * A
+     */
+    a: string;
+    /**
+     * B
+     */
+    b: string;
+};
+
+/**
  * Passage
  */
 export type Passage = {
@@ -2122,6 +2156,10 @@ export type ListItemsData = {
          * Offset
          */
         offset?: number;
+        /**
+         * Unsorted
+         */
+        unsorted?: boolean;
     };
     url: '/api/items';
 };
@@ -3311,6 +3349,49 @@ export type GetImportResponses = {
 };
 
 export type GetImportResponse = GetImportResponses[keyof GetImportResponses];
+
+export type ListDuplicatesEverywhereData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/duplicates';
+};
+
+export type ListDuplicatesEverywhereResponses = {
+    /**
+     * Response List Duplicates Everywhere
+     *
+     * Successful Response
+     */
+    200: Array<DuplicateOut>;
+};
+
+export type ListDuplicatesEverywhereResponse = ListDuplicatesEverywhereResponses[keyof ListDuplicatesEverywhereResponses];
+
+export type MarkDifferentData = {
+    body: Pair;
+    path?: never;
+    query?: never;
+    url: '/api/duplicates/different';
+};
+
+export type MarkDifferentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MarkDifferentError = MarkDifferentErrors[keyof MarkDifferentErrors];
+
+export type MarkDifferentResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type MarkDifferentResponse = MarkDifferentResponses[keyof MarkDifferentResponses];
 
 export type GetConfigData = {
     body?: never;

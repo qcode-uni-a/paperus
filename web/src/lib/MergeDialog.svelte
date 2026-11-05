@@ -15,8 +15,10 @@
 	import { libraryName, loadOrganize } from '#lib/organize.svelte.ts';
 
 	/** Merge this paper into another one (the same paper twice), showing
-	 * beforehand what moves and what stays behind. */
-	let { item }: { item: ItemDetail } = $props();
+	 * beforehand what moves and what stays behind. ``onmerged`` instead of
+	 * going to the paper that stayed. */
+	let { item, onmerged }: { item: ItemDetail | Item; onmerged?: (kept: ItemDetail) => void } =
+		$props();
 
 	const KINDS = [
 		['version', 'Versions'],
@@ -38,13 +40,18 @@
 	const staying = $derived((steps ?? []).filter((s) => s.action === 'stays'));
 	const moving = $derived((steps ?? []).filter((s) => s.action === 'move'));
 
-	export async function open() {
+	/** With ``into``, straight to what merging into it would do. */
+	export async function open(into?: Item) {
 		words = '';
 		chosen = null;
 		steps = null;
 		error = '';
 		found = [];
 		dialog?.showModal();
+		if (into) {
+			await choose(into);
+			return;
+		}
 		const { data } = await listDuplicates({ path: { item_id: item.id } });
 		likely = data ?? [];
 	}
@@ -90,7 +97,8 @@
 		}
 		dialog?.close();
 		await loadOrganize();
-		await goto(resolve('/items/[id]', { id: data.item.id }));
+		if (onmerged) onmerged(data.item);
+		else await goto(resolve('/items/[id]', { id: data.item.id }));
 	}
 
 	/** "Huber and Koren (2026), Shared library", leaving out what is missing. */
