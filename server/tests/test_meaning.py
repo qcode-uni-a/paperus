@@ -11,7 +11,12 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from paperus.embedding import embed_file, files_missing_embeddings
+from paperus.embedding import (
+    embed_file,
+    embed_note,
+    files_missing_embeddings,
+    notes_missing_embeddings,
+)
 from paperus.jobs import queue_embedding
 from paperus.ml import MLClient, MLUnavailable
 from paperus.models import Embedding
@@ -223,3 +228,29 @@ def test_reread_all_marks_existing_files(
     process_file(db, blobs, file_id)
     hits, _ = search(admin, "Huber", mode="keyword")
     assert hits[0]["in_references"] is True
+
+
+def test_notes_are_found_by_meaning(
+    logged_in: TestClient, db: Session, fake_ml: FakeML, job_app: App
+) -> None:
+    note = logged_in.post(
+        "/api/notes", json={"text": "# Station log\n\nGaps in the record."}
+    ).json()
+    # Saving queues the vectors; until then, words only.
+    assert isinstance(job_app.connector, InMemoryConnector)
+    jobs = [j["task_name"] for j in job_app.connector.jobs.values()]
+    assert "paperus:embed_note" in jobs
+    assert notes_missing_embeddings(db, MODEL) == [uuid.UUID(note["id"])]
+    assert search(logged_in, "missing", mode="meaning")[0] == []
+
+    assert embed_note(db, fake_ml.client(), MODEL, uuid.UUID(note["id"])) == 1
+    assert notes_missing_embeddings(db, MODEL) == []
+    [hit], _ = search(logged_in, "missing", mode="meaning")
+    assert (hit["kind"], hit["note_id"], hit["item_id"]) == ("note", note["id"], None)
+    assert hit["item_title"] == "Station log"
+    # Types filter papers; notes only when asked for.
+    assert search(logged_in, "gaps", type="article-journal")[0] == []
+    assert len(search(logged_in, "gaps", type="note")[0]) == 1
+    # Trashed notes are not found.
+    logged_in.delete(f"/api/notes/{note['id']}")
+    assert search(logged_in, "gaps")[0] == []
