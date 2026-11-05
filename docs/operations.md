@@ -46,6 +46,54 @@ Agree in writing who patches the OS and who updates the application. Automate
 updates (container images + script or Ansible), set up backups and test a
 restore.
 
+## Reverse proxy
+
+paperus serves the website, the API and file downloads on **one port**
+(8000); the ML service and the database are only reachable inside the
+Docker network. Put a reverse proxy with HTTPS in front of that port, on a
+**domain or subdomain of its own** (serving under a path such as
+`example.org/paperus/` is not supported).
+
+- The proxy's `X-Forwarded-For`/`-Proto` headers are trusted from this
+  machine and private networks (`PAPERUS_TRUSTED_PROXIES`, addresses or
+  CIDR ranges); narrow it if the server port is reachable from elsewhere.
+- Uploads can be large (up to `PAPERUS_MAX_UPLOAD_BYTES`, 512 MB by
+  default): raise the proxy's body size limit and timeouts.
+- Downloads use range requests (PDF.js loads large PDFs in parts); proxies
+  pass them through by default.
+
+Caddy (gets and renews certificates by itself):
+
+```
+paperus.example.org {
+	reverse_proxy localhost:8000
+}
+```
+
+nginx (certificates set up separately, e.g. with certbot):
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name paperus.example.org;
+    # ssl_certificate …; ssl_certificate_key …;
+
+    client_max_body_size 512m;   # nginx allows 1 MB by default
+    proxy_request_buffering off; # stream uploads instead of buffering them
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 600s;
+    }
+}
+```
+
+Tested with Caddy in front of the container images: HTTPS, login with the
+Secure session cookie, uploads, downloads with range requests.
+
 ## Data protection and licences
 
 - Involve the data protection officer early: accounts, notes, usage logs are

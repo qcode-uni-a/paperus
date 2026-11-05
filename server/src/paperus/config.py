@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PAPERUS_", env_file=".env")
 
     database_url: str = "postgresql+psycopg://paperus:paperus@localhost:5432/paperus"
+    # Reverse proxies whose X-Forwarded-For/-Proto headers are believed
+    # (addresses or CIDR ranges, comma-separated); by default this machine and
+    # private networks, which covers a proxy in Docker or on the local network.
+    trusted_proxies: str = (
+        "127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
+    )
     # Session cookies only over HTTPS (browsers also accept them on
     # http://localhost). Turn off only to test from other devices on a local
     # network over plain HTTP.

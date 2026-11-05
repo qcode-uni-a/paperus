@@ -41,7 +41,9 @@ by meaning takes 2–3 GB).
    2.3 GB).
 4. Create the first administrator:
    `docker compose exec server paperus user create admin --admin`
-5. Open port 8000 through a reverse proxy with HTTPS (Caddy, nginx, Traefik).
+5. Put a reverse proxy with HTTPS in front of port 8000, on a (sub)domain of its
+   own; examples for Caddy and nginx are in
+   [operations](docs/operations.md#reverse-proxy).
 
 Back up the files folder and the database folder together. To update, change
 `PAPERUS_VERSION` or pull `release` again, then `docker compose up -d`.

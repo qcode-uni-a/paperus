@@ -47,6 +47,8 @@ def main(argv: list[str] | None = None) -> None:
             host=args.host,
             port=args.port,
             reload=args.reload,
+            proxy_headers=True,
+            forwarded_allow_ips=Settings().trusted_proxies,
         )
     elif args.command == "worker":
         logging.basicConfig(level=logging.INFO)
