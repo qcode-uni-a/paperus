@@ -43,6 +43,9 @@ updates:
       day: monday
     cooldown:
       default-days: 7
+      # Tags like node:26-slim are pushed again every few days (fixes, a new
+      # Debian base), so a cooldown would skip exactly the maintained ones.
+      exclude: [node, python]
     ignore:
       # Node's major versions (only even ones become LTS) by hand.
       - dependency-name: node
