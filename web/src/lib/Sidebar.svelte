@@ -69,6 +69,7 @@
 		{/each}
 	{:else}
 		<a href={library} class:current={onLibrary && !filtered}><span>Library</span></a>
+		<a href={resolve('/recent')} class:current={active(resolve('/recent'))}><span>Recent</span></a>
 
 		<a href={collectionsPath} class:current={active(collectionsPath)}><span>Collections</span></a>
 

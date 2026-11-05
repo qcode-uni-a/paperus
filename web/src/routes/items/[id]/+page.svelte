@@ -8,6 +8,7 @@
 		etagOf,
 		FILE_ROLES,
 		getItem,
+		markViewed,
 		pinVersion,
 		restoreFile,
 		restoreItem,
@@ -92,6 +93,11 @@
 
 	$effect(() => {
 		if (id) load();
+	});
+
+	// For the person's recent papers.
+	$effect(() => {
+		if (id) markViewed({ path: { item_id: id } });
 	});
 
 	// Refresh while the server reads the files (text, title from the file).

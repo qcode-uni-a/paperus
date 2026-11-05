@@ -246,3 +246,31 @@ def test_list_items_by_title_words(logged_in: TestClient) -> None:
 def test_items_need_login(client: TestClient) -> None:
     assert client.get("/api/items").status_code == 401
     assert client.post("/api/items", json={"doi": DOI}).status_code == 401
+
+
+def test_recent_activity(logged_in: TestClient) -> None:
+    def add(title: str) -> str:
+        response = logged_in.post("/api/items", json={"metadata": {"title": title}})
+        item_id: str = response.json()["id"]
+        return item_id
+
+    old, middle, new = add("Old"), add("Middle"), add("New")
+
+    def recent() -> list[str]:
+        response = logged_in.get("/api/items", params={"sort": "recent"})
+        return [i["title"] for i in response.json()]
+
+    assert recent() == ["New", "Middle", "Old"]
+    # Opening an item brings it up, and so does changing one.
+    assert logged_in.post(f"/api/items/{old}/viewed").status_code == 204
+    assert recent() == ["Old", "New", "Middle"]
+    listed = logged_in.get("/api/items", params={"sort": "recent", "limit": 1}).json()
+    assert listed[0]["viewed_at"] is not None
+    logged_in.post(f"/api/items/{middle}/tags", json={"name": "fresh"})
+    assert recent() == ["Middle", "Old", "New"]
+    page = logged_in.get("/api/items", params={"sort": "recent", "offset": 2}).json()
+    assert [i["title"] for i in page] == ["New"]
+    opened = logged_in.get("/api/items", params={"sort": "opened"})
+    assert [i["title"] for i in opened.json()] == ["Old"]
+    assert opened.headers["X-Total-Count"] == "1"
+    assert new

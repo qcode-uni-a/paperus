@@ -5,13 +5,15 @@
 	import { isShared } from '#lib/organize.svelte.ts';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 
-	let { item }: { item: Item } = $props();
+	/** ``note``: a line above the title, e.g. why it is in a list. */
+	let { item, note }: { item: Item; note?: string } = $props();
 
 	const authors = $derived(shortAuthors(item.authors));
 </script>
 
 <li>
 	{#if isShared(item.library_id)}<span class="corner"><SharedIcon /></span>{/if}
+	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
 	<p class="reference">
 		<span
@@ -37,6 +39,10 @@
 		border-bottom: 1px solid var(--rule);
 		display: grid;
 		gap: 4px;
+	}
+	.note {
+		color: var(--muted);
+		font-size: var(--step--1);
 	}
 	.corner {
 		position: absolute;

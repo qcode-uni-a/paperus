@@ -258,6 +258,10 @@ class Item(Record, Trashable, Base):
     )
     change: Mapped[int] = mapped_column(BigInteger, index=True)
     """Change number of the last change to the item or its versions and files."""
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    """When that change happened (stamped with the change number)."""
 
     versions: Mapped[list[Version]] = relationship(
         back_populates="item",
@@ -271,6 +275,20 @@ class Item(Record, Trashable, Base):
     collection_links: Mapped[list[CollectionItem]] = relationship(
         back_populates="item", cascade="all, delete-orphan", lazy="selectin"
     )
+
+
+class ItemView(Base):
+    """When a person last opened an item, for their recent papers."""
+
+    __tablename__ = "item_views"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Version(Record, Base):

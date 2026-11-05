@@ -8,6 +8,7 @@ until commit, so numbers become visible in order and ``since=N`` never misses
 a change that commits late.
 """
 
+from datetime import UTC, datetime
 from itertools import chain
 
 from sqlalchemy import event, select, update
@@ -74,8 +75,11 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
     with db.no_autoflush:
         if _INFO_KEY not in db.info:
             db.info[_INFO_KEY] = _next_change(db)
+        now = datetime.now(UTC)
         for target in stamped:
             target.change = db.info[_INFO_KEY]
+            if isinstance(target, Item):
+                target.changed_at = now
 
 
 @event.listens_for(Session, "after_commit")

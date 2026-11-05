@@ -249,7 +249,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -387,6 +387,32 @@
                 }
               ],
               "title": "Library"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "added",
+                "recent",
+                "opened"
+              ],
+              "type": "string",
+              "default": "added",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -749,6 +775,43 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/viewed": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Mark Viewed",
+        "description": "Remember that the person opened the item (for their recent papers).",
+        "operationId": "mark_viewed",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -3097,6 +3160,23 @@
             "type": "integer",
             "title": "Change"
           },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "viewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewed At"
+          },
           "deleted_at": {
             "anyOf": [
               {
@@ -3170,6 +3250,7 @@
           "identifiers",
           "created_at",
           "change",
+          "changed_at",
           "deleted_at",
           "processing",
           "tags",
@@ -3334,6 +3415,23 @@
             "type": "integer",
             "title": "Change"
           },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "viewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewed At"
+          },
           "deleted_at": {
             "anyOf": [
               {
@@ -3378,6 +3476,7 @@
           "identifiers",
           "created_at",
           "change",
+          "changed_at",
           "deleted_at",
           "processing",
           "tags",

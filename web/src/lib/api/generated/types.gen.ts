@@ -396,6 +396,14 @@ export type ItemDetail = {
      */
     change: number;
     /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Viewed At
+     */
+    viewed_at?: string | null;
+    /**
      * Deleted At
      */
     deleted_at: string | null;
@@ -516,6 +524,14 @@ export type ItemOut = {
      * Change
      */
     change: number;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Viewed At
+     */
+    viewed_at?: string | null;
     /**
      * Deleted At
      */
@@ -1338,6 +1354,14 @@ export type ListItemsData = {
          * Library
          */
         library?: string | null;
+        /**
+         * Sort
+         */
+        sort?: 'added' | 'recent' | 'opened';
+        /**
+         * Offset
+         */
+        offset?: number;
     };
     url: '/api/items';
 };
@@ -1607,6 +1631,36 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type MarkViewedData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/viewed';
+};
+
+export type MarkViewedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MarkViewedError = MarkViewedErrors[keyof MarkViewedErrors];
+
+export type MarkViewedResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type MarkViewedResponse = MarkViewedResponses[keyof MarkViewedResponses];
 
 export type FindUploadData = {
     body?: never;

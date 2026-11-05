@@ -2,12 +2,13 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 import httpx2
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 from paperus import changes, library, metadata
@@ -19,6 +20,7 @@ from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, norma
 from paperus.models import (
     Item,
     ItemTag,
+    ItemView,
     MetadataSource,
     TextStatus,
     Version,
@@ -92,6 +94,10 @@ class ItemOut(BaseModel):
     identifiers: list[IdentifierOut]
     created_at: datetime
     change: int
+    changed_at: datetime
+    """When the item or its versions, files, tags or collections last changed."""
+    viewed_at: datetime | None = None
+    """When the reader last opened it (only in ``sort=recent`` lists)."""
     deleted_at: datetime | None
     processing: bool
     """Files are still being read (text, and metadata for uploads)."""
@@ -159,6 +165,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
         identifiers=[i for v in item.versions for i in _identifiers(v)],
         created_at=item.created_at,
         change=item.change,
+        changed_at=item.changed_at,
         deleted_at=item.deleted_at,
         tags=item_tags(item, access),
         collection_ids=[
@@ -478,9 +485,14 @@ def list_items(
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
+    sort: Literal["added", "recent", "opened"] = "added",
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ItemOut]:
     """Items the person can read, newest first; ``before`` = last ``id`` for
-    the next page. ``library`` shows one library only.
+    the next page. ``library`` shows one library only. ``sort=recent``:
+    by the latest of the item's last change and the reader's last opening,
+    newest first, paged with ``offset`` instead of ``before``;
+    ``sort=opened``: only items the reader opened, by when.
 
     ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
     with all of them) and ``collection`` (with its subcollections unless
@@ -518,10 +530,60 @@ def list_items(
         conditions.append(Item.title.icontains(word, autoescape=True))
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
+    if sort in ("recent", "opened"):
+        viewed = (
+            select(ItemView.item_id, ItemView.viewed_at)
+            .where(ItemView.user_id == access.user.id)
+            .subquery()
+        )
+        activity = (
+            func.greatest(
+                Item.changed_at, func.coalesce(viewed.c.viewed_at, Item.changed_at)
+            )
+            if sort == "recent"
+            else viewed.c.viewed_at
+        )
+        if sort == "opened":
+            conditions.append(viewed.c.viewed_at.is_not(None))
+            opened_total = db.scalar(
+                select(func.count())
+                .select_from(Item)
+                .join(viewed, viewed.c.item_id == Item.id)
+                .where(*conditions)
+            )
+            response.headers["X-Total-Count"] = str(opened_total or 0)
+        rows = db.execute(
+            select(Item, viewed.c.viewed_at)
+            .outerjoin(viewed, viewed.c.item_id == Item.id)
+            .where(*conditions)
+            .order_by(activity.desc(), Item.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return [
+            item_out(item, access).model_copy(update={"viewed_at": seen})
+            for item, seen in rows
+        ]
     query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item, access) for item in db.scalars(query)]
+
+
+@router.post("/api/items/{item_id}/viewed", status_code=204)
+def mark_viewed(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Remember that the person opened the item (for their recent papers)."""
+    get_readable_item(db, access, item_id)
+    db.execute(
+        insert(ItemView)
+        .values(user_id=access.user.id, item_id=item_id, viewed_at=func.now())
+        .on_conflict_do_update(
+            index_elements=[ItemView.user_id, ItemView.item_id],
+            set_={"viewed_at": func.now()},
+        )
+    )
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/api/items/{item_id}")
