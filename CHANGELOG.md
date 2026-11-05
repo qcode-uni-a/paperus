@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Merge duplicates**: "Merge into…" in a paper's ⋯ menu suggests papers
+  with the same identifier or file and moves versions, files, tags and
+  collections over (as far as one's rights allow); the merged paper goes to
+  the trash.
+
 ## 0.0.2 (2026-11-05)
 
 Groups: private papers, shared ones, and who may do what.
@@ -34,8 +41,8 @@ papers to other groups or back to their people from there.
 
 ### Known limitations
 
-- Two people adding the same paper independently get two items; merging
-  duplicates comes later.
+- Two people adding the same paper independently get two items (merge them
+  by hand since the next version).
 - A group's collection cannot yet appear inside a private collection.
 - No MCP server for AI assistants, no BibTeX export, no backups command yet.
 - The Python packages and the TypeScript client are not published yet.
