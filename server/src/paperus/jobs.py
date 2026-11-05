@@ -19,7 +19,12 @@ from sqlalchemy.orm import Session, sessionmaker
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
-from paperus.embedding import embed_file, files_missing_embeddings
+from paperus.embedding import (
+    embed_file,
+    embed_note,
+    files_missing_embeddings,
+    notes_missing_embeddings,
+)
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLUnavailable, make_ml_client
 from paperus.processing import pending_files, process_file
@@ -75,6 +80,21 @@ def embed(file_id: str) -> None:
     log.info("embedded %d chunks of file %s", count, file_id)
 
 
+@tasks.task(
+    name="embed_note",
+    queue="ml",
+    retry=RetryStrategy(
+        max_attempts=10, exponential_wait=2, retry_exceptions={MLUnavailable}
+    ),
+)
+def embed_a_note(note_id: str) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        model = load_config(db, context.settings).embedding_model
+        count = embed_note(db, context.ml, model, uuid.UUID(note_id))
+    log.info("embedded %d chunks of note %s", count, note_id)
+
+
 @tasks.periodic(cron="*/10 * * * *")
 @tasks.task(
     name="queue_missing_embeddings",
@@ -89,6 +109,8 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
         model = load_config(db, context.settings).embedding_model
         for file_id in files_missing_embeddings(db, model):
             queue_embedding(job.app, file_id)
+        for note_id in notes_missing_embeddings(db, model):
+            queue_note_embedding(job.app, note_id)
 
 
 def queue_embedding_sweep(app: App) -> None:
@@ -105,6 +127,14 @@ def queue_text_sweep(app: App) -> None:
     task = app.configure_task("paperus:queue_pending_files", queueing_lock="sweep")
     with contextlib.suppress(AlreadyEnqueued):
         task.defer(timestamp=0)
+
+
+def queue_note_embedding(app: App, note_id: uuid.UUID) -> None:
+    task = app.configure_task(
+        "paperus:embed_note", queueing_lock=f"embed-note-{note_id}"
+    )
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(note_id=str(note_id))
 
 
 def queue_embedding(app: App, file_id: uuid.UUID) -> None:

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -15,6 +15,7 @@ from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.items import Owner
 from paperus.api.organize import _collection
+from paperus.jobs import queue_note_embedding
 from paperus.models import (
     CollectionNote,
     Item,
@@ -206,7 +207,7 @@ def list_notes(
 
 @router.post("/api/notes", status_code=201)
 def create_note(
-    body: NoteIn, response: Response, db: DB, access: CurrentAccess
+    body: NoteIn, request: Request, response: Response, db: DB, access: CurrentAccess
 ) -> NoteDetail:
     """A new note for the given owner (or the person's default owner), about
     the given papers, optionally put into a collection."""
@@ -236,6 +237,7 @@ def create_note(
             CollectionNote(collection_id=collection.id, added_by=access.user.id)
         )
     db.commit()
+    queue_note_embedding(request.app.state.jobs, note.id)
     return note_detail(db, note, access, response)
 
 
@@ -251,6 +253,7 @@ def read_note(
 def change_note(
     note_id: uuid.UUID,
     body: NoteChange,
+    request: Request,
     response: Response,
     db: DB,
     access: CurrentAccess,
@@ -265,6 +268,7 @@ def change_note(
         raise HTTPException(412, "the note changed in the meantime")
     notes.set_text(db, note, body.text, access.user.id)
     db.commit()
+    queue_note_embedding(request.app.state.jobs, note.id)
     return note_detail(db, note, access, response)
 
 

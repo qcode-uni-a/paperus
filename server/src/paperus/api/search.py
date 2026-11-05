@@ -29,11 +29,17 @@ QUERY_TIMEOUT = 30.0
 
 class Passage(BaseModel):
     passage_id: str
-    """``<file id>#<position>``: stable while the file's text is unchanged."""
-    item_id: uuid.UUID
+    """``<file id>#<position>`` (or the note's id for notes): stable while the
+    text is unchanged."""
+    kind: Literal["paper", "note"] = "paper"
+    """From a paper's file, or from a note."""
+    item_id: uuid.UUID | None
+    """The paper (not for notes)."""
     item_title: str
-    version_id: uuid.UUID
-    file_id: uuid.UUID
+    """The paper's title, or the note's."""
+    version_id: uuid.UUID | None
+    file_id: uuid.UUID | None
+    note_id: uuid.UUID | None = None
     position: int
     page: int | None
     snippet: str
@@ -52,8 +58,8 @@ _SEARCH = text(
     f"""
     WITH q AS (SELECT websearch_to_tsquery('simple', :query) AS tsq),
     visible AS NOT MATERIALIZED (
-        SELECT fc.file_id, fc.position, fc.page, fc.chunk_sha256, fc.in_references,
-               f.version_id,
+        SELECT 'paper' AS kind, fc.file_id AS source_id, fc.position, fc.page,
+               fc.chunk_sha256, fc.in_references, f.version_id,
                i.id AS item_id, i.title AS item_title
         FROM file_chunks fc
              JOIN files f ON f.id = fc.file_id
@@ -64,19 +70,27 @@ _SEARCH = text(
           AND i.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR i.type = ANY(CAST(:types AS text[])))
+        UNION ALL
+        SELECT 'note', nc.note_id, nc.position, NULL, nc.chunk_sha256, false,
+               NULL, NULL, n.title
+        FROM note_chunks nc JOIN notes n ON n.id = nc.note_id
+        WHERE n.deleted_at IS NULL
+          AND n.library_id = ANY(CAST(:libraries AS uuid[]))
+          AND (cardinality(CAST(:types AS text[])) = 0
+               OR 'note' = ANY(CAST(:types AS text[])))
     ),
     keyword AS (
-        SELECT vis.file_id, vis.position, row_number() OVER (
-                   ORDER BY ts_rank_cd(c.tsv, q.tsq) DESC, vis.file_id, vis.position
+        SELECT vis.source_id, vis.position, row_number() OVER (
+                   ORDER BY ts_rank_cd(c.tsv, q.tsq) DESC, vis.source_id, vis.position
                ) AS rank
         FROM visible vis JOIN chunks c ON c.sha256 = vis.chunk_sha256, q
         WHERE :use_keyword AND c.tsv @@ q.tsq
         ORDER BY rank LIMIT {CANDIDATES}
     ),
     meaning AS (
-        SELECT vis.file_id, vis.position, row_number() OVER (
+        SELECT vis.source_id, vis.position, row_number() OVER (
                    ORDER BY e.embedding <=> CAST(:vector AS halfvec),
-                            vis.file_id, vis.position
+                            vis.source_id, vis.position
                ) AS rank
         FROM visible vis
              JOIN embeddings e
@@ -85,17 +99,18 @@ _SEARCH = text(
         ORDER BY rank LIMIT {CANDIDATES}
     ),
     fused AS (
-        SELECT file_id, position, sum(1.0 / ({RRF_K} + rank)) AS score,
+        SELECT source_id, position, sum(1.0 / ({RRF_K} + rank)) AS score,
                bool_or(source = 'keyword') AS by_keyword,
                bool_or(source = 'meaning') AS by_meaning
         FROM (
-            SELECT file_id, position, rank, 'keyword' AS source FROM keyword
+            SELECT source_id, position, rank, 'keyword' AS source FROM keyword
             UNION ALL
-            SELECT file_id, position, rank, 'meaning' AS source FROM meaning
+            SELECT source_id, position, rank, 'meaning' AS source FROM meaning
         ) AS candidates
-        GROUP BY file_id, position
+        GROUP BY source_id, position
     )
-    SELECT vis.file_id, vis.position, vis.page, vis.in_references, vis.version_id,
+    SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
+           vis.version_id,
            vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
            CASE WHEN fused.by_keyword THEN ts_headline(
@@ -113,10 +128,10 @@ _SEARCH = text(
                '&', '&amp;'), '<', '&lt;'), '>', '&gt;')
            END AS snippet
     FROM fused
-         JOIN visible vis USING (file_id, position)
+         JOIN visible vis USING (source_id, position)
          JOIN chunks c ON c.sha256 = vis.chunk_sha256,
          q
-    ORDER BY fused.score DESC, vis.file_id, vis.position
+    ORDER BY fused.score DESC, vis.source_id, vis.position
     LIMIT :limit
     """
 )
@@ -169,11 +184,13 @@ def run_search(
     ).mappings()
     passages = [
         Passage(
-            passage_id=f"{row['file_id']}#{row['position']}",
+            passage_id=f"{row['source_id']}#{row['position']}",
+            kind=row["kind"],
             item_id=row["item_id"],
             item_title=row["item_title"],
             version_id=row["version_id"],
-            file_id=row["file_id"],
+            file_id=row["source_id"] if row["kind"] == "paper" else None,
+            note_id=row["source_id"] if row["kind"] == "note" else None,
             position=row["position"],
             page=row["page"],
             snippet=row["snippet"],

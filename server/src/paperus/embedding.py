@@ -7,7 +7,15 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from paperus.ml import MLClient
-from paperus.models import Chunk, Embedding, File, FileChunk, TextStatus
+from paperus.models import (
+    Chunk,
+    Embedding,
+    File,
+    FileChunk,
+    Note,
+    NoteChunk,
+    TextStatus,
+)
 
 BATCH = 32
 
@@ -34,7 +42,24 @@ def missing_chunks(db: Session, file_id: uuid.UUID, model: str) -> list[Chunk]:
 
 def embed_file(db: Session, ml: MLClient, model: str, file_id: uuid.UUID) -> int:
     """Embed the file's missing chunks, committing per batch; returns the count."""
-    chunks = missing_chunks(db, file_id, model)
+    return _embed(db, ml, model, missing_chunks(db, file_id, model))
+
+
+def embed_note(db: Session, ml: MLClient, model: str, note_id: uuid.UUID) -> int:
+    """Embed the note's chunks that lack a vector; returns the count."""
+    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
+    chunks = list(
+        db.scalars(
+            select(Chunk)
+            .join(NoteChunk, NoteChunk.chunk_sha256 == Chunk.sha256)
+            .where(NoteChunk.note_id == note_id, Chunk.sha256.not_in(has_vector))
+            .distinct()
+        )
+    )
+    return _embed(db, ml, model, chunks)
+
+
+def _embed(db: Session, ml: MLClient, model: str, chunks: list[Chunk]) -> int:
     for start in range(0, len(chunks), BATCH):
         batch = chunks[start : start + BATCH]
         vectors = ml.embed([c.text for c in batch], model=model, kind="passage")
@@ -69,6 +94,23 @@ def files_missing_embeddings(
             )
             .group_by(File.id)
             .order_by(File.id)
+            .limit(limit)
+        )
+    )
+
+
+def notes_missing_embeddings(
+    db: Session, model: str, limit: int = 500
+) -> list[uuid.UUID]:
+    """Non-trashed notes with chunks lacking a vector from ``model``."""
+    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
+    return list(
+        db.scalars(
+            select(Note.id)
+            .join(NoteChunk, NoteChunk.note_id == Note.id)
+            .where(Note.deleted_at.is_(None), NoteChunk.chunk_sha256.not_in(has_vector))
+            .group_by(Note.id)
+            .order_by(Note.id)
             .limit(limit)
         )
     )

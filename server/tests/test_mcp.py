@@ -60,7 +60,14 @@ def token(person: Person, *scopes: str, **extra: object) -> str:
     return raw
 
 
-ALL = ("search", "papers.read", "files.read", "tags.write", "papers.write")
+ALL = (
+    "search",
+    "papers.read",
+    "files.read",
+    "tags.write",
+    "papers.write",
+    "notes.write",
+)
 
 
 @pytest.fixture
@@ -115,6 +122,9 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "list_tags",
         "add_tags",
         "add_document",
+        "get_note",
+        "create_note",
+        "update_note",
     }
     assert tools["search"]["annotations"]["readOnlyHint"] is True
     assert tools["add_tags"]["annotations"]["readOnlyHint"] is False
@@ -270,3 +280,45 @@ def test_writing(
         Assistant(client, token(bob, "papers.read")).call(
             "add_document", doi="10.1234/radar"
         )
+
+
+def test_notes(client: TestClient, ada: Person) -> None:
+    assistant = Assistant(client, token(ada, *ALL))
+    [paper] = assistant.call("list_documents", title="radar")["papers"]
+    created = assistant.call(
+        "create_note",
+        text="# Summary by Claude\n\nThe gaps below the beam are filled by diffusion.",
+        paper_ids=[paper["paper_id"]],
+    )
+    assert created["title"] == "Summary by Claude"
+    assert created["link"].endswith(f"/notes/{created['note_id']}")
+    note = assistant.call("get_note", note_id=created["note_id"])
+    assert note["about"] == [
+        {"paper_id": paper["paper_id"], "title": "Radar gap filling"}
+    ]
+    assert "shared_with" not in note  # private
+    details = assistant.call("get_document", paper_id=paper["paper_id"])
+    assert details["notes"] == [
+        {"note_id": created["note_id"], "title": "Summary by Claude"}
+    ]
+    # Found by search, apart from papers.
+    found = assistant.call("search", query="beam", mode="keyword")
+    [hit] = found["notes"]
+    assert hit["note"] == "Summary by Claude" and "beam" in hit["passages"][0]["text"]
+    # Updating needs the current change number.
+    with pytest.raises(ToolFailed, match="changed in the meantime"):
+        assistant.call(
+            "update_note", note_id=hit["note_id"], text="x", change=note["change"] - 1
+        )
+    updated = assistant.call(
+        "update_note", note_id=hit["note_id"], text="# Better", change=note["change"]
+    )
+    assert updated["change"] > note["change"]
+    assert ada.get(f"/api/notes/{hit['note_id']}").json()["title"] == "Better"
+    # Without notes.write: reading only.
+    reader = Assistant(client, token(ada, "papers.read"))
+    assert reader.call("get_note", note_id=hit["note_id"])["title"] == "Better"
+    with pytest.raises(ToolFailed, match=r"notes\.write"):
+        reader.call("create_note", text="x")
+    with pytest.raises(ToolFailed, match="no group called"):
+        assistant.call("create_note", text="x", group="Nowhere")
