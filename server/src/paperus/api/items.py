@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
-from paperus import changes, library, metadata
+from paperus import changes, library, merge, metadata
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
@@ -591,3 +591,58 @@ def get_item(
     item_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
     return item_detail(get_readable_item(db, access, item_id), access, response)
+
+
+@router.get("/api/items/{item_id}/duplicates")
+def list_duplicates(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[ItemOut]:
+    """Papers the person can see that share an identifier or a file with
+    this one: candidates for merging."""
+    item = get_readable_item(db, access, item_id)
+    return [
+        item_out(other, access) for other in merge.likely_duplicates(db, access, item)
+    ]
+
+
+class MergeInto(BaseModel):
+    into: uuid.UUID
+    """The paper that stays; this one goes to the trash."""
+
+
+class MergeOut(BaseModel):
+    item: ItemDetail
+    """The paper that stayed, with what it took over."""
+    versions: int
+    files: int
+    tags: int
+    collections: int
+    left_behind: list[str]
+    """What could not move; it stays with the trashed paper."""
+
+
+@router.post("/api/items/{item_id}/merge")
+def merge_item(
+    item_id: uuid.UUID,
+    body: MergeInto,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> MergeOut:
+    """Merge this paper into another one (the same paper twice). Needs the
+    right to change this one; what may move to the other depends on the
+    person's rights there (see docs/permissions.md)."""
+    source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    target = get_readable_item(db, access, body.into, allow_trashed=False)
+    try:
+        result = merge.merge_items(db, access, source, target)
+    except merge.CannotMerge as error:
+        raise HTTPException(409, str(error)) from error
+    db.commit()
+    db.refresh(target)
+    return MergeOut(
+        item=item_detail(target, access, response),
+        versions=result.versions,
+        files=result.files,
+        tags=result.tags,
+        collections=result.collections,
+        left_behind=result.left_behind,
+    )

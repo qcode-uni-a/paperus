@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from tests.conftest import FakeDOIRegistry
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 3000 + b"\n%%EOF\n"
@@ -200,6 +201,76 @@ def test_papers_default_owner_and_known_papers(w: World) -> None:
         "/api/uploads", files={"upload": ("c.pdf", PDF, "application/pdf")}
     ).json()
     assert other["existing"] is False
+
+
+def test_papers_merge(w: World, doi_registry: FakeDOIRegistry) -> None:
+    doi_registry.records["10.1234/x"] = {"type": "journal-article", "title": "X"}
+    doi_registry.records["10.48550/arxiv.2101.00001"] = {
+        "type": "article",
+        "title": "X",
+    }
+    # The member's private copy and the group's paper (another version).
+    group_paper = w.admin.post(
+        "/api/items", json={"doi": "10.1234/x", "library_id": w.library}
+    ).json()
+    mine = w.member.post(
+        "/api/items", json={"doi": "10.48550/arxiv.2101.00001", "kind": "preprint"}
+    ).json()
+    w.member.post(
+        f"/api/items/{mine['id']}/files",
+        files={"upload": ("annotated.pdf", PDF, "application/pdf")},
+    )
+    w.member.post(f"/api/items/{mine['id']}/tags", json={"name": "to read"})
+    shelf = make_collection(w.member, "Shelf").json()
+    w.member.post(
+        f"/api/collections/{shelf['id']}/items", json={"item_ids": [mine["id"]]}
+    )
+    # Readers cannot merge a group's paper away.
+    assert w.reader.post(
+        f"/api/items/{group_paper['id']}/merge", json={"into": mine["id"]}
+    ).status_code in (403, 404)
+    # As member: everything moves; the private tag stays private.
+    merged = w.member.post(
+        f"/api/items/{mine['id']}/merge", json={"into": group_paper["id"]}
+    ).json()
+    assert (merged["versions"], merged["tags"], merged["collections"]) == (1, 1, 1)
+    assert merged["left_behind"] == []
+    assert len(merged["item"]["versions"]) == 2
+    assert w.member.get(f"/api/items/{mine['id']}").json()["deleted_at"] is not None
+    assert w.admin.get(f"/api/items/{group_paper['id']}").json()["tags"] == []
+    assert w.member.titles(collection=shelf["id"]) == ["X"]
+    # As reader of the target: only private things move.
+    copy = w.reader.add("Reader's copy")
+    w.reader.post(f"/api/items/{copy['id']}/tags", json={"name": "mine"})
+    result = w.reader.post(
+        f"/api/items/{copy['id']}/merge", json={"into": group_paper["id"]}
+    ).json()
+    assert result["tags"] == 1
+    assert result["versions"] == 0
+    assert result["left_behind"] == [
+        "versions and files (you may not change the other paper)"
+    ]
+    assert (
+        w.member.post(
+            f"/api/items/{group_paper['id']}/merge", json={"into": group_paper["id"]}
+        ).status_code
+        == 409
+    )
+
+
+def test_papers_likely_duplicates(w: World) -> None:
+    first = w.member.post(
+        "/api/uploads", files={"upload": ("a.pdf", PDF, "application/pdf")}
+    ).json()
+    # The outsider's copy is invisible to the member, so not a candidate.
+    w.outsider.post("/api/uploads", files={"upload": ("b.pdf", PDF, "application/pdf")})
+    shared = w.paper("Same file, group")
+    w.admin.post(
+        f"/api/items/{shared['id']}/files",
+        files={"upload": ("c.pdf", PDF, "application/pdf")},
+    )
+    found = w.member.get(f"/api/items/{first['item_id']}/duplicates").json()
+    assert [i["id"] for i in found] == [shared["id"]]
 
 
 # Tags

@@ -39,6 +39,7 @@ because of it; they need a membership like everyone else.
 | Move to the trash, restore | yes | no | yes |
 | Give to a group I may add to | yes | no | yes |
 | Take for myself | (already mine) | no | yes |
+| Merge into another paper (this one goes to the trash) | yes | no | yes |
 
 - New papers belong to my default owner (me, or a group I chose) or to
   the owner picked when adding.
@@ -48,6 +49,12 @@ because of it; they need a membership like everyone else.
   two items.
 - When a paper changes owner, the collections of a group that no longer
   owns it let it go. Tags stay.
+- **Merging** two papers that are the same: the one merged away goes to the
+  trash; the other keeps its details and takes over its versions and files
+  (only if I may change it), its tags and its collections (where the rules
+  below allow). What cannot move stays with the trashed paper. Likely
+  duplicates (same identifier or file, among papers I can see) are
+  suggested; nothing is merged automatically.
 
 ## Tags
 
