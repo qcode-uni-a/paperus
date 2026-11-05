@@ -15,7 +15,7 @@ Settings are environment variables:
 | --- | --- | --- |
 | `PAPERUS_ML_TOKEN` | none | Shared secret; requests need `Authorization: Bearer <token>` |
 | `PAPERUS_ML_CACHE_PATH` | `~/.cache/paperus-ml` | Downloaded models |
-| `PAPERUS_ML_PRELOAD` | `[]` | Models to load at start and keep, e.g. `["bge-m3"]` |
+| `PAPERUS_ML_PRELOAD` | `[]` | Models to load at start and keep, e.g. `["arctic-embed-m-v2"]` |
 | `PAPERUS_ML_MODEL_TTL` | `300` | Unload other models after this many idle seconds (0: never) |
 | `PAPERUS_ML_INTRA_OP_THREADS` | `0` | CPU cores per model (0: all it sees; in a container, set it, as the host's cores are seen) |
 | `PAPERUS_ML_MAX_BATCH_TEXTS` / `_TOKENS` | `32` / `16384` | Batch size (memory grows with both) |

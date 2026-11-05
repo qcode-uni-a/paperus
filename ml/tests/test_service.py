@@ -100,6 +100,18 @@ def test_models_listing(client: TestClient) -> None:
     listed = {m["name"]: m for m in client.get("/models").json()}
     assert set(listed) == set(MODELS)
     assert listed["bge-m3"]["dimensions"] == 1024
+    # What an admin needs for choosing one.
+    arctic = listed["arctic-embed-m-v2"]
+    assert arctic["licence"] == "Apache-2.0" and arctic["download_mb"] == 311
+    assert arctic["scores"] == {"en": 58.4, "de": 55.2, "multilingual": 54.8}
+    assert arctic["benchmarks"]["de"] == "Retrieval, German (MTEB deu v1)"
+    assert all(m["description"] and m["licence"] for m in listed.values())
+
+
+def test_measure_speed(client: TestClient) -> None:
+    speed = client.post("/models/bge-m3/speed").json()
+    assert speed["passages"] == 48 and speed["passages_per_second"] > 0
+    assert client.post("/models/nope/speed").status_code == 404
 
 
 def test_cache_layout_and_delete(tmp_path: Path, tiny: Encoder) -> None:

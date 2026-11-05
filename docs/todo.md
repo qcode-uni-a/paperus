@@ -4,10 +4,11 @@ Smaller tasks noted along the way; larger plans live in the other documents.
 
 ## Search
 
-- **Embedding speed.** bge-m3 in fp32 embeds about 1.5 chunks/s on a
-  24-core CPU (measured 2026-11-05), so a 10,000-paper library would take
-  days, not hours as estimated in [search.md](search.md). Compare int8
-  exports, batch sizes and thread settings, and a smaller model.
+- **Embedding speed.** Measured 2026-11-05 on 24 cores with the library's
+  own passages: bge-m3 2.8 passages/s, arctic-embed-m-v2 8.3,
+  multilingual-e5-small 23.5 (more in the ML service's model list). The
+  default is now arctic-embed-m-v2. Still to try: a reranker on the top
+  hits, GPU support, and an evaluation with real questions (search.md).
 
 ## Sidebar and library
 

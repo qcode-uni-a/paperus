@@ -88,11 +88,16 @@ class MLClient:
         """Remove a downloaded model from the service's cache."""
         self._call("DELETE", f"/models/{name}")
 
-    def _call(self, method: str, path: str) -> httpx2.Response:
+    def measure_speed(self, name: str) -> dict[str, Any]:
+        """Time the model on sample passages on the service's machine (it may
+        download the model first: allow for that)."""
+        return dict(self._call("POST", f"/models/{name}/speed", timeout=900).json())
+
+    def _call(self, method: str, path: str, timeout: float = 10) -> httpx2.Response:
         errors = []
         for url in self._ordered_urls():
             try:
-                response = self.http.request(method, f"{url}{path}", timeout=10)
+                response = self.http.request(method, f"{url}{path}", timeout=timeout)
                 response.raise_for_status()
             except httpx2.HTTPError as error:
                 errors.append(f"{url}: {error}")

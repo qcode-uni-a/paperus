@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     ml_timeout: float = 120
     # Model for search by meaning; changing it re-embeds the library in the
     # background (keyword search keeps working meanwhile).
-    embedding_model: str = "bge-m3"
+    embedding_model: str = "arctic-embed-m-v2"
     # Sent to metadata services (Crossref asks for one), e.g. admin@example.org.
     contact_email: str | None = None
     # File contents, stored by SHA-256: "filesystem" (any mounted path: local

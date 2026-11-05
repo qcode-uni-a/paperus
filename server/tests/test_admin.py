@@ -62,6 +62,14 @@ def test_ml_status(admin: TestClient, fake_ml: FakeML) -> None:
     assert status["models"] == []
 
 
+def test_measure_speed(admin: TestClient, fake_ml: FakeML) -> None:
+    speed = admin.post("/api/admin/ml/models/bge-m3/speed").json()
+    assert (speed["model"], speed["passages_per_second"]) == ("bge-m3", 8.0)
+    assert admin.post("/api/admin/ml/models/nope/speed").status_code == 503
+    fake_ml.down = True
+    assert admin.post("/api/admin/ml/models/bge-m3/speed").status_code == 503
+
+
 def test_delete_cached_model(admin: TestClient, fake_ml: FakeML) -> None:
     assert admin.delete("/api/admin/ml/models/bge-m3").status_code == 409
     assert admin.delete("/api/admin/ml/models/multilingual-e5-small").status_code == 204

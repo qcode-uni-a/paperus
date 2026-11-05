@@ -8,6 +8,7 @@ model in every request, so this service needs no model configuration.
 import asyncio
 import contextlib
 import secrets
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
@@ -17,7 +18,8 @@ from pydantic import BaseModel, Field
 
 from paperus_ml.config import Settings
 from paperus_ml.manager import ModelManager, UnknownModel
-from paperus_ml.models import MODELS, Kind
+from paperus_ml.models import MODELS, SCORES, Kind
+from paperus_ml.samples import sample_passages
 
 MAX_TEXTS = 256
 UNLOAD_CHECK_SECONDS = 30
@@ -46,6 +48,22 @@ class ModelInfo(BaseModel):
     loaded: bool
     cached_bytes: int | None
     """Size of the downloaded files; None if not downloaded yet."""
+    description: str
+    licence: str
+    download_mb: int
+    scores: dict[str, float]
+    """Published retrieval scores (nDCG@10, out of 100) by benchmark."""
+    benchmarks: dict[str, str] = Field(default_factory=lambda: dict(SCORES))
+    """What the score keys mean."""
+
+
+class Speed(BaseModel):
+    model: str
+    passages: int
+    seconds: float
+    passages_per_second: float
+    load_seconds: float
+    """Downloading and loading first, if the model was not loaded."""
 
 
 def create_app(
@@ -103,6 +121,10 @@ def create_app(
                 max_tokens=s.max_tokens,
                 loaded=s.name in loaded,
                 cached_bytes=models.cached_bytes(s),
+                description=s.description,
+                licence=s.licence,
+                download_mb=s.download_mb,
+                scores=dict(s.scores),
             )
             for s in MODELS.values()
         ]
@@ -114,6 +136,30 @@ def create_app(
             models.delete_cached(name)
         except UnknownModel as error:
             raise HTTPException(404, f"unknown model {name!r}") from error
+
+    @app.post("/models/{name}/speed", dependencies=[Depends(check_token)])
+    def measure_speed(name: str) -> Speed:
+        """Embed sample passages (about 250 words each, like paperus'
+        passages) and time it: speed differs much between machines. Downloads
+        and loads the model first if needed."""
+        started = time.monotonic()
+        try:
+            encoder = models.get(name)
+        except UnknownModel as error:
+            raise HTTPException(404, f"unknown model {name!r}") from error
+        load_seconds = time.monotonic() - started
+        passages = sample_passages()
+        encoder.embed(passages[:2], "passage")  # warm up
+        started = time.monotonic()
+        encoder.embed(passages, "passage")
+        seconds = time.monotonic() - started
+        return Speed(
+            model=name,
+            passages=len(passages),
+            seconds=round(seconds, 2),
+            passages_per_second=round(len(passages) / seconds, 1),
+            load_seconds=round(load_seconds, 1),
+        )
 
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:

@@ -28,7 +28,10 @@ they are not part of paperus.
 | Model | Source | Licence |
 | --- | --- | --- |
 | BGE-M3 | [BAAI/bge-m3](https://huggingface.co/BAAI/bge-m3) | MIT |
-| multilingual-e5-small | [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small) (ONNX export of intfloat/multilingual-e5-small) | MIT |
+| BGE-M3 int8 | [Xenova/bge-m3](https://huggingface.co/Xenova/bge-m3) (ONNX export of BAAI/bge-m3) | MIT |
+| Snowflake Arctic Embed M/L v2.0 | [Snowflake/snowflake-arctic-embed-m-v2.0](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v2.0), [-l-v2.0](https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0) | Apache-2.0 |
+| GTE multilingual base | [onnx-community/gte-multilingual-base](https://huggingface.co/onnx-community/gte-multilingual-base) (ONNX export of Alibaba-NLP/gte-multilingual-base) | Apache-2.0 |
+| multilingual-e5 small/base/large | [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small), [-base](https://huggingface.co/Xenova/multilingual-e5-base), [-large](https://huggingface.co/Xenova/multilingual-e5-large) (ONNX exports of intfloat/multilingual-e5-*) | MIT |
 
 Metadata comes from doi.org, Crossref and DataCite at runtime, under their
 terms of use.

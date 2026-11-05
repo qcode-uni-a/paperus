@@ -139,6 +139,20 @@ class FakeML:
             raise httpx2.ConnectError("ML service down")
         if request.url.path == "/ping":
             return httpx2.Response(200, json="pong")
+        if request.url.path.endswith("/speed"):
+            name = request.url.path.split("/")[2]
+            if name not in self.MODELS:
+                return httpx2.Response(404)
+            return httpx2.Response(
+                200,
+                json={
+                    "model": name,
+                    "passages": 48,
+                    "seconds": 6.0,
+                    "passages_per_second": 8.0,
+                    "load_seconds": 0.0,
+                },
+            )
         if request.url.path == "/models":
             models = [
                 {
@@ -186,6 +200,8 @@ def doi_registry() -> FakeDOIRegistry:
 def settings(database_url: str, tmp_path: Path) -> Settings:
     return Settings(
         database_url=database_url,
+        # The tests were written for it (the default is arctic-embed-m-v2).
+        embedding_model="bge-m3",
         storage_path=tmp_path / "files",
         backup_path=tmp_path / "backups",
     )

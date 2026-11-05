@@ -38,6 +38,22 @@ class MLModel(BaseModel):
     max_tokens: int
     loaded: bool
     cached_bytes: int | None
+    # For choosing (older ML services do not send these).
+    description: str = ""
+    licence: str = ""
+    download_mb: int = 0
+    scores: dict[str, float] = {}
+    """Published retrieval scores (nDCG@10, out of 100), by benchmark."""
+    benchmarks: dict[str, str] = {}
+    """What the keys of ``scores`` mean."""
+
+
+class MLSpeed(BaseModel):
+    model: str
+    passages: int
+    seconds: float
+    passages_per_second: float
+    load_seconds: float
 
 
 class MLStatus(BaseModel):
@@ -110,6 +126,18 @@ def ml_status(request: Request, admin: Admin) -> MLStatus:
     except MLUnavailable:
         models = []
     return MLStatus(services=services, models=models)
+
+
+@router.post("/ml/models/{name}/speed")
+def measure_ml_speed(name: str, request: Request, admin: Admin) -> MLSpeed:
+    """Time a model on this installation's ML service with sample passages
+    (downloads it first if needed, which can take minutes)."""
+    try:
+        return MLSpeed.model_validate(_ml(request).measure_speed(name))
+    except MLUnavailable as error:
+        raise HTTPException(
+            503, f"ML service unreachable or failed: {error}"
+        ) from error
 
 
 @router.delete("/ml/models/{name}", status_code=204)
