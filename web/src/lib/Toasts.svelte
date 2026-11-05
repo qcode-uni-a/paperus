@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { mdiAlertOutline, mdiCheckCircleOutline, mdiClose, mdiInformationOutline } from '@mdi/js';
 	import Icon from '#lib/Icon.svelte';
-	import { dismiss, toasts, type ToastKind } from '#lib/toasts.svelte.ts';
+	import { dismiss, hold, resume, toasts, type ToastKind } from '#lib/toasts.svelte.ts';
 
 	const ICONS: Record<ToastKind, string> = {
 		info: mdiInformationOutline,
@@ -12,7 +12,14 @@
 
 <div class="toasts" aria-live="polite">
 	{#each toasts.list as toast (toast.id)}
-		<div class="toast {toast.kind}" role="status">
+		<div
+			class="toast {toast.kind}"
+			role="status"
+			onmouseenter={() => hold(toast.id)}
+			onmouseleave={() => resume(toast.id)}
+			onfocusin={() => hold(toast.id)}
+			onfocusout={() => resume(toast.id)}
+		>
 			<span class="mark"><Icon path={ICONS[toast.kind]} size={22} /></span>
 			<div class="body">
 				<strong>{toast.title}</strong>

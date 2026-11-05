@@ -1,9 +1,6 @@
-import { error } from '@sveltejs/kit';
-import { SETTINGS, type SettingsSection } from '#lib/admin/data.svelte.ts';
-import type { PageLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
 
-export const load: PageLoad = ({ params }) => {
-	const entry = SETTINGS.find(([slug]) => slug === params.section);
-	if (!entry) error(404, 'Unknown settings section');
-	return { section: entry[0] as SettingsSection, title: entry[1] };
-};
+// One settings page now (like Immich); old links open their section there.
+export const load = ({ params }: { params: { section: string } }) =>
+	redirect(308, `${resolve('/admin/settings')}?open=${encodeURIComponent(params.section)}`);

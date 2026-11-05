@@ -118,12 +118,11 @@
 	}
 </script>
 
-<h1>Machine learning</h1>
 {#if message}<p class="muted">{message}</p>{/if}
 {#if error}<p class="error">{error}</p>{/if}
 
-<section class="card">
-	<h2>Search by meaning</h2>
+<section class="part">
+	<h3>Search by meaning</h3>
 	<p class="muted">
 		The model turns passages and queries into vectors. Better models find more of what is meant;
 		faster ones get a large library ready sooner.
@@ -208,8 +207,8 @@
 	<div><button onclick={embedMissing}>Embed missing now</button></div>
 </section>
 
-<section class="card">
-	<h2>CPU cores</h2>
+<section class="part">
+	<h3>CPU cores</h3>
 	<p class="muted">
 		How many cores the ML service uses for each model. Fewer keep the database and the website quick
 		while a large library is being embedded; more get it done sooner.
@@ -245,8 +244,8 @@
 	{/if}
 </section>
 
-<section class="card">
-	<h2>Service</h2>
+<section class="part">
+	<h3>Service</h3>
 	<ul>
 		{#each admin.ml?.services ?? [] as service (service.url)}
 			<li class="row">
@@ -263,12 +262,20 @@
 </section>
 
 <style>
-	section {
+	/* Parts of the settings section, divided by lines. */
+	.part {
 		display: grid;
 		gap: 12px;
-		margin-bottom: 16px;
+		padding: 18px 0;
 	}
-	h2,
+	.part + .part {
+		border-top: 1px solid var(--rule);
+	}
+	h3 {
+		margin: 0;
+		font-size: var(--step-0);
+		font-weight: 650;
+	}
 	p {
 		margin: 0;
 	}

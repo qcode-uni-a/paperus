@@ -21,7 +21,6 @@
 		mdiTagMultipleOutline,
 		mdiTrashCanOutline
 	} from '@mdi/js';
-	import { SETTINGS } from '#lib/admin/data.svelte.ts';
 	import Icon from '#lib/Icon.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
@@ -51,7 +50,6 @@
 		[resolve('/admin/backups'), 'Backups', mdiBackupRestore],
 		[resolve('/admin/server'), 'Server stats', mdiServer]
 	] as const;
-	const onSettingsPage = $derived(page.url.pathname.startsWith(`${settingsPath}/`));
 
 	const MAIN = [
 		[library, 'Library', mdiBookshelf],
@@ -96,17 +94,7 @@
 		<a class="back" href={resolve('/')}><Icon path={mdiArrowLeft} /><span>Back to library</span></a>
 		<span class="group">Administration</span>
 		{#each ADMIN as [path, label, icon] (path)}
-			<a href={path} class:current={active(path) && !(path === settingsPath && onSettingsPage)}
-				><Icon path={icon} /><span>{label}</span></a
-			>
-			{#if path === settingsPath && active(settingsPath)}
-				{#each SETTINGS as [slug, sublabel] (slug)}
-					{@const href = resolve('/admin/settings/[section]', { section: slug })}
-					<a {href} class="sub" class:current={page.url.pathname === href}
-						><span>{sublabel}</span></a
-					>
-				{/each}
-			{/if}
+			<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
 		{/each}
 	{:else}
 		{#each MAIN as [path, label, icon] (path)}

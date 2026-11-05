@@ -10,7 +10,9 @@
 - **A new look, inspired by Immich**: the search moved into the top bar (on
   every page; "/" jumps to it), the menu got icons and a rounded highlight
   for the current page, buttons are rounded, and pages start right next to
-  the menu.
+  the menu. Administration → Settings is one page of sections that open
+  and close (the open ones stay in the address); messages appear in the
+  corner and close themselves.
 - **Search shows more papers**: at most three passages per paper, with
   "More from this paper" for the rest, so one paper with many hits no
   longer fills the list (the API: `per_item`, and `item` to search within

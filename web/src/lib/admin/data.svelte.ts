@@ -21,16 +21,23 @@ export function formatSize(bytes: number | null | undefined): string {
 	return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
+/** The sections of the settings page (Immich-like): slug, title, what it is
+ * about, and whether it can be set yet. */
 export const SETTINGS = [
-	['integrity', 'Integrity checks'],
-	['jobs', 'Job settings'],
-	['logging', 'Logging'],
-	['ml', 'Machine learning'],
-	['server', 'Server'],
-	['storage-template', 'Storage template'],
-	['trash', 'Trash'],
-	['users', 'Users'],
-	['authentication', 'Authentication']
+	[
+		'ml',
+		'Machine learning',
+		'Search by meaning: the model, its speed, the CPU cores it uses',
+		false
+	],
+	['integrity', 'Integrity checks', 'Whether every file and its stored contents match', true],
+	['jobs', 'Job settings', 'How many background jobs run at once, and when checks run', true],
+	['logging', 'Logging', 'How much the server and the worker write to their logs', true],
+	['server', 'Server', 'Public address, contact email for metadata services, upload limits', true],
+	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],
+	['trash', 'Trash', 'When the trash empties itself', true],
+	['users', 'Users', "What happens to a removed person's papers and notes", true],
+	['authentication', 'Authentication', 'Password login, university login, session length', true]
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS)[number][0];

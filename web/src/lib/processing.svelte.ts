@@ -40,19 +40,16 @@ export function watchUploads(itemIds: string[]): void {
 			query: { id: itemIds.slice(0, 200), unsorted: true, limit: 200 }
 		});
 		const missing = unsorted?.length ?? 0;
-		notify(
-			{
-				kind: 'success',
-				title: `${itemIds.length} papers are ready`,
-				text: missing
-					? `Text read and searchable. ${missing} had no DOI or arXiv ID: their details need a hand.`
-					: 'Text read, details found, all searchable.',
-				link: missing
-					? { href: resolve('/manage/unsorted'), label: 'Open Unsorted' }
-					: { href: resolve('/recent'), label: 'Show them' }
-			},
-			0
-		);
+		notify({
+			kind: 'success',
+			title: `${itemIds.length} papers are ready`,
+			text: missing
+				? `Text read and searchable. ${missing} had no DOI or arXiv ID: their details need a hand.`
+				: 'Text read, details found, all searchable.',
+			link: missing
+				? { href: resolve('/manage/unsorted'), label: 'Open Unsorted' }
+				: { href: resolve('/recent'), label: 'Show them' }
+		});
 	};
 	setTimeout(check, EVERY);
 }
@@ -90,8 +87,7 @@ export function watchImport(importId: string, filename: string): void {
 						title: `Import of ${filename} failed`,
 						text: data.error ?? undefined,
 						link: { href: resolve('/import'), label: 'Details' }
-					},
-			0
+					}
 		);
 	};
 	setTimeout(check, EVERY);
