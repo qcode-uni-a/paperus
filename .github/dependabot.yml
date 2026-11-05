@@ -23,6 +23,14 @@ updates:
       day: monday
     cooldown:
       default-days: 7
+    ignore:
+      # TypeScript 7 (the native compiler) is not supported by svelte-check
+      # yet; move by hand when it is.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # marked-katex-extension accepts katex below 0.19 only (5.1.13).
+      - dependency-name: katex
+        versions: [">=0.19.0"]
     groups:
       npm:
         update-types: [minor, patch]
@@ -35,6 +43,10 @@ updates:
       day: monday
     cooldown:
       default-days: 7
+    ignore:
+      # Node's major versions (only even ones become LTS) by hand.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
     groups:
       images:
         update-types: [minor, patch]
