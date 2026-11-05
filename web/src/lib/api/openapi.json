@@ -7773,6 +7773,25 @@
             "type": "string",
             "title": "Item Title"
           },
+          "item_authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Authors",
+            "default": []
+          },
+          "item_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Year"
+          },
           "version_id": {
             "anyOf": [
               {

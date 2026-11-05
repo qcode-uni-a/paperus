@@ -79,6 +79,7 @@ def test_search_finds_passages_with_pages(
     [hit] = search(logged_in, "SPEI")
     assert hit["item_id"] == item_id
     assert hit["item_title"] == "Drought paper"
+    assert (hit["item_authors"], hit["item_year"]) == ([], None)
     assert hit["file_id"] == file["id"]
     assert hit["page"] == 1
     assert hit["passage_id"] == f"{file['id']}#0"
@@ -170,3 +171,22 @@ def test_best_few_per_paper_and_within_one(
         "/api/search", params={"q": "drought", "mode": "keyword", "item": many}
     ).json()
     assert len(within) > 2 and {p["item_id"] for p in within} == {many}
+
+
+def test_results_name_authors_and_year(
+    logged_in: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    """How people recognise a paper: "Vicente-Serrano et al. (2010)"."""
+    metadata = {
+        "title": "A multiscalar drought index",
+        "author": [
+            {"family": "Vicente-Serrano", "given": "Sergio"},
+            {"family": "Beguería", "given": "Santiago"},
+        ],
+        "issued": {"date-parts": [[2010, 4]]},
+    }
+    item_id = logged_in.post("/api/items", json={"metadata": metadata}).json()["id"]
+    assert process(db, blobs, upload(logged_in, item_id)) == "done"
+    [hit] = search(logged_in, "SPEI")
+    assert hit["item_authors"] == ["Vicente-Serrano, Sergio", "Beguería, Santiago"]
+    assert hit["item_year"] == 2010

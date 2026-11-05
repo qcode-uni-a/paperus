@@ -6,6 +6,7 @@
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import { organize } from '#lib/organize.svelte.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { shortAuthors } from '#lib/format.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
 
 	const PAGE = 50;
@@ -40,12 +41,28 @@
 
 	/** Passages grouped by paper or note, in the order of their best passage. */
 	const groups = $derived.by(() => {
-		type Group = { id: string; kind: 'paper' | 'note'; title: string; passages: Passage[] };
+		type Group = {
+			id: string;
+			kind: 'paper' | 'note';
+			title: string;
+			/** "Vicente-Serrano and Beguería (2010)": how people know a paper. */
+			byline: string;
+			passages: Passage[];
+		};
 		const bySource = new Map<string, Group>();
 		for (const passage of passages ?? []) {
 			const id = passage.item_id ?? passage.note_id ?? '';
 			const kind = passage.kind ?? 'paper';
-			const group = bySource.get(id) ?? { id, kind, title: passage.item_title, passages: [] };
+			const authors = shortAuthors(passage.item_authors ?? []);
+			const year = passage.item_year ? `(${passage.item_year})` : '';
+			const byline = [authors, year].filter(Boolean).join(' ');
+			const group = bySource.get(id) ?? {
+				id,
+				kind,
+				title: passage.item_title,
+				byline,
+				passages: []
+			};
 			group.passages.push(passage);
 			bySource.set(id, group);
 		}
@@ -170,6 +187,7 @@
 							>
 						{:else}
 							<a class="source" href={resolve('/items/[id]', { id: group.id })}>{group.title}</a>
+							{#if group.byline}<p class="byline">{group.byline}</p>{/if}
 						{/if}
 						<ul class="passages">
 							{#each allOf[group.id] ?? group.passages as passage (passage.passage_id)}
@@ -291,6 +309,10 @@
 		color: var(--ink);
 		text-decoration: none;
 		max-width: 70ch;
+	}
+	.byline {
+		margin: 2px 0 0;
+		color: var(--muted);
 	}
 	.source:hover {
 		color: var(--royal);

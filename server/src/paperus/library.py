@@ -68,6 +68,29 @@ def citation_csl(item: Item) -> dict[str, Any]:
     return csl
 
 
+def author_names(csl: dict[str, Any]) -> list[str]:
+    """ "Family, Given" for each author (or the literal name)."""
+    names = []
+    for author in csl.get("author", []):
+        if "family" in author:
+            names.append(
+                ", ".join(filter(None, [author["family"], author.get("given")]))
+            )
+        elif "literal" in author:
+            names.append(author["literal"])
+    return names
+
+
+def issued_year(csl: dict[str, Any]) -> int | None:
+    """The year of publication, from the first date there is."""
+    for key in ("issued", "published-print", "published-online"):
+        try:
+            return int(csl[key]["date-parts"][0][0])
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+    return None
+
+
 def refresh_item(item: Item) -> None:
     """Update the cached type and title after versions or overrides change."""
     csl = citation_csl(item)

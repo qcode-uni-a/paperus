@@ -232,6 +232,13 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                     "paper_id": str(item_id),
                     "link": _link(base, item_id, None),
                 }
+                # How people name a paper ("Lovelace et al. 1843"); only
+                # when known, to keep the answer short.
+                authors = _short_authors(found[0].item_authors)
+                if authors:
+                    paper["authors"] = authors
+                if found[0].item_year:
+                    paper["year"] = found[0].item_year
                 if abstracts:
                     item = db.get(Item, item_id)
                     if item is not None:
@@ -772,6 +779,14 @@ def _link(base: str, item_id: uuid.UUID, page: int | None) -> str:
 
 
 _TAGS = re.compile(r"<[^>]+>")
+
+
+def _short_authors(authors: list[str]) -> str | None:
+    """ "Lovelace", "Lovelace and Babbage", "Lovelace, Babbage et al."."""
+    families = [name.split(",")[0] for name in authors]
+    if len(families) <= 2:
+        return " and ".join(families) or None
+    return f"{families[0]}, {families[1]} et al."
 
 
 def _plain(snippet: str) -> str:

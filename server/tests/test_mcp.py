@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus.mcp_server import _short_authors
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
@@ -341,3 +342,11 @@ def test_full_text_needs_files_read_and_no_trash(
         reader.call("get_file", file_id=paper["file_id"])
     with pytest.raises(ToolFailed, match="1 to 500"):
         reader.call("search", query="x" * 501)
+
+
+def test_short_authors() -> None:
+    assert _short_authors([]) is None
+    assert _short_authors(["Lovelace, Ada"]) == "Lovelace"
+    assert _short_authors(["Lovelace, Ada", "Babbage, C."]) == "Lovelace and Babbage"
+    three = ["He, X.", "Jiang, Y.", "Wu, Z."]
+    assert _short_authors(three) == "He, Jiang et al."

@@ -7,14 +7,15 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from paperus import metrics
+from paperus import library, metrics
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
 from paperus.ml import MLClient, MLRejected, MLUnavailable
+from paperus.models import Item
 from paperus.system import load_config
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,10 @@ class Passage(BaseModel):
     """The paper (not for notes)."""
     item_title: str
     """The paper's title, or the note's."""
+    item_authors: list[str] = []
+    """The paper's authors ("Family, Given"); empty for notes."""
+    item_year: int | None = None
+    """The paper's year of publication."""
     version_id: uuid.UUID | None
     file_id: uuid.UUID | None
     note_id: uuid.UUID | None = None
@@ -229,9 +234,26 @@ def run_search(
         )
         for row in rows
     ]
+    _add_authors(db, passages)
     metrics.SEARCHES.labels(used).inc()
     metrics.SEARCH_SECONDS.observe(time.perf_counter() - started)
     return used, passages
+
+
+def _add_authors(db: Session, passages: list[Passage]) -> None:
+    """Authors and year, by which people recognise a paper (one query for
+    all papers in the results)."""
+    ids = {p.item_id for p in passages if p.item_id is not None}
+    if not ids:
+        return
+    found = {}
+    for item in db.scalars(select(Item).where(Item.id.in_(ids))):
+        csl = library.citation_csl(item)
+        found[item.id] = (library.author_names(csl), library.issued_year(csl))
+    for passage in passages:
+        known = found.get(passage.item_id) if passage.item_id else None
+        if known is not None:
+            passage.item_authors, passage.item_year = known
 
 
 @router.get("/api/search")

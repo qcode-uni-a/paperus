@@ -1574,6 +1574,14 @@ export type Passage = {
      */
     item_title: string;
     /**
+     * Item Authors
+     */
+    item_authors?: Array<string>;
+    /**
+     * Item Year
+     */
+    item_year?: number | null;
+    /**
      * Version Id
      */
     version_id: string | null;

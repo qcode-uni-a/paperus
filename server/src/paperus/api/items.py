@@ -120,27 +120,6 @@ class ItemDetail(ItemOut):
     versions: list[VersionOut]
 
 
-def _authors(csl: dict[str, Any]) -> list[str]:
-    names = []
-    for author in csl.get("author", []):
-        if "family" in author:
-            names.append(
-                ", ".join(filter(None, [author["family"], author.get("given")]))
-            )
-        elif "literal" in author:
-            names.append(author["literal"])
-    return names
-
-
-def _year(csl: dict[str, Any]) -> int | None:
-    for key in ("issued", "published-print", "published-online"):
-        try:
-            return int(csl[key]["date-parts"][0][0])
-        except (KeyError, IndexError, TypeError, ValueError):
-            continue
-    return None
-
-
 def _container_title(csl: dict[str, Any]) -> str | None:
     value = csl.get("container-title")
     if isinstance(value, list):
@@ -164,8 +143,8 @@ def item_out(item: Item, access: Access) -> ItemOut:
         library_id=item.library_id,
         type=item.type,
         title=item.title,
-        authors=_authors(csl),
-        year=_year(csl),
+        authors=library.author_names(csl),
+        year=library.issued_year(csl),
         container_title=_container_title(csl),
         identifiers=[i for v in item.versions for i in _identifiers(v)],
         created_at=item.created_at,
