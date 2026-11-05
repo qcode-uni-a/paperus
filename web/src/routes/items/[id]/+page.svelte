@@ -22,6 +22,7 @@
 		type VersionKind
 	} from '#lib/api/client.ts';
 	import MenuButton from '#lib/MenuButton.svelte';
+	import StarButton from '#lib/StarButton.svelte';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
@@ -203,6 +204,7 @@
 					>{/if}
 			</h1>
 			{#if !item.deleted_at}
+				<StarButton item={item.id} starred={item.favourite ?? false} />
 				<MenuButton label="Item actions">
 					{#if viewed}
 						<button role="menuitem" onclick={() => (showDetails = !showDetails)}>

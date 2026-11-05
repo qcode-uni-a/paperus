@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
 	import { menu } from '#lib/menu.svelte.ts';
-	import { loadOrganize } from '#lib/organize.svelte.ts';
+	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	// Like Immich: inside the administration, its menu replaces the normal one.
@@ -71,8 +71,17 @@
 	{:else}
 		<a href={library} class:current={onLibrary && !filtered}><span>Library</span></a>
 		<a href={resolve('/recent')} class:current={active(resolve('/recent'))}><span>Recent</span></a>
+		<a href={resolve('/favourites')} class:current={active(resolve('/favourites'))}
+			><span>Favourites</span></a
+		>
 
 		<a href={collectionsPath} class:current={active(collectionsPath)}><span>Collections</span></a>
+		{#each organize.collections.filter((c) => c.pinned) as pinned (pinned.id)}
+			{@const href = resolve('/collections/[id]', { id: pinned.id })}
+			<a {href} class="sub pin" class:current={page.url.pathname === href}
+				><span>{pinned.name}</span></a
+			>
+		{/each}
 		<a href={resolve('/notes')} class:current={active(resolve('/notes'))}><span>Notes</span></a>
 
 		<div class="bottom">
@@ -142,7 +151,7 @@
 		margin: 0 -0.3em;
 		border-radius: 0.4em 0.2em 0.5em 0.25em;
 	}
-	a.current:not(.sub):has(+ .sub) span {
+	a.current:not(.sub):has(+ .sub:not(.pin)) span {
 		background: none;
 		color: var(--ink);
 	}

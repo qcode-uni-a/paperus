@@ -6,7 +6,7 @@
 	import CollectionAdd from '#lib/CollectionAdd.svelte';
 	import MenuButton from '#lib/MenuButton.svelte';
 	import NoteRow from '#lib/NoteRow.svelte';
-	import { listNotes } from '#lib/api/client.ts';
+	import { listNotes, pinCollection, unpinCollection } from '#lib/api/client.ts';
 	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
 	import { startNote } from '#lib/notes.ts';
 	import { downloadCitations } from '#lib/citations.ts';
@@ -31,6 +31,13 @@
 			}
 		);
 	});
+
+	async function togglePin() {
+		if (!collection) return;
+		if (collection.pinned) await unpinCollection({ path: { collection_id: id } });
+		else await pinCollection({ path: { collection_id: id } });
+		await loadOrganize();
+	}
 
 	async function writeNote() {
 		noteError = (await startNote({ collection: id, library: collection?.library_id })) ?? '';
@@ -100,6 +107,9 @@
 						</button>
 						<hr />
 					{/if}
+					<button role="menuitem" onclick={togglePin}
+						>{collection.pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}</button
+					>
 					<button
 						role="menuitem"
 						onclick={() => downloadCitations({ collection: id, nested: includeInside }, 'bibtex')}

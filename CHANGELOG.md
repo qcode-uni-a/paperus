@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Favourites**: star papers (☆ next to the title, in lists and on the
+  paper); "Favourites" in the sidebar lists them. Each person has their
+  own stars, readers too.
+- **Pinned collections**: a collection's ⋯ menu pins it to the sidebar,
+  below Collections, for quick access.
 - **Manage → Duplicates**: papers that look like the same paper twice
   (same DOI or arXiv ID, same file, or the same title), typical after
   importing from several programs, with a recommendation which to keep and

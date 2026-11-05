@@ -4,6 +4,7 @@
 	import { shortAuthors, typeName } from '#lib/format.ts';
 	import { isShared } from '#lib/organize.svelte.ts';
 	import SharedIcon from '#lib/SharedIcon.svelte';
+	import StarButton from '#lib/StarButton.svelte';
 
 	/** ``note``: a line above the title, e.g. why it is in a list. */
 	let { item, note }: { item: Item; note?: string } = $props();
@@ -12,8 +13,13 @@
 </script>
 
 <li>
-	{#if isShared(item.library_id)}<span class="corner"><SharedIcon owner={item.library_id} /></span
-		>{/if}
+	<span class="corner"
+		>{#if isShared(item.library_id)}<SharedIcon owner={item.library_id} />{/if}<StarButton
+			item={item.id}
+			starred={item.favourite ?? false}
+			size={16}
+		/></span
+	>
 	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
 	<p class="reference">
@@ -47,9 +53,15 @@
 	}
 	.corner {
 		position: absolute;
-		top: 16px;
+		top: 12px;
 		right: 0;
 		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	/* Room for the corner's icons. */
+	.title {
+		padding-right: 56px;
 	}
 	.title {
 		font-family: var(--serif);

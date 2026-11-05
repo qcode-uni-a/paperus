@@ -213,6 +213,10 @@ export type CollectionChanged = {
      */
     recent?: Array<ItemPreview>;
     /**
+     * Pinned
+     */
+    pinned?: boolean;
+    /**
      * Left Out
      */
     left_out?: number;
@@ -276,6 +280,10 @@ export type CollectionOut = {
      * Recent
      */
     recent?: Array<ItemPreview>;
+    /**
+     * Pinned
+     */
+    pinned?: boolean;
 };
 
 /**
@@ -641,6 +649,10 @@ export type ItemDetail = {
      */
     collection_ids: Array<string>;
     /**
+     * Favourite
+     */
+    favourite?: boolean;
+    /**
      * Csl
      */
     csl: {
@@ -769,6 +781,10 @@ export type ItemOut = {
      * Collection Ids
      */
     collection_ids: Array<string>;
+    /**
+     * Favourite
+     */
+    favourite?: boolean;
 };
 
 /**
@@ -2160,6 +2176,10 @@ export type ListItemsData = {
          * Unsorted
          */
         unsorted?: boolean;
+        /**
+         * Favourite
+         */
+        favourite?: boolean;
     };
     url: '/api/items';
 };
@@ -2429,6 +2449,66 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type UnstarItemData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/favourite';
+};
+
+export type UnstarItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnstarItemError = UnstarItemErrors[keyof UnstarItemErrors];
+
+export type UnstarItemResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnstarItemResponse = UnstarItemResponses[keyof UnstarItemResponses];
+
+export type StarItemData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/favourite';
+};
+
+export type StarItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StarItemError = StarItemErrors[keyof StarItemErrors];
+
+export type StarItemResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type StarItemResponse = StarItemResponses[keyof StarItemResponses];
 
 export type MarkViewedData = {
     body?: never;
@@ -3868,6 +3948,66 @@ export type PreviewMoveResponses = {
 };
 
 export type PreviewMoveResponse = PreviewMoveResponses[keyof PreviewMoveResponses];
+
+export type UnpinCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/pin';
+};
+
+export type UnpinCollectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnpinCollectionError = UnpinCollectionErrors[keyof UnpinCollectionErrors];
+
+export type UnpinCollectionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnpinCollectionResponse = UnpinCollectionResponses[keyof UnpinCollectionResponses];
+
+export type PinCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/pin';
+};
+
+export type PinCollectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PinCollectionError = PinCollectionErrors[keyof PinCollectionErrors];
+
+export type PinCollectionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type PinCollectionResponse = PinCollectionResponses[keyof PinCollectionResponses];
 
 export type AddItemsData = {
     body: ItemIds;
