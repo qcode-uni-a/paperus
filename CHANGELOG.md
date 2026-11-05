@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.0.3 (2026-11-05)
+
+Backups, a first start in the browser, and merging duplicates.
 
 - **Backups** (Administration → Backups): now or daily/weekly at a chosen
   hour, keeping the newest N; the database and optionally the files (each
@@ -14,6 +16,13 @@
   with the same identifier or file and moves versions, files, tags and
   collections over (as far as one's rights allow); the merged paper goes to
   the trash.
+
+### Upgrading from 0.0.2
+
+Add a backup folder to `.env` (`BACKUP_LOCATION`, best on another disk) and
+the matching line to `compose.yaml` (see `deploy/`), then turn on a schedule
+under Administration → Backups. The database migrates on start (nothing to
+do).
 
 ## 0.0.2 (2026-11-05)
 
