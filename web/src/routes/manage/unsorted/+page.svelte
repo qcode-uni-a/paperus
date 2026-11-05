@@ -68,20 +68,21 @@
 	{#if total > items.length}<p class="muted">The first {items.length} of {total}.</p>{/if}
 	<ul>
 		{#each items as item (item.id)}
-			<li>
-				<ul class="row"><ItemRow {item} /></ul>
-				<form onsubmit={(event) => lookUp(event, item)}>
-					<input
-						bind:value={entered[item.id]}
-						placeholder="DOI or arXiv ID, e.g. 10.1038/… or 2611.04768"
-						aria-label="DOI or arXiv ID of {item.title}"
-					/>
-					<button disabled={busy === item.id || !entered[item.id]?.trim()}>
-						{busy === item.id ? 'Looking up…' : 'Look up'}
-					</button>
-				</form>
-				{#if errors[item.id]}<p class="error">{errors[item.id]}</p>{/if}
-			</li>
+			<ItemRow {item}>
+				{#snippet actions()}
+					<form onsubmit={(event) => lookUp(event, item)}>
+						<input
+							bind:value={entered[item.id]}
+							placeholder="DOI or arXiv ID, e.g. 10.1038/… or 2611.04768"
+							aria-label="DOI or arXiv ID of {item.title}"
+						/>
+						<button disabled={busy === item.id || !entered[item.id]?.trim()}>
+							{busy === item.id ? 'Looking up…' : 'Look up'}
+						</button>
+					</form>
+					{#if errors[item.id]}<p class="error">{errors[item.id]}</p>{/if}
+				{/snippet}
+			</ItemRow>
 		{/each}
 	</ul>
 {/if}
@@ -101,14 +102,6 @@
 		margin: 0;
 		padding: 0;
 		list-style: none;
-	}
-	li {
-		padding-bottom: 12px;
-		border-bottom: 1px solid var(--rule);
-	}
-	.row :global(li) {
-		border-bottom: none;
-		padding-bottom: 8px;
 	}
 	form {
 		display: flex;

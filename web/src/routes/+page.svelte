@@ -213,7 +213,7 @@
 
 	{#if passages !== null}
 		{#if passages.length === 0}
-			<p class="muted">Nothing found for “{query}”.</p>
+			<p class="muted">Nothing found for “{searched}”.</p>
 		{:else}
 			<ul class="results">
 				{#each groups as group (group.id)}

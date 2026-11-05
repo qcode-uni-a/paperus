@@ -989,6 +989,10 @@ export type MlService = {
  */
 export type MlServiceState = {
     /**
+     * Url
+     */
+    url: string;
+    /**
      * Threads
      */
     threads: number;
@@ -1004,6 +1008,10 @@ export type MlServiceState = {
      * Loaded
      */
     loaded: Array<string>;
+    /**
+     * Loading
+     */
+    loading?: Array<string>;
 };
 
 /**
@@ -1015,21 +1023,25 @@ export type MlSpeed = {
      */
     model: string;
     /**
+     * Loading
+     */
+    loading?: boolean;
+    /**
      * Passages
      */
-    passages: number;
+    passages?: number;
     /**
      * Seconds
      */
-    seconds: number;
+    seconds?: number;
     /**
      * Passages Per Second
      */
-    passages_per_second: number;
+    passages_per_second?: number;
     /**
-     * Load Seconds
+     * Url
      */
-    load_seconds: number;
+    url?: string | null;
 };
 
 /**
@@ -1112,7 +1124,7 @@ export type MergeStep = {
     /**
      * Kind
      */
-    kind: 'version' | 'file' | 'tag' | 'collection';
+    kind: 'version' | 'file' | 'tag' | 'collection' | 'note';
     /**
      * Name
      */
@@ -1621,7 +1633,7 @@ export type SystemConfig = {
     /**
      * Ml Threads
      */
-    ml_threads?: number;
+    ml_threads?: number | null;
 };
 
 /**

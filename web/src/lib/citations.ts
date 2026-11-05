@@ -32,7 +32,12 @@ export async function copyCitations(
 		// Safari wants the clipboard write to start within the click.
 		await navigator.clipboard.write([
 			new ClipboardItem({
-				'text/plain': fetch(url, { credentials: 'same-origin' }).then((r) => r.blob())
+				// As plain text (some browsers refuse other types); an error page
+				// must not end up on the clipboard.
+				'text/plain': fetch(url, { credentials: 'same-origin' }).then(async (r) => {
+					if (!r.ok) throw new Error(`${r.status}`);
+					return new Blob([await r.text()], { type: 'text/plain' });
+				})
 			})
 		]);
 		return true;

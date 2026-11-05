@@ -51,8 +51,11 @@
 	let error = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
+	let alive = true;
+
 	async function load() {
 		const { data } = await listImports();
+		if (!alive) return;
 		imports = data ?? [];
 		clearTimeout(timer);
 		// Follow imports still running.
@@ -67,7 +70,10 @@
 			owner = defaultLibrary()?.id ?? writableLibraries()[0]?.id ?? '';
 			await load();
 		});
-		return () => clearTimeout(timer);
+		return () => {
+			alive = false;
+			clearTimeout(timer);
+		};
 	});
 
 	/** With XMLHttpRequest, for the upload's progress (exports with PDFs are big). */
@@ -195,7 +201,7 @@
 								{count(report.missing_files.length, 'file', 'files')} not in the export
 							</summary>
 							<ul class="list">
-								{#each report.missing_files as missing (missing)}<li>
+								{#each report.missing_files as missing, i (i)}<li>
 										<code>{missing}</code>
 									</li>{/each}
 							</ul>

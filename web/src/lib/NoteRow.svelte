@@ -1,4 +1,6 @@
 <script lang="ts">
+	import NoteIcon from '#lib/NoteIcon.svelte';
+	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
@@ -6,16 +8,18 @@
 	import SharedIcon from '#lib/SharedIcon.svelte';
 
 	/** A note in a list; ``about`` false hides the papers it is about (on a paper's page). */
-	let { note, about = true }: { note: NoteOut; about?: boolean } = $props();
+	let {
+		note,
+		about = true,
+		actions
+	}: { note: NoteOut; about?: boolean; actions?: Snippet } = $props();
 </script>
 
 <li>
 	{#if isShared(note.library_id)}<span class="corner"><SharedIcon owner={note.library_id} /></span
 		>{/if}
 	<a class="title" href={resolve('/notes/[id]', { id: note.id })}>
-		<svg viewBox="0 0 24 24" aria-hidden="true"
-			><path d="M6 3.5h8.5L19 8v12.5H6zM14 3.5V8.5h5M9 12.5h7M9 16h5" /></svg
-		>
+		<NoteIcon size={18} />
 		<span>{note.title || 'Untitled note'}</span>
 	</a>
 	{#if note.excerpt}<p class="excerpt">{note.excerpt}</p>{/if}
@@ -29,9 +33,13 @@
 		{/if}
 		<span>{note.changed_by ? `${note.changed_by}, ` : ''}{ago(note.changed_at)}</span>
 	</p>
+	{#if actions}<div class="actions">{@render actions()}</div>{/if}
 </li>
 
 <style>
+	.actions {
+		margin-top: 6px;
+	}
 	li {
 		position: relative;
 		list-style: none;
@@ -47,6 +55,7 @@
 		display: flex;
 	}
 	.title {
+		padding-right: 32px;
 		display: inline-flex;
 		align-items: baseline;
 		gap: 8px;
@@ -61,16 +70,6 @@
 	.title:hover span {
 		color: var(--royal);
 		text-decoration: underline;
-	}
-	svg {
-		flex: none;
-		width: 18px;
-		height: 18px;
-		align-self: center;
-		fill: none;
-		stroke: var(--royal);
-		stroke-width: 1.6;
-		stroke-linejoin: round;
 	}
 	p {
 		margin: 0;

@@ -34,18 +34,30 @@
 	/** How long the library would take, if the model's speed was measured. */
 	function estimate(name: string): string | null {
 		const speed = speeds[name];
-		if (!speed || !passages) return null;
+		if (!speed?.passages_per_second || !passages) return null;
 		return duration(passages / speed.passages_per_second);
 	}
 
+	let alive = true;
+	$effect(() => () => (alive = false));
+
+	/** Measure; a model still downloading or loading is asked again until
+	 * it is ready (the page may be left meanwhile). */
 	async function measure(model: MlModel) {
 		measuring = model.name;
 		error = '';
-		const { data, error: failure } = await measureMlSpeed({ path: { name: model.name } });
+		while (alive) {
+			const { data, error: failure } = await measureMlSpeed({ path: { name: model.name } });
+			if (data?.loading) {
+				await new Promise((done) => setTimeout(done, 5000));
+				continue;
+			}
+			if (data) speeds[model.name] = data;
+			else error = errorMessage(failure);
+			break;
+		}
 		measuring = null;
-		if (data) speeds[model.name] = data;
-		else error = errorMessage(failure);
-		await loadAdmin();
+		if (alive) await loadAdmin();
 	}
 
 	async function use(model: MlModel) {
@@ -70,17 +82,20 @@
 		await loadAdmin();
 	}
 
-	// CPU cores for the ML service (0: all it sees).
+	// CPU cores for the ML service (0: all it sees). Unset until an admin
+	// chooses: the ML service's own setting applies.
 	let threads = $state<number | null>(null);
 	const cores = $derived(admin.ml?.service?.cores ?? null);
 	$effect(() => {
-		if (config && threads === null) threads = config.ml_threads ?? 0;
+		if (config && threads === null) threads = config.ml_threads ?? admin.ml?.service?.threads ?? 0;
 	});
 
 	async function saveThreads() {
 		if (!config || threads === null) return;
 		error = message = '';
+		saving = true;
 		const { error: failure } = await setConfig({ body: { ...config, ml_threads: threads } });
+		saving = false;
 		if (failure) error = errorMessage(failure);
 		else
 			message =
@@ -165,8 +180,8 @@
 				<div class="buttons">
 					<button onclick={() => measure(model)} disabled={measuring !== null}>
 						{measuring === model.name
-							? model.cached_bytes == null
-								? 'Downloading and measuring…'
+							? admin.ml?.service?.loading?.includes(model.name) || model.cached_bytes == null
+								? 'Downloading and loading…'
 								: 'Measuring…'
 							: 'Measure speed'}
 					</button>
@@ -215,11 +230,15 @@
 					: `${threads}${cores ? ` of ${cores}` : ''}`}</span
 			>
 		</label>
-		<button onclick={saveThreads} disabled={!config || threads === (config?.ml_threads ?? 0)}
+		<button
+			onclick={saveThreads}
+			disabled={saving || !config || threads === (config?.ml_threads ?? admin.ml?.service?.threads)}
 			>Save</button
 		>
 	</div>
-	{#if admin.ml?.service && admin.ml.service.threads !== (config?.ml_threads ?? 0)}
+	{#if config?.ml_threads == null}
+		<p class="muted small">Not set here: the ML service uses its own setting.</p>
+	{:else if admin.ml?.service && admin.ml.service.threads !== config.ml_threads}
 		<p class="muted small">
 			The ML service has not taken this setting yet; it gets it within minutes.
 		</p>

@@ -497,7 +497,7 @@ export const listDuplicatesEverywhere = <ThrowOnError extends boolean = false>(o
  * Mark Different
  *
  * The two are different papers: do not suggest them again (for everyone
- * who sees both).
+ * who sees both). Needs the right to change at least one of them.
  */
 export const markDifferent = <ThrowOnError extends boolean = false>(options: Options<MarkDifferentData, ThrowOnError>): RequestResult<MarkDifferentResponses, MarkDifferentErrors, ThrowOnError> => (options.client ?? client).post<MarkDifferentResponses, MarkDifferentErrors, ThrowOnError>({
     url: '/api/duplicates/different',
@@ -537,8 +537,9 @@ export const mlStatus = <ThrowOnError extends boolean = false>(options?: Options
 /**
  * Measure Ml Speed
  *
- * Time a model on this installation's ML service with sample passages
- * (downloads it first if needed, which can take minutes).
+ * Time a model on this installation's ML service with sample passages.
+ * A model not downloaded yet starts downloading: the answer then says
+ * ``loading``; ask again in a while.
  */
 export const measureMlSpeed = <ThrowOnError extends boolean = false>(options: Options<MeasureMlSpeedData, ThrowOnError>): RequestResult<MeasureMlSpeedResponses, MeasureMlSpeedErrors, ThrowOnError> => (options.client ?? client).post<MeasureMlSpeedResponses, MeasureMlSpeedErrors, ThrowOnError>({ url: '/api/admin/ml/models/{name}/speed', ...options });
 
@@ -757,8 +758,8 @@ export const createGroup = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * Delete Group
  *
- * Delete an empty group: no groups inside and no items (not even in its
- * trash). Its tags, collections and memberships go with it.
+ * Delete an empty group: no groups inside and no items or notes (not
+ * even in its trash). Its tags, collections and memberships go with it.
  */
 export const deleteGroup = <ThrowOnError extends boolean = false>(options: Options<DeleteGroupData, ThrowOnError>): RequestResult<DeleteGroupResponses, DeleteGroupErrors, ThrowOnError> => (options.client ?? client).delete<DeleteGroupResponses, DeleteGroupErrors, ThrowOnError>({ url: '/api/groups/{group_id}', ...options });
 

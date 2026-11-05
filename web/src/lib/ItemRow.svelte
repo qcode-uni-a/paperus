@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
 	import { shortAuthors, typeName } from '#lib/format.ts';
@@ -7,7 +8,7 @@
 	import StarButton from '#lib/StarButton.svelte';
 
 	/** ``note``: a line above the title, e.g. why it is in a list. */
-	let { item, note }: { item: Item; note?: string } = $props();
+	let { item, note, actions }: { item: Item; note?: string; actions?: Snippet } = $props();
 
 	const authors = $derived(shortAuthors(item.authors));
 </script>
@@ -36,9 +37,13 @@
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
 	</p>
+	{#if actions}<div class="actions">{@render actions()}</div>{/if}
 </li>
 
 <style>
+	.actions {
+		margin-top: 6px;
+	}
 	li {
 		position: relative;
 		list-style: none;

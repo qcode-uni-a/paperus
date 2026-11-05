@@ -24,7 +24,8 @@
 		['version', 'Versions'],
 		['file', 'Files'],
 		['tag', 'Tags'],
-		['collection', 'Collections']
+		['collection', 'Collections'],
+		['note', 'Notes']
 	] as const;
 
 	let dialog = $state<HTMLDialogElement>();

@@ -2438,7 +2438,7 @@
           "duplicates"
         ],
         "summary": "Mark Different",
-        "description": "The two are different papers: do not suggest them again (for everyone\nwho sees both).",
+        "description": "The two are different papers: do not suggest them again (for everyone\nwho sees both). Needs the right to change at least one of them.",
         "operationId": "mark_different",
         "requestBody": {
           "content": {
@@ -2555,7 +2555,7 @@
           "admin"
         ],
         "summary": "Measure Ml Speed",
-        "description": "Time a model on this installation's ML service with sample passages\n(downloads it first if needed, which can take minutes).",
+        "description": "Time a model on this installation's ML service with sample passages.\nA model not downloaded yet starts downloading: the answer then says\n``loading``; ask again in a while.",
         "operationId": "measure_ml_speed",
         "parameters": [
           {
@@ -3534,7 +3534,7 @@
           "groups"
         ],
         "summary": "Delete Group",
-        "description": "Delete an empty group: no groups inside and no items (not even in its\ntrash). Its tags, collections and memberships go with it.",
+        "description": "Delete an empty group: no groups inside and no items or notes (not\neven in its trash). Its tags, collections and memberships go with it.",
         "operationId": "delete_group",
         "parameters": [
           {
@@ -6080,6 +6080,10 @@
       },
       "MLServiceState": {
         "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
           "threads": {
             "type": "integer",
             "title": "Threads"
@@ -6101,10 +6105,19 @@
             },
             "type": "array",
             "title": "Loaded"
+          },
+          "loading": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Loading",
+            "default": []
           }
         },
         "type": "object",
         "required": [
+          "url",
           "threads",
           "keep",
           "cores",
@@ -6118,30 +6131,41 @@
             "type": "string",
             "title": "Model"
           },
+          "loading": {
+            "type": "boolean",
+            "title": "Loading",
+            "default": false
+          },
           "passages": {
             "type": "integer",
-            "title": "Passages"
+            "title": "Passages",
+            "default": 0
           },
           "seconds": {
             "type": "number",
-            "title": "Seconds"
+            "title": "Seconds",
+            "default": 0
           },
           "passages_per_second": {
             "type": "number",
-            "title": "Passages Per Second"
+            "title": "Passages Per Second",
+            "default": 0
           },
-          "load_seconds": {
-            "type": "number",
-            "title": "Load Seconds"
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "type": "object",
         "required": [
-          "model",
-          "passages",
-          "seconds",
-          "passages_per_second",
-          "load_seconds"
+          "model"
         ],
         "title": "MLSpeed"
       },
@@ -6295,7 +6319,8 @@
               "version",
               "file",
               "tag",
-              "collection"
+              "collection",
+              "note"
             ],
             "title": "Kind"
           },
@@ -7164,11 +7189,17 @@
             "title": "Embedding Model"
           },
           "ml_threads": {
-            "type": "integer",
-            "maximum": 1024.0,
-            "minimum": 0.0,
-            "title": "Ml Threads",
-            "default": 0
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1024.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ml Threads"
           }
         },
         "type": "object",

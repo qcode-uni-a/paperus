@@ -37,25 +37,19 @@
 {/if}
 <ul>
 	{#each items ?? [] as item (item.id)}
-		<div class="row">
-			<div class="grow"><ItemRow {item} /></div>
-			<button onclick={() => restore(item.id)}>Restore</button>
-		</div>
+		<ItemRow {item}>
+			{#snippet actions()}<button onclick={() => restore(item.id)}>Restore</button>{/snippet}
+		</ItemRow>
 	{/each}
 	{#each notes as note (note.id)}
-		<div class="row">
-			<div class="grow"><NoteRow {note} /></div>
-			<button onclick={() => restoreWritten(note.id)}>Restore</button>
-		</div>
+		<NoteRow {note}>
+			{#snippet actions()}<button onclick={() => restoreWritten(note.id)}>Restore</button>{/snippet}
+		</NoteRow>
 	{/each}
 </ul>
 
 <style>
 	ul {
 		padding: 0;
-	}
-	.grow {
-		flex: 1;
-		min-width: 0;
 	}
 </style>

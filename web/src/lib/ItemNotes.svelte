@@ -1,4 +1,5 @@
 <script lang="ts">
+	import NoteIcon from '#lib/NoteIcon.svelte';
 	import { resolve } from '$app/paths';
 	import { listNotes } from '#lib/api/client.ts';
 	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
@@ -25,9 +26,7 @@
 <div class="notes">
 	{#each notes as note (note.id)}
 		<a class="note" href={resolve('/notes/[id]', { id: note.id })}>
-			<svg viewBox="0 0 24 24" aria-hidden="true"
-				><path d="M6 3.5h8.5L19 8v12.5H6zM14 3.5V8.5h5M9 12.5h7M9 16h5" /></svg
-			>
+			<NoteIcon size={14} />
 			<span>{note.title || 'Untitled note'}</span>
 		</a>
 	{/each}
@@ -62,15 +61,6 @@
 	}
 	.note:hover {
 		border-color: var(--royal);
-	}
-	svg {
-		flex: none;
-		width: 14px;
-		height: 14px;
-		fill: none;
-		stroke: var(--royal);
-		stroke-width: 1.8;
-		stroke-linejoin: round;
 	}
 	.new {
 		padding: 2px 10px;
