@@ -197,6 +197,13 @@ docker compose run --rm server paperus backup list
 docker compose run --rm server paperus backup restore NAME --replace
 docker compose up -d</code
 		></pre>
+	<p>
+		Moving to a new server, or starting over after losing the old one? Start paperus there with an
+		empty database and copy the backup's folder (and, for files, the <code>files</code> folder next
+		to it) into its backups folder. On first start, the welcome page offers
+		<strong>Restore from a backup</strong>, checks which files are there and restores it: no
+		commands needed.
+	</p>
 	<p class="muted">
 		A backup from an older paperus is brought up to date while restoring; one from a newer paperus
 		needs that version first.

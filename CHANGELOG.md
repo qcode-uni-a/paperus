@@ -21,7 +21,10 @@
   at the bottom of the menu and in Administration → Server stats (with the
   backups); also as Prometheus metrics.
 - **Empty trash** on the trash page: deletes for good what one may change.
-- The search bar is hidden in the administration.
+- The search bar is hidden in the administration; the settings sections
+  start folded.
+- The backups page mentions restoring a backup on a new server from the
+  welcome page, without commands.
 
 ## 0.0.6 (2026-11-05)
 

@@ -9,13 +9,9 @@
 	import TrashSettings from '#lib/admin/TrashSettings.svelte';
 	import SettingSection from '#lib/admin/SettingSection.svelte';
 
-	/** All settings on one page, each section opened as needed; the open
-	 * ones are in the address (?open=ml,trash). */
-	const open = $derived(
-		page.url.searchParams.has('open')
-			? (page.url.searchParams.get('open') ?? '').split(',').filter(Boolean)
-			: ['ml']
-	);
+	/** All settings on one page, all closed at first, each opened as needed;
+	 * the open ones are in the address (?open=ml,trash). */
+	const open = $derived((page.url.searchParams.get('open') ?? '').split(',').filter(Boolean));
 
 	function toggle(slug: string, opened: boolean) {
 		const next = opened ? [...open, slug] : open.filter((s) => s !== slug);
