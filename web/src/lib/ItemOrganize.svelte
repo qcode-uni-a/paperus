@@ -1,21 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import SharedIcon from '#lib/SharedIcon.svelte';
-	import {
-		addItems,
-		addTag,
-		errorMessage,
-		removeItem,
-		setOwner,
-		removeTag
-	} from '#lib/api/client.ts';
+	import { addItems, addTag, errorMessage, removeItem, removeTag } from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
 	import {
 		collectionPath,
 		flatTree,
 		libraryById,
-		isShared,
-		libraryName,
 		loadOrganize,
 		organize
 	} from '#lib/organize.svelte.ts';
@@ -32,8 +22,6 @@
 	// New tags: the item's owner for those who may change it, else private
 	// (as the server decides).
 	const tagLibrary = $derived(itemWritable ? item.library_id : own?.id);
-	// Who else could own it: the person and groups they may add to.
-	const owners = $derived(organize.libraries.filter((l) => l.writable));
 
 	/** Whether the person may put tags of this owner on the item (and take
 	 * them off): private tags anywhere, a group's on papers they may change. */
@@ -112,38 +100,6 @@
 </script>
 
 <div class="organize">
-	<div class="line">
-		<span class="label">Owner</span>
-		{#if itemWritable && owners.length > 1 && !item.deleted_at}
-			<select
-				class="owner"
-				value={item.library_id}
-				aria-label="Owner"
-				onchange={async (event) => {
-					const target = event.currentTarget.value;
-					const leaving = isShared(item.library_id);
-					if (
-						leaving &&
-						!confirm(
-							`${libraryName(item.library_id)} will no longer see this paper, and its tags and collections come off it. Continue?`
-						)
-					) {
-						event.currentTarget.value = item.library_id;
-						return;
-					}
-					await done(await setOwner({ path: { item_id: item.id }, body: { library_id: target } }));
-				}}
-			>
-				{#each owners as owner (owner.id)}
-					<option value={owner.id}>{libraryName(owner.id)}</option>
-				{/each}
-			</select>
-		{:else}
-			<span class="owner-name">{libraryName(item.library_id)}</span>
-		{/if}
-		{#if isShared(item.library_id)}<SharedIcon size={15} />{/if}
-	</div>
-
 	<div class="line">
 		<span class="label">Tags</span>
 		{#each item.tags as tag (tag.id)}
@@ -252,15 +208,6 @@
 		width: 84px;
 		color: var(--muted);
 		font-size: var(--step--1);
-	}
-	select.owner {
-		width: auto;
-		max-width: min(260px, 100%);
-		padding: 2px 8px;
-		font-size: 0.92em;
-	}
-	.owner-name {
-		font-size: 0.92em;
 	}
 	.chip {
 		display: inline-flex;

@@ -22,10 +22,12 @@
 		type VersionKind
 	} from '#lib/api/client.ts';
 	import MenuButton from '#lib/MenuButton.svelte';
+	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
+	import SharedIcon from '#lib/SharedIcon.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
-	import { libraryById } from '#lib/organize.svelte.ts';
+	import { isShared, libraryById } from '#lib/organize.svelte.ts';
 	import { fullName } from '#lib/format.ts';
 
 	const id = $derived(page.params.id ?? '');
@@ -37,8 +39,7 @@
 	let notFound = $state(false);
 	let error = $state('');
 
-	let editing = $state(false);
-	let titleDraft = $state('');
+	let editDialog = $state<ItemEditDialog>();
 
 	let addingVersion = $state(false);
 	let versionDoi = $state('');
@@ -117,24 +118,6 @@
 		await load();
 	}
 
-	async function saveTitle(event: SubmitEvent) {
-		event.preventDefault();
-		if (!item) return;
-		const { error: failure, response } = await setOverrides({
-			path: { item_id: id },
-			body: { ...item.overrides, title: titleDraft },
-			headers: { 'if-match': etag }
-		});
-		if (response?.status === 412) {
-			error = 'Someone changed this item in the meantime. Here is the current version.';
-		} else if (failure) {
-			error = errorMessage(failure);
-		} else {
-			editing = false;
-		}
-		await load();
-	}
-
 	async function submitVersion(event: SubmitEvent) {
 		event.preventDefault();
 		const body = versionDoi.trim()
@@ -201,36 +184,26 @@
 	{/if}
 
 	<header>
-		{#if editing}
-			<form class="row" onsubmit={saveTitle}>
-				<input bind:value={titleDraft} aria-label="Title" required />
-				<button class="primary">Save</button>
-				<button type="button" onclick={() => (editing = false)}>Cancel</button>
-			</form>
-		{:else}
-			<div class="title">
-				<h1>{item.title}</h1>
-				{#if !item.deleted_at && (writable || viewed)}
-					<MenuButton label="Item actions">
-						{#if viewed}
-							<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
-								{showDetails ? 'Hide details' : 'Details and files'}
-							</button>
-						{/if}
-						{#if writable}
-							<button
-								role="menuitem"
-								onclick={() => {
-									titleDraft = item?.title ?? '';
-									editing = true;
-								}}>Edit title</button
-							>
-							<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
-						{/if}
-					</MenuButton>
-				{/if}
-			</div>
-		{/if}
+		<div class="title">
+			<h1>
+				{item.title}{#if isShared(item.library_id)}<span class="shared-mark"
+						><SharedIcon size={18} /></span
+					>{/if}
+			</h1>
+			{#if !item.deleted_at && (writable || viewed)}
+				<MenuButton label="Item actions">
+					{#if viewed}
+						<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
+							{showDetails ? 'Hide details' : 'Details and files'}
+						</button>
+					{/if}
+					{#if writable}
+						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
+					{/if}
+				</MenuButton>
+			{/if}
+		</div>
 		<p class="muted">
 			{item.authors
 				.map(fullName)
@@ -239,6 +212,7 @@
 		</p>
 
 		<ItemOrganize {item} onchange={load} />
+		{#if writable}<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />{/if}
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
 
@@ -377,6 +351,11 @@
 	header {
 		margin-bottom: 16px;
 	}
+	.shared-mark {
+		display: inline-flex;
+		margin-left: 10px;
+		vertical-align: 0.05em;
+	}
 	.title {
 		display: flex;
 		align-items: flex-start;
@@ -399,11 +378,6 @@
 	}
 	header p {
 		margin: 0;
-	}
-	header form input {
-		flex: 1;
-		min-width: 200px;
-		font-size: 1.4em;
 	}
 	.trashed {
 		justify-content: space-between;
