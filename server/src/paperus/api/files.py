@@ -201,6 +201,12 @@ def download_file(
     if file is None:
         raise HTTPException(404, "file not found")
     blobs: BlobStore = request.app.state.blobs
+    # Uploaded files open on paperus's own address. An HTML or SVG file
+    # must not run scripts there, so everything but PDFs (which browsers
+    # will not show sandboxed) opens in a sandbox; the type is never guessed.
+    safety = {"X-Content-Type-Options": "nosniff"}
+    if file.media_type != PDF:
+        safety["Content-Security-Policy"] = "sandbox"
     if isinstance(blobs, FilesystemStore):
         # Supports range requests, which PDF.js uses for large files.
         return FileResponse(
@@ -208,6 +214,7 @@ def download_file(
             media_type=file.media_type,
             filename=file.filename,
             content_disposition_type="inline",
+            headers=safety,
         )
     return StreamingResponse(
         blobs.iter_bytes(file.blob_sha256),
@@ -215,6 +222,7 @@ def download_file(
         headers={
             "Content-Disposition": f"inline; filename*=utf-8''{quote(file.filename)}",
             "Content-Length": str(file.blob.size),
+            **safety,
         },
     )
 

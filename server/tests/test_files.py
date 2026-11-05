@@ -54,6 +54,8 @@ def test_upload_and_download(logged_in: TestClient, item_id: str) -> None:
     assert response.content == PDF_BYTES
     assert response.headers["content-type"] == "application/pdf"
     assert response.headers["content-disposition"].startswith("inline")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert "content-security-policy" not in response.headers
 
     [version] = logged_in.get(f"/api/items/{item_id}").json()["versions"]
     assert version["files"] == [file]
@@ -132,3 +134,11 @@ def test_files_need_login(client: TestClient) -> None:
     files = {"upload": ("paper.pdf", PDF_BYTES, "application/pdf")}
     assert client.post(f"/api/items/{unknown}/files", files=files).status_code == 401
     assert client.get(f"/api/files/{unknown}/content").status_code == 401
+
+
+def test_uploaded_html_cannot_run_scripts(logged_in: TestClient, item_id: str) -> None:
+    page = b"<script>fetch('/api/items')</script>"
+    file = upload(logged_in, item_id, page, "notes.html", "text/html")
+    response = logged_in.get(f"/api/files/{file['id']}/content")
+    assert response.headers["content-security-policy"] == "sandbox"
+    assert response.headers["x-content-type-options"] == "nosniff"

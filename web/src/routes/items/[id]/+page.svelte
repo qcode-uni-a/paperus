@@ -23,6 +23,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
+	import TextViewer from '#lib/TextViewer.svelte';
 	import { fullName } from '#lib/format.ts';
 
 	const id = $derived(page.params.id ?? '');
@@ -59,6 +60,25 @@
 		];
 		return candidates[0] ?? null;
 	});
+
+	/** Without a PDF: the main text file (notes, Markdown), if any. */
+	const textFile = $derived.by(() => {
+		if (!item || pdfFile) return null;
+		const preferred = item.versions.find((v) => v.id === item?.preferred_version_id);
+		const texts = [preferred, ...item.versions]
+			.flatMap((v) => v?.files ?? [])
+			.filter((f) => !f.deleted_at && isText(f.media_type, f.filename));
+		return texts.find((f) => f.role === 'main') ?? texts[0] ?? null;
+	});
+	const viewed = $derived(pdfFile ?? textFile);
+
+	function isText(mediaType: string, filename: string): boolean {
+		return (
+			mediaType.startsWith('text/') ||
+			['application/json', 'application/x-tex'].includes(mediaType) ||
+			/\.(md|markdown|txt)$/i.test(filename)
+		);
+	}
 
 	async function load() {
 		const { data, response } = await getItem({ path: { item_id: id } });
@@ -183,7 +203,7 @@
 				<h1>{item.title}</h1>
 				{#if !item.deleted_at}
 					<MenuButton label="Item actions">
-						{#if pdfFile}
+						{#if viewed}
 							<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
 								{showDetails ? 'Hide details' : 'Details and files'}
 							</button>
@@ -210,7 +230,7 @@
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
 
-	{#if showDetails || !pdfFile}
+	{#if showDetails || !viewed}
 		<section>
 			<div class="row">
 				<span class="badge">{item.type}</span>
@@ -332,6 +352,12 @@
 
 	{#if pdfFile}
 		<PdfViewer url="/api/files/{pdfFile.id}/content" {startPage} />
+	{:else if textFile}
+		<TextViewer
+			url="/api/files/{textFile.id}/content"
+			mediaType={textFile.media_type}
+			filename={textFile.filename}
+		/>
 	{/if}
 {/if}
 
