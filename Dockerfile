@@ -5,7 +5,7 @@
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
 FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
 
-FROM node:24-slim AS web
+FROM node:25-slim AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
