@@ -359,6 +359,24 @@ export type DuplicateOut = {
 };
 
 /**
+ * Emptied
+ */
+export type Emptied = {
+    /**
+     * Items
+     */
+    items: number;
+    /**
+     * Notes
+     */
+    notes: number;
+    /**
+     * Files
+     */
+    files: number;
+};
+
+/**
  * FileOut
  */
 export type FileOut = {
@@ -1634,6 +1652,26 @@ export type SystemConfig = {
      * Ml Threads
      */
     ml_threads?: number | null;
+    /**
+     * Public Url
+     */
+    public_url?: string | null;
+    /**
+     * Contact Email
+     */
+    contact_email?: string | null;
+    /**
+     * Max Upload Mb
+     */
+    max_upload_mb?: number | null;
+    /**
+     * Trash Days
+     */
+    trash_days?: number | null;
+    /**
+     * Log Level
+     */
+    log_level?: 'debug' | 'info' | 'warning' | 'error';
 };
 
 /**
@@ -3496,6 +3534,22 @@ export type MarkDifferentResponses = {
 };
 
 export type MarkDifferentResponse = MarkDifferentResponses[keyof MarkDifferentResponses];
+
+export type EmptyTrashData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/trash';
+};
+
+export type EmptyTrashResponses = {
+    /**
+     * Successful Response
+     */
+    200: Emptied;
+};
+
+export type EmptyTrashResponse = EmptyTrashResponses[keyof EmptyTrashResponses];
 
 export type GetConfigData = {
     body?: never;

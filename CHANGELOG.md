@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **More settings** (Administration → Settings):
+  - Server: the public address (for links the server makes, e.g. for AI
+    assistants), the contact email sent to metadata services, and the
+    largest upload.
+  - Trash: empty it automatically after some days (every night; off by
+    default). Emptying also removes stored files nothing uses any more.
+  - Logging: the log level of server and worker, without a restart.
+- **Empty trash** on the trash page: deletes for good what one may change.
+- The search bar is hidden in the administration.
+
 ## 0.0.6 (2026-11-05)
 
 A new look, faster search by meaning with a choice of

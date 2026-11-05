@@ -32,10 +32,10 @@ export const SETTINGS = [
 	],
 	['integrity', 'Integrity checks', 'Whether every file and its stored contents match', true],
 	['jobs', 'Job settings', 'How many background jobs run at once, and when checks run', true],
-	['logging', 'Logging', 'How much the server and the worker write to their logs', true],
-	['server', 'Server', 'Public address, contact email for metadata services, upload limits', true],
+	['logging', 'Logging', 'How much the server and the worker write to their logs', false],
+	['server', 'Server', 'Public address, contact email for metadata services, upload limits', false],
 	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],
-	['trash', 'Trash', 'When the trash empties itself', true],
+	['trash', 'Trash', 'When the trash empties itself', false],
 	['users', 'Users', "What happens to a removed person's papers and notes", true],
 	['authentication', 'Authentication', 'Password login, university login, session length', true]
 ] as const;

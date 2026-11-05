@@ -2523,6 +2523,28 @@
         }
       }
     },
+    "/api/trash": {
+      "delete": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Empty Trash",
+        "description": "Delete for good everything in the trash the person may change: their\nown and that of groups where they are a member or admin.",
+        "operationId": "empty_trash",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Emptied"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/config": {
       "get": {
         "tags": [
@@ -2711,7 +2733,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), or ``text-all`` (read every file again).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again) or\n``trash`` (delete what is older than the trash days).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -4981,6 +5003,29 @@
           "can_merge"
         ],
         "title": "DuplicateOut"
+      },
+      "Emptied": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "notes": {
+            "type": "integer",
+            "title": "Notes"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "notes",
+          "files"
+        ],
+        "title": "Emptied"
       },
       "FileOut": {
         "properties": {
@@ -7256,6 +7301,70 @@
               }
             ],
             "title": "Ml Threads"
+          },
+          "public_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2083,
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Url"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "pattern": "^[^@\\s]+@[^@\\s]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          },
+          "max_upload_mb": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Upload Mb"
+          },
+          "trash_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trash Days"
+          },
+          "log_level": {
+            "type": "string",
+            "enum": [
+              "debug",
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Log Level",
+            "default": "info"
           }
         },
         "type": "object",

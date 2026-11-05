@@ -2,7 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
+	import LoggingSettings from '#lib/admin/LoggingSettings.svelte';
 	import MlSettings from '#lib/admin/MlSettings.svelte';
+	import ServerSettings from '#lib/admin/ServerSettings.svelte';
+	import TrashSettings from '#lib/admin/TrashSettings.svelte';
 	import SettingSection from '#lib/admin/SettingSection.svelte';
 
 	/** All settings on one page, each section opened as needed; the open
@@ -73,6 +76,12 @@
 		>
 			{#if slug === 'ml'}
 				<MlSettings />
+			{:else if slug === 'server'}
+				<ServerSettings />
+			{:else if slug === 'trash'}
+				<TrashSettings />
+			{:else if slug === 'logging'}
+				<LoggingSettings />
 			{:else}
 				<p class="muted">Not available yet. Planned for this section:</p>
 				<ul class="planned">
