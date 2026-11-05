@@ -874,6 +874,60 @@
         }
       }
     },
+    "/api/items/{item_id}/merge-preview": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Preview Merge",
+        "description": "What merging this paper into ``into`` would move and leave behind.",
+        "operationId": "preview_merge",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "into",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Into"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergePreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/merge": {
       "post": {
         "tags": [
@@ -4103,43 +4157,85 @@
       },
       "MergeOut": {
         "properties": {
-          "item": {
-            "$ref": "#/components/schemas/ItemDetail"
-          },
-          "versions": {
-            "type": "integer",
-            "title": "Versions"
-          },
-          "files": {
-            "type": "integer",
-            "title": "Files"
-          },
-          "tags": {
-            "type": "integer",
-            "title": "Tags"
-          },
-          "collections": {
-            "type": "integer",
-            "title": "Collections"
-          },
-          "left_behind": {
+          "steps": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/MergeStep"
             },
             "type": "array",
-            "title": "Left Behind"
+            "title": "Steps"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemDetail"
           }
         },
         "type": "object",
         "required": [
-          "item",
-          "versions",
-          "files",
-          "tags",
-          "collections",
-          "left_behind"
+          "steps",
+          "item"
         ],
         "title": "MergeOut"
+      },
+      "MergePreview": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/MergeStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "steps"
+        ],
+        "title": "MergePreview"
+      },
+      "MergeStep": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "version",
+              "file",
+              "tag",
+              "collection"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "move",
+              "already",
+              "stays"
+            ],
+            "title": "Action"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "action",
+          "reason"
+        ],
+        "title": "MergeStep"
       },
       "MetadataSource": {
         "type": "string",

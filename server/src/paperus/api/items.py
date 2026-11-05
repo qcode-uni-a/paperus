@@ -608,15 +608,45 @@ class MergeInto(BaseModel):
     """The paper that stays; this one goes to the trash."""
 
 
-class MergeOut(BaseModel):
+class MergeStep(BaseModel):
+    kind: merge.Kind
+    name: str
+    action: merge.Action
+    """``move``: goes over; ``already``: the other paper has it; ``stays``:
+    stays with the paper in the trash."""
+    reason: str | None
+
+
+class MergePreview(BaseModel):
+    steps: list[MergeStep]
+
+
+class MergeOut(MergePreview):
     item: ItemDetail
     """The paper that stayed, with what it took over."""
-    versions: int
-    files: int
-    tags: int
-    collections: int
-    left_behind: list[str]
-    """What could not move; it stays with the trashed paper."""
+
+
+def _steps(steps: list[merge.Step]) -> list[MergeStep]:
+    return [
+        MergeStep(kind=s.kind, name=s.name, action=s.action, reason=s.reason)
+        for s in steps
+    ]
+
+
+@router.get("/api/items/{item_id}/merge-preview")
+def preview_merge(
+    item_id: uuid.UUID,
+    into: uuid.UUID,
+    db: DB,
+    access: CurrentAccess,
+) -> MergePreview:
+    """What merging this paper into ``into`` would move and leave behind."""
+    source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    target = get_readable_item(db, access, into, allow_trashed=False)
+    try:
+        return MergePreview(steps=_steps(merge.plan_merge(access, source, target)))
+    except merge.CannotMerge as error:
+        raise HTTPException(409, str(error)) from error
 
 
 @router.post("/api/items/{item_id}/merge")
@@ -633,16 +663,9 @@ def merge_item(
     source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     target = get_readable_item(db, access, body.into, allow_trashed=False)
     try:
-        result = merge.merge_items(db, access, source, target)
+        steps = merge.merge_items(db, access, source, target)
     except merge.CannotMerge as error:
         raise HTTPException(409, str(error)) from error
     db.commit()
     db.refresh(target)
-    return MergeOut(
-        item=item_detail(target, access, response),
-        versions=result.versions,
-        files=result.files,
-        tags=result.tags,
-        collections=result.collections,
-        left_behind=result.left_behind,
-    )
+    return MergeOut(item=item_detail(target, access, response), steps=_steps(steps))

@@ -758,27 +758,43 @@ export type MergeInto = {
  * MergeOut
  */
 export type MergeOut = {
+    /**
+     * Steps
+     */
+    steps: Array<MergeStep>;
     item: ItemDetail;
+};
+
+/**
+ * MergePreview
+ */
+export type MergePreview = {
     /**
-     * Versions
+     * Steps
      */
-    versions: number;
+    steps: Array<MergeStep>;
+};
+
+/**
+ * MergeStep
+ */
+export type MergeStep = {
     /**
-     * Files
+     * Kind
      */
-    files: number;
+    kind: 'version' | 'file' | 'tag' | 'collection';
     /**
-     * Tags
+     * Name
      */
-    tags: number;
+    name: string;
     /**
-     * Collections
+     * Action
      */
-    collections: number;
+    action: 'move' | 'already' | 'stays';
     /**
-     * Left Behind
+     * Reason
      */
-    left_behind: Array<string>;
+    reason: string | null;
 };
 
 /**
@@ -1810,6 +1826,41 @@ export type ListDuplicatesResponses = {
 };
 
 export type ListDuplicatesResponse = ListDuplicatesResponses[keyof ListDuplicatesResponses];
+
+export type PreviewMergeData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query: {
+        /**
+         * Into
+         */
+        into: string;
+    };
+    url: '/api/items/{item_id}/merge-preview';
+};
+
+export type PreviewMergeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewMergeError = PreviewMergeErrors[keyof PreviewMergeErrors];
+
+export type PreviewMergeResponses = {
+    /**
+     * Successful Response
+     */
+    200: MergePreview;
+};
+
+export type PreviewMergeResponse = PreviewMergeResponses[keyof PreviewMergeResponses];
 
 export type MergeItemData = {
     body: MergeInto;

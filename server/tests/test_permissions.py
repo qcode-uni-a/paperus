@@ -230,11 +230,20 @@ def test_papers_merge(w: World, doi_registry: FakeDOIRegistry) -> None:
         f"/api/items/{group_paper['id']}/merge", json={"into": mine["id"]}
     ).status_code in (403, 404)
     # As member: everything moves; the private tag stays private.
+    preview = w.member.get(
+        f"/api/items/{mine['id']}/merge-preview", params={"into": group_paper["id"]}
+    ).json()["steps"]
     merged = w.member.post(
         f"/api/items/{mine['id']}/merge", json={"into": group_paper["id"]}
     ).json()
-    assert (merged["versions"], merged["tags"], merged["collections"]) == (1, 1, 1)
-    assert merged["left_behind"] == []
+    assert merged["steps"] == preview  # the preview is what happens
+    moved = sorted((s["kind"], s["name"]) for s in preview if s["action"] == "move")
+    assert moved == [
+        ("collection", "Shelf"),
+        ("file", "annotated.pdf"),
+        ("tag", "to read"),
+        ("version", "Preprint: doi 10.48550/arxiv.2101.00001, arxiv 2101.00001"),
+    ]
     assert len(merged["item"]["versions"]) == 2
     assert w.member.get(f"/api/items/{mine['id']}").json()["deleted_at"] is not None
     assert w.admin.get(f"/api/items/{group_paper['id']}").json()["tags"] == []
@@ -245,11 +254,9 @@ def test_papers_merge(w: World, doi_registry: FakeDOIRegistry) -> None:
     result = w.reader.post(
         f"/api/items/{copy['id']}/merge", json={"into": group_paper["id"]}
     ).json()
-    assert result["tags"] == 1
-    assert result["versions"] == 0
-    assert result["left_behind"] == [
-        "versions and files (you may not change the other paper)"
-    ]
+    actions = {(s["kind"], s["action"], s["reason"]) for s in result["steps"]}
+    assert ("tag", "move", None) in actions
+    assert ("version", "stays", "you may not change the other paper") in actions
     assert (
         w.member.post(
             f"/api/items/{group_paper['id']}/merge", json={"into": group_paper["id"]}
