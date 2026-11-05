@@ -1,4 +1,8 @@
 # Stage 0: database for local development, reachable from this machine only.
+# A project name of its own, so it never clashes with an installation
+# (deploy/compose.yaml is project "paperus").
+name: paperus-dev
+
 services:
   db:
     image: pgvector/pgvector:pg18
@@ -31,3 +35,5 @@ services:
 
 volumes:
   db-data:
+    # Kept from before the project was renamed.
+    name: paperus_db-data
