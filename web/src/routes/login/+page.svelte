@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { login as apiLogin } from '#lib/api/client.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -29,7 +29,8 @@
 </script>
 
 <div class="login">
-	<h1><span class="highlight">paperus</span></h1>
+	<img class="mark" src={asset('favicon.svg')} alt="" width="72" height="72" />
+	<h1>paperus</h1>
 	<p class="tagline">Papers, for us: the group's library, searchable by meaning.</p>
 	<form onsubmit={login}>
 		<label>Username <input bind:value={username} autocomplete="username" required /></label>
@@ -53,8 +54,9 @@
 		letter-spacing: -0.03em;
 		margin: 0 0 8px;
 	}
-	h1 .highlight {
-		padding: 0 0.2em;
+	.mark {
+		display: block;
+		margin: 0 0 8px -6px;
 	}
 	.tagline {
 		color: var(--muted);

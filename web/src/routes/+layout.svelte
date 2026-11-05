@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { resolve } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import DropZone from '#lib/DropZone.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
@@ -41,7 +41,9 @@
 			>
 				<span></span><span></span><span></span>
 			</button>
-			<a class="brand" href={resolve('/')}><span class="highlight">paperus</span></a>
+			<a class="brand" href={resolve('/')}
+				><img src={asset('favicon.svg')} alt="" width="30" height="30" />paperus</a
+			>
 		</div>
 		<div class="row">
 			{#if session.user}<AddMenu />{/if}
@@ -84,8 +86,10 @@
 		color: var(--ink);
 		text-decoration: none;
 	}
-	.brand .highlight {
-		padding: 0 0.25em;
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
 	}
 	.burger {
 		display: grid;

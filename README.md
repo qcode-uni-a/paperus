@@ -1,4 +1,9 @@
-# paperus
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/paperus-logo-dark.svg">
+    <img src="docs/logo/paperus-logo.svg" alt="paperus" height="64">
+  </picture>
+</h1>
 
 *Papers, for us.* A self-hosted research library for groups: think Zotero, but
 with group sharing, search by meaning and integration with whatever AI
