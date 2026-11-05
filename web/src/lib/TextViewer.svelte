@@ -1,17 +1,6 @@
-<script lang="ts" module>
-	import DOMPurify from 'dompurify';
-	import { marked } from 'marked';
-
-	// Links in a note open in a new tab, away from paperus.
-	DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-		if (node.tagName === 'A' && node.getAttribute('href')) {
-			node.setAttribute('target', '_blank');
-			node.setAttribute('rel', 'noreferrer');
-		}
-	});
-</script>
-
 <script lang="ts">
+	import { renderMarkdown } from '#lib/markdown.ts';
+
 	/** A text file shown as a page: Markdown rendered, plain text as written. */
 	let { url, mediaType, filename }: { url: string; mediaType: string; filename: string } = $props();
 
@@ -37,18 +26,23 @@
 			.catch((failure: unknown) => (error = String(failure)));
 	});
 
-	// The file is someone's upload: never trust its HTML.
-	const html = $derived(
-		markdown && text !== null
-			? DOMPurify.sanitize(marked.parse(text, { async: false, gfm: true }))
-			: ''
-	);
+	let html = $state<string | null>(null);
+	$effect(() => {
+		const source = text;
+		html = null;
+		if (!markdown || source === null) return;
+		renderMarkdown(source)
+			.then((rendered) => {
+				if (source === text) html = rendered;
+			})
+			.catch((failure: unknown) => (error = String(failure)));
+	});
 </script>
 
 <div class="viewer">
 	{#if error}
 		<p class="error">Could not open the file: {error}</p>
-	{:else if text === null}
+	{:else if text === null || (markdown && html === null)}
 		<p class="muted">Opening {filename}…</p>
 	{:else}
 		<div class="toolbar">
@@ -57,7 +51,7 @@
 		</div>
 		<div class="desk">
 			{#if markdown}
-				<!-- Sanitized above with DOMPurify. -->
+				<!-- Sanitized with DOMPurify in renderMarkdown. -->
 				<article class="sheet markdown">{@html html}</article>
 			{:else}
 				<article class="sheet"><pre class:prose>{text}</pre></article>
@@ -179,6 +173,12 @@
 		border: 1px solid var(--rule);
 		font-family: var(--sans);
 		font-size: 0.92em;
+	}
+	/* Long formulas scroll sideways instead of widening the page. */
+	.markdown :global(.katex-display) {
+		overflow-x: auto;
+		overflow-y: hidden;
+		padding: 2px 0;
 	}
 	.markdown :global(img) {
 		max-width: 100%;
