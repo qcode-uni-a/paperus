@@ -949,6 +949,28 @@ export type MlService = {
 };
 
 /**
+ * MLServiceState
+ */
+export type MlServiceState = {
+    /**
+     * Threads
+     */
+    threads: number;
+    /**
+     * Keep
+     */
+    keep: Array<string>;
+    /**
+     * Cores
+     */
+    cores: number;
+    /**
+     * Loaded
+     */
+    loaded: Array<string>;
+};
+
+/**
  * MLSpeed
  */
 export type MlSpeed = {
@@ -986,6 +1008,7 @@ export type MlStatus = {
      * Models
      */
     models: Array<MlModel>;
+    service?: MlServiceState | null;
 };
 
 /**
@@ -1545,6 +1568,10 @@ export type SystemConfig = {
      * Embedding Model
      */
     embedding_model: string;
+    /**
+     * Ml Threads
+     */
+    ml_threads?: number;
 };
 
 /**

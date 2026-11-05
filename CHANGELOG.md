@@ -12,8 +12,10 @@
 - **New installations use arctic-embed-m-v2**: about three times faster
   than bge-m3 and at least as good in published retrieval scores.
   Installations already using bge-m3 keep it until an admin switches.
-- **ML service**: one batch at a time per model (simultaneous requests no
-  longer fight over the cores); `ML_THREADS` and `ML_MODEL` in `.env`.
+- **ML service settings in the administration**: the CPU cores it may use
+  (a slider), and it keeps the model in use loaded. The server sends the
+  settings to the ML service, also after either restarts. One batch at a
+  time per model, so simultaneous requests no longer fight over the cores.
 
 ## 0.0.5 (2026-11-05)
 

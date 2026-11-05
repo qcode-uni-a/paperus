@@ -1,5 +1,6 @@
 """FastAPI application."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -31,7 +32,7 @@ from paperus.api import (
 from paperus.api import tokens as token_api
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
-from paperus.jobs import make_job_app
+from paperus.jobs import make_job_app, queue_ml_configuration
 from paperus.mcp_server import build_mcp
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, make_ml_client
@@ -55,6 +56,13 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         with jobs.open():
+            # The ML service starts from its own defaults; send ours.
+            try:
+                queue_ml_configuration(jobs)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "could not queue the ML configuration", exc_info=True
+                )
             async with app.state.mcp.session_manager.run():
                 yield
         http.close()

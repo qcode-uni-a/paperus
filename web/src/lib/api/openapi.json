@@ -5798,6 +5798,40 @@
         ],
         "title": "MLService"
       },
+      "MLServiceState": {
+        "properties": {
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "keep": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keep"
+          },
+          "cores": {
+            "type": "integer",
+            "title": "Cores"
+          },
+          "loaded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Loaded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "threads",
+          "keep",
+          "cores",
+          "loaded"
+        ],
+        "title": "MLServiceState"
+      },
       "MLSpeed": {
         "properties": {
           "model": {
@@ -5846,6 +5880,16 @@
             },
             "type": "array",
             "title": "Models"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MLServiceState"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6818,6 +6862,13 @@
           "embedding_model": {
             "type": "string",
             "title": "Embedding Model"
+          },
+          "ml_threads": {
+            "type": "integer",
+            "maximum": 1024.0,
+            "minimum": 0.0,
+            "title": "Ml Threads",
+            "default": 0
           }
         },
         "type": "object",

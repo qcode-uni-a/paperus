@@ -15,12 +15,13 @@ Settings are environment variables:
 | --- | --- | --- |
 | `PAPERUS_ML_TOKEN` | none | Shared secret; requests need `Authorization: Bearer <token>` |
 | `PAPERUS_ML_CACHE_PATH` | `~/.cache/paperus-ml` | Downloaded models |
-| `PAPERUS_ML_PRELOAD` | `[]` | Models to load at start and keep, e.g. `["arctic-embed-m-v2"]` |
+| `PAPERUS_ML_PRELOAD` | `[]` | Models to load at start and keep, e.g. `["arctic-embed-m-v2"]` (paperus then sends the one in use) |
 | `PAPERUS_ML_MODEL_TTL` | `300` | Unload other models after this many idle seconds (0: never) |
-| `PAPERUS_ML_INTRA_OP_THREADS` | `0` | CPU cores per model (0: all it sees; in a container, set it, as the host's cores are seen) |
+| `PAPERUS_ML_INTRA_OP_THREADS` | `0` | CPU cores per model at start (0: all it sees); paperus' administration sets it afterwards |
 | `PAPERUS_ML_MAX_BATCH_TEXTS` / `_TOKENS` | `32` / `16384` | Batch size (memory grows with both) |
 
-One batch runs at a time per model, using all its cores; simultaneous
+paperus sends its settings with `PUT /config` (cores, models to keep
+loaded). One batch runs at a time per model, using all its cores; simultaneous
 requests take turns batch by batch.
 
 Most installations use the `paperus-ml` container image instead. Status:

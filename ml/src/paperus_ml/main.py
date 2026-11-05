@@ -7,13 +7,14 @@ model in every request, so this service needs no model configuration.
 
 import asyncio
 import contextlib
+import os
 import secrets
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from paperus_ml.config import Settings
@@ -57,6 +58,19 @@ class ModelInfo(BaseModel):
     """What the score keys mean."""
 
 
+class ServiceConfig(BaseModel):
+    threads: int = Field(ge=0, le=1024)
+    """CPU threads per model; 0: all the service sees."""
+    keep: list[str]
+    """Models to keep loaded (paperus sends the one in use)."""
+
+
+class ServiceState(ServiceConfig):
+    cores: int
+    """CPU cores this service may use."""
+    loaded: list[str]
+
+
 class Speed(BaseModel):
     model: str
     passages: int
@@ -64,6 +78,14 @@ class Speed(BaseModel):
     passages_per_second: float
     load_seconds: float
     """Downloading and loading first, if the model was not loaded."""
+
+
+def usable_cores() -> int:
+    """Cores this process may run on (a container's CPU set, if limited)."""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:  # not on Linux
+        return os.cpu_count() or 1
 
 
 def create_app(
@@ -136,6 +158,26 @@ def create_app(
             models.delete_cached(name)
         except UnknownModel as error:
             raise HTTPException(404, f"unknown model {name!r}") from error
+
+    @app.get("/config", dependencies=[Depends(check_token)])
+    def get_config() -> ServiceState:
+        return ServiceState(
+            threads=models.threads,
+            keep=models.kept,
+            cores=usable_cores(),
+            loaded=models.loaded(),
+        )
+
+    @app.put("/config", dependencies=[Depends(check_token)])
+    def set_config(body: ServiceConfig, tasks: BackgroundTasks) -> ServiceState:
+        """Apply paperus' settings; kept models load in the background."""
+        try:
+            missing = models.configure(threads=body.threads, keep=body.keep)
+        except UnknownModel as error:
+            raise HTTPException(404, f"unknown model {error.args[0]!r}") from error
+        if missing:
+            tasks.add_task(models.load_kept)
+        return get_config()
 
     @app.post("/models/{name}/speed", dependencies=[Depends(check_token)])
     def measure_speed(name: str) -> Speed:

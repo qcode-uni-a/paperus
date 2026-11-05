@@ -196,6 +196,28 @@ def run_worker(settings: Settings) -> None:
         app.run_worker(queues=["text", "ml", "backup", "import"], concurrency=3)
 
 
+@tasks.periodic(cron="*/5 * * * *")
+@tasks.task(name="configure_ml", queue="ml", queueing_lock="configure-ml")
+def configure_ml(timestamp: int) -> None:
+    """Send the administration's ML settings to the ML services again, in
+    case one restarted (they start from their environment variables)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+    errors = context.ml.configure(
+        threads=config.ml_threads, keep=[config.embedding_model]
+    )
+    for error in errors:
+        log.info("ML service not configured: %s", error)
+
+
+def queue_ml_configuration(app: App) -> None:
+    """Send the ML settings soon (e.g. when the server starts)."""
+    task = app.configure_task("paperus:configure_ml", queueing_lock="configure-ml")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
+
+
 @tasks.task(name="import_library", queue="import", pass_context=True)
 def import_library(job: JobContext, import_id: str) -> None:
     """Run an import someone uploaded (see ``paperus.importing``)."""

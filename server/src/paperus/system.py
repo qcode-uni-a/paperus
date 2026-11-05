@@ -17,7 +17,10 @@ KEY = "config"
 
 class SystemConfig(BaseModel):
     embedding_model: str
-    """Model for search by meaning; a change re-embeds in the background."""
+    """Model for search by meaning; a change re-embeds in the background.
+    The ML service keeps it loaded."""
+    ml_threads: int = Field(0, ge=0, le=1024)
+    """CPU threads the ML service uses per model; 0: all it sees."""
 
 
 def defaults(settings: Settings) -> SystemConfig:

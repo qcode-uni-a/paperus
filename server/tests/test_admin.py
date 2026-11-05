@@ -24,16 +24,30 @@ def test_admins_only(logged_in: TestClient) -> None:
 
 
 def test_change_embedding_model(
-    admin: TestClient, db: Session, settings: Settings, job_app: App
+    admin: TestClient, db: Session, settings: Settings, job_app: App, fake_ml: FakeML
 ) -> None:
-    assert admin.get("/api/admin/config").json() == {"embedding_model": "bge-m3"}
+    assert admin.get("/api/admin/config").json() == {
+        "embedding_model": "bge-m3",
+        "ml_threads": 0,
+    }
     response = admin.put(
-        "/api/admin/config", json={"embedding_model": "multilingual-e5-small"}
+        "/api/admin/config",
+        json={"embedding_model": "multilingual-e5-small", "ml_threads": 6},
     )
     assert response.status_code == 200
     assert load_config(db, settings).embedding_model == "multilingual-e5-small"
     # The library is re-embedded in the background.
     assert queued(job_app) == ["paperus:queue_missing_embeddings"]
+    # The ML service keeps the new model loaded, with the threads chosen.
+    assert fake_ml.config == {"threads": 6, "keep": ["multilingual-e5-small"]}
+    service = admin.get("/api/admin/ml").json()["service"]
+    assert (service["threads"], service["cores"]) == (6, 8)
+    assert (
+        admin.put(
+            "/api/admin/config", json={"embedding_model": "bge-m3", "ml_threads": -1}
+        ).status_code
+        == 422
+    )
 
     unknown = admin.put("/api/admin/config", json={"embedding_model": "gpt-9"})
     assert unknown.status_code == 422

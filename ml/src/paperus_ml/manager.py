@@ -31,6 +31,8 @@ class ModelManager:
             name: threading.Lock() for name in MODELS
         }
         self._keep = set(settings.preload)
+        self.threads = settings.intra_op_threads
+        """CPU threads per model (0: all ONNX Runtime sees); set by paperus."""
 
     def model_dir(self, spec: ModelSpec) -> Path:
         """<cache>/<task>/<model>, with plain files: the shared Hugging Face
@@ -66,7 +68,7 @@ class ModelManager:
         return Encoder(
             spec,
             model_dir,
-            intra_op_threads=self.settings.intra_op_threads,
+            intra_op_threads=self.threads,
             max_batch_texts=self.settings.max_batch_texts,
             max_batch_tokens=self.settings.max_batch_tokens,
         )
@@ -105,6 +107,30 @@ class ModelManager:
             unloaded.append(name)
             log.info("unloaded idle model %s", name)
         return unloaded
+
+    @property
+    def kept(self) -> list[str]:
+        return sorted(self._keep)
+
+    def configure(self, *, threads: int, keep: list[str]) -> list[str]:
+        """Settings from paperus' administration: threads per model, and the
+        models to keep loaded (the one in use). Models loaded with other
+        threads are unloaded; returns the models still to load (``load_kept``
+        loads them, which can take a while)."""
+        unknown = [name for name in keep if name not in MODELS]
+        if unknown:
+            raise UnknownModel(unknown[0])
+        if threads != self.threads:
+            self.threads = threads
+            for name in list(self._models):
+                with self._locks[name]:
+                    self._models.pop(name, None)
+        self._keep = set(keep)
+        return [name for name in keep if name not in self._models]
+
+    def load_kept(self) -> None:
+        for name in self.kept:
+            self.get(name)
 
     def preload(self) -> None:
         for name in self.settings.preload:

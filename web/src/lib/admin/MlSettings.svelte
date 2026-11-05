@@ -70,6 +70,26 @@
 		await loadAdmin();
 	}
 
+	// CPU cores for the ML service (0: all it sees).
+	let threads = $state<number | null>(null);
+	const cores = $derived(admin.ml?.service?.cores ?? null);
+	$effect(() => {
+		if (config && threads === null) threads = config.ml_threads ?? 0;
+	});
+
+	async function saveThreads() {
+		if (!config || threads === null) return;
+		error = message = '';
+		const { error: failure } = await setConfig({ body: { ...config, ml_threads: threads } });
+		if (failure) error = errorMessage(failure);
+		else
+			message =
+				threads === 0
+					? 'The ML service uses all its cores.'
+					: `The ML service uses ${threads} ${threads === 1 ? 'core' : 'cores'} per model.`;
+		await loadAdmin();
+	}
+
 	async function embedMissing() {
 		await runJob({ path: { job: 'embeddings' } });
 		message = 'Looking for missing embeddings…';
@@ -174,6 +194,39 @@
 </section>
 
 <section class="card">
+	<h2>CPU cores</h2>
+	<p class="muted">
+		How many cores the ML service uses for each model. Fewer keep the database and the website quick
+		while a large library is being embedded; more get it done sooner.
+	</p>
+	<div class="row">
+		<label class="cores">
+			<input
+				type="range"
+				min="0"
+				max={cores ?? 32}
+				bind:value={threads}
+				aria-label="CPU cores"
+				disabled={!config}
+			/>
+			<span
+				>{threads === 0 || threads === null
+					? `All${cores ? ` (${cores})` : ''}`
+					: `${threads}${cores ? ` of ${cores}` : ''}`}</span
+			>
+		</label>
+		<button onclick={saveThreads} disabled={!config || threads === (config?.ml_threads ?? 0)}
+			>Save</button
+		>
+	</div>
+	{#if admin.ml?.service && admin.ml.service.threads !== (config?.ml_threads ?? 0)}
+		<p class="muted small">
+			The ML service has not taken this setting yet; it gets it within minutes.
+		</p>
+	{/if}
+</section>
+
+<section class="card">
 	<h2>Service</h2>
 	<ul>
 		{#each admin.ml?.services ?? [] as service (service.url)}
@@ -199,6 +252,18 @@
 	h2,
 	p {
 		margin: 0;
+	}
+	.cores {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.cores input {
+		width: min(320px, 60vw);
+	}
+	.cores span {
+		min-width: 6ch;
+		font-variant-numeric: tabular-nums;
 	}
 	.warning {
 		padding: 10px 14px;

@@ -97,16 +97,19 @@ Secure session cookie, uploads, downloads with range requests.
 ## ML service (search by meaning)
 
 The `ml` container computes the vectors for search by meaning on the CPU.
+Its settings are made under Administration → Settings → Machine learning
+and sent to it by the server (at once, when the server starts, and every
+five minutes, so a restarted ML service gets them back):
 
-- **Cores**: `ML_THREADS` in `.env` (default 0: all cores it sees). Lower
-  it to keep cores free for the database and the server on the same
-  machine. Docker's `cpus:` limit alone is not enough: inside a container
-  the host's cores are still seen, and too many threads slow it down.
+- **The model**, chosen by published scores and a speed test on this
+  server; the ML service keeps it loaded.
+- **CPU cores** it may use (default: all it sees). Lower it to keep cores
+  free for the database and the server on the same machine. Docker's
+  `cpus:` limit alone is not enough: inside a container the host's cores
+  are still seen, and too many threads slow it down.
 - **One batch at a time per model**: each batch uses all of its cores;
   simultaneous requests (several uploads, a search) take turns batch by
   batch, so a search waits for one batch at most.
-- **The model** is chosen under Administration → Settings → Machine
-  learning.
 
 ## Backups
 

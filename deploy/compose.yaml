@@ -44,8 +44,6 @@ services:
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}
     environment:
       PAPERUS_ML_TOKEN: ${ML_TOKEN}
-      PAPERUS_ML_PRELOAD: '["${ML_MODEL:-arctic-embed-m-v2}"]'
-      PAPERUS_ML_INTRA_OP_THREADS: ${ML_THREADS:-0}
     volumes:
       - ${MODEL_CACHE_LOCATION}:/cache
     restart: unless-stopped

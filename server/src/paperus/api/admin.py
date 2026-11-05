@@ -56,10 +56,20 @@ class MLSpeed(BaseModel):
     load_seconds: float
 
 
+class MLServiceState(BaseModel):
+    threads: int
+    keep: list[str]
+    cores: int
+    """CPU cores the (first) ML service may use."""
+    loaded: list[str]
+
+
 class MLStatus(BaseModel):
     services: list[MLService]
     models: list[MLModel]
     """Empty if no service answers."""
+    service: MLServiceState | None = None
+    """The first service's settings and cores (None for older services)."""
 
 
 class Stats(BaseModel):
@@ -114,6 +124,8 @@ def set_config(
     db.commit()
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
+    # Applied at once where the service answers; the worker repeats it.
+    _ml(request).configure(threads=body.ml_threads, keep=[body.embedding_model])
     return body
 
 
@@ -125,7 +137,11 @@ def ml_status(request: Request, admin: Admin) -> MLStatus:
         models = _models(ml)
     except MLUnavailable:
         models = []
-    return MLStatus(services=services, models=models)
+    try:
+        service = MLServiceState.model_validate(ml.service_config())
+    except (MLUnavailable, ValueError):
+        service = None
+    return MLStatus(services=services, models=models, service=service)
 
 
 @router.post("/ml/models/{name}/speed")

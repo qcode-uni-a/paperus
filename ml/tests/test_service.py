@@ -139,3 +139,27 @@ def test_default_cache_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     monkeypatch.delenv("PAPERUS_ML_CACHE_PATH", raising=False)
     assert Settings().cache_path == tmp_path / "paperus-ml"
+
+
+def test_config_from_paperus(tiny: Encoder) -> None:
+    loader = CountingLoader(tiny)
+    manager = ModelManager(Settings(), loader)
+    with TestClient(create_app(Settings(), manager)) as client:
+        state = client.get("/config").json()
+        assert (state["threads"], state["keep"], state["loaded"]) == (0, [], [])
+        assert state["cores"] >= 1
+        # The model in use is kept and loads in the background.
+        state = client.put("/config", json={"threads": 2, "keep": ["bge-m3"]}).json()
+        assert (state["threads"], state["keep"]) == (2, ["bge-m3"])
+        assert manager.loaded() == ["bge-m3"] and loader.loads == ["bge-m3"]
+        # Other threads: models load again with them.
+        client.put("/config", json={"threads": 4, "keep": ["bge-m3"]})
+        assert loader.loads == ["bge-m3", "bge-m3"]
+        # The same again changes nothing.
+        client.put("/config", json={"threads": 4, "keep": ["bge-m3"]})
+        assert loader.loads == ["bge-m3", "bge-m3"]
+        assert (
+            client.put("/config", json={"threads": 4, "keep": ["x"]}).status_code == 404
+        )
+    # Kept models are not unloaded when idle.
+    assert manager.unload_idle(now=1e12) == []

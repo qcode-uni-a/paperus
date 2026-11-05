@@ -88,6 +88,25 @@ class MLClient:
         """Remove a downloaded model from the service's cache."""
         self._call("DELETE", f"/models/{name}")
 
+    def service_config(self) -> dict[str, Any]:
+        """Threads, kept models and usable cores of the first service."""
+        return dict(self._call("GET", "/config").json())
+
+    def configure(self, *, threads: int, keep: list[str]) -> list[str]:
+        """Send the administration's settings to every service; returns the
+        errors of those that did not take them."""
+        errors = []
+        for url in self.urls:
+            try:
+                self.http.put(
+                    f"{url}/config",
+                    json={"threads": threads, "keep": keep},
+                    timeout=10,
+                ).raise_for_status()
+            except httpx2.HTTPError as error:
+                errors.append(f"{url}: {error}")
+        return errors
+
     def measure_speed(self, name: str) -> dict[str, Any]:
         """Time the model on sample passages on the service's machine (it may
         download the model first: allow for that)."""

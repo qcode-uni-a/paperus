@@ -121,6 +121,7 @@ class FakeML:
         self.down = False
         self.requests: list[dict[str, Any]] = []
         self.deleted: list[str] = []
+        self.config: dict[str, Any] = {"threads": 0, "keep": []}
 
     def vector(self, text: str) -> list[float]:
         vector = [0.0] * self.DIMENSIONS
@@ -139,6 +140,10 @@ class FakeML:
             raise httpx2.ConnectError("ML service down")
         if request.url.path == "/ping":
             return httpx2.Response(200, json="pong")
+        if request.url.path == "/config":
+            if request.method == "PUT":
+                self.config = json.loads(request.content)
+            return httpx2.Response(200, json={**self.config, "cores": 8, "loaded": []})
         if request.url.path.endswith("/speed"):
             name = request.url.path.split("/")[2]
             if name not in self.MODELS:
