@@ -26,8 +26,7 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
   with its owner's permissions narrowed by its scopes (never more);
   deactivating a user stops their tokens. Administrators see that tokens
   exist, not their values.
-- **Onboarding.** Create the first administrator in the browser on first
-  start, like Immich, instead of the command line.
+
 - **Feature parity with Zotero** as the general goal: citation styles and
   export, browser connector, notes and annotations, Word/LibreOffice
   plugins, Zotero import, related items, duplicates merging.
