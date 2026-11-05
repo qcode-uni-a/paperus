@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.0.6 (2026-11-05)
+
+A new look inspired by Immich, faster search by meaning with a choice of
+models, tidying up the library (duplicates, unsorted papers, favourites),
+and fixes from a code review, including security fixes for access tokens.
 
 - **Messages when background work is done**: after uploading more than
   five papers, a note says they are being read, and a message follows when
@@ -43,6 +47,21 @@
   (a slider), and it keeps the model in use loaded. The server sends the
   settings to the ML service, also after either restarts. One batch at a
   time per model, so simultaneous requests no longer fight over the cores.
+
+- **Fixes from a code review**:
+  - Security: an access token limited to some owners could still read the
+    person's private papers, notes and files by id; a site administrator's
+    token saw every group. Personal settings (stars, pins) are closed to
+    tokens, and a test pins the decision for every API route.
+  - Import: a crafted Zotero file or zip can no longer stall or flood the
+    worker; one bad entry no longer spoils the rest; nothing is imported
+    twice; uploaded exports are deleted afterwards.
+  - Notes: switching between notes, filing or linking them, or two saves at
+    once can no longer lose or mix up text; leaving with unsaved text warns.
+  - Merging papers keeps their notes and stars; a group with notes cannot
+    be deleted by accident.
+  - Search by meaning answers at once (by words) while a model is still
+    downloading, instead of waiting.
 
 ## 0.0.5 (2026-11-05)
 
