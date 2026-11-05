@@ -1,5 +1,6 @@
 """The MCP server: tools over Streamable HTTP, acting through a token."""
 
+import base64
 import uuid
 from typing import Any
 
@@ -97,6 +98,8 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "search",
         "get_passage",
         "get_document",
+        "get_file",
+        "my_access",
         "list_collections",
         "list_documents",
         "list_tags",
@@ -135,6 +138,28 @@ def test_search_and_read(client: TestClient, ada: Person) -> None:
         "get_document", paper_id=hit["paper_id"], part="text", first_page=2
     )
     assert "Blind zones" not in page_two["text"]
+    [file] = details["files"]
+    assert file["filename"] == "radar.pdf" and file["media_type"] == "application/pdf"
+    assert file["download"].endswith(f"/api/files/{file['file_id']}/content")
+    # The download link works with the token.
+    download = client.get(
+        file["download"].removeprefix("https://testserver"),
+        headers={"Authorization": assistant.headers["Authorization"]},
+    )
+    assert download.status_code == 200
+    assert download.content.startswith(b"%PDF")
+
+    result = assistant.rpc(
+        "tools/call", {"name": "get_file", "arguments": {"file_id": file["file_id"]}}
+    )
+    assert not result["isError"]
+    note, embedded = result["content"]
+    assert "radar.pdf" in note["text"]
+    assert embedded["resource"]["mimeType"] == "application/pdf"
+    assert base64.b64decode(embedded["resource"]["blob"]) == download.content
+    with pytest.raises(ToolFailed, match="No such file"):
+        assistant.call("get_file", file_id=str(uuid.uuid4()))
+
     papers = assistant.call("list_documents", title="radar")
     assert papers["total"] == 1
     with pytest.raises(ToolFailed, match="No such paper"):
@@ -152,6 +177,9 @@ def test_scopes_and_owner_limits(client: TestClient, db: Session, ada: Person) -
         no_files.call("get_document", paper_id=paper["paper_id"], part="text")
     with pytest.raises(ToolFailed, match=r"tags\.write"):
         no_files.call("add_tags", paper_ids=[paper["paper_id"]], tags=["x"])
+    file_id = no_files.call("get_document", paper_id=paper["paper_id"])["files"][0]
+    with pytest.raises(ToolFailed, match=r"files\.read"):
+        no_files.call("get_file", file_id=file_id["file_id"])
 
     # A token limited to a group sees nothing of Ada's own papers.
     root = Person(client, db, "root", admin=True)
@@ -161,6 +189,19 @@ def test_scopes_and_owner_limits(client: TestClient, db: Session, ada: Person) -
     titles = [p["title"] for p in only_chair.call("list_documents")["papers"]]
     assert titles == ["Group paper"]
     assert only_chair.call("search", query="radar", mode="keyword")["passages"] == []
+
+    # The assistant can see what it may do.
+    rights = only_chair.call("my_access")
+    assert rights["acting_for"] == "ada" and rights["sees"] == "only: Chair"
+    assert "groups" not in rights and rights["expires"] is None
+    assert {"search", "get_file", "add_tags", "my_access"} <= set(rights["tools"])
+    with_groups = Assistant(client, token(ada, "groups.read", expires_in_days=30))
+    rights = with_groups.call("my_access")
+    assert rights["tools"] == ["my_access"] and rights["sees"].startswith("everything")
+    assert rights["groups"] == [
+        {"group": "Chair", "role": "admin", "may_add_and_change": True}
+    ]
+    assert rights["expires"] is not None
 
     # Revoked: refused at once.
     listed = ada.get("/api/me/tokens").json()

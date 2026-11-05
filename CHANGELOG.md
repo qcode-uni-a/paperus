@@ -4,8 +4,9 @@
 
 - **AI assistants (MCP)**: paperus speaks MCP at `/mcp`, so Claude, Cursor
   and others can search the library, read passages and papers, list
-  collections and tags, and (if allowed) tag papers and add them by DOI,
-  always citing links into paperus. See [docs/ai.md](docs/ai.md).
+  collections and tags, download the files (PDFs), see what their token
+  allows, and (if allowed) tag papers and add them by DOI, always citing
+  links into paperus. See [docs/ai.md](docs/ai.md).
 - **Access tokens** (Settings): for AI assistants and scripts, with rights
   from presets or one by one, optionally only some owners, an expiry; shows
   the setup for Claude Code, Claude Desktop and Cursor.
