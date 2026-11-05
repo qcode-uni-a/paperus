@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **AI assistants (MCP)**: paperus speaks MCP at `/mcp`, so Claude, Cursor
+  and others can search the library, read passages and papers, list
+  collections and tags, and (if allowed) tag papers and add them by DOI,
+  always citing links into paperus. See [docs/ai.md](docs/ai.md).
+- **Access tokens** (Settings): for AI assistants and scripts, with rights
+  from presets or one by one, optionally only some owners, an expiry; shows
+  the setup for Claude Code, Claude Desktop and Cursor.
+
 ## 0.0.3 (2026-11-05)
 
 Backups, a first start in the browser, and merging duplicates.

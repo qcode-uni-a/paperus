@@ -17,6 +17,6 @@ export default defineConfig({
 	],
 	server: {
 		// `paperus serve` runs on port 8000 during development.
-		proxy: { '/api': 'http://127.0.0.1:8000' }
+		proxy: { '/api': 'http://127.0.0.1:8000', '/mcp': 'http://127.0.0.1:8000' }
 	}
 });

@@ -13,6 +13,17 @@ happens in the user's own AI client. paperus never calls an LLM vendor.
 
 ## MCP server
 
+**Built (first version):** `/mcp` in the server (Streamable HTTP, official
+Python SDK). Clients connect with a personal access token (Settings → Access
+tokens) as `Authorization: Bearer …`; the page shows the setup for Claude
+Code, Claude Desktop (via `mcp-remote`) and Cursor. Tools: `search`,
+`get_passage`, `get_document` (details or text by pages), `list_collections`,
+`list_documents`, `list_tags`; with write scopes `add_tags` and
+`add_document`. Not yet: OAuth (needed for claude.ai and ChatGPT
+connectors), notes and annotations, the AI inbox, citation export.
+
+The plan:
+
 - Transport: Streamable HTTP (remote connectors in Claude, ChatGPT, …); small
   stdio bridge/CLI for local clients.
 - Auth: OAuth 2.1 against paperus, delegating to university OIDC. Tokens act as

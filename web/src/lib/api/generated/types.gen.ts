@@ -265,6 +265,48 @@ export type CollectionOut = {
 };
 
 /**
+ * CreatedToken
+ */
+export type CreatedToken = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Hint
+     */
+    hint: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<Scope>;
+    /**
+     * Library Ids
+     */
+    library_ids: Array<string> | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string | null;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+    /**
+     * Token
+     */
+    token: string;
+};
+
+/**
  * DefaultLibrary
  */
 export type DefaultLibrary = {
@@ -921,6 +963,28 @@ export type NewItemUpload = {
 };
 
 /**
+ * NewToken
+ */
+export type NewToken = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<Scope>;
+    /**
+     * Library Ids
+     */
+    library_ids?: Array<string> | null;
+    /**
+     * Expires In Days
+     */
+    expires_in_days?: number | null;
+};
+
+/**
  * NewUser
  */
 export type NewUser = {
@@ -1075,6 +1139,11 @@ export type Role = 'reader' | 'member' | 'admin';
  * Scheme
  */
 export type Scheme = 'doi' | 'arxiv' | 'isbn' | 'pmid' | 'url';
+
+/**
+ * Scope
+ */
+export type Scope = 'search' | 'papers.read' | 'files.read' | 'papers.write' | 'tags.write' | 'collections.write' | 'groups.read';
 
 /**
  * SetupState
@@ -1255,6 +1324,44 @@ export type TagSource = 'manual' | 'automatic' | 'ai';
  * TextStatus
  */
 export type TextStatus = 'pending' | 'done' | 'no_text' | 'unsupported' | 'failed';
+
+/**
+ * TokenOut
+ */
+export type TokenOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Hint
+     */
+    hint: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<Scope>;
+    /**
+     * Library Ids
+     */
+    library_ids: Array<string> | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Expires At
+     */
+    expires_at: string | null;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+};
 
 /**
  * UserBrief
@@ -3384,3 +3491,76 @@ export type RestoreOnFirstStartResponses = {
 };
 
 export type RestoreOnFirstStartResponse = RestoreOnFirstStartResponses[keyof RestoreOnFirstStartResponses];
+
+export type ListTokensData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/tokens';
+};
+
+export type ListTokensResponses = {
+    /**
+     * Response List Tokens
+     *
+     * Successful Response
+     */
+    200: Array<TokenOut>;
+};
+
+export type ListTokensResponse = ListTokensResponses[keyof ListTokensResponses];
+
+export type CreateTokenData = {
+    body: NewToken;
+    path?: never;
+    query?: never;
+    url: '/api/me/tokens';
+};
+
+export type CreateTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTokenError = CreateTokenErrors[keyof CreateTokenErrors];
+
+export type CreateTokenResponses = {
+    /**
+     * Successful Response
+     */
+    201: CreatedToken;
+};
+
+export type CreateTokenResponse = CreateTokenResponses[keyof CreateTokenResponses];
+
+export type RevokeTokenData = {
+    body?: never;
+    path: {
+        /**
+         * Token Id
+         */
+        token_id: string;
+    };
+    query?: never;
+    url: '/api/me/tokens/{token_id}';
+};
+
+export type RevokeTokenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokeTokenError = RevokeTokenErrors[keyof RevokeTokenErrors];
+
+export type RevokeTokenResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RevokeTokenResponse = RevokeTokenResponses[keyof RevokeTokenResponses];

@@ -11,21 +11,13 @@ Smaller tasks noted along the way; larger plans live in the other documents.
 
 ## Ideas to decide later
 
+- **OAuth for MCP**, so claude.ai and ChatGPT can connect as custom
+  connectors (they do not take a token header); later delegating to the
+  university's login.
+
 Collected 2026-11-05, roughly in priority order; each needs a design first.
 
 
-- **Personal access tokens.** For scripts, the MCP server (an AI assistant
-  acting for its user) and the browser extension, instead of the login
-  session. In Settings: create a named token, shown once, with scoped
-  rights like Immich's API keys: pick permissions per kind and action
-  (e.g. `papers.read`, `papers.write`, `files.download`, `search`,
-  `tags.write`, `collections.write`, `groups.read`), with presets ("read
-  only", "AI assistant: search and read", "everything"), optionally only
-  for some owners (just me, or one group), and an expiry; see when each
-  was last used; revoke. Stored only as a hash like login sessions; a token acts
-  with its owner's permissions narrowed by its scopes (never more);
-  deactivating a user stops their tokens. Administrators see that tokens
-  exist, not their values.
 
 - **Feature parity with Zotero** as the general goal: citation styles and
   export, browser connector, notes and annotations, Word/LibreOffice

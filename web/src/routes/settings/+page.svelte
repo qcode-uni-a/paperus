@@ -6,6 +6,7 @@
 		loadOrganize,
 		writableLibraries
 	} from '#lib/organize.svelte.ts';
+	import AccessTokens from '#lib/AccessTokens.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
 
@@ -108,6 +109,11 @@
 			</label>
 		{/each}
 	</fieldset>
+</section>
+
+<section>
+	<h2>Access tokens</h2>
+	<AccessTokens />
 </section>
 
 <section>
