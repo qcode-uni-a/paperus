@@ -440,6 +440,12 @@ def test_zotero_rdf() -> None:
     )
     assert book.csl["collection-title"] == "Weather Studies"
     assert book.identifiers == [(Scheme.ISBN, "9783161484100")]
+    # A file on its own in Zotero becomes a document of its own.
+    note = papers["Note241029"]
+    assert note.csl["type"] == "document"
+    assert [f.path for f in note.files] == ["files/30/Note241029.pdf"]
+    assert (note.tags, note.collections) == (["handwritten"], [("Thesis",)])
+    assert len(export.papers) == 4
     assert zotero.read("<rdf:RDF").problems
 
 
@@ -453,6 +459,7 @@ def test_zotero_zip(
             "Exported Items/files/13/van Gogh - 2024 - Radar gaps.pdf": make_pdf(
                 [["Radar"]]
             ),
+            "Exported Items/files/30/Note241029.pdf": make_pdf([["Scribbles"]]),
         }
     )
     started = client.post(
@@ -464,7 +471,7 @@ def test_zotero_zip(
     done = ada.get(f"/api/imports/{started['id']}").json()
     assert (done["status"], done["format"]) == ("done", "zotero-rdf")
     report = done["report"]
-    assert (report["added"], report["files"], report["notes"]) == (3, 1, 2)
+    assert (report["added"], report["files"], report["notes"]) == (4, 2, 2)
     assert report["missing_files"] == []
     thesis = next(
         c for c in ada.get("/api/collections").json() if c["name"] == "Thesis"

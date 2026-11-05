@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Zotero import: files on their own in Zotero (no paper around them, e.g.
+  lecture notes, a thesis, scanned notes) come along as documents instead
+  of being left out. Found with a real export of 381 papers.
+- Import page: dropping the export there chooses it (it used to start a
+  normal upload); a dropped folder gets a note to zip it first.
+
 ## 0.0.9 (2026-11-05)
 
 Ready for the pilot's groups: sharing with a group in one step, finding the

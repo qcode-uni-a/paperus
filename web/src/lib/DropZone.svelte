@@ -13,8 +13,11 @@
 	// dragenter/dragleave fire for every element passed; count them.
 	let depth = $state(0);
 
+	// The import page takes a dropped export itself; it is no paper.
+	const elsewhere = $derived(page.route.id === '/import');
+
 	function hasFiles(event: DragEvent): boolean {
-		return event.dataTransfer?.types.includes('Files') ?? false;
+		return !elsewhere && (event.dataTransfer?.types.includes('Files') ?? false);
 	}
 </script>
 

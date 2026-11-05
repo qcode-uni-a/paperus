@@ -49,6 +49,28 @@
 	let imports = $state<ImportOut[]>([]);
 	let owner = $state('');
 	let file = $state<File | null>(null);
+	let over = $state(false);
+	let dropProblem = $state('');
+
+	/** A dropped export: one file (the export, or a zip of it with its
+	 * files). A folder cannot be read from a drop; it has to be zipped. */
+	function dropped(event: DragEvent) {
+		event.preventDefault();
+		over = false;
+		dropProblem = '';
+		const items = [...(event.dataTransfer?.items ?? [])];
+		if (items.some((item) => item.webkitGetAsEntry?.()?.isDirectory)) {
+			dropProblem =
+				'That is a folder. Zip it first (with the export file and its files folder inside), then drop or choose the zip.';
+			return;
+		}
+		const files = [...(event.dataTransfer?.files ?? [])];
+		if (files.length !== 1) {
+			dropProblem = 'Drop one file: the export, or a zip of it together with its files folder.';
+			return;
+		}
+		file = files[0];
+	}
 	let sending = $state<number | null>(null);
 	let error = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -139,19 +161,30 @@
 
 <div class="layout">
 	<form onsubmit={start}>
-		<label class="drop" class:chosen={file}>
+		<label
+			class="drop"
+			class:chosen={file}
+			class:over
+			ondragover={(event) => {
+				event.preventDefault();
+				over = true;
+			}}
+			ondragleave={() => (over = false)}
+			ondrop={dropped}
+		>
 			<input
 				type="file"
 				accept=".rdf,.bib,.bibtex,.ris,.json,.zip,application/zip"
 				onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
 			/>
-			<strong>{file ? file.name : 'Choose the export'}</strong>
+			<strong>{file ? file.name : 'Choose or drop the export'}</strong>
 			<span class="muted"
 				>{file
 					? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-					: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files'}</span
+					: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files. A folder: zip it first.'}</span
 			>
 		</label>
+		{#if dropProblem}<p class="error" role="alert">{dropProblem}</p>{/if}
 		{#if writableLibraries().length > 1}
 			<label class="owner"
 				>New papers belong to
@@ -270,6 +303,7 @@
 		cursor: pointer;
 	}
 	.drop:hover,
+	.drop.over,
 	.drop.chosen {
 		border-color: var(--royal);
 	}

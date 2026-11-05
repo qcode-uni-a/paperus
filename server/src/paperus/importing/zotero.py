@@ -6,6 +6,8 @@ details on a ``dcterms:isPartOf`` container, creators in sequences of
 ``foaf:Person``, tags as ``dc:subject``, child notes (``bib:Memo``) via
 ``dcterms:isReferencedBy``, files (``z:Attachment`` with ``z:path``) via
 ``link:link``, and collections (``z:Collection``) with ``dcterms:hasPart``.
+Files without a paper (a ``z:Attachment`` nothing links to) become papers
+of type "document".
 Only the structure is taken from Zotero's translator (AGPL), not its code.
 """
 
@@ -107,9 +109,15 @@ def read(text: str) -> Export:
     reader = _Reader(graph)
     export.collections = reader.collection_paths()
     member_of = reader.memberships()
+    attached = set(graph.objects(None, LINK.link))
     for subject in sorted(set(graph.subjects(Z.itemType, None)), key=str):
         kind = str(graph.value(subject, Z.itemType))
         if kind == "attachment":
+            # A file on its own in Zotero (no paper around it): a paper of
+            # its own, or it would be lost.
+            if subject not in attached and (alone := reader.standalone(subject)):
+                alone.collections = member_of.get(subject, [])
+                export.papers.append(alone)
             continue
         if kind == "note":
             text_ = reader.note_text(subject)
@@ -315,6 +323,28 @@ class _Reader:
                 if (file := self._file(attachment)) is not None
             ],
             source_key=key or csl["title"],
+        )
+
+    def standalone(self, subject: Node) -> ExportedPaper | None:
+        """A file without a paper (lecture notes, a thesis, scanned notes):
+        a document named like the file in Zotero; None for a bare link."""
+        file = self._file(subject)
+        if file is None:
+            return None
+        title = self.text(subject, DC.title) or file.path.rsplit("/", 1)[-1]
+        title = re.sub(r"\.(pdf|html?|epub|docx?|txt|md)$", "", title, flags=re.I)
+        return ExportedPaper(
+            csl={"type": "document", "title": title or "(untitled)"},
+            tags=self._tags(subject),
+            notes=[
+                text
+                for note in sorted(
+                    self.g.objects(subject, DCTERMS.isReferencedBy), key=str
+                )
+                if (text := self.note_text(note))
+            ],
+            files=[file],
+            source_key=str(subject),
         )
 
     def _creator_properties(self, subject: Node) -> list[tuple[URIRef, str]]:

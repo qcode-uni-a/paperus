@@ -136,10 +136,18 @@ Read twice.</dc:description>
         <z:itemType>note</z:itemType>
         <rdf:value>&lt;p&gt;Ideas for the thesis.&lt;/p&gt;</rdf:value>
     </bib:Memo>
+    <z:Attachment rdf:about="#item_30">
+        <z:itemType>attachment</z:itemType>
+        <dc:subject>handwritten</dc:subject>
+        <rdf:resource rdf:resource="files/30/Note241029.pdf"/>
+        <dc:title>Note241029.pdf</dc:title>
+        <link:type>application/pdf</link:type>
+    </z:Attachment>
     <z:Collection rdf:about="#collection_3">
         <dc:title>Thesis</dc:title>
         <dcterms:hasPart rdf:resource="#collection_4"/>
         <dcterms:hasPart rdf:resource="#item_20"/>
+        <dcterms:hasPart rdf:resource="#item_30"/>
         <dcterms:hasPart rdf:resource="urn:isbn:978-3-16-148410-0"/>
     </z:Collection>
     <z:Collection rdf:about="#collection_4">
