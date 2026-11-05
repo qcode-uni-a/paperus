@@ -19,6 +19,13 @@
   added beforehand), linked by username, or linked by hand with "Link my
   account" (also in one's own settings). Password login can be limited to
   administrators.
+- **Storage template**: a readable copy of the library on disk, each
+  paper's files in folders and under names from a template (e.g.
+  `{owner}/{first_author}_{journal}_{year}` gives
+  `Chair/Lovelace_NatPhys_1843.pdf`), with a live preview; updated
+  every night, as copies or hard links. paperus keeps storing files by
+  content; only files it wrote are ever changed or removed. Docker:
+  `COPY_LOCATION` in `.env`.
 - **Users settings**: groups (with a role) that new accounts join, and
   handing a departed person's papers, notes, collections and tags to a
   group or another person (tags merge by name).

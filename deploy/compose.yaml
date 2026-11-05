@@ -20,6 +20,7 @@ services:
     volumes:
       - ${UPLOAD_LOCATION}:/data/files
       - ${BACKUP_LOCATION:-./backups}:/data/backups
+      - ${COPY_LOCATION:-./library-copy}:/data/copy
     ports:
       - ${PAPERUS_PORT:-8000}:8000
     depends_on:
@@ -37,6 +38,7 @@ services:
     volumes:
       - ${UPLOAD_LOCATION}:/data/files
       - ${BACKUP_LOCATION:-./backups}:/data/backups
+      - ${COPY_LOCATION:-./library-copy}:/data/copy
     depends_on:
       server:
         condition: service_healthy

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from paperus import auth, integrity, metrics, oidc, system, usage
+from paperus import auth, integrity, metrics, oidc, readable, system, usage
 from paperus.api.auth import OIDC_CALLBACK, public_base
 from paperus.api.deps import DB, CurrentUser, request_token
 from paperus.jobs import (
@@ -15,6 +15,7 @@ from paperus.jobs import (
     queue_empty_trash,
     queue_integrity_check,
     queue_ml_configuration,
+    queue_readable_copy,
     queue_text_sweep,
 )
 from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
@@ -140,6 +141,11 @@ def set_config(
     system.apply(body, request.app.state.http)
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
+    copy = ("copy_enabled", "copy_template", "copy_links")
+    if body.copy_enabled and any(
+        getattr(body, name) != getattr(current, name) for name in copy
+    ):
+        queue_readable_copy(request.app.state.jobs)
     if model_changed or body.ml_threads != current.ml_threads:
         # The worker sends it at once (first in its queue), and every minute.
         queue_ml_configuration(request.app.state.jobs)
@@ -212,7 +218,8 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     (read files still pending), ``text-all`` (read every file again),
     ``trash`` (delete what is older than the trash days), ``integrity``
     (check stored contents), ``integrity-deep`` (also their SHA-256) or
-    ``integrity-clean`` (check and remove unused stored contents)."""
+    ``integrity-clean`` (check and remove unused stored contents), ``copy``
+    (update the readable copy) or ``copy-remove`` (delete it)."""
     jobs = request.app.state.jobs
     sweeps = {
         "embeddings": queue_embedding_sweep,
@@ -221,6 +228,8 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
         "integrity": queue_integrity_check,
         "integrity-deep": lambda app: queue_integrity_check(app, deep=True),
         "integrity-clean": lambda app: queue_integrity_check(app, remove_unused=True),
+        "copy": queue_readable_copy,
+        "copy-remove": lambda app: queue_readable_copy(app, remove=True),
     }
     if job == "text-all":
         count = reread_all(db)
@@ -309,3 +318,47 @@ def end_all_sessions(request: Request, db: DB, admin: Admin) -> dict[str, int]:
     ended = auth.end_all_sessions(db, request_token(request) or "")
     db.commit()
     return {"ended": ended}
+
+
+class ReadableCopy(BaseModel):
+    path: str
+    """The folder on the server (``PAPERUS_COPY_PATH``)."""
+    free_bytes: int | None
+    report: readable.CopyReport | None
+    """The last update."""
+    variables: dict[str, str]
+    links_possible: bool
+    """Hard links work only with files stored on a disk."""
+
+
+@router.get("/readable-copy")
+def readable_copy(request: Request, db: DB, admin: Admin) -> ReadableCopy:
+    settings = request.app.state.settings
+    root = settings.copy_path.resolve()
+    return ReadableCopy(
+        path=str(root),
+        free_bytes=readable.free_space(root),
+        report=readable.last_report(db),
+        variables=readable.VARIABLES,
+        links_possible=settings.storage_backend == "filesystem",
+    )
+
+
+class TemplateIn(BaseModel):
+    template: str = Field(max_length=300)
+
+
+class TemplatePreview(BaseModel):
+    paths: list[str]
+    """Where some of the library's files would go."""
+    error: str | None = None
+
+
+@router.post("/readable-copy/preview")
+def preview_template(body: TemplateIn, db: DB, admin: Admin) -> TemplatePreview:
+    try:
+        template = readable.check_template(body.template)
+    except readable.TemplateError as error:
+        return TemplatePreview(paths=[], error=str(error))
+    found = readable.wanted(db, template, limit=40)
+    return TemplatePreview(paths=[w.path for w in found[:8]])

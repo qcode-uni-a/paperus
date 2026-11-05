@@ -8,10 +8,11 @@ import uuid
 from typing import Literal, Self
 
 import httpx2
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import readable
 from paperus.config import Settings
 from paperus.metadata import user_agent
 from paperus.models import SystemSetting
@@ -87,12 +88,27 @@ class SystemConfig(BaseModel):
     an existing account of that name is linked on its first login."""
     oidc_create_accounts: bool = True
 
+    # Readable copy (storage template)
+    copy_enabled: bool = False
+    """Keep a readable copy of the library on disk (``paperus.readable``),
+    in the folder ``PAPERUS_COPY_PATH``."""
+    copy_template: str = Field(readable.DEFAULT_TEMPLATE, min_length=1, max_length=300)
+    """Where each file goes; ``/`` makes folders."""
+    copy_links: bool = False
+    """Hard links instead of copies: no extra space, but the copy's files are
+    the stored ones (editing one changes the library's)."""
+
     # Users
     new_user_groups: list[Joining] = Field(default_factory=list, max_length=20)
     """Groups new accounts join (made by an administrator or on a first
     OIDC login)."""
     """Create an account on someone's first OIDC login; off: only
     people an administrator added beforehand."""
+
+    @field_validator("copy_template")
+    @classmethod
+    def _known_variables(cls, template: str) -> str:
+        return readable.check_template(template)
 
     @model_validator(mode="after")
     def _login_possible(self) -> Self:

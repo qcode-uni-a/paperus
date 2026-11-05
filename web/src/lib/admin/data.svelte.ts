@@ -44,7 +44,12 @@ export const SETTINGS = [
 	],
 	['logging', 'Logging', 'How much the server and the worker write to their logs', false],
 	['server', 'Server', 'Public address, contact email for metadata services, upload limits', false],
-	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],
+	[
+		'storage-template',
+		'Storage template',
+		'A readable copy of the library on disk, in folders',
+		false
+	],
 	['trash', 'Trash', 'When the trash empties itself', false],
 	[
 		'users',

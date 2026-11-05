@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     storage_path: Path = Path("data/files")
     backup_path: Path = Path("data/backups")
     """Where backups go: best another disk or a network share."""
+    copy_path: Path = Path("data/library-copy")
+    """Where the readable copy goes, if switched on (Administration →
+    Settings → Storage template)."""
     s3_bucket: str | None = None
     s3_prefix: str = ""
     s3_endpoint_url: str | None = None

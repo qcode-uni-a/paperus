@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
 	import AuthSettings from '#lib/admin/AuthSettings.svelte';
+	import CopySettings from '#lib/admin/CopySettings.svelte';
 	import UsersSettings from '#lib/admin/UsersSettings.svelte';
 	import JobSettings from '#lib/admin/JobSettings.svelte';
 	import IntegritySettings from '#lib/admin/IntegritySettings.svelte';
@@ -65,6 +66,8 @@
 				<MlSettings />
 			{:else if slug === 'integrity'}
 				<IntegritySettings />
+			{:else if slug === 'storage-template'}
+				<CopySettings />
 			{:else if slug === 'users'}
 				<UsersSettings />
 			{:else if slug === 'authentication'}

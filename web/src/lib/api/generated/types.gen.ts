@@ -313,6 +313,36 @@ export type CollectionOut = {
 };
 
 /**
+ * CopyReport
+ */
+export type CopyReport = {
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Files
+     */
+    files?: number;
+    /**
+     * Bytes
+     */
+    bytes?: number;
+    /**
+     * Written
+     */
+    written?: number;
+    /**
+     * Removed
+     */
+    removed?: number;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
  * CreatedToken
  */
 export type CreatedToken = {
@@ -1656,6 +1686,31 @@ export type ProviderFound = {
 };
 
 /**
+ * ReadableCopy
+ */
+export type ReadableCopy = {
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Free Bytes
+     */
+    free_bytes: number | null;
+    report: CopyReport | null;
+    /**
+     * Variables
+     */
+    variables: {
+        [key: string]: string;
+    };
+    /**
+     * Links Possible
+     */
+    links_possible: boolean;
+};
+
+/**
  * Report
  */
 export type Report = {
@@ -1962,6 +2017,18 @@ export type SystemConfig = {
      */
     oidc_create_accounts?: boolean;
     /**
+     * Copy Enabled
+     */
+    copy_enabled?: boolean;
+    /**
+     * Copy Template
+     */
+    copy_template?: string;
+    /**
+     * Copy Links
+     */
+    copy_links?: boolean;
+    /**
      * New User Groups
      */
     new_user_groups?: Array<Joining>;
@@ -2075,6 +2142,30 @@ export type TagOut = {
  * Who put a tag on an item (Zotero keeps manual and automatic apart).
  */
 export type TagSource = 'manual' | 'automatic' | 'ai';
+
+/**
+ * TemplateIn
+ */
+export type TemplateIn = {
+    /**
+     * Template
+     */
+    template: string;
+};
+
+/**
+ * TemplatePreview
+ */
+export type TemplatePreview = {
+    /**
+     * Paths
+     */
+    paths: Array<string>;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
 
 /**
  * TextStatus
@@ -4254,6 +4345,47 @@ export type EndAllSessionsResponses = {
 };
 
 export type EndAllSessionsResponse = EndAllSessionsResponses[keyof EndAllSessionsResponses];
+
+export type ReadableCopyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/readable-copy';
+};
+
+export type ReadableCopyResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReadableCopy;
+};
+
+export type ReadableCopyResponse = ReadableCopyResponses[keyof ReadableCopyResponses];
+
+export type PreviewTemplateData = {
+    body: TemplateIn;
+    path?: never;
+    query?: never;
+    url: '/api/admin/readable-copy/preview';
+};
+
+export type PreviewTemplateErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewTemplateError = PreviewTemplateErrors[keyof PreviewTemplateErrors];
+
+export type PreviewTemplateResponses = {
+    /**
+     * Successful Response
+     */
+    200: TemplatePreview;
+};
+
+export type PreviewTemplateResponse = PreviewTemplateResponses[keyof PreviewTemplateResponses];
 
 export type ListTagsData = {
     body?: never;

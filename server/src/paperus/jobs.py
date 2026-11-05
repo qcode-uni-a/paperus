@@ -19,7 +19,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import integrity, trash
+from paperus import integrity, readable, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -365,6 +365,43 @@ def scheduled_integrity(timestamp: int) -> None:
     last = report.checked_at if report else None
     if due(last, config.integrity_schedule, config.night_hour, now, weekday=6):
         check_integrity_now()
+
+
+@tasks.task(name="readable_copy", queue="backup", queueing_lock="readable-copy")
+def update_readable_copy(remove: bool = False) -> None:
+    """Bring the readable copy in line with the library (or remove it)."""
+    context = _worker_context()
+    root = context.settings.copy_path
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if remove:
+            report = readable.remove_copy(db, root)
+        elif config.copy_enabled:
+            report = readable.sync(
+                db, context.blobs, root, config.copy_template, links=config.copy_links
+            )
+        else:
+            return
+    log.info("readable copy: %s", report.model_dump())
+
+
+@tasks.periodic(cron="50 * * * *")
+@tasks.task(name="nightly_readable_copy", queue="backup")
+def nightly_readable_copy(timestamp: int) -> None:
+    """At ten to the end of the night hour (after the trash and the integrity
+    check): the readable copy, if switched on."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+    hour = datetime.fromtimestamp(timestamp, UTC).hour
+    if config.copy_enabled and hour == config.night_hour:
+        update_readable_copy()
+
+
+def queue_readable_copy(app: App, *, remove: bool = False) -> None:
+    task = app.configure_task("paperus:readable_copy", queueing_lock="readable-copy")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(remove=remove)
 
 
 def queue_integrity_check(

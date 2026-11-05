@@ -2940,7 +2940,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy) or ``copy-remove`` (delete it).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -3127,6 +3127,68 @@
                   },
                   "type": "object",
                   "title": "Response End All Sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/readable-copy": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Readable Copy",
+        "operationId": "readable_copy",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadableCopy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/readable-copy/preview": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Preview Template",
+        "operationId": "preview_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatePreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -5359,6 +5421,51 @@
           "count"
         ],
         "title": "CollectionOut"
+      },
+      "CopyReport": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files",
+            "default": 0
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes",
+            "default": 0
+          },
+          "written": {
+            "type": "integer",
+            "title": "Written",
+            "default": 0
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed",
+            "default": 0
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at"
+        ],
+        "title": "CopyReport"
       },
       "CreatedToken": {
         "properties": {
@@ -7757,6 +7864,55 @@
         ],
         "title": "ProviderFound"
       },
+      "ReadableCopy": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CopyReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Variables"
+          },
+          "links_possible": {
+            "type": "boolean",
+            "title": "Links Possible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "free_bytes",
+          "report",
+          "variables",
+          "links_possible"
+        ],
+        "title": "ReadableCopy"
+      },
       "Report": {
         "properties": {
           "checked_at": {
@@ -8287,6 +8443,23 @@
             "title": "Oidc Create Accounts",
             "default": true
           },
+          "copy_enabled": {
+            "type": "boolean",
+            "title": "Copy Enabled",
+            "default": false
+          },
+          "copy_template": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Copy Template",
+            "default": "{owner}/{first_author}_{journal}_{year}"
+          },
+          "copy_links": {
+            "type": "boolean",
+            "title": "Copy Links",
+            "default": false
+          },
           "new_user_groups": {
             "items": {
               "$ref": "#/components/schemas/Joining"
@@ -8549,6 +8722,47 @@
         ],
         "title": "TagSource",
         "description": "Who put a tag on an item (Zotero keeps manual and automatic apart)."
+      },
+      "TemplateIn": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template"
+        ],
+        "title": "TemplateIn"
+      },
+      "TemplatePreview": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paths"
+        ],
+        "title": "TemplatePreview"
       },
       "TextStatus": {
         "type": "string",
