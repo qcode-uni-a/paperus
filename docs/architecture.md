@@ -100,21 +100,62 @@ Item: the work; notes, tags, collections, citation metadata
   ambiguous both ways (two people, one name; one person, several spellings).
 - **Tag, collection**: tags are labels (each link records its source:
   manual, automatic from metadata, or AI); collections nest and an item can
-  be in several. **Both have an owner: a user (private) or a group
-  (shared).** Names are unique per owner, so a private "to read" and a
-  group's "to read" are different tags. People see their own tags and
-  collections and those of their groups; filters, counts and the sidebar
-  show only those. A private tag on a group's item is visible only to its
-  owner (personal reading notes on shared papers). Collections nest only
-  within one owner. Who in a group may create, rename or delete shared ones
-  follows the group's roles. (Built so far without owners: everything
-  belongs to the one library until groups exist.)
-- **Group, membership, role.**
+  be in several. **Both belong to a library: a person's (private) or a
+  group's (shared).** Names are unique per library, so a private "to read"
+  and a group's "to read" are different tags. People see the tags and
+  collections of the libraries they can read; filters and counts show only
+  those. A private tag or collection may hold items of a group's library
+  (personal reading lists of shared papers); it stays visible only to its
+  owner. Collections nest only within one library. Who may create, rename
+  or delete a group's tags and collections follows the roles below.
+- **Library**: where items live. Every person has one (private), every
+  group has one. An item belongs to exactly one library; see "Groups and
+  libraries" below.
+- **Group, membership, role**: see below.
 - **Provenance**: who or what created each object (user, AI via client X,
   import, sync), for labels, the AI inbox and the audit log.
 
 Every chunk and note carries owner and visibility, so permission filters run
 inside the search query itself.
+
+### Groups and libraries
+
+- **Libraries.** Each person has a private library; each group has one.
+  Every item, tag and collection belongs to exactly one library (like
+  Zotero). The same paper in two libraries is two items, each with its own
+  metadata edits, tags and notes; the bytes, text, chunks and embeddings
+  are stored once, since they are shared by content hash. Identifiers are
+  unique per library, so adding a known DOI finds the item in that library.
+  Moving or copying items between libraries comes later.
+- **Nested groups.** A group can sit inside another (faculty → chair →
+  project), like GitLab. Membership is inherited downwards: members of a
+  group are members of every group inside it with the same role; a
+  subgroup can give someone a higher role, never a lower one. Nothing is
+  inherited upwards: members of a project do not see the chair's library
+  unless they are members there too.
+- **Roles** in a group:
+  - *Reader*: reads and searches the group's library; keeps private tags,
+    collections and notes on its items.
+  - *Member*: also adds, edits and deletes items, and the group's tags and
+    collections.
+  - *Admin*: also manages the group's members, settings and subgroups.
+- **Who creates groups.** Site administrators create top-level groups and
+  name their first admin. Group admins create subgroups and add members.
+  When adding people, the website warns that the group's licences must
+  allow sharing its PDFs (see [operations](operations.md)).
+- **Private means private.** A person's library is visible only to that
+  person and their AI assistant; not to group admins and not to site
+  administrators, who manage users and groups but see no library by virtue
+  of being administrators.
+- **Visibility in one query.** The libraries a person can read (their own,
+  their groups' and those groups' subgroups) are computed once per request;
+  every list, search and file download filters by library ID, so permission
+  checks run inside the SQL (and inside the search query).
+- **On the website**: one list of everything a person can read, with a
+  small label for the library of each item and a filter for one library.
+  New items go into a chosen default library; the Add dialog and uploads
+  let people pick another. Change numbers, trash and duplicate detection
+  work per library.
 
 ### Changes, sync and trash
 
