@@ -453,7 +453,12 @@ def test_zotero_rdf() -> None:
     assert note.csl["type"] == "document"
     assert [f.path for f in note.files] == ["files/30/Note241029.pdf"]
     assert (note.tags, note.collections) == (["handwritten"], [("Thesis",)])
-    assert len(export.papers) == 4
+    # Downloaded from arXiv: Zotero kept the address, so the ID is known.
+    arxiv_file = papers["2601"]
+    assert arxiv_file.identifiers == [(Scheme.ARXIV, "2601.01704")]
+    assert arxiv_file.csl["type"] == "article"
+    assert arxiv_file.csl["URL"] == "https://arxiv.org/pdf/2601.01704v1"
+    assert len(export.papers) == 5
     assert zotero.read("<rdf:RDF").problems
 
 
@@ -468,6 +473,7 @@ def test_zotero_zip(
                 [["Radar"]]
             ),
             "Exported Items/files/30/Note241029.pdf": make_pdf([["Scribbles"]]),
+            "Exported Items/files/31/2601.pdf": make_pdf([["Floquet"]]),
         }
     )
     started = client.post(
@@ -479,7 +485,7 @@ def test_zotero_zip(
     done = ada.get(f"/api/imports/{started['id']}").json()
     assert (done["status"], done["format"]) == ("done", "zotero-rdf")
     report = done["report"]
-    assert (report["added"], report["files"], report["notes"]) == (4, 2, 2)
+    assert (report["added"], report["files"], report["notes"]) == (5, 3, 2)
     assert report["missing_files"] == []
     thesis = next(
         c for c in ada.get("/api/collections").json() if c["name"] == "Thesis"

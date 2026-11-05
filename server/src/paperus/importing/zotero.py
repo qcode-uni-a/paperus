@@ -335,8 +335,18 @@ class _Reader:
             return None
         title = self.text(subject, DC.title) or file.path.rsplit("/", 1)[-1]
         title = re.sub(r"\.(pdf|html?|epub|docx?|txt|md)$", "", title, flags=re.I)
+        # Downloaded from arXiv (Zotero keeps the address): its arXiv ID, so
+        # its details can be looked up and the PDF fetched again.
+        url = self._url(subject)
+        arxiv = _arxiv_from(url)
+        found = identifiers_of(arxiv=arxiv) if arxiv else []
+        csl: dict[str, Any] = {"type": "article" if found else "document"}
+        csl["title"] = title or "(untitled)"
+        if url:
+            csl["URL"] = url
         return ExportedPaper(
-            csl={"type": "document", "title": title or "(untitled)"},
+            csl=csl,
+            identifiers=found,
             tags=self._tags(subject),
             notes=[
                 text

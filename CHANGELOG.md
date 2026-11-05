@@ -11,6 +11,8 @@
   worker down (453 files re-read in 95 seconds, 1.5 GB at most).
 - Zotero import: saved web pages (snapshots) are left out next to a PDF;
   alone, they stay.
+- Zotero import: a file on its own that was downloaded from arXiv gets its
+  arXiv ID from the address Zotero kept (e.g. "2601.pdf" is 2601.01704).
 - **Duplicates**: "Review one by one" shows each pair side by side (first
   page, details with differences marked) and what merging does, with
   keyboard shortcuts; clearer cards in the list ("Keep this one" ← "Merged

@@ -143,6 +143,17 @@ Read twice.</dc:description>
         <dc:title>Note241029.pdf</dc:title>
         <link:type>application/pdf</link:type>
     </z:Attachment>
+    <z:Attachment rdf:about="#item_31">
+        <z:itemType>attachment</z:itemType>
+        <rdf:resource rdf:resource="files/31/2601.pdf"/>
+        <dc:title>2601.pdf</dc:title>
+        <dc:identifier>
+            <dcterms:URI>
+               <rdf:value>https://arxiv.org/pdf/2601.01704v1</rdf:value>
+            </dcterms:URI>
+        </dc:identifier>
+        <link:type>application/pdf</link:type>
+    </z:Attachment>
     <z:Collection rdf:about="#collection_3">
         <dc:title>Thesis</dc:title>
         <dcterms:hasPart rdf:resource="#collection_4"/>
