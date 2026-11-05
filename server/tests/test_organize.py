@@ -101,6 +101,12 @@ def test_nested_collections(logged_in: TestClient) -> None:
     logged_in.post(f"/api/collections/{thesis}/items", json={"item_ids": [b["id"]]})
     listed = {c["name"]: c for c in logged_in.get("/api/collections").json()}
     assert listed["Thesis"]["count"] == 3
+    assert [p["title"] for p in listed["Thesis"]["recent"]].count("B") == 1
+    # B is directly in Thesis and in Chapter 2; the list shows it once.
+    assert titles(logged_in, collection=thesis) == ["A", "B", "C"]
+    response = logged_in.get("/api/items", params={"collection": thesis})
+    assert response.headers["X-Total-Count"] == "3"
+    assert titles(logged_in, collection=thesis, nested=False) == ["A", "B"]
 
     logged_in.delete(f"/api/collections/{chapter}/items/{c['id']}")
     assert titles(logged_in, collection=chapter) == ["B"]
