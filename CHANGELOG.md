@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.0.2 (2026-11-05)
+
+Groups: private papers, shared ones, and who may do what.
 
 - **Groups and owners**: every paper, tag and collection belongs to a person
   or a group. Groups nest (faculty, chair, project); members of a group are
@@ -16,9 +18,27 @@
   may do what: [docs/permissions.md](docs/permissions.md).
 - **Settings**: owner of new papers, tags and collections, theme, password.
 - **Recent**: papers by latest activity (opened by me, or added or changed).
+- **Users** in the browser (Administration → Users): create, new password,
+  administrator rights, deactivate. People can leave groups; groups can
+  move inside other groups.
 - A one-time hint after the first added paper explains owners.
 - Tag colours (18), descriptions and usage; Manage pages for collections
   (a tree with drag and drop) and tags.
+
+### Upgrading from 0.0.1
+
+The database migrates on start (migrations 0006–0011, nothing is lost):
+everything added so far belongs to a new group, "Shared library", with
+every existing user as a member (administrators as its admins). Give
+papers to other groups or back to their people from there.
+
+### Known limitations
+
+- Two people adding the same paper independently get two items; merging
+  duplicates comes later.
+- A group's collection cannot yet appear inside a private collection.
+- No MCP server for AI assistants, no BibTeX export, no backups command yet.
+- The Python packages and the TypeScript client are not published yet.
 
 ## 0.0.1 (2026-11-05)
 

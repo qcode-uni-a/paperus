@@ -1,6 +1,6 @@
 [project]
 name = "paperus-ml"
-version = "0.0.1"
+version = "0.0.2"
 description = "Machine learning service of paperus: text embeddings (later reranking, OCR)"
 readme = "README.md"
 license = "Apache-2.0"

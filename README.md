@@ -9,8 +9,8 @@
 with group sharing, search by meaning and integration with whatever AI
 assistant you already use.
 
-> Status: early version (0.0.1) for a pilot in one group. It works, but every
-> user sees every item and the data format may still change. See the
+> Status: early version (0.0.2) for a pilot. It works, with private papers
+> and nested groups, but the data format may still change. See the
 > [changelog](CHANGELOG.md) for what is there and what is missing.
 
 ## The idea
