@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 import httpx2
 
+from paperus import metrics
 from paperus.config import Settings
 
 log = logging.getLogger(__name__)
@@ -72,6 +73,25 @@ class MLClient:
         self, texts: list[str], *, model: str, kind: Kind, timeout: float | None = None
     ) -> list[list[float]]:
         """One vector per text; raises MLUnavailable if no service answers."""
+        started = time.perf_counter()
+        try:
+            vectors = self._embed(texts, model=model, kind=kind, timeout=timeout)
+        except MLLoading:
+            metrics.ML_CALLS.labels("embed", "loading").inc()
+            raise
+        except MLRejected:
+            metrics.ML_CALLS.labels("embed", "rejected").inc()
+            raise
+        except MLUnavailable:
+            metrics.ML_CALLS.labels("embed", "unavailable").inc()
+            raise
+        metrics.ML_CALLS.labels("embed", "ok").inc()
+        metrics.ML_SECONDS.labels("embed").observe(time.perf_counter() - started)
+        return vectors
+
+    def _embed(
+        self, texts: list[str], *, model: str, kind: Kind, timeout: float | None
+    ) -> list[list[float]]:
         errors = []
         loading = False
         for url in self._ordered_urls():

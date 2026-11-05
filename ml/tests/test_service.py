@@ -220,3 +220,24 @@ def test_new_threads_reload_when_used(tiny: Encoder) -> None:
     # None: back to the service's own setting.
     manager.configure(threads=None, keep=[])
     assert manager.threads == 3
+
+
+def test_metrics(client: TestClient) -> None:
+    from prometheus_client import REGISTRY, CollectorRegistry, generate_latest
+
+    from paperus_ml.metrics import ModelsCollector
+
+    def count() -> float:
+        labels = {"model": "bge-m3", "kind": "passage", "outcome": "ok"}
+        return REGISTRY.get_sample_value("paperus_ml_requests_total", labels) or 0
+
+    before = count()
+    client.post("/embed", json={"model": "bge-m3", "texts": ["rain", "snow"]})
+    assert count() == before + 1
+    registry = CollectorRegistry()
+    registry.register(
+        ModelsCollector(lambda: ["bge-m3"], lambda: ["arctic-embed-m-v2"])
+    )
+    text = generate_latest(registry).decode()
+    assert 'paperus_ml_model_loaded{model="bge-m3"} 1.0' in text
+    assert 'paperus_ml_model_loaded{model="arctic-embed-m-v2"} 0.5' in text

@@ -1,6 +1,7 @@
 """Search: by keyword, by meaning, or both (hybrid, the default)."""
 
 import logging
+import time
 import uuid
 from typing import Annotated, Literal
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from paperus import metrics
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
@@ -177,6 +179,7 @@ def run_search(
     (hybrid falls back to keywords without the ML service). ``per_item``:
     at most that many per paper or note (more candidates are looked at, so
     more papers fill the list); ``item_id``: within that paper only."""
+    started = time.perf_counter()
     model = load_config(db, settings).embedding_model
     vector = None
     if mode != "keyword":
@@ -226,6 +229,8 @@ def run_search(
         )
         for row in rows
     ]
+    metrics.SEARCHES.labels(used).inc()
+    metrics.SEARCH_SECONDS.observe(time.perf_counter() - started)
     return used, passages
 
 

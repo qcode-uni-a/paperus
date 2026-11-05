@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # How long a request waits for a model that is still loading before the
     # service answers 503 "loading" (the model keeps loading meanwhile).
     load_wait: float = 2.0
+    # Prometheus metrics on this port (inside the container network); off
+    # unless set, e.g. 9465.
+    metrics_port: int | None = None
 
 
 def default_cache_path() -> Path:

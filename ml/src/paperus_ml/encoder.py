@@ -1,6 +1,7 @@
 """Running an embedding model with ONNX Runtime."""
 
 import threading
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import numpy.typing as npt
 import onnxruntime
 from tokenizers import Encoding, Tokenizer
 
+from paperus_ml import metrics
 from paperus_ml.models import Kind, ModelSpec
 
 Vectors = npt.NDArray[np.float32]
@@ -106,5 +108,9 @@ class Encoder:
         if "token_type_ids" in self.input_names:
             feed["token_type_ids"] = np.zeros_like(ids)
         with self.running:
+            started = time.perf_counter()
             hidden = self.session.run(None, feed)[0]
+            metrics.BATCH_SECONDS.labels(self.spec.name).observe(
+                time.perf_counter() - started
+            )
         return pool(np.asarray(hidden, dtype=np.float32), mask, self.spec.pooling)

@@ -12,6 +12,11 @@
   - Integrity checks: whether every file's stored contents are there
     (every Sunday night, or now), deeply also whether they are unchanged,
     and removing stored contents nothing uses any more.
+- **Prometheus metrics** for monitoring, on a port of their own (off by
+  default): requests, searches, calls to the ML service, and the library's
+  figures (papers, files waiting to be read, storage, background jobs, the
+  last backup); the ML service reports its requests, batch times and
+  loaded models. See docs/operations.md.
 - **Empty trash** on the trash page: deletes for good what one may change.
 - The search bar is hidden in the administration.
 

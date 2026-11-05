@@ -4,9 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import func, select, text
 
-from paperus import integrity, system
+from paperus import integrity, metrics, system
 from paperus.api.deps import DB, CurrentUser
 from paperus.jobs import (
     queue_embedding_sweep,
@@ -16,7 +15,7 @@ from paperus.jobs import (
     queue_text_sweep,
 )
 from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
-from paperus.models import Chunk, Embedding, File, FileChunk, Item, TextStatus, User
+from paperus.models import User
 from paperus.processing import reread_all
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -189,51 +188,15 @@ def delete_ml_model(name: str, request: Request, db: DB, admin: Admin) -> None:
 
 @router.get("/stats")
 def stats(request: Request, db: DB, admin: Admin) -> Stats:
-    model = system.load_config(db, request.app.state.settings).embedding_model
-    # Passages to embed: in files not in the trash, outside reference lists.
-    visible_chunks = (
-        select(FileChunk.chunk_sha256)
-        .join(File, File.id == FileChunk.file_id)
-        .where(File.deleted_at.is_(None), FileChunk.in_references.is_(False))
-    )
-    jobs: dict[str, dict[str, int]] = {}
-    for queue, status, count in db.execute(
-        text(
-            "SELECT queue_name, status::text, count(*) FROM procrastinate_jobs"
-            " GROUP BY queue_name, status"
-        )
-    ):
-        jobs.setdefault(queue, {})[status] = count
-    count = func.count()
+    figures = metrics.library_figures(db, request.app.state.settings)
     return Stats(
-        items=db.scalar(
-            select(count).select_from(Item).where(Item.deleted_at.is_(None))
-        )
-        or 0,
-        files=db.scalar(
-            select(count).select_from(File).where(File.deleted_at.is_(None))
-        )
-        or 0,
-        files_pending=db.scalar(
-            select(count)
-            .select_from(File)
-            .where(File.text_status == TextStatus.PENDING, File.deleted_at.is_(None))
-        )
-        or 0,
-        chunks=db.scalar(
-            select(func.count(func.distinct(Chunk.sha256))).where(
-                Chunk.sha256.in_(visible_chunks)
-            )
-        )
-        or 0,
-        embedded=db.scalar(
-            select(count)
-            .select_from(Embedding)
-            .where(Embedding.model == model, Embedding.chunk_sha256.in_(visible_chunks))
-        )
-        or 0,
-        embedding_model=model,
-        jobs=jobs,
+        items=figures.items,
+        files=figures.files,
+        files_pending=figures.files_pending,
+        chunks=figures.chunks,
+        embedded=figures.embedded,
+        embedding_model=figures.embedding_model,
+        jobs=figures.jobs,
     )
 
 

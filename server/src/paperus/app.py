@@ -1,6 +1,7 @@
 """FastAPI application."""
 
 import logging
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
 
-from paperus import system, tokens
+from paperus import metrics, system, tokens
 from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
@@ -65,6 +66,8 @@ def create_app(
             logging.getLogger(__name__).warning(
                 "could not apply the saved settings", exc_info=True
             )
+        if settings.metrics_port:
+            metrics.serve(settings.metrics_port, app.state.sessionmaker, settings)
         with jobs.open():
             # The ML service starts from its own defaults; send ours.
             try:
@@ -132,6 +135,25 @@ def create_app(
         ),
     )
     app.router.routes.extend(mcp_app.routes)
+
+    @app.middleware("http")
+    async def count_requests(request: Request, call_next: Any) -> Response:  # noqa: ANN401
+        """Requests by route (the pattern, not the address: few labels)."""
+        started = time.perf_counter()
+        response: Response = await call_next(request)
+        route = request.scope.get("route")
+        path = getattr(route, "path", None)
+        if path is None:
+            path = "/mcp" if request.url.path == "/mcp" else "other"
+        elif not path.startswith(("/api", "/mcp")):
+            path = "website"
+        metrics.HTTP_REQUESTS.labels(
+            request.method, path, str(response.status_code)
+        ).inc()
+        metrics.HTTP_SECONDS.labels(request.method, path).observe(
+            time.perf_counter() - started
+        )
+        return response
 
     @app.middleware("http")
     async def mcp_needs_a_token(request: Request, call_next: Any) -> Response:  # noqa: ANN401

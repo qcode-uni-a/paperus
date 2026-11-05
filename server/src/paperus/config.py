@@ -46,5 +46,8 @@ class Settings(BaseSettings):
     # Temporary files for the s3 backend (uploads, text extraction).
     temp_path: Path | None = None
     max_upload_bytes: int = 512 * 1024 * 1024
+    # Prometheus metrics on this port (in the container's network, not
+    # through the public address); off unless set, e.g. 9464.
+    metrics_port: int | None = None
     # Imports from other reference managers, files included.
     max_import_bytes: int = 20 * 1024 * 1024 * 1024

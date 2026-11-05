@@ -24,6 +24,7 @@ dependencies = [
     "mcp>=2.3.0,<3",
     "pgvector>=0.5.1",
     "procrastinate>=3.10,<3.11",  # schema frozen in src/paperus/migrations/
+    "prometheus-client>=0.26.0",
     "psycopg[binary]>=3.3.8",
     "pybtex>=0.26.1",
     "pydantic-settings>=2.16.2",

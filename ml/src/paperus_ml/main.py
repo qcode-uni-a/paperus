@@ -18,6 +18,7 @@ from typing import Annotated
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from paperus_ml import metrics
 from paperus_ml.config import Settings
 from paperus_ml.encoder import Encoder
 from paperus_ml.manager import ModelFailed, ModelLoading, ModelManager, UnknownModel
@@ -103,6 +104,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        if settings.metrics_port:
+            metrics.serve(
+                settings.metrics_port,
+                metrics.ModelsCollector(models.loaded, models.loading),
+            )
         await asyncio.to_thread(models.preload)
 
         async def unload_loop() -> None:
@@ -227,7 +233,14 @@ def create_app(
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:
         """Runs in FastAPI's thread pool; ONNX Runtime releases the GIL."""
-        vectors = _model(body.model).embed(body.texts, body.kind)
+        try:
+            vectors = _model(body.model).embed(body.texts, body.kind)
+        except HTTPException as error:
+            outcome = "loading" if error.status_code == 503 else "error"
+            metrics.REQUESTS.labels(body.model, body.kind, outcome).inc()
+            raise
+        metrics.REQUESTS.labels(body.model, body.kind, "ok").inc()
+        metrics.TEXTS.labels(body.model, body.kind).inc(len(body.texts))
         return EmbedResponse(
             model=body.model,
             dimensions=vectors.shape[1],

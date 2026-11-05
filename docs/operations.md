@@ -111,6 +111,44 @@ five minutes, so a restarted ML service gets them back):
   simultaneous requests (several uploads, a search) take turns batch by
   batch, so a search waits for one batch at most.
 
+## Monitoring (Prometheus)
+
+The server and the ML service can serve Prometheus metrics, each on a port
+of its own, so they are not reachable through the public address: set
+`PAPERUS_METRICS_PORT` (e.g. 9464) for the server and
+`PAPERUS_ML_METRICS_PORT` (e.g. 9465) for the ML service (both are
+commented out in `compose.yaml`). Prometheus scrapes them inside the
+Docker network, e.g. with a `prometheus` service in the same compose
+project:
+
+```yaml
+scrape_configs:
+  - job_name: paperus
+    static_configs:
+      - targets: ["server:9464", "ml:9465"]
+```
+
+Server (`paperus_…`):
+
+- `http_requests_total`, `http_request_duration_seconds` by method, route
+  pattern and status;
+- `searches_total` by mode, `search_duration_seconds`;
+- `ml_calls_total` by outcome (ok, loading, rejected, unavailable),
+  `ml_call_duration_seconds`;
+- the library, read at each scrape: `items`, `items_in_trash`, `files`,
+  `files_pending`, `notes`, `users`, `groups`, `storage_bytes`, `chunks`,
+  `embedded_chunks{model}`, `imports_running`, `jobs{queue,status}`,
+  `last_backup_timestamp_seconds`;
+- and the usual process metrics (memory, CPU, open files).
+
+ML service (`paperus_ml_…`): `requests_total{model,kind,outcome}`,
+`texts_total`, `batch_duration_seconds{model}`, `model_loaded{model}`
+(1 loaded, 0.5 loading).
+
+Worth an alert: `files_pending` or `jobs{status="failed"}` growing,
+`ml_calls_total{outcome="unavailable"}` rising, the last backup older than
+its schedule.
+
 ## Backups
 
 Administration → Backups writes backups now or on a schedule (daily or

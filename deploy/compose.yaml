@@ -10,6 +10,8 @@ x-paperus-env: &paperus-env
   PAPERUS_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
   PAPERUS_COOKIE_SECURE: ${COOKIE_SECURE:-true}
   PAPERUS_TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7}
+  # Prometheus metrics (see docs/operations.md, Monitoring):
+  # PAPERUS_METRICS_PORT: 9464
 
 services:
   server:
@@ -44,6 +46,7 @@ services:
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}
     environment:
       PAPERUS_ML_TOKEN: ${ML_TOKEN}
+      # PAPERUS_ML_METRICS_PORT: 9465
     volumes:
       - ${MODEL_CACHE_LOCATION}:/cache
     restart: unless-stopped
