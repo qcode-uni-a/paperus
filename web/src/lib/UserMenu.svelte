@@ -45,7 +45,7 @@
 	</div>
 	{#if writableLibraries().length > 1}
 		<label class="default">
-			New items go to
+			New papers belong to
 			<select
 				value={defaultLibrary()?.id}
 				onchange={(event) => chooseDefault(event.currentTarget.value)}

@@ -72,14 +72,8 @@
 		return texts.find((f) => f.role === 'main') ?? texts[0] ?? null;
 	});
 	const viewed = $derived(pdfFile ?? textFile);
-	// Readers of a group's library see the item but change nothing of it.
-	const writable = $derived(item?.library_ids.some((id) => libraryById(id)?.writable) ?? false);
-	// Trash is for everyone: only with the right to change all its libraries
-	// (otherwise remove it from one under Libraries).
-	const canTrash = $derived(
-		(item?.library_ids.every((id) => libraryById(id)?.writable) ?? false) &&
-			item?.library_ids.length === 1
-	);
+	// Readers of a group see its papers but change nothing of them.
+	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
 
 	function isText(mediaType: string, filename: string): boolean {
 		return (

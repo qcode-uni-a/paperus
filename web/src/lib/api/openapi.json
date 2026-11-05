@@ -137,7 +137,7 @@
           "items"
         ],
         "summary": "Add Item",
-        "description": "A new item; if one of its identifiers is known in a library the person\ncan read, the existing item (put into this library too, 200).",
+        "description": "A new item; if one of its identifiers is known among the items the\nperson can see, the existing item (200).",
         "operationId": "add_item",
         "requestBody": {
           "required": true,
@@ -522,7 +522,7 @@
           "items"
         ],
         "summary": "Trash Item",
-        "description": "Move to the trash, for everyone; restorable with ``POST \u2026/restore``.\nOnly for people who may change every library the item is in; others\ntake it out of their library (``DELETE \u2026/libraries/{id}``).",
+        "description": "Move to the trash; restorable with ``POST \u2026/restore``.",
         "operationId": "trash_item",
         "parameters": [
           {
@@ -594,14 +594,14 @@
         }
       }
     },
-    "/api/items/{item_id}/libraries/{library_id}": {
+    "/api/items/{item_id}/owner": {
       "put": {
         "tags": [
           "items"
         ],
-        "summary": "Add Item To Library",
-        "description": "Put the item into another library the person may change (share it).",
-        "operationId": "add_item_to_library",
+        "summary": "Set Owner",
+        "description": "Give the item to another owner the person may add to: share it with a\ngroup, or take a group's paper for oneself (members may delete it\nanyway). Tags and collections of the group that gave it up come off.",
+        "operationId": "set_owner",
         "parameters": [
           {
             "name": "item_id",
@@ -612,70 +612,18 @@
               "format": "uuid",
               "title": "Item Id"
             }
-          },
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Library Id"
-            }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ItemDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Owner"
               }
             }
           }
-        }
-      },
-      "delete": {
-        "tags": [
-          "items"
-        ],
-        "summary": "Remove Item From Library",
-        "description": "Take the item out of one library, with that library's tags and\ncollections on it; out of its last library, it goes to the trash.",
-        "operationId": "remove_item_from_library",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Library Id"
-            }
-          }
-        ],
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -792,7 +740,7 @@
           "files"
         ],
         "summary": "Upload New Item",
-        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in a library the person can read makes no new item: the answer\n(200, ``existing``) names the item that has it, now also in this\nlibrary. ``library_id``: the person's default library if not given.",
+        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in a library the person can read makes no new item: the answer\n(200, ``existing``) names the item that has it. ``library_id`` (the\nowner): the person's default if not given.",
         "operationId": "upload_new_item",
         "requestBody": {
           "content": {
@@ -2496,7 +2444,7 @@
         },
         "type": "object",
         "title": "CollectionChange",
-        "description": "Only the fields given are changed; ``parent_id: null`` moves to the top.\n\n``library_id`` gives the collection, with the collections inside it, to\nanother library (at its top level unless ``parent_id`` names a collection\nthere). Papers a group's collection may not hold leave it."
+        "description": "Only the fields given are changed; ``parent_id: null`` moves to the top.\n\n``library_id`` gives the collection, with the collections inside it, to\nanother library the person may change, e.g. from their own to a group\nor back (members may delete a group's collections anyway). It lands at\nthe top level there unless ``parent_id`` names a collection there.\nPapers a group's collection may not hold leave it, unless\n``add_papers`` puts them into the group."
       },
       "CollectionChanged": {
         "properties": {
@@ -3019,13 +2967,10 @@
             "format": "uuid",
             "title": "Id"
           },
-          "library_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Library Ids"
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "type": {
             "type": "string",
@@ -3144,7 +3089,7 @@
         "type": "object",
         "required": [
           "id",
-          "library_ids",
+          "library_id",
           "type",
           "title",
           "authors",
@@ -3259,13 +3204,10 @@
             "format": "uuid",
             "title": "Id"
           },
-          "library_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Library Ids"
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "type": {
             "type": "string",
@@ -3355,7 +3297,7 @@
         "type": "object",
         "required": [
           "id",
-          "library_ids",
+          "library_id",
           "type",
           "title",
           "authors",
@@ -3433,21 +3375,12 @@
           },
           "file": {
             "$ref": "#/components/schemas/FileOut"
-          },
-          "library_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "title": "Library Ids"
           }
         },
         "type": "object",
         "required": [
           "item_id",
-          "file",
-          "library_ids"
+          "file"
         ],
         "title": "KnownFile"
       },
@@ -3765,6 +3698,20 @@
           "file"
         ],
         "title": "NewItemUpload"
+      },
+      "Owner": {
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id"
+        ],
+        "title": "Owner"
       },
       "Passage": {
         "properties": {

@@ -2,13 +2,13 @@
 	import { changeCollection, deleteCollection, errorMessage } from '#lib/api/client.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import IconButton from '#lib/IconButton.svelte';
+	import SharedIcon from '#lib/SharedIcon.svelte';
 	import {
 		childrenOf,
 		libraryById,
-		libraryName,
 		loadOrganize,
 		organize,
-		severalLibraries,
+		isShared,
 		type Collection
 	} from '#lib/organize.svelte.ts';
 
@@ -27,12 +27,6 @@
 	});
 
 	const top = $derived(childrenOf(null));
-	// One tree per library: those with collections, and those one may add to.
-	const libraries = $derived(
-		organize.libraries.filter(
-			(library) => library.writable || organize.collections.some((c) => c.library_id === library.id)
-		)
-	);
 	const writable = (collection: Collection) =>
 		libraryById(collection.library_id)?.writable ?? false;
 	const depth = $derived.by(() => {
@@ -48,14 +42,12 @@
 		return found;
 	}
 
-	/** ``target``: a collection, or a library's top level (``top:<id>``). */
+	/** ``target``: a collection of the same owner, or the top level. */
 	function canDrop(target: string): boolean {
 		if (!dragged) return false;
 		const moving = organize.collections.find((c) => c.id === dragged);
 		if (!moving) return false;
-		if (target.startsWith('top:')) {
-			return moving.parent_id !== null && target === `top:${moving.library_id}`;
-		}
+		if (target === 'top') return moving.parent_id !== null;
 		const into = organize.collections.find((c) => c.id === target);
 		return (
 			into !== undefined &&
@@ -90,7 +82,7 @@
 				const id = dragged;
 				const allowed = canDrop(target);
 				dragged = over = null;
-				if (id && allowed) move(id, target.startsWith('top:') ? null : target);
+				if (id && allowed) move(id, target === 'top' ? null : target);
 			}
 		};
 	}
@@ -142,32 +134,20 @@
 {#if loaded && organize.collections.length === 0}
 	<p class="muted">No collections yet.</p>
 {:else}
-	{#each libraries as library (library.id)}
-		{@const roots = childrenOf(null, library.id)}
-		<section class="library">
-			{#if severalLibraries()}<h2>{libraryName(library.id)}</h2>{/if}
-			<div
-				class="root"
-				class:target={dragged && canDrop(`top:${library.id}`)}
-				class:over={over === `top:${library.id}`}
-				{...dropTarget(`top:${library.id}`)}
-			>
-				<span class="root-label">Top level</span>
-				{#if dragged && canDrop(`top:${library.id}`)}
-					<span class="hint">Drop here to move it to the top</span>
-				{:else if roots.length === 0}
-					<span class="hint">No collections yet.</span>
-				{/if}
-			</div>
-			{#if roots.length}
-				<ul class="tree">
-					{#each roots as collection (collection.id)}
-						{@render node(collection)}
-					{/each}
-				</ul>
-			{/if}
-		</section>
-	{/each}
+	<div
+		class="root"
+		class:target={dragged && canDrop('top')}
+		class:over={over === 'top'}
+		{...dropTarget('top')}
+	>
+		<span class="root-label">Top level</span>
+		{#if dragged && canDrop('top')}<span class="hint">Drop here to move it to the top</span>{/if}
+	</div>
+	<ul class="tree">
+		{#each top as collection (collection.id)}
+			{@render node(collection)}
+		{/each}
+	</ul>
 {/if}
 
 {#snippet node(collection: Collection)}
@@ -193,7 +173,11 @@
 			     Keyboards edit through the ⋯ menu. -->
 			<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 			<div class="body" onclick={() => writable(collection) && edit(collection)}>
-				<strong>{collection.name}</strong>
+				<strong
+					>{collection.name}{#if isShared(collection.library_id)}<span class="shared-mark"
+							><SharedIcon size={15} /></span
+						>{/if}</strong
+				>
 				<span class="counts">{counts(collection)}</span>
 				{#if collection.description}<span class="description">{collection.description}</span>{/if}
 			</div>
@@ -239,12 +223,10 @@
 		margin: 0;
 		max-width: 70ch;
 	}
-	.library {
-		margin-bottom: 28px;
-	}
-	.library h2 {
-		margin: 0 0 8px;
-		font-size: var(--step-1);
+	.shared-mark {
+		display: inline-flex;
+		margin-left: 8px;
+		vertical-align: -1px;
 	}
 	.root {
 		display: flex;

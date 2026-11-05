@@ -5,8 +5,8 @@ export type Collection = CollectionOut;
 export type Tag = TagOut;
 export type Library = LibraryOut;
 
-/** Libraries, tags and collections for pickers and filters; reload after
- * changes. */
+/** Owners (the person and their groups; "libraries" in the API), tags and
+ * collections for pickers; reload after changes. */
 export const organize = $state<{ libraries: Library[]; tags: Tag[]; collections: Collection[] }>({
 	libraries: [],
 	tags: [],
@@ -34,13 +34,13 @@ export function libraryById(id: string | null | undefined): Library | undefined 
 	return organize.libraries.find((library) => library.id === id);
 }
 
-/** "My library", "Shared library", or "Chair / Project" for nested groups. */
+/** The owner's name: "Me", or the group's ("Chair / Project" if nested). */
 export function libraryName(id: string | null | undefined): string {
 	const library = libraryById(id);
 	return library ? [...library.path, library.name].join(' / ') : '';
 }
 
-/** Libraries the person may add to, the default first. */
+/** Owners the person may give things to, the default first. */
 export function writableLibraries(): Library[] {
 	return organize.libraries
 		.filter((library) => library.writable)
@@ -87,15 +87,15 @@ export function flatTree(libraryId?: string): { collection: Collection; depth: n
 	return rows;
 }
 
-/** Where new items for a collection go: a group's collection holds only that
- * group's items, so its library; a private one, the default library. */
+/** Who owns new papers added to a collection: a group's collection holds
+ * only the group's papers, so the group; for a private one, the default. */
 export function libraryForCollection(collectionId: string | undefined): string | undefined {
 	const collection = organize.collections.find((c) => c.id === collectionId);
 	const library = libraryById(collection?.library_id);
 	return library?.kind === 'group' ? library.id : undefined;
 }
 
-/** Whether any of these libraries is a group's (the item is shared). */
-export function inGroup(libraryIds: string[]): boolean {
-	return libraryIds.some((id) => libraryById(id)?.kind === 'group');
+/** Whether a group owns it (it is shared with the group's members). */
+export function isShared(libraryId: string | null | undefined): boolean {
+	return libraryById(libraryId)?.kind === 'group';
 }

@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddItemToLibraryData, AddItemToLibraryErrors, AddItemToLibraryResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemFromLibraryData, RemoveItemFromLibraryErrors, RemoveItemFromLibraryResponses, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -71,8 +71,8 @@ export const listItems = <ThrowOnError extends boolean = false>(options?: Option
 /**
  * Add Item
  *
- * A new item; if one of its identifiers is known in a library the person
- * can read, the existing item (put into this library too, 200).
+ * A new item; if one of its identifiers is known among the items the
+ * person can see, the existing item (200).
  */
 export const addItem = <ThrowOnError extends boolean = false>(options: Options<AddItemData, ThrowOnError>): RequestResult<AddItemResponses, AddItemErrors, ThrowOnError> => (options.client ?? client).post<AddItemResponses, AddItemErrors, ThrowOnError>({
     url: '/api/items',
@@ -125,9 +125,7 @@ export const setOverrides = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Trash Item
  *
- * Move to the trash, for everyone; restorable with ``POST …/restore``.
- * Only for people who may change every library the item is in; others
- * take it out of their library (``DELETE …/libraries/{id}``).
+ * Move to the trash; restorable with ``POST …/restore``.
  */
 export const trashItem = <ThrowOnError extends boolean = false>(options: Options<TrashItemData, ThrowOnError>): RequestResult<TrashItemResponses, TrashItemErrors, ThrowOnError> => (options.client ?? client).delete<TrashItemResponses, TrashItemErrors, ThrowOnError>({ url: '/api/items/{item_id}', ...options });
 
@@ -137,19 +135,20 @@ export const trashItem = <ThrowOnError extends boolean = false>(options: Options
 export const getItem = <ThrowOnError extends boolean = false>(options: Options<GetItemData, ThrowOnError>): RequestResult<GetItemResponses, GetItemErrors, ThrowOnError> => (options.client ?? client).get<GetItemResponses, GetItemErrors, ThrowOnError>({ url: '/api/items/{item_id}', ...options });
 
 /**
- * Remove Item From Library
+ * Set Owner
  *
- * Take the item out of one library, with that library's tags and
- * collections on it; out of its last library, it goes to the trash.
+ * Give the item to another owner the person may add to: share it with a
+ * group, or take a group's paper for oneself (members may delete it
+ * anyway). Tags and collections of the group that gave it up come off.
  */
-export const removeItemFromLibrary = <ThrowOnError extends boolean = false>(options: Options<RemoveItemFromLibraryData, ThrowOnError>): RequestResult<RemoveItemFromLibraryResponses, RemoveItemFromLibraryErrors, ThrowOnError> => (options.client ?? client).delete<RemoveItemFromLibraryResponses, RemoveItemFromLibraryErrors, ThrowOnError>({ url: '/api/items/{item_id}/libraries/{library_id}', ...options });
-
-/**
- * Add Item To Library
- *
- * Put the item into another library the person may change (share it).
- */
-export const addItemToLibrary = <ThrowOnError extends boolean = false>(options: Options<AddItemToLibraryData, ThrowOnError>): RequestResult<AddItemToLibraryResponses, AddItemToLibraryErrors, ThrowOnError> => (options.client ?? client).put<AddItemToLibraryResponses, AddItemToLibraryErrors, ThrowOnError>({ url: '/api/items/{item_id}/libraries/{library_id}', ...options });
+export const setOwner = <ThrowOnError extends boolean = false>(options: Options<SetOwnerData, ThrowOnError>): RequestResult<SetOwnerResponses, SetOwnerErrors, ThrowOnError> => (options.client ?? client).put<SetOwnerResponses, SetOwnerErrors, ThrowOnError>({
+    url: '/api/items/{item_id}/owner',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Restore Item
@@ -173,8 +172,8 @@ export const findUpload = <ThrowOnError extends boolean = false>(options: Option
  * The background job looks for a DOI or arXiv ID in the file and replaces
  * the placeholder metadata (see ``paperus.identify``). A file that is
  * already in a library the person can read makes no new item: the answer
- * (200, ``existing``) names the item that has it, now also in this
- * library. ``library_id``: the person's default library if not given.
+ * (200, ``existing``) names the item that has it. ``library_id`` (the
+ * owner): the person's default if not given.
  */
 export const uploadNewItem = <ThrowOnError extends boolean = false>(options: Options<UploadNewItemData, ThrowOnError>): RequestResult<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError> => (options.client ?? client).post<UploadNewItemResponses, UploadNewItemErrors, ThrowOnError>({
     ...formDataBodySerializer,

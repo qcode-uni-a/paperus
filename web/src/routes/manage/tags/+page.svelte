@@ -1,14 +1,8 @@
 <script lang="ts">
 	import { deleteTag, errorMessage } from '#lib/api/client.ts';
 	import IconButton from '#lib/IconButton.svelte';
-	import {
-		libraryById,
-		libraryName,
-		loadOrganize,
-		organize,
-		severalLibraries,
-		type Tag
-	} from '#lib/organize.svelte.ts';
+	import SharedIcon from '#lib/SharedIcon.svelte';
+	import { libraryById, isShared, loadOrganize, organize, type Tag } from '#lib/organize.svelte.ts';
 	import TagDialog from '#lib/TagDialog.svelte';
 	import { ago } from '#lib/format.ts';
 
@@ -26,17 +20,15 @@
 		loadOrganize().then(() => (loaded = true));
 	});
 
-	let libraryFilter = $state('');
 	const writable = (tag: Tag) => libraryById(tag.library_id)?.writable ?? false;
 
 	const shown = $derived.by(() => {
 		const words = filter.trim().toLowerCase();
 		const matching = organize.tags.filter(
 			(tag) =>
-				(!libraryFilter || tag.library_id === libraryFilter) &&
-				(!words ||
-					tag.name.toLowerCase().includes(words) ||
-					(tag.description ?? '').toLowerCase().includes(words))
+				!words ||
+				tag.name.toLowerCase().includes(words) ||
+				(tag.description ?? '').toLowerCase().includes(words)
 		);
 		const key = (tag: Tag): string | number =>
 			sort === 'name' ? tag.name.toLowerCase() : sort === 'count' ? tag.count : (tag[sort] ?? '');
@@ -127,14 +119,7 @@
 			placeholder="Filter by name or description"
 			aria-label="Filter tags"
 		/>
-		{#if severalLibraries()}
-			<select bind:value={libraryFilter} aria-label="Library">
-				<option value="">All libraries</option>
-				{#each organize.libraries as library (library.id)}
-					<option value={library.id}>{libraryName(library.id)}</option>
-				{/each}
-			</select>
-		{/if}
+
 		{#if selected.length}
 			<div class="bulk">
 				<span>{selected.length} selected</span>
@@ -189,8 +174,8 @@
 						>
 							{tag.name}
 						</button>
+						{#if isShared(tag.library_id)}<SharedIcon size={15} />{/if}
 						{#if tag.description}<p>{tag.description}</p>{/if}
-						{#if severalLibraries()}<p class="library">{libraryName(tag.library_id)}</p>{/if}
 					</td>
 					<td class="number">{tag.count}</td>
 					<td class="wide muted">{sources(tag)}</td>
@@ -334,6 +319,10 @@
 		display: inline-block;
 		width: 1ch;
 	}
+	.name :global(.shared) {
+		margin-left: 6px;
+		vertical-align: middle;
+	}
 	.name p {
 		margin: 4px 0 0;
 		max-width: 60ch;
@@ -352,9 +341,6 @@
 	.chip:disabled {
 		cursor: default;
 		opacity: 1;
-	}
-	.name p.library {
-		color: var(--faint);
 	}
 	.chip:hover:not(:disabled) {
 		background: var(--tag-bg, var(--rail));

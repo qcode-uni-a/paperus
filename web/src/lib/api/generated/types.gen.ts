@@ -46,8 +46,11 @@ export type BodyUploadToVersion = {
  * Only the fields given are changed; ``parent_id: null`` moves to the top.
  *
  * ``library_id`` gives the collection, with the collections inside it, to
- * another library (at its top level unless ``parent_id`` names a collection
- * there). Papers a group's collection may not hold leave it.
+ * another library the person may change, e.g. from their own to a group
+ * or back (members may delete a group's collections anyway). It lands at
+ * the top level there unless ``parent_id`` names a collection there.
+ * Papers a group's collection may not hold leave it, unless
+ * ``add_papers`` puts them into the group.
  */
 export type CollectionChange = {
     /**
@@ -357,9 +360,9 @@ export type ItemDetail = {
      */
     id: string;
     /**
-     * Library Ids
+     * Library Id
      */
-    library_ids: Array<string>;
+    library_id: string;
     /**
      * Type
      */
@@ -478,9 +481,9 @@ export type ItemOut = {
      */
     id: string;
     /**
-     * Library Ids
+     * Library Id
      */
-    library_ids: Array<string>;
+    library_id: string;
     /**
      * Type
      */
@@ -570,10 +573,6 @@ export type KnownFile = {
      */
     item_id: string;
     file: FileOut;
-    /**
-     * Library Ids
-     */
-    library_ids: Array<string>;
 };
 
 /**
@@ -759,6 +758,16 @@ export type NewItemUpload = {
      * Existing
      */
     existing?: boolean;
+};
+
+/**
+ * Owner
+ */
+export type Owner = {
+    /**
+     * Library Id
+     */
+    library_id: string;
 };
 
 /**
@@ -1462,73 +1471,35 @@ export type GetItemResponses = {
 
 export type GetItemResponse = GetItemResponses[keyof GetItemResponses];
 
-export type RemoveItemFromLibraryData = {
-    body?: never;
+export type SetOwnerData = {
+    body: Owner;
     path: {
         /**
          * Item Id
          */
         item_id: string;
-        /**
-         * Library Id
-         */
-        library_id: string;
     };
     query?: never;
-    url: '/api/items/{item_id}/libraries/{library_id}';
+    url: '/api/items/{item_id}/owner';
 };
 
-export type RemoveItemFromLibraryErrors = {
+export type SetOwnerErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RemoveItemFromLibraryError = RemoveItemFromLibraryErrors[keyof RemoveItemFromLibraryErrors];
+export type SetOwnerError = SetOwnerErrors[keyof SetOwnerErrors];
 
-export type RemoveItemFromLibraryResponses = {
+export type SetOwnerResponses = {
     /**
      * Successful Response
      */
     200: ItemDetail;
 };
 
-export type RemoveItemFromLibraryResponse = RemoveItemFromLibraryResponses[keyof RemoveItemFromLibraryResponses];
-
-export type AddItemToLibraryData = {
-    body?: never;
-    path: {
-        /**
-         * Item Id
-         */
-        item_id: string;
-        /**
-         * Library Id
-         */
-        library_id: string;
-    };
-    query?: never;
-    url: '/api/items/{item_id}/libraries/{library_id}';
-};
-
-export type AddItemToLibraryErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type AddItemToLibraryError = AddItemToLibraryErrors[keyof AddItemToLibraryErrors];
-
-export type AddItemToLibraryResponses = {
-    /**
-     * Successful Response
-     */
-    200: ItemDetail;
-};
-
-export type AddItemToLibraryResponse = AddItemToLibraryResponses[keyof AddItemToLibraryResponses];
+export type SetOwnerResponse = SetOwnerResponses[keyof SetOwnerResponses];
 
 export type RestoreItemData = {
     body?: never;

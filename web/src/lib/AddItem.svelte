@@ -22,8 +22,8 @@
 	let date = $state('');
 	let error = $state('');
 	let busy = $state(false);
-	// A group's collection takes items of its library only; otherwise the
-	// default library, unless another is picked.
+	// A group's collection takes only the group's papers; otherwise the
+	// default owner, unless another is picked.
 	const fixedLibrary = $derived(libraryForCollection(collection));
 	let library = $state(defaultLibrary()?.id ?? '');
 
@@ -106,7 +106,7 @@
 	{/if}
 	{#if !fixedLibrary && writableLibraries().length > 1}
 		<label
-			>Library
+			>Owner
 			<select bind:value={library}>
 				{#each writableLibraries() as option (option.id)}
 					<option value={option.id}>{libraryName(option.id)}</option>

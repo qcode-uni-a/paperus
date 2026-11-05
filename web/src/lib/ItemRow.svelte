@@ -2,7 +2,8 @@
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
 	import { shortAuthors, typeName } from '#lib/format.ts';
-	import { inGroup } from '#lib/organize.svelte.ts';
+	import { isShared } from '#lib/organize.svelte.ts';
+	import SharedIcon from '#lib/SharedIcon.svelte';
 
 	let { item }: { item: Item } = $props();
 
@@ -10,6 +11,7 @@
 </script>
 
 <li>
+	{#if isShared(item.library_id)}<span class="corner"><SharedIcon /></span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
 	<p class="reference">
 		<span
@@ -20,15 +22,7 @@
 				>{/if}</span
 		>
 		<span class="badge">{typeName(item.type)}</span>
-		{#if inGroup(item.library_ids)}
-			<svg class="shared" viewBox="0 0 24 24" role="img" aria-label="Shared with a group">
-				<title>Shared with a group</title>
-				<circle cx="9" cy="8" r="3.2" />
-				<path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
-				<circle cx="16.5" cy="9" r="2.6" />
-				<path d="M15.5 14.2c2.6-.3 4.6 1.3 5.2 4.3" />
-			</svg>
-		{/if}
+
 		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
@@ -37,20 +31,18 @@
 
 <style>
 	li {
+		position: relative;
 		list-style: none;
 		padding: 14px 0 16px;
 		border-bottom: 1px solid var(--rule);
 		display: grid;
 		gap: 4px;
 	}
-	.shared {
-		width: 16px;
-		height: 16px;
-		align-self: center;
-		fill: none;
-		stroke: var(--muted);
-		stroke-width: 1.8;
-		stroke-linecap: round;
+	.corner {
+		position: absolute;
+		top: 16px;
+		right: 0;
+		display: flex;
 	}
 	.title {
 		font-family: var(--serif);

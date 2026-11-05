@@ -49,7 +49,7 @@
 		<label>Name <input bind:value={name} required maxlength="100" /></label>
 		{#if !tag && writableLibraries().length > 1}
 			<label
-				>Library
+				>Owner
 				<select bind:value={library}>
 					{#each writableLibraries() as option (option.id)}
 						<option value={option.id}>{libraryName(option.id)}</option>

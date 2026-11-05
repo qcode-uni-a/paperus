@@ -89,8 +89,7 @@
 	}
 
 	async function remove(group: GroupOut) {
-		if (!confirm(`Delete the group “${group.name}”? Its library is empty, so nothing is lost.`))
-			return;
+		if (!confirm(`Delete the group “${group.name}”? It has no papers, so nothing is lost.`)) return;
 		const result = await deleteGroup({ path: { group_id: group.id } });
 		if (result.error) {
 			error = errorMessage(result.error);
@@ -111,7 +110,8 @@
 	<div>
 		<h1>Groups</h1>
 		<p class="muted">
-			Each group has a library. Everyone in a group is also in the groups inside it.
+			Papers and collections given to a group are shared with its members. Everyone in a group is
+			also in the groups inside it.
 		</p>
 	</div>
 	{#if session.user?.is_admin}
@@ -144,7 +144,7 @@
 							member.{/if}
 						{#if selected.items !== null}
 							{selected.items}
-							{selected.items === 1 ? 'item' : 'items'} in its library.{/if}
+							{selected.items === 1 ? 'paper' : 'papers'}.{/if}
 					</p>
 				</div>
 				{#if selected.can_manage}
@@ -246,8 +246,8 @@
 					<button>Add</button>
 				</form>
 				<p class="licence">
-					Everyone you add can open the PDFs in this group's library and in the groups inside it.
-					Make sure the licences of these papers allow sharing them with these people.
+					Everyone you add can open the PDFs of this group's papers and those of the groups inside
+					it. Make sure the licences of these papers allow sharing them with these people.
 				</p>
 
 				<h3>Groups inside</h3>

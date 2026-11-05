@@ -34,8 +34,8 @@
 	let library = $state('');
 	let error = $state('');
 	let saving = $state(false);
-	// Moving to another library: how many papers are not there yet, and
-	// whether they join it or leave the collection.
+	// Giving it to another owner: how many papers that owner does not have
+	// yet, and whether they go along or leave the collection.
 	let missing = $state<number | null>(null);
 	let addPapers = $state(true);
 	const moving = $derived(collection !== null && library !== collection.library_id);
@@ -112,7 +112,7 @@
 		</label>
 		{#if writableLibraries().length > 1}
 			<label>
-				{collection ? 'Belongs to' : 'Library'}
+				Owner
 				<select bind:value={library} onchange={() => (parent = '')}>
 					{#each writableLibraries() as option (option.id)}
 						<option value={option.id}>{libraryName(option.id)}</option>
@@ -122,20 +122,21 @@
 			{#if moving}
 				<div class="move">
 					<p>
-						The collection and those inside it move to {libraryName(library)}.
-						{#if !toGroup}
-							The group's tags stay with the group.
-						{/if}
+						{toGroup
+							? `The collection and those inside it are then shared with ${libraryName(library)}.`
+							: 'The collection and those inside it become yours; the group no longer sees them.'}
 					</p>
 					{#if toGroup && missing}
 						<p>
 							{missing}
-							{missing === 1 ? 'paper is' : 'papers are'} not in {libraryName(library)} yet:
+							{missing === 1 ? 'paper in it is' : 'papers in it are'} not shared with {libraryName(
+								library
+							)} yet:
 						</p>
 						<label class="choice"
-							><input type="radio" bind:group={addPapers} value={true} /> Add {missing === 1
+							><input type="radio" bind:group={addPapers} value={true} /> Share {missing === 1
 								? 'it'
-								: 'them'} to {libraryName(library)}</label
+								: 'them'} too</label
 						>
 						<label class="choice"
 							><input type="radio" bind:group={addPapers} value={false} /> Leave {missing === 1

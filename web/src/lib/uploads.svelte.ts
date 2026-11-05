@@ -1,5 +1,5 @@
-import { addItemToLibrary, addItems, errorMessage, findUpload } from '#lib/api/client.ts';
-import { defaultLibrary, libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
+import { addItems, errorMessage, findUpload } from '#lib/api/client.ts';
+import { libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
@@ -14,7 +14,7 @@ export interface Upload {
 	itemId?: string;
 	/** Also put the new item into this collection. */
 	collection?: string;
-	/** The library the item goes into; the person's default if not set. */
+	/** Who owns the new item (a library ID); the person's default if not set. */
 	library?: string;
 	/** The file was already in the library; no new item was made. */
 	existing?: boolean;
@@ -71,7 +71,7 @@ function pump(): void {
 async function run(upload: Upload, file: File): Promise<void> {
 	upload.status = 'uploading';
 	try {
-		const known = await knownItem(file, upload.library);
+		const known = await knownItem(file);
 		const result = known
 			? { item_id: known, existing: true }
 			: await send(file, upload.library, (loaded) => (upload.loaded = loaded));
@@ -101,7 +101,7 @@ const HASH_LIMIT = 512 * 1024 ** 2;
 /** The item that already has this exact file, so it need not be sent again.
  * Hashing needs a secure context (HTTPS or localhost); elsewhere the server
  * still recognizes the file after the upload. */
-async function knownItem(file: File, library?: string): Promise<string | null> {
+async function knownItem(file: File): Promise<string | null> {
 	if (!globalThis.crypto?.subtle || file.size > HASH_LIMIT) return null;
 	try {
 		const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
@@ -109,16 +109,7 @@ async function knownItem(file: File, library?: string): Promise<string | null> {
 			''
 		);
 		const { data } = await findUpload({ path: { sha256 } });
-		if (!data) return null;
-		// Known elsewhere: the paper exists once, so it joins this library too.
-		const target = library ?? defaultLibrary()?.id;
-		if (target && !data.library_ids.includes(target)) {
-			const added = await addItemToLibrary({
-				path: { item_id: data.item_id, library_id: target }
-			});
-			if (added.error) return null;
-		}
-		return data.item_id;
+		return data?.item_id ?? null;
 	} catch {
 		return null;
 	}

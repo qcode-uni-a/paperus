@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import SharedIcon from '#lib/SharedIcon.svelte';
 	import {
-		addItemToLibrary,
 		addItems,
 		addTag,
 		errorMessage,
 		removeItem,
-		removeItemFromLibrary,
+		setOwner,
 		removeTag
 	} from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
@@ -14,6 +14,7 @@
 		collectionPath,
 		flatTree,
 		libraryById,
+		isShared,
 		libraryName,
 		loadOrganize,
 		organize
@@ -27,18 +28,12 @@
 	let error = $state('');
 
 	const own = $derived(organize.libraries.find((library) => library.kind === 'personal'));
-	// The item's libraries the person may change.
-	const writableHere = $derived(item.library_ids.filter((id) => writableLibrary(id)));
-	// New tags: the person's own if the item is in it, else one of the
-	// item's group libraries they may change, else private (as the server).
-	const tagLibrary = $derived(
-		own && item.library_ids.includes(own.id) ? own.id : (writableHere[0] ?? own?.id)
-	);
-	// Libraries the item can still be added to.
-	const otherLibraries = $derived(
-		organize.libraries.filter((l) => l.writable && !item.library_ids.includes(l.id))
-	);
-	let sharing = $state(false);
+	const itemWritable = $derived(writableLibrary(item.library_id));
+	// New tags: the item's owner for those who may change it, else private
+	// (as the server decides).
+	const tagLibrary = $derived(itemWritable ? item.library_id : own?.id);
+	// Who else could own it: the person and groups they may add to.
+	const owners = $derived(organize.libraries.filter((l) => l.writable));
 
 	const suggestions = $derived(
 		organize.tags
@@ -47,7 +42,7 @@
 	);
 	// A group's collections hold only its items; private ones any item.
 	const choices = $derived(
-		[...writableHere.flatMap((id) => flatTree(id)), ...flatTree(own?.id)].filter(
+		[...(itemWritable ? flatTree(item.library_id) : []), ...flatTree(own?.id)].filter(
 			({ collection }, index, all) =>
 				!item.collection_ids.includes(collection.id) &&
 				all.findIndex((row) => row.collection.id === collection.id) === index
@@ -62,7 +57,7 @@
 	}
 	/** A private tag or collection on an item of a group. */
 	function isPrivate(libraryId: string | undefined): boolean {
-		return own !== undefined && libraryId === own.id && !item.library_ids.includes(own.id);
+		return own !== undefined && libraryId === own.id && item.library_id !== own.id;
 	}
 
 	async function done(result: { error?: unknown }) {
@@ -98,44 +93,35 @@
 
 <div class="organize">
 	<div class="line">
-		<span class="label">Libraries</span>
-		{#each item.library_ids as id (id)}
-			<span class="chip">
-				<span class="name">{libraryName(id)}</span>
-				{#if writableLibrary(id) && !item.deleted_at}
-					<button
-						onclick={async () => {
-							const last = item.library_ids.length === 1;
-							if (last && !confirm('This is its only library: move the item to the trash?')) return;
-							await done(
-								await removeItemFromLibrary({ path: { item_id: item.id, library_id: id } })
-							);
-						}}
-						aria-label="Remove from {libraryName(id)}">×</button
-					>
-				{/if}
-			</span>
-		{/each}
-		{#if sharing}
+		<span class="label">Owner</span>
+		{#if itemWritable && owners.length > 1 && !item.deleted_at}
 			<select
-				{@attach openPicker}
-				aria-label="Add to library"
+				class="owner"
+				value={item.library_id}
+				aria-label="Owner"
 				onchange={async (event) => {
-					const id = event.currentTarget.value;
-					sharing = false;
-					if (id)
-						await done(await addItemToLibrary({ path: { item_id: item.id, library_id: id } }));
+					const target = event.currentTarget.value;
+					const leaving = isShared(item.library_id);
+					if (
+						leaving &&
+						!confirm(
+							`${libraryName(item.library_id)} will no longer see this paper, and its tags and collections come off it. Continue?`
+						)
+					) {
+						event.currentTarget.value = item.library_id;
+						return;
+					}
+					await done(await setOwner({ path: { item_id: item.id }, body: { library_id: target } }));
 				}}
-				onblur={() => (sharing = false)}
 			>
-				<option value="">Choose a library…</option>
-				{#each otherLibraries as library (library.id)}
-					<option value={library.id}>{libraryName(library.id)}</option>
+				{#each owners as owner (owner.id)}
+					<option value={owner.id}>{libraryName(owner.id)}</option>
 				{/each}
 			</select>
-		{:else if otherLibraries.length && !item.deleted_at}
-			{@render plus('Add to another library', () => (sharing = true))}
+		{:else}
+			<span class="owner-name">{libraryName(item.library_id)}</span>
 		{/if}
+		{#if isShared(item.library_id)}<SharedIcon size={15} />{/if}
 	</div>
 
 	<div class="line">
@@ -246,6 +232,15 @@
 		width: 84px;
 		color: var(--muted);
 		font-size: var(--step--1);
+	}
+	select.owner {
+		width: auto;
+		max-width: min(260px, 100%);
+		padding: 2px 8px;
+		font-size: 0.92em;
+	}
+	.owner-name {
+		font-size: 0.92em;
 	}
 	.chip {
 		display: inline-flex;

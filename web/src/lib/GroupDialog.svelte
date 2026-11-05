@@ -76,7 +76,7 @@
 		{:else if parent}
 			<p class="note">
 				Everyone in {parent.name} is in the new group too, with the same role. Add people who should see
-				only this group's library afterwards.
+				only this group's papers afterwards.
 			</p>
 		{/if}
 		{#if error}<p class="error">{error}</p>{/if}
