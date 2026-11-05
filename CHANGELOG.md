@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A new look, inspired by Immich**: the search moved into the top bar (on
+  every page; "/" jumps to it), the menu got icons and a rounded highlight
+  for the current page, buttons are rounded, and pages start right next to
+  the menu.
+- **Search shows more papers**: at most three passages per paper, with
+  "More from this paper" for the rest, so one paper with many hits no
+  longer fills the list (the API: `per_item`, and `item` to search within
+  one paper; AI assistants get the same).
 - **Favourites**: star papers (☆ next to the title, in lists and on the
   paper); "Favourites" in the sidebar lists them. Each person has their
   own stars, readers too.

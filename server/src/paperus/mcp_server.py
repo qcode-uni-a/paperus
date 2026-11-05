@@ -193,6 +193,7 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                 query,
                 limit=100,
                 mode=mode,
+                per_item=max(1, min(passages_per_paper, 10)),
             )
             per_paper = max(1, min(passages_per_paper, 10))
             groups: dict[tuple[str, uuid.UUID], list[Passage]] = {}

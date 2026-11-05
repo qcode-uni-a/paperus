@@ -2876,6 +2876,14 @@ export type SearchData = {
          * Library
          */
         library?: string | null;
+        /**
+         * Per Item
+         */
+        per_item?: number | null;
+        /**
+         * Item
+         */
+        item?: string | null;
     };
     url: '/api/search';
 };

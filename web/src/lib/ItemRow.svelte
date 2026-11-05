@@ -24,13 +24,13 @@
 	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
 	<p class="reference">
-		<span
-			>{#if authors}{authors}{/if}{#if item.year}{authors
-					? ' '
-					: ''}({item.year}){/if}{#if item.container_title}{authors || item.year ? '. ' : ''}<em
-					>{item.container_title}</em
-				>{/if}</span
-		>
+		{#if authors || item.year || item.container_title}<span
+				>{#if authors}{authors}{/if}{#if item.year}{authors
+						? ' '
+						: ''}({item.year}){/if}{#if item.container_title}{authors || item.year ? '. ' : ''}<em
+						>{item.container_title}</em
+					>{/if}</span
+			>{/if}
 		<span class="badge">{typeName(item.type)}</span>
 
 		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span

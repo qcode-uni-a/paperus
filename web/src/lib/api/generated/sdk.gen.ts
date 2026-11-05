@@ -313,9 +313,11 @@ export const restoreFile = <ThrowOnError extends boolean = false>(options: Optio
  *
  * Passages for ``q`` in the libraries the person can read (or one
  * ``library``): its words (quotes for phrases, ``-`` to exclude), its
- * meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
- * ``X-Search-Mode`` header says what was used: without the ML service,
- * hybrid search falls back to keywords.
+ * meaning, or both; ``type`` (repeatable, CSL types) limits the items.
+ * ``per_item`` keeps the best few per paper or note, so more papers fit;
+ * ``item`` searches within one paper. The ``X-Search-Mode`` header says
+ * what was used: without the ML service, hybrid search falls back to
+ * keywords.
  */
 export const search = <ThrowOnError extends boolean = false>(options: Options<SearchData, ThrowOnError>): RequestResult<SearchResponses, SearchErrors, ThrowOnError> => (options.client ?? client).get<SearchResponses, SearchErrors, ThrowOnError>({ url: '/api/search', ...options });
 

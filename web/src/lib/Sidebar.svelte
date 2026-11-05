@@ -1,7 +1,28 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import {
+		mdiAccountGroupOutline,
+		mdiAccountMultipleOutline,
+		mdiArrowLeft,
+		mdiBackupRestore,
+		mdiBookshelf,
+		mdiBriefcaseOutline,
+		mdiCogOutline,
+		mdiContentDuplicate,
+		mdiFileQuestionOutline,
+		mdiFolderCogOutline,
+		mdiFolderMultipleOutline,
+		mdiHistory,
+		mdiNoteTextOutline,
+		mdiServer,
+		mdiShieldAccountOutline,
+		mdiStarOutline,
+		mdiTagMultipleOutline,
+		mdiTrashCanOutline
+	} from '@mdi/js';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
+	import Icon from '#lib/Icon.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -24,11 +45,28 @@
 	});
 
 	const ADMIN = [
-		[resolve('/admin/users'), 'Users'],
-		[resolve('/admin/jobs'), 'Jobs'],
-		[settingsPath, 'Settings'],
-		[resolve('/admin/backups'), 'Backups'],
-		[resolve('/admin/server'), 'Server stats']
+		[resolve('/admin/users'), 'Users', mdiAccountMultipleOutline],
+		[resolve('/admin/jobs'), 'Jobs', mdiBriefcaseOutline],
+		[settingsPath, 'Settings', mdiCogOutline],
+		[resolve('/admin/backups'), 'Backups', mdiBackupRestore],
+		[resolve('/admin/server'), 'Server stats', mdiServer]
+	] as const;
+	const onSettingsPage = $derived(page.url.pathname.startsWith(`${settingsPath}/`));
+
+	const MAIN = [
+		[library, 'Library', mdiBookshelf],
+		[resolve('/recent'), 'Recent', mdiHistory],
+		[resolve('/favourites'), 'Favourites', mdiStarOutline],
+		[collectionsPath, 'Collections', mdiFolderMultipleOutline],
+		[resolve('/notes'), 'Notes', mdiNoteTextOutline]
+	] as const;
+	const MANAGE = [
+		[resolve('/manage/collections'), 'Collections', mdiFolderCogOutline],
+		[resolve('/manage/tags'), 'Tags', mdiTagMultipleOutline],
+		[resolve('/manage/groups'), 'Groups', mdiAccountGroupOutline],
+		[resolve('/manage/duplicates'), 'Duplicates', mdiContentDuplicate],
+		[resolve('/manage/unsorted'), 'Unsorted', mdiFileQuestionOutline],
+		[resolve('/trash'), 'Trash', mdiTrashCanOutline]
 	] as const;
 
 	function active(path: string): boolean {
@@ -55,10 +93,12 @@
 
 <nav id="menu" aria-label="Menu" class:drawer={menu.narrow} hidden={!menu.open}>
 	{#if inAdmin}
-		<a class="back" href={resolve('/')}>← Back to library</a>
+		<a class="back" href={resolve('/')}><Icon path={mdiArrowLeft} /><span>Back to library</span></a>
 		<span class="group">Administration</span>
-		{#each ADMIN as [path, label] (path)}
-			<a href={path} class:current={active(path)}><span>{label}</span></a>
+		{#each ADMIN as [path, label, icon] (path)}
+			<a href={path} class:current={active(path) && !(path === settingsPath && onSettingsPage)}
+				><Icon path={icon} /><span>{label}</span></a
+			>
 			{#if path === settingsPath && active(settingsPath)}
 				{#each SETTINGS as [slug, sublabel] (slug)}
 					{@const href = resolve('/admin/settings/[section]', { section: slug })}
@@ -69,111 +109,98 @@
 			{/if}
 		{/each}
 	{:else}
-		<a href={library} class:current={onLibrary && !filtered}><span>Library</span></a>
-		<a href={resolve('/recent')} class:current={active(resolve('/recent'))}><span>Recent</span></a>
-		<a href={resolve('/favourites')} class:current={active(resolve('/favourites'))}
-			><span>Favourites</span></a
-		>
-
-		<a href={collectionsPath} class:current={active(collectionsPath)}><span>Collections</span></a>
-		{#each organize.collections.filter((c) => c.pinned) as pinned (pinned.id)}
-			{@const href = resolve('/collections/[id]', { id: pinned.id })}
-			<a {href} class="sub pin" class:current={page.url.pathname === href}
-				><span>{pinned.name}</span></a
+		{#each MAIN as [path, label, icon] (path)}
+			<a href={path} class:current={path === library ? onLibrary && !filtered : active(path)}
+				><Icon path={icon} /><span>{label}</span></a
 			>
-		{/each}
-		<a href={resolve('/notes')} class:current={active(resolve('/notes'))}><span>Notes</span></a>
-
-		<div class="bottom">
-			<span class="group">Manage</span>
-			<a
-				href={resolve('/manage/collections')}
-				class:current={active(resolve('/manage/collections'))}><span>Collections</span></a
-			>
-			<a href={resolve('/manage/tags')} class:current={active(resolve('/manage/tags'))}
-				><span>Tags</span></a
-			>
-			<a href={resolve('/manage/groups')} class:current={active(resolve('/manage/groups'))}
-				><span>Groups</span></a
-			>
-			<a href={resolve('/manage/duplicates')} class:current={active(resolve('/manage/duplicates'))}
-				><span>Duplicates</span></a
-			>
-			<a href={resolve('/manage/unsorted')} class:current={active(resolve('/manage/unsorted'))}
-				><span>Unsorted</span></a
-			>
-			<a href={resolve('/trash')} class:current={active(resolve('/trash'))}><span>Trash</span></a>
-			{#if session.user?.is_admin}
-				<a href={adminPath}><span>Administration</span></a>
+			{#if path === collectionsPath}
+				{#each organize.collections.filter((c) => c.pinned) as pinned (pinned.id)}
+					{@const href = resolve('/collections/[id]', { id: pinned.id })}
+					<a {href} class="sub" class:current={page.url.pathname === href}
+						><span>{pinned.name}</span></a
+					>
+				{/each}
 			{/if}
-		</div>
+		{/each}
+
+		<span class="group">Manage</span>
+		{#each MANAGE as [path, label, icon] (path)}
+			<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
+		{/each}
+		{#if session.user?.is_admin}
+			<a href={adminPath}><Icon path={mdiShieldAccountOutline} /><span>Administration</span></a>
+		{/if}
 	{/if}
 </nav>
 
 <style>
+	/* Like Immich: icons and labels, the current entry a rounded pill in the
+	   accent colour, flush with the left edge. */
 	nav {
 		display: grid;
 		align-content: start;
 		gap: 2px;
 		position: sticky;
-		top: 80px;
-		width: 200px;
+		top: 72px;
+		width: 248px;
 		flex-shrink: 0;
+		margin-left: -16px;
+		padding-right: 12px;
 	}
 	nav[hidden] {
 		display: none;
 	}
 	a {
-		padding: 7px 10px;
-		border-radius: var(--radius);
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		min-height: 44px;
+		padding: 0 16px 0 24px;
+		border-radius: 0 999px 999px 0;
 		text-decoration: none;
 		color: var(--ink);
+		font-weight: 500;
+	}
+	a :global(svg) {
+		color: var(--muted);
 	}
 	a:hover {
 		background: var(--rail);
 		color: var(--ink);
 	}
-	/* The current entry gets the highlighter, like a marked line in a paper. */
-	a.current span {
+	a.current {
+		background: var(--accent-soft);
+		color: var(--royal);
 		font-weight: 650;
-		color: var(--on-highlighter);
-		background: linear-gradient(
-			100deg,
-			transparent 0.15em,
-			var(--highlighter) 0.3em,
-			var(--highlighter) calc(100% - 0.3em),
-			transparent calc(100% - 0.1em)
-		);
-		background-size: 100% 70%;
-		background-position: 0 75%;
-		background-repeat: no-repeat;
-		padding: 0 0.3em;
-		margin: 0 -0.3em;
-		border-radius: 0.4em 0.2em 0.5em 0.25em;
 	}
-	a.current:not(.sub):has(+ .sub:not(.pin)) span {
-		background: none;
-		color: var(--ink);
+	a.current :global(svg) {
+		color: var(--royal);
+	}
+	a span {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	a.sub {
-		padding-left: 24px;
-		font-size: 0.95em;
+		min-height: 36px;
+		padding-left: 60px;
+		font-size: 0.94em;
+		font-weight: 450;
 		color: var(--muted);
 	}
-	.bottom {
-		display: grid;
-		gap: 2px;
-		margin-top: 16px;
-		padding-top: 10px;
-		border-top: 1px solid var(--rule);
+	a.sub.current {
+		color: var(--royal);
 	}
 	a.back {
 		color: var(--royal);
-		margin-bottom: 12px;
+		margin-bottom: 8px;
+	}
+	a.back :global(svg) {
+		color: var(--royal);
 	}
 	.group {
-		margin: 4px 10px 2px;
-		font-family: var(--serif);
+		margin: 20px 0 6px 24px;
+		font-size: var(--step--1);
 		font-weight: 600;
 		color: var(--muted);
 	}
@@ -183,8 +210,9 @@
 		position: fixed;
 		inset: 0 auto 0 0;
 		z-index: 40;
-		width: min(280px, 85vw);
-		padding: 20px 16px;
+		width: min(300px, 85vw);
+		margin-left: 0;
+		padding: 16px 12px 16px 0;
 		overflow-y: auto;
 		background: var(--paper);
 		border-right: 1px solid var(--rule);

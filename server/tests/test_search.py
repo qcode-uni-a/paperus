@@ -150,3 +150,23 @@ def test_search_needs_login_and_a_query(
     assert logged_in.get("/api/search").status_code == 422
     logged_in.post("/api/auth/logout")
     assert client.get("/api/search", params={"q": "x"}).status_code == 401
+
+
+def test_best_few_per_paper_and_within_one(
+    logged_in: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    """One paper full of hits does not fill the list; a search within one
+    paper gets the rest of its hits."""
+    long = make_pdf([[f"Drought in year {n}", "Drought again."] for n in range(1, 9)])
+    many, few = add_item(logged_in, "Many droughts"), add_item(logged_in, "Few")
+    process(db, blobs, upload(logged_in, many, long, "long.pdf"))
+    process(db, blobs, upload(logged_in, few))
+    found = logged_in.get(
+        "/api/search", params={"q": "drought", "mode": "keyword", "per_item": 2}
+    ).json()
+    titles = [p["item_title"] for p in found]
+    assert titles.count("Many droughts") == 2 and "Few" in titles
+    within = logged_in.get(
+        "/api/search", params={"q": "drought", "mode": "keyword", "item": many}
+    ).json()
+    assert len(within) > 2 and {p["item_id"] for p in within} == {many}

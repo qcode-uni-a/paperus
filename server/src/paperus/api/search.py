@@ -70,6 +70,8 @@ _SEARCH = text(
           AND i.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR i.type = ANY(CAST(:types AS text[])))
+          -- Within one paper only, if asked.
+          AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
         UNION ALL
         SELECT 'note', nc.note_id, nc.position, NULL, nc.chunk_sha256, false,
                NULL, NULL, n.title
@@ -78,6 +80,7 @@ _SEARCH = text(
           AND n.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR 'note' = ANY(CAST(:types AS text[])))
+          AND CAST(:item AS uuid) IS NULL
     ),
     keyword AS (
         SELECT vis.source_id, vis.position, row_number() OVER (
@@ -85,7 +88,7 @@ _SEARCH = text(
                ) AS rank
         FROM visible vis JOIN chunks c ON c.sha256 = vis.chunk_sha256, q
         WHERE :use_keyword AND c.tsv @@ q.tsq
-        ORDER BY rank LIMIT {CANDIDATES}
+        ORDER BY rank LIMIT :candidates
     ),
     meaning AS (
         SELECT vis.source_id, vis.position, row_number() OVER (
@@ -96,7 +99,7 @@ _SEARCH = text(
              JOIN embeddings e
                ON e.chunk_sha256 = vis.chunk_sha256 AND e.model = :model
         WHERE :use_meaning AND NOT vis.in_references
-        ORDER BY rank LIMIT {CANDIDATES}
+        ORDER BY rank LIMIT :candidates
     ),
     fused AS (
         SELECT source_id, position, sum(1.0 / ({RRF_K} + rank)) AS score,
@@ -108,6 +111,14 @@ _SEARCH = text(
             SELECT source_id, position, rank, 'meaning' AS source FROM meaning
         ) AS candidates
         GROUP BY source_id, position
+    ),
+    -- The best few per paper (or note), so one paper cannot fill the list.
+    capped AS (
+        SELECT fused.*, row_number() OVER (
+                   PARTITION BY coalesce(vis.item_id, vis.source_id)
+                   ORDER BY fused.score DESC, source_id, position
+               ) AS nth
+        FROM fused JOIN visible vis USING (source_id, position)
     )
     SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
            vis.version_id,
@@ -127,10 +138,11 @@ _SEARCH = text(
                     THEN left(c.text, 320) || '…' ELSE c.text END,
                '&', '&amp;'), '<', '&lt;'), '>', '&gt;')
            END AS snippet
-    FROM fused
+    FROM capped fused
          JOIN visible vis USING (source_id, position)
          JOIN chunks c ON c.sha256 = vis.chunk_sha256,
          q
+    WHERE fused.nth <= :per_item
     ORDER BY fused.score DESC, vis.source_id, vis.position
     LIMIT :limit
     """
@@ -158,9 +170,13 @@ def run_search(
     mode: Mode = "hybrid",
     types: list[str] | None = None,
     library_id: uuid.UUID | None = None,
+    per_item: int | None = None,
+    item_id: uuid.UUID | None = None,
 ) -> tuple[Mode, list[Passage]]:
     """Passages for ``q`` that the person may read, and the mode used
-    (hybrid falls back to keywords without the ML service)."""
+    (hybrid falls back to keywords without the ML service). ``per_item``:
+    at most that many per paper or note (more candidates are looked at, so
+    more papers fill the list); ``item_id``: within that paper only."""
     model = load_config(db, settings).embedding_model
     vector = None
     if mode != "keyword":
@@ -180,6 +196,9 @@ def run_search(
             "use_meaning": vector is not None,
             "types": types or [],
             "libraries": libraries,
+            "item": item_id,
+            "per_item": per_item or limit,
+            "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
         },
     ).mappings()
     passages = [
@@ -221,12 +240,16 @@ def search(
     mode: Mode = "hybrid",
     type: Annotated[list[str] | None, Query()] = None,
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
+    per_item: Annotated[int | None, Query(ge=1, le=100)] = None,
+    item: uuid.UUID | None = None,
 ) -> list[Passage]:
     """Passages for ``q`` in the libraries the person can read (or one
     ``library``): its words (quotes for phrases, ``-`` to exclude), its
-    meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
-    ``X-Search-Mode`` header says what was used: without the ML service,
-    hybrid search falls back to keywords."""
+    meaning, or both; ``type`` (repeatable, CSL types) limits the items.
+    ``per_item`` keeps the best few per paper or note, so more papers fit;
+    ``item`` searches within one paper. The ``X-Search-Mode`` header says
+    what was used: without the ML service, hybrid search falls back to
+    keywords."""
     used, passages = run_search(
         db,
         access,
@@ -237,6 +260,8 @@ def search(
         mode=mode,
         types=type,
         library_id=library_id,
+        per_item=per_item,
+        item_id=item,
     )
     response.headers["X-Search-Mode"] = used
     return passages

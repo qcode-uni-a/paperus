@@ -74,8 +74,12 @@
 	--step-3: 1.728rem;
 	--step-4: 2.074rem;
 
-	--radius: 6px;
+	--radius: 10px;
 	--gap: 16px;
+
+	/* The current menu entry, and filled fields like the search bar. */
+	--accent-soft: color-mix(in srgb, var(--royal) 13%, transparent);
+	--field: #eceff5;
 
 	/* Legacy names used across components. */
 	--bg: var(--paper);
@@ -111,6 +115,7 @@
 	--success: #7fd29a;
 	--focus: #9aacff;
 	--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+	--field: #1f2642;
 
 	--tag-gray-bg: #2a3046;
 	--tag-gray-ink: #c9cede;
@@ -170,6 +175,7 @@
 		--success: #7fd29a;
 		--focus: #9aacff;
 		--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+		--field: #1f2642;
 
 		--tag-gray-bg: #2a3046;
 		--tag-gray-ink: #c9cede;
@@ -283,11 +289,13 @@ textarea:focus-visible {
 	color: var(--faint);
 }
 
+/* Rounded buttons, as in Immich. */
 button {
 	background: var(--surface);
 	border: 1px solid var(--rule);
-	border-radius: var(--radius);
-	padding: 7px 14px;
+	border-radius: 999px;
+	padding: 7px 18px;
+	font-weight: 550;
 	cursor: pointer;
 	color: var(--ink);
 	transition:
