@@ -73,3 +73,32 @@ duplicate detection, topic clustering of a collection.
 Build a test set early: ~50 real questions from the group with the paragraphs
 that answer them. Measure recall@10 and compare chunking/model choices on our
 own data. Run the same set through several AI clients for the MCP path.
+
+`paperus evaluate questions.json --user <name> [--each]` runs every question
+in each mode (keyword, meaning, hybrid; one passage per paper) and prints
+hit@1, hit@5 and MRR@10 per mode and per kind of question. The file is a JSON
+list of `{"q": "…", "item_id": "…", "kind": "vague", "accept": ["…"]}`
+(`accept`: other papers that also count as right). Question sets name papers
+from someone's library, so they stay out of the repository.
+
+### First run (2026-11-06)
+
+44 questions written by Claude from the abstracts and passages of 40 papers
+in one physicist’s library (376 papers), with multilingual-e5-small:
+
+| mode    | hit@1 | hit@5 | MRR@10 |
+| ------- | ----- | ----- | ------ |
+| keyword | 0.18  | 0.20  | 0.19   |
+| meaning | 0.68  | 0.91  | 0.78   |
+| hybrid  | 0.66  | 0.91  | 0.77   |
+
+- Keyword search needs every word in one passage, so it finds nothing for a
+  question written as a sentence (2 of 25 paraphrases); it finds all five
+  name-and-term queries ("SATIN protocol"). Hybrid is therefore almost
+  exactly search by meaning.
+- German questions about English papers: 2 of 4 in the top five.
+- Trial: the keyword half matching any word that is not a stop word
+  (ranked with `ts_rank`, normalised by length) reached 0.66 / 0.89 / 0.75
+  on its own, but hybrid only 0.68 / 0.89 / 0.77. The questions share the
+  abstracts' words, which favours keywords; not adopted until real
+  questions from the group confirm it.

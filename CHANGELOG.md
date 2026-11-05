@@ -8,6 +8,9 @@
   shows which ones you have. Connected from its settings with a token that
   may only add papers. Until it is in the stores: the zips on the GitHub
   release, loaded unpacked.
+- `paperus evaluate questions.json --user <name>`: how well each search mode
+  finds the paper each question means (hit@1, hit@5, MRR@10); first results
+  in `docs/search.md`.
 - `GET /api/items/lookup?id=arxiv:…&id=doi:…`: which of these papers one has.
 - **Download again** for a damaged file: a fresh open-access copy from
   arXiv, or by DOI via Unpaywall (with the contact email set), replaces it;

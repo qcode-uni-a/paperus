@@ -1,5 +1,5 @@
 """Command line: ``paperus serve``, ``worker``, ``migrate``, ``user create``,
-``backup create|list|restore``, ``import``."""
+``backup create|list|restore``, ``import``, ``evaluate``."""
 
 import argparse
 import getpass
@@ -22,9 +22,11 @@ from paperus.backup import (
 )
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
+from paperus.evaluate import evaluate, load_questions, report
 from paperus.importing.run import run_import
 from paperus.jobs import make_job_app, queue_text_extraction, run_worker
 from paperus.migrate import migrate
+from paperus.ml import make_ml_client
 from paperus.models import Group, Import, ImportStatus, User
 from paperus.storage import make_blob_store
 from paperus.system import max_upload_bytes
@@ -81,6 +83,17 @@ def main(argv: list[str] | None = None) -> None:
         help="give everything new to this group (default: the user's default owner)",
     )
 
+    evaluate_ = commands.add_parser(
+        "evaluate", help="how well search finds papers, for a set of questions"
+    )
+    evaluate_.add_argument(
+        "path", help='JSON: [{"q": "…", "item_id": "…", "kind": "…"}, …]'
+    )
+    evaluate_.add_argument("--user", required=True, help="search as this user")
+    evaluate_.add_argument(
+        "--each", action="store_true", help="also show each question's rank"
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "serve":
@@ -108,6 +121,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "import":
         logging.basicConfig(level=logging.WARNING)
         sys.exit(import_command(args.path, args.user, args.group))
+    elif args.command == "evaluate":
+        logging.basicConfig(level=logging.WARNING)
+        sys.exit(evaluate_command(args.path, args.user, each=args.each))
     elif args.command == "user" and args.user_command == "create":
         sys.exit(
             create_user_command(
@@ -271,5 +287,25 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
         print(error, file=sys.stderr)
         return 1
     finally:
+        engine.dispose()
+    return 0
+
+
+def evaluate_command(path_text: str, username: str, *, each: bool = False) -> int:
+    """Search with each question in every mode and print the scores."""
+    questions = load_questions(Path(path_text))
+    settings = Settings()
+    engine = make_engine(settings.database_url)
+    ml = make_ml_client(settings)
+    try:
+        with make_sessionmaker(engine)() as db:
+            user = db.scalar(select(User).where(User.username == username))
+            if user is None:
+                print(f"No user {username!r}.", file=sys.stderr)
+                return 1
+            results = evaluate(db, Access.of(db, user), ml, settings, questions)
+            print(report(results, questions if each else None))
+    finally:
+        ml.close()
         engine.dispose()
     return 0
