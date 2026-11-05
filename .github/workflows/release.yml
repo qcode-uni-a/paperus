@@ -96,7 +96,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.2  # no moving major tag; pin an exact version
       - run: cd ${{ matrix.folder }} && uv build -o ../dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
