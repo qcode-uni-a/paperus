@@ -1,8 +1,9 @@
 """Change numbers: which items changed since a client last looked.
 
-Every transaction that changes an item, or its versions, identifiers or
-files, takes the next number from the library's counter and stamps it on the
-item (like Zotero's library version). Taking the number locks the counter row
+Every transaction that changes an item (or its versions, identifiers, files,
+tags and collection memberships), a tag or a collection takes the next number
+from the library's counter and stamps it on what changed (like Zotero's
+library version). Taking the number locks the counter row
 until commit, so numbers become visible in order and ``since=N`` never misses
 a change that commits late.
 """
@@ -12,7 +13,17 @@ from itertools import chain
 from sqlalchemy import event, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
-from paperus.models import ChangeCounter, File, Identifier, Item, Version
+from paperus.models import (
+    ChangeCounter,
+    Collection,
+    CollectionItem,
+    File,
+    Identifier,
+    Item,
+    ItemTag,
+    Tag,
+    Version,
+)
 
 COUNTER = "library"
 _INFO_KEY = "paperus_change"
@@ -38,11 +49,12 @@ def _next_change(db: Session) -> int:
     )
 
 
-def _item_of(obj: object) -> Item | None:
+def _stamped(obj: object) -> Item | Tag | Collection | None:
+    """The object whose change number a change to ``obj`` moves."""
     match obj:
-        case Item():
+        case Item() | Tag() | Collection():
             return obj
-        case Version():
+        case Version() | ItemTag() | CollectionItem():
             return obj.item
         case Identifier() | File():
             return obj.version.item if obj.version else None
@@ -56,14 +68,14 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
         (obj for obj in db.dirty if db.is_modified(obj, include_collections=True)),
         db.deleted,
     )
-    items = {item for obj in changed if (item := _item_of(obj)) is not None}
-    if not items:
+    stamped = {target for obj in changed if (target := _stamped(obj)) is not None}
+    if not stamped:
         return
     with db.no_autoflush:
         if _INFO_KEY not in db.info:
             db.info[_INFO_KEY] = _next_change(db)
-        for item in items:
-            item.change = db.info[_INFO_KEY]
+        for target in stamped:
+            target.change = db.info[_INFO_KEY]
 
 
 @event.listens_for(Session, "after_commit")

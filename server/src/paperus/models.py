@@ -125,6 +125,16 @@ class FileSource(StrEnum):
     BROWSER = "browser"
 
 
+class TagSource(StrEnum):
+    """Who put a tag on an item (Zotero keeps manual and automatic apart)."""
+
+    MANUAL = "manual"
+    AUTOMATIC = "automatic"
+    """From metadata, e.g. a registry's subjects."""
+    AI = "ai"
+    """Suggested by an AI assistant (shown apart until accepted)."""
+
+
 class Item(Record, Trashable, Base):
     """One work (paper, book, lecture notes, meeting notes, …).
 
@@ -151,6 +161,12 @@ class Item(Record, Trashable, Base):
         order_by="Version.id",
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+    tag_links: Mapped[list[ItemTag]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", lazy="selectin"
+    )
+    collection_links: Mapped[list[CollectionItem]] = relationship(
+        back_populates="item", cascade="all, delete-orphan", lazy="selectin"
     )
 
 
@@ -301,3 +317,76 @@ class SystemSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class Tag(Record, Base):
+    """A label for items; names are unique regardless of case."""
+
+    __tablename__ = "tags"
+    __table_args__ = (Index("ix_tags_name_lower", text("lower(name)"), unique=True),)
+
+    name: Mapped[str] = mapped_column(String(100))
+    change: Mapped[int] = mapped_column(
+        BigInteger, server_default=text("0"), index=True
+    )
+
+
+class ItemTag(Base):
+    __tablename__ = "item_tags"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    source: Mapped[str] = mapped_column(String(16))
+    added_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    item: Mapped[Item] = relationship(back_populates="tag_links")
+    tag: Mapped[Tag] = relationship(lazy="joined", innerjoin=True)
+
+
+class Collection(Record, Base):
+    """A folder of items; collections nest, and an item can be in several.
+
+    Deleting a collection deletes its subcollections, never its items.
+    """
+
+    __tablename__ = "collections"
+
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None]
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"), index=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    change: Mapped[int] = mapped_column(
+        BigInteger, server_default=text("0"), index=True
+    )
+
+
+class CollectionItem(Base):
+    __tablename__ = "collection_items"
+
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    added_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    item: Mapped[Item] = relationship(back_populates="collection_links")

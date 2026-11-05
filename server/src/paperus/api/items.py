@@ -13,8 +13,17 @@ from sqlalchemy.exc import IntegrityError
 from paperus import changes, library, metadata
 from paperus.api.deps import DB, CurrentUser
 from paperus.api.files import FileOut, file_out
+from paperus.api.organize import ItemTagOut, item_tags
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
-from paperus.models import Item, MetadataSource, TextStatus, Version, VersionKind
+from paperus.models import (
+    Item,
+    ItemTag,
+    MetadataSource,
+    TextStatus,
+    Version,
+    VersionKind,
+)
+from paperus.organize import item_ids_in
 
 router = APIRouter(tags=["items"])
 
@@ -77,6 +86,8 @@ class ItemOut(BaseModel):
     deleted_at: datetime | None
     processing: bool
     """Files are still being read (text, and metadata for uploads)."""
+    tags: list[ItemTagOut]
+    collection_ids: list[uuid.UUID]
 
 
 class ItemDetail(ItemOut):
@@ -135,6 +146,8 @@ def item_out(item: Item) -> ItemOut:
         created_at=item.created_at,
         change=item.change,
         deleted_at=item.deleted_at,
+        tags=item_tags(item),
+        collection_ids=[link.collection_id for link in item.collection_links],
         processing=any(
             f.text_status == TextStatus.PENDING and f.deleted_at is None
             for v in item.versions
@@ -398,11 +411,16 @@ def list_items(
     before: uuid.UUID | None = None,
     trashed: bool = False,
     since: Annotated[int | None, Query(ge=0)] = None,
+    tag: Annotated[list[uuid.UUID] | None, Query()] = None,
+    collection: uuid.UUID | None = None,
+    nested: bool = True,
 ) -> list[ItemOut]:
     """Items, newest first; ``before`` = last ``id`` for the next page.
 
-    ``trashed=true`` lists the trash instead. ``X-Total-Count`` is the number
-    of items in the list (or trash), for showing the total while paging.
+    ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
+    with all of them) and ``collection`` (with its subcollections unless
+    ``nested=false``) filter the list. ``X-Total-Count`` is the number of
+    matching items, for showing the total while paging.
     ``since=N`` is for syncing:
     every item changed after change number N, trashed or not, in change
     order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
@@ -412,10 +430,18 @@ def list_items(
     if since is not None:
         query = select(Item).where(Item.change > since).order_by(Item.change, Item.id)
         return [item_out(item) for item in db.scalars(query)]
-    in_trash = Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None)
-    total = db.scalar(select(func.count()).select_from(Item).where(in_trash)) or 0
+    conditions = [
+        Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None)
+    ]
+    for tag_id in tag or []:
+        conditions.append(
+            Item.id.in_(select(ItemTag.item_id).where(ItemTag.tag_id == tag_id))
+        )
+    if collection is not None:
+        conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
+    total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
-    query = select(Item).where(in_trash).order_by(Item.id.desc()).limit(limit)
+    query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item) for item in db.scalars(query)]
