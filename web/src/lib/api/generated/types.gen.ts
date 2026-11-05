@@ -252,6 +252,10 @@ export type GroupChange = {
      * Description
      */
     description?: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
 };
 
 /**
@@ -777,6 +781,24 @@ export type NewItemUpload = {
 };
 
 /**
+ * NewUser
+ */
+export type NewUser = {
+    /**
+     * Username
+     */
+    username: string;
+    /**
+     * Password
+     */
+    password: string;
+    /**
+     * Is Admin
+     */
+    is_admin?: boolean;
+};
+
+/**
  * Owner
  */
 export type Owner = {
@@ -1039,6 +1061,26 @@ export type UserBrief = {
 };
 
 /**
+ * UserChange
+ *
+ * Only the fields given change.
+ */
+export type UserChange = {
+    /**
+     * Password
+     */
+    password?: string | null;
+    /**
+     * Is Admin
+     */
+    is_admin?: boolean | null;
+    /**
+     * Active
+     */
+    active?: boolean | null;
+};
+
+/**
  * UserOut
  */
 export type UserOut = {
@@ -1058,6 +1100,44 @@ export type UserOut = {
      * Seen Hints
      */
     seen_hints: Array<string>;
+};
+
+/**
+ * UserRow
+ */
+export type UserRow = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Username
+     */
+    username: string;
+    /**
+     * Is Admin
+     */
+    is_admin: boolean;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Login At
+     */
+    last_login_at: string | null;
+    /**
+     * Deactivated At
+     */
+    deactivated_at: string | null;
+    /**
+     * Groups
+     */
+    groups: number;
+    /**
+     * Papers
+     */
+    papers: number;
 };
 
 /**
@@ -2673,6 +2753,36 @@ export type SetMemberResponses = {
 
 export type SetMemberResponse = SetMemberResponses[keyof SetMemberResponses];
 
+export type LeaveGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}/leave';
+};
+
+export type LeaveGroupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LeaveGroupError = LeaveGroupErrors[keyof LeaveGroupErrors];
+
+export type LeaveGroupResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type LeaveGroupResponse = LeaveGroupResponses[keyof LeaveGroupResponses];
+
 export type FindUsersData = {
     body?: never;
     path?: never;
@@ -2704,3 +2814,76 @@ export type FindUsersResponses = {
 };
 
 export type FindUsersResponse = FindUsersResponses[keyof FindUsersResponses];
+
+export type ListUsersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/users';
+};
+
+export type ListUsersResponses = {
+    /**
+     * Response List Users
+     *
+     * Successful Response
+     */
+    200: Array<UserRow>;
+};
+
+export type ListUsersResponse = ListUsersResponses[keyof ListUsersResponses];
+
+export type CreateUserData = {
+    body: NewUser;
+    path?: never;
+    query?: never;
+    url: '/api/admin/users';
+};
+
+export type CreateUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateUserError = CreateUserErrors[keyof CreateUserErrors];
+
+export type CreateUserResponses = {
+    /**
+     * Successful Response
+     */
+    201: UserRow;
+};
+
+export type CreateUserResponse = CreateUserResponses[keyof CreateUserResponses];
+
+export type ChangeUserData = {
+    body: UserChange;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/admin/users/{user_id}';
+};
+
+export type ChangeUserErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangeUserError = ChangeUserErrors[keyof ChangeUserErrors];
+
+export type ChangeUserResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserRow;
+};
+
+export type ChangeUserResponse = ChangeUserResponses[keyof ChangeUserResponses];

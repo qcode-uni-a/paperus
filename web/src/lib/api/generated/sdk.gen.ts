@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, ListCollectionsData, ListCollectionsResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -549,9 +549,52 @@ export const setMember = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
+ * Leave Group
+ *
+ * Leave a group one was added to. Membership through a group above can
+ * only be left there.
+ */
+export const leaveGroup = <ThrowOnError extends boolean = false>(options: Options<LeaveGroupData, ThrowOnError>): RequestResult<LeaveGroupResponses, LeaveGroupErrors, ThrowOnError> => (options.client ?? client).post<LeaveGroupResponses, LeaveGroupErrors, ThrowOnError>({ url: '/api/groups/{group_id}/leave', ...options });
+
+/**
  * Find Users
  *
  * People to add to a group, by username; for site administrators and
  * group admins.
  */
 export const findUsers = <ThrowOnError extends boolean = false>(options?: Options<FindUsersData, ThrowOnError>): RequestResult<FindUsersResponses, FindUsersErrors, ThrowOnError> => (options?.client ?? client).get<FindUsersResponses, FindUsersErrors, ThrowOnError>({ url: '/api/users', ...options });
+
+/**
+ * List Users
+ */
+export const listUsers = <ThrowOnError extends boolean = false>(options?: Options<ListUsersData, ThrowOnError>): RequestResult<ListUsersResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListUsersResponses, unknown, ThrowOnError>({ url: '/api/admin/users', ...options });
+
+/**
+ * Create User
+ *
+ * A new account (with its private space); 409 if the name is taken.
+ */
+export const createUser = <ThrowOnError extends boolean = false>(options: Options<CreateUserData, ThrowOnError>): RequestResult<CreateUserResponses, CreateUserErrors, ThrowOnError> => (options.client ?? client).post<CreateUserResponses, CreateUserErrors, ThrowOnError>({
+    url: '/api/admin/users',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Change User
+ *
+ * Reset a password, grant or take admin rights, (de)activate. The last
+ * active administrator cannot lose those rights, and nobody deactivates
+ * themselves.
+ */
+export const changeUser = <ThrowOnError extends boolean = false>(options: Options<ChangeUserData, ThrowOnError>): RequestResult<ChangeUserResponses, ChangeUserErrors, ThrowOnError> => (options.client ?? client).patch<ChangeUserResponses, ChangeUserErrors, ThrowOnError>({
+    url: '/api/admin/users/{user_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

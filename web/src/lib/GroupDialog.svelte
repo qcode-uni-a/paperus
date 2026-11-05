@@ -4,7 +4,34 @@
 
 	/** Create a group (top-level with a first admin, or inside ``parent``), or
 	 * rename one. */
-	let { onsaved }: { onsaved?: (id: string) => void } = $props();
+	let {
+		onsaved,
+		groups = [],
+		siteAdmin = false
+	}: {
+		onsaved?: (id: string) => void;
+		/** All groups the person sees, for moving one. */
+		groups?: GroupOut[];
+		siteAdmin?: boolean;
+	} = $props();
+	let inside = $state('');
+
+	/** Where the group may move: groups one manages, not itself or below. */
+	const destinations = $derived.by(() => {
+		if (!group) return [];
+		const below = new Set([group.id]);
+		let grew = true;
+		while (grew) {
+			grew = false;
+			for (const g of groups) {
+				if (g.parent_id && below.has(g.parent_id) && !below.has(g.id)) {
+					below.add(g.id);
+					grew = true;
+				}
+			}
+		}
+		return groups.filter((g) => g.can_manage && !below.has(g.id));
+	});
 
 	let dialog = $state<HTMLDialogElement>();
 	let group = $state<GroupOut | null>(null);
@@ -24,6 +51,7 @@
 		name = group?.name ?? '';
 		description = group?.description ?? '';
 		adminName = '';
+		inside = group?.parent_id ?? '';
 		error = '';
 		if (topLevel) findUsers().then(({ data }) => (people = data ?? []));
 		dialog?.showModal();
@@ -40,8 +68,12 @@
 			return;
 		}
 		const body = { name, description: description.trim() || null };
+		const moving = group && inside !== (group.parent_id ?? '');
 		const result = group
-			? await changeGroup({ path: { group_id: group.id }, body })
+			? await changeGroup({
+					path: { group_id: group.id },
+					body: moving ? { ...body, parent_id: inside || null } : body
+				})
 			: await createGroup({
 					body: { ...body, parent_id: parent?.id ?? null, admin_id: admin?.id ?? null }
 				});
@@ -65,6 +97,25 @@
 			Description <span class="optional">(optional)</span>
 			<textarea bind:value={description} rows="2"></textarea>
 		</label>
+		{#if group && (destinations.length || siteAdmin)}
+			<label>
+				Inside
+				<select bind:value={inside}>
+					{#if siteAdmin || !group.parent_id}
+						<option value="">No other group (top level)</option>
+					{/if}
+					{#each destinations as option (option.id)}
+						<option value={option.id}>{option.name}</option>
+					{/each}
+				</select>
+			</label>
+			{#if inside !== (group.parent_id ?? '')}
+				<p class="note">
+					Members of the new group above become members of {group.name} too; those who were in it only
+					through its old place no longer are.
+				</p>
+			{/if}
+		{/if}
 		{#if topLevel}
 			<label>
 				First admin <span class="optional">(you, if left empty)</span>

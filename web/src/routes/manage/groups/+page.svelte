@@ -6,6 +6,7 @@
 		deleteGroup,
 		errorMessage,
 		findUsers,
+		leaveGroup,
 		listGroups,
 		listMembers,
 		removeMember,
@@ -99,6 +100,17 @@
 		select(groups[0]?.id ?? '');
 	}
 
+	async function leave(group: GroupOut) {
+		if (!confirm(`Leave ${group.name}? You will no longer see its papers.`)) return;
+		const result = await leaveGroup({ path: { group_id: group.id } });
+		if (result.error) {
+			error = errorMessage(result.error);
+			return;
+		}
+		await Promise.all([load(), loadOrganize()]);
+		select(groups[0]?.id ?? '');
+	}
+
 	function roleLabel(role: Role): string {
 		return ROLES.find((r) => r.value === role)?.label ?? role;
 	}
@@ -165,6 +177,9 @@
 			{#if error}<p class="error">{error}</p>{/if}
 
 			<h3>People</h3>
+			{#if members.find((m) => m.user_id === session.user?.id)?.direct_role}
+				<button class="leave" onclick={() => leave(selected)}>Leave {selected.name}</button>
+			{/if}
 			<ul class="members">
 				{#each members as member (member.user_id)}
 					<li>
@@ -267,6 +282,8 @@
 {/if}
 
 <GroupDialog
+	{groups}
+	siteAdmin={session.user?.is_admin ?? false}
 	bind:this={dialog}
 	onsaved={async (id) => {
 		await Promise.all([load(), loadOrganize()]);
@@ -415,6 +432,10 @@
 	}
 	.spacer {
 		width: 34px;
+	}
+	.leave {
+		margin: -4px 0 8px;
+		font-size: var(--step--1);
 	}
 	.add {
 		display: flex;
