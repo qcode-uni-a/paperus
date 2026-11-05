@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The search field says what the search options are set to, e.g. "Search
+  preprints by meaning".
 - Fixed: the search options panel was squeezed to the width of its button.
 - **Profile picture editor**: move and zoom the picture in a circle, with
   previews at the sizes others see. Only the 256-pixel result leaves the

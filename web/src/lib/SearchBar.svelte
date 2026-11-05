@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import Icon from '#lib/Icon.svelte';
+	import { plural } from '#lib/format.ts';
 	import SearchFilters, { type Filters } from '#lib/SearchFilters.svelte';
 
 	/** The search in the top bar, on every page. The search
@@ -19,6 +20,21 @@
 		words: mode !== 'meaning',
 		meaning: mode !== 'keyword',
 		types: params.getAll('type')
+	});
+
+	/** What the search options say, in the empty field: "Search preprints
+	 * by meaning". */
+	const placeholder = $derived.by(() => {
+		const how =
+			filters.words && filters.meaning ? 'words or meaning' : filters.words ? 'words' : 'meaning';
+		const kinds = filters.types.map(plural);
+		const what =
+			kinds.length === 0
+				? ''
+				: kinds.length <= 2
+					? `${kinds.join(' and ')} `
+					: `${kinds.length} types `;
+		return `Search ${what}by ${how}`;
 	});
 
 	let query = $state(untrack(() => searched));
@@ -86,7 +102,7 @@
 		bind:this={field}
 		type="search"
 		bind:value={query}
-		placeholder="Search by words or meaning"
+		{placeholder}
 		aria-label="Search the library"
 		onkeydown={(event) => {
 			if (event.key === 'Escape') clear();
@@ -117,6 +133,7 @@
 		background: var(--field);
 		color: var(--ink);
 		font-size: var(--step-0);
+		text-overflow: ellipsis;
 	}
 	input:hover {
 		border-color: var(--rule);

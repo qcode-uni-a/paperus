@@ -18,6 +18,14 @@ export function typeName(type: string): string {
 	return TYPE_NAMES[type] ?? type.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
 }
 
+/** A type in the plural, lower case: "journal articles", "theses". */
+export function plural(type: string): string {
+	const name = typeName(type).toLowerCase();
+	if (name.endsWith('sis')) return `${name.slice(0, -3)}ses`;
+	if (name === 'software') return name;
+	return `${name}s`;
+}
+
 /** "Huang, Xin" → "Xin Huang"; names without a comma stay as they are. */
 export function fullName(author: string): string {
 	const [family, given] = author.split(',').map((part) => part.trim());
