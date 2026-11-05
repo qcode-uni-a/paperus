@@ -37,6 +37,70 @@ export type BodyUploadToVersion = {
 };
 
 /**
+ * CollectionChange
+ *
+ * Only the fields given are changed; ``parent_id: null`` moves to the top.
+ */
+export type CollectionChange = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+};
+
+/**
+ * CollectionIn
+ */
+export type CollectionIn = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+};
+
+/**
+ * CollectionOut
+ */
+export type CollectionOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id: string | null;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * FileOut
  */
 export type FileOut = {
@@ -170,6 +234,14 @@ export type ItemDetail = {
      */
     processing: boolean;
     /**
+     * Tags
+     */
+    tags: Array<ItemTagOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+    /**
      * Csl
      */
     csl: {
@@ -189,6 +261,16 @@ export type ItemDetail = {
      * Versions
      */
     versions: Array<VersionOut>;
+};
+
+/**
+ * ItemIds
+ */
+export type ItemIds = {
+    /**
+     * Item Ids
+     */
+    item_ids: Array<string>;
 };
 
 /**
@@ -239,6 +321,29 @@ export type ItemOut = {
      * Processing
      */
     processing: boolean;
+    /**
+     * Tags
+     */
+    tags: Array<ItemTagOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+};
+
+/**
+ * ItemTagOut
+ */
+export type ItemTagOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    source: TagSource;
 };
 
 /**
@@ -446,6 +551,41 @@ export type SystemConfig = {
      */
     embedding_model: string;
 };
+
+/**
+ * TagIn
+ */
+export type TagIn = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * TagOut
+ */
+export type TagOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
+ * TagSource
+ *
+ * Who put a tag on an item (Zotero keeps manual and automatic apart).
+ */
+export type TagSource = 'manual' | 'automatic' | 'ai';
 
 /**
  * TextStatus
@@ -689,6 +829,18 @@ export type ListItemsData = {
          * Since
          */
         since?: number | null;
+        /**
+         * Tag
+         */
+        tag?: Array<string> | null;
+        /**
+         * Collection
+         */
+        collection?: string | null;
+        /**
+         * Nested
+         */
+        nested?: boolean;
     };
     url: '/api/items';
 };
@@ -1282,3 +1434,316 @@ export type RunJobResponses = {
 };
 
 export type RunJobResponse = RunJobResponses[keyof RunJobResponses];
+
+export type ListTagsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tags';
+};
+
+export type ListTagsResponses = {
+    /**
+     * Response List Tags
+     *
+     * Successful Response
+     */
+    200: Array<TagOut>;
+};
+
+export type ListTagsResponse = ListTagsResponses[keyof ListTagsResponses];
+
+export type AddTagData = {
+    body: TagIn;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/tags';
+};
+
+export type AddTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddTagError = AddTagErrors[keyof AddTagErrors];
+
+export type AddTagResponses = {
+    /**
+     * Response Add Tag
+     *
+     * Successful Response
+     */
+    201: Array<ItemTagOut>;
+};
+
+export type AddTagResponse = AddTagResponses[keyof AddTagResponses];
+
+export type RemoveTagData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/tags/{tag_id}';
+};
+
+export type RemoveTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveTagError = RemoveTagErrors[keyof RemoveTagErrors];
+
+export type RemoveTagResponses = {
+    /**
+     * Response Remove Tag
+     *
+     * Successful Response
+     */
+    200: Array<ItemTagOut>;
+};
+
+export type RemoveTagResponse = RemoveTagResponses[keyof RemoveTagResponses];
+
+export type DeleteTagData = {
+    body?: never;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/tags/{tag_id}';
+};
+
+export type DeleteTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteTagError = DeleteTagErrors[keyof DeleteTagErrors];
+
+export type DeleteTagResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteTagResponse = DeleteTagResponses[keyof DeleteTagResponses];
+
+export type RenameTagData = {
+    body: TagIn;
+    path: {
+        /**
+         * Tag Id
+         */
+        tag_id: string;
+    };
+    query?: never;
+    url: '/api/tags/{tag_id}';
+};
+
+export type RenameTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RenameTagError = RenameTagErrors[keyof RenameTagErrors];
+
+export type RenameTagResponses = {
+    /**
+     * Successful Response
+     */
+    200: TagOut;
+};
+
+export type RenameTagResponse = RenameTagResponses[keyof RenameTagResponses];
+
+export type ListCollectionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/collections';
+};
+
+export type ListCollectionsResponses = {
+    /**
+     * Response List Collections
+     *
+     * Successful Response
+     */
+    200: Array<CollectionOut>;
+};
+
+export type ListCollectionsResponse = ListCollectionsResponses[keyof ListCollectionsResponses];
+
+export type CreateCollectionData = {
+    body: CollectionIn;
+    path?: never;
+    query?: never;
+    url: '/api/collections';
+};
+
+export type CreateCollectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateCollectionError = CreateCollectionErrors[keyof CreateCollectionErrors];
+
+export type CreateCollectionResponses = {
+    /**
+     * Successful Response
+     */
+    201: CollectionOut;
+};
+
+export type CreateCollectionResponse = CreateCollectionResponses[keyof CreateCollectionResponses];
+
+export type DeleteCollectionData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}';
+};
+
+export type DeleteCollectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteCollectionError = DeleteCollectionErrors[keyof DeleteCollectionErrors];
+
+export type DeleteCollectionResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteCollectionResponse = DeleteCollectionResponses[keyof DeleteCollectionResponses];
+
+export type ChangeCollectionData = {
+    body: CollectionChange;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}';
+};
+
+export type ChangeCollectionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangeCollectionError = ChangeCollectionErrors[keyof ChangeCollectionErrors];
+
+export type ChangeCollectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: CollectionOut;
+};
+
+export type ChangeCollectionResponse = ChangeCollectionResponses[keyof ChangeCollectionResponses];
+
+export type AddItemsData = {
+    body: ItemIds;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/items';
+};
+
+export type AddItemsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddItemsError = AddItemsErrors[keyof AddItemsErrors];
+
+export type AddItemsResponses = {
+    /**
+     * Successful Response
+     */
+    200: CollectionOut;
+};
+
+export type AddItemsResponse = AddItemsResponses[keyof AddItemsResponses];
+
+export type RemoveItemData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/items/{item_id}';
+};
+
+export type RemoveItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveItemError = RemoveItemErrors[keyof RemoveItemErrors];
+
+export type RemoveItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: CollectionOut;
+};
+
+export type RemoveItemResponse = RemoveItemResponses[keyof RemoveItemResponses];

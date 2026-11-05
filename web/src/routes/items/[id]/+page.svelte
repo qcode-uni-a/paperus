@@ -20,6 +20,7 @@
 		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
+	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import { fullName } from '#lib/format.ts';
 
@@ -185,6 +186,7 @@
 				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
 				<em>{item.container_title}</em>{/if}
 		</p>
+		<ItemOrganize {item} onchange={load} />
 		{#if !item.deleted_at}
 			<div class="row actions">
 				{#if pdfFile}

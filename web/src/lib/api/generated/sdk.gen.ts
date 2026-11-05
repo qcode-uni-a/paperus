@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddVersionData, AddVersionErrors, AddVersionResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListCollectionsData, ListCollectionsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListTagsData, ListTagsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RenameTagData, RenameTagErrors, RenameTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -55,8 +55,10 @@ export const me = <ThrowOnError extends boolean = false>(options?: Options<MeDat
  *
  * Items, newest first; ``before`` = last ``id`` for the next page.
  *
- * ``trashed=true`` lists the trash instead. ``X-Total-Count`` is the number
- * of items in the list (or trash), for showing the total while paging.
+ * ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
+ * with all of them) and ``collection`` (with its subcollections unless
+ * ``nested=false``) filter the list. ``X-Total-Count`` is the number of
+ * matching items, for showing the total while paging.
  * ``since=N`` is for syncing:
  * every item changed after change number N, trashed or not, in change
  * order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
@@ -252,3 +254,105 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
  * (read files still pending), or ``text-all`` (read every file again).
  */
 export const runJob = <ThrowOnError extends boolean = false>(options: Options<RunJobData, ThrowOnError>): RequestResult<RunJobResponses, RunJobErrors, ThrowOnError> => (options.client ?? client).post<RunJobResponses, RunJobErrors, ThrowOnError>({ url: '/api/admin/jobs/{job}', ...options });
+
+/**
+ * List Tags
+ */
+export const listTags = <ThrowOnError extends boolean = false>(options?: Options<ListTagsData, ThrowOnError>): RequestResult<ListTagsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListTagsResponses, unknown, ThrowOnError>({ url: '/api/tags', ...options });
+
+/**
+ * Add Tag
+ *
+ * Tag an item; the tag is created if it does not exist (any case).
+ */
+export const addTag = <ThrowOnError extends boolean = false>(options: Options<AddTagData, ThrowOnError>): RequestResult<AddTagResponses, AddTagErrors, ThrowOnError> => (options.client ?? client).post<AddTagResponses, AddTagErrors, ThrowOnError>({
+    url: '/api/items/{item_id}/tags',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove Tag
+ */
+export const removeTag = <ThrowOnError extends boolean = false>(options: Options<RemoveTagData, ThrowOnError>): RequestResult<RemoveTagResponses, RemoveTagErrors, ThrowOnError> => (options.client ?? client).delete<RemoveTagResponses, RemoveTagErrors, ThrowOnError>({ url: '/api/items/{item_id}/tags/{tag_id}', ...options });
+
+/**
+ * Delete Tag
+ *
+ * Remove a tag from every item and delete it.
+ */
+export const deleteTag = <ThrowOnError extends boolean = false>(options: Options<DeleteTagData, ThrowOnError>): RequestResult<DeleteTagResponses, DeleteTagErrors, ThrowOnError> => (options.client ?? client).delete<DeleteTagResponses, DeleteTagErrors, ThrowOnError>({ url: '/api/tags/{tag_id}', ...options });
+
+/**
+ * Rename Tag
+ *
+ * Rename a tag everywhere (409 if another tag has that name).
+ */
+export const renameTag = <ThrowOnError extends boolean = false>(options: Options<RenameTagData, ThrowOnError>): RequestResult<RenameTagResponses, RenameTagErrors, ThrowOnError> => (options.client ?? client).patch<RenameTagResponses, RenameTagErrors, ThrowOnError>({
+    url: '/api/tags/{tag_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Collections
+ *
+ * All collections, flat; ``parent_id`` gives the tree.
+ */
+export const listCollections = <ThrowOnError extends boolean = false>(options?: Options<ListCollectionsData, ThrowOnError>): RequestResult<ListCollectionsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListCollectionsResponses, unknown, ThrowOnError>({ url: '/api/collections', ...options });
+
+/**
+ * Create Collection
+ */
+export const createCollection = <ThrowOnError extends boolean = false>(options: Options<CreateCollectionData, ThrowOnError>): RequestResult<CreateCollectionResponses, CreateCollectionErrors, ThrowOnError> => (options.client ?? client).post<CreateCollectionResponses, CreateCollectionErrors, ThrowOnError>({
+    url: '/api/collections',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Collection
+ *
+ * Delete a collection and its subcollections; items stay in the library.
+ */
+export const deleteCollection = <ThrowOnError extends boolean = false>(options: Options<DeleteCollectionData, ThrowOnError>): RequestResult<DeleteCollectionResponses, DeleteCollectionErrors, ThrowOnError> => (options.client ?? client).delete<DeleteCollectionResponses, DeleteCollectionErrors, ThrowOnError>({ url: '/api/collections/{collection_id}', ...options });
+
+/**
+ * Change Collection
+ *
+ * Rename, describe or move a collection (not into itself).
+ */
+export const changeCollection = <ThrowOnError extends boolean = false>(options: Options<ChangeCollectionData, ThrowOnError>): RequestResult<ChangeCollectionResponses, ChangeCollectionErrors, ThrowOnError> => (options.client ?? client).patch<ChangeCollectionResponses, ChangeCollectionErrors, ThrowOnError>({
+    url: '/api/collections/{collection_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Add Items
+ */
+export const addItems = <ThrowOnError extends boolean = false>(options: Options<AddItemsData, ThrowOnError>): RequestResult<AddItemsResponses, AddItemsErrors, ThrowOnError> => (options.client ?? client).post<AddItemsResponses, AddItemsErrors, ThrowOnError>({
+    url: '/api/collections/{collection_id}/items',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove Item
+ */
+export const removeItem = <ThrowOnError extends boolean = false>(options: Options<RemoveItemData, ThrowOnError>): RequestResult<RemoveItemResponses, RemoveItemErrors, ThrowOnError> => (options.client ?? client).delete<RemoveItemResponses, RemoveItemErrors, ThrowOnError>({ url: '/api/collections/{collection_id}/items/{item_id}', ...options });

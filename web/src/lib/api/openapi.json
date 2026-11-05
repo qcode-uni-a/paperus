@@ -177,7 +177,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items, newest first; ``before`` = last ``id`` for the next page.\n\n``trashed=true`` lists the trash instead. ``X-Total-Count`` is the number\nof items in the list (or trash), for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items, newest first; ``before`` = last ``id`` for the next page.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list. ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -234,6 +234,53 @@
                 }
               ],
               "title": "Since"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Collection"
+            }
+          },
+          {
+            "name": "nested",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Nested"
             }
           }
         ],
@@ -1104,6 +1151,495 @@
           }
         }
       }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "List Tags",
+        "operationId": "list_tags",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Tags"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/tags": {
+      "post": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Add Tag",
+        "description": "Tag an item; the tag is created if it does not exist (any case).",
+        "operationId": "add_tag",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTagOut"
+                  },
+                  "title": "Response Add Tag"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/tags/{tag_id}": {
+      "delete": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Remove Tag",
+        "operationId": "remove_tag",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTagOut"
+                  },
+                  "title": "Response Remove Tag"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/{tag_id}": {
+      "patch": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Rename Tag",
+        "description": "Rename a tag everywhere (409 if another tag has that name).",
+        "operationId": "rename_tag",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Delete Tag",
+        "description": "Remove a tag from every item and delete it.",
+        "operationId": "delete_tag",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections": {
+      "get": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "List Collections",
+        "description": "All collections, flat; ``parent_id`` gives the tree.",
+        "operationId": "list_collections",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CollectionOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Collections"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Create Collection",
+        "operationId": "create_collection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections/{collection_id}": {
+      "patch": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Change Collection",
+        "description": "Rename, describe or move a collection (not into itself).",
+        "operationId": "change_collection",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Delete Collection",
+        "description": "Delete a collection and its subcollections; items stay in the library.",
+        "operationId": "delete_collection",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections/{collection_id}/items": {
+      "post": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Add Items",
+        "operationId": "add_items",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItemIds"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/collections/{collection_id}/items/{item_id}": {
+      "delete": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Remove Item",
+        "operationId": "remove_item",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1157,6 +1693,136 @@
           "upload"
         ],
         "title": "Body_upload_to_version"
+      },
+      "CollectionChange": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "title": "CollectionChange",
+        "description": "Only the fields given are changed; ``parent_id: null`` moves to the top."
+      },
+      "CollectionIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CollectionIn"
+      },
+      "CollectionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parent_id",
+          "count"
+        ],
+        "title": "CollectionOut"
       },
       "FileOut": {
         "properties": {
@@ -1374,6 +2040,21 @@
             "type": "boolean",
             "title": "Processing"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/ItemTagOut"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "collection_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Collection Ids"
+          },
           "csl": {
             "additionalProperties": true,
             "type": "object",
@@ -1417,12 +2098,33 @@
           "change",
           "deleted_at",
           "processing",
+          "tags",
+          "collection_ids",
           "csl",
           "overrides",
           "preferred_version_id",
           "versions"
         ],
         "title": "ItemDetail"
+      },
+      "ItemIds": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Item Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "ItemIds"
       },
       "ItemOut": {
         "properties": {
@@ -1499,6 +2201,21 @@
           "processing": {
             "type": "boolean",
             "title": "Processing"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/ItemTagOut"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "collection_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Collection Ids"
           }
         },
         "type": "object",
@@ -1513,9 +2230,34 @@
           "created_at",
           "change",
           "deleted_at",
-          "processing"
+          "processing",
+          "tags",
+          "collection_ids"
         ],
         "title": "ItemOut"
+      },
+      "ItemTagOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TagSource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "source"
+        ],
+        "title": "ItemTagOut"
       },
       "LoginRequest": {
         "properties": {
@@ -1832,6 +2574,55 @@
           "embedding_model"
         ],
         "title": "SystemConfig"
+      },
+      "TagIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TagIn"
+      },
+      "TagOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "count"
+        ],
+        "title": "TagOut"
+      },
+      "TagSource": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "automatic",
+          "ai"
+        ],
+        "title": "TagSource",
+        "description": "Who put a tag on an item (Zotero keeps manual and automatic apart)."
       },
       "TextStatus": {
         "type": "string",
