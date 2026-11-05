@@ -9,6 +9,15 @@ Smaller tasks noted along the way; larger plans live in the other documents.
   multilingual-e5-small 23.5 (more in the ML service's model list). The
   default is now arctic-embed-m-v2. Still to try: a reranker on the top
   hits, GPU support, and an evaluation with real questions (search.md).
+- **Overlap between passages** (to investigate, once the evaluation with
+  real questions exists). Passages are now about 200 words, cut at
+  paragraph or sentence ends within a page, without overlap. Overlap helps
+  when a statement is split across two passages, but repeats text in
+  results, complicates putting the text back together (`get_document`),
+  adds about 15% vectors and reuses fewer passages across versions. Better
+  variant to test: keep the passages as they are and only add the
+  neighbouring sentence when computing the vector (the vector then needs a
+  key besides the passage's SHA-256). Measure with and without.
 
 ## Sidebar and library
 
