@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.8 (2026-11-05)
+
+The first release with packages besides the container images.
+
+- **PyPI**: `paperus` (the server) and `paperus-ml` (the ML service), e.g.
+  `uv tool install paperus`.
+- **npm**: `paperus`, the TypeScript client for the API.
+
 ## 0.0.7 (2026-11-05)
 
 All settings in one place: background jobs, OIDC login, users leaving, a
