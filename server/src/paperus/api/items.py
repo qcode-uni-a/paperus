@@ -7,7 +7,7 @@ from typing import Annotated, Any, Self
 import httpx2
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from paperus import changes, library, metadata
@@ -401,7 +401,9 @@ def list_items(
 ) -> list[ItemOut]:
     """Items, newest first; ``before`` = last ``id`` for the next page.
 
-    ``trashed=true`` lists the trash instead. ``since=N`` is for syncing:
+    ``trashed=true`` lists the trash instead. ``X-Total-Count`` is the number
+    of items in the list (or trash), for showing the total while paging.
+    ``since=N`` is for syncing:
     every item changed after change number N, trashed or not, in change
     order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
     is the number to pass as ``since`` next time.
@@ -410,11 +412,10 @@ def list_items(
     if since is not None:
         query = select(Item).where(Item.change > since).order_by(Item.change, Item.id)
         return [item_out(item) for item in db.scalars(query)]
-    query = select(Item).order_by(Item.id.desc()).limit(limit)
-    if trashed:
-        query = query.where(Item.deleted_at.is_not(None))
-    else:
-        query = query.where(Item.deleted_at.is_(None))
+    in_trash = Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None)
+    total = db.scalar(select(func.count()).select_from(Item).where(in_trash)) or 0
+    response.headers["X-Total-Count"] = str(total)
+    query = select(Item).where(in_trash).order_by(Item.id.desc()).limit(limit)
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item) for item in db.scalars(query)]

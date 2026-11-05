@@ -226,6 +226,8 @@ def test_list_items_newest_first_with_paging(logged_in: TestClient) -> None:
     assert [item["title"] for item in page] == ["Note 2", "Note 1"]
     rest = logged_in.get("/api/items", params={"before": page[-1]["id"]}).json()
     assert [item["title"] for item in rest] == ["Note 0"]
+    response = logged_in.get("/api/items", params={"limit": 1})
+    assert response.headers["X-Total-Count"] == "3"
 
 
 def test_items_need_login(client: TestClient) -> None:

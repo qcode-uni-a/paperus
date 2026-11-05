@@ -31,11 +31,31 @@
 		return [...byItem.values()];
 	});
 
+	let total = $state<number | null>(null);
+	let loading = false;
+
+	/** The first page, or with ``before`` the page after that item. */
 	async function loadItems(before?: string) {
-		const { data } = await listItems({ query: { limit: PAGE, before } });
+		if (before && loading) return;
+		loading = true;
+		const { data, response } = await listItems({ query: { limit: PAGE, before } });
+		loading = false;
 		if (!data) return;
 		items = before ? [...items, ...data] : data;
-		more = data.length === PAGE;
+		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
+		more = data.length > 0 && items.length < total;
+	}
+
+	/** Load the next page when the end of the list comes near. */
+	function loadMoreNearby(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry.isIntersecting && more) loadItems(items.at(-1)?.id);
+			},
+			{ rootMargin: '800px 0px' }
+		);
+		observer.observe(node);
+		return () => observer.disconnect();
 	}
 
 	$effect(() => {
@@ -161,12 +181,17 @@
 			</p>
 		</div>
 	{:else}
-		<h1 class="count">{items.length}{more ? '+' : ''} items</h1>
+		<h1 class="count">
+			{(total ?? items.length).toLocaleString()}
+			{(total ?? items.length) === 1 ? 'item' : 'items'}
+		</h1>
 		<ul class="items">
 			{#each items as item (item.id)}<ItemRow {item} />{/each}
 		</ul>
 		{#if more}
-			<div><button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button></div>
+			<div {@attach loadMoreNearby} class="more">
+				<button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button>
+			</div>
 		{/if}
 	{/if}
 </div>
@@ -279,6 +304,11 @@
 		line-height: 1.65;
 		max-width: 72ch;
 		color: var(--ink);
+	}
+	.more {
+		display: flex;
+		justify-content: center;
+		padding: 8px 0 24px;
 	}
 	.empty {
 		padding: 48px 0;
