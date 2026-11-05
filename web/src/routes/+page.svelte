@@ -6,7 +6,7 @@
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import AddItem from '#lib/AddItem.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
-	import { addFiles, uploads } from '#lib/uploads.svelte.ts';
+	import { uploads } from '#lib/uploads.svelte.ts';
 
 	const PAGE = 50;
 
@@ -113,21 +113,9 @@
 	</div>
 
 	<div class="actions row">
-		<label class="pick">
-			<input
-				type="file"
-				multiple
-				onchange={(event) => {
-					addFiles(event.currentTarget.files ?? []);
-					event.currentTarget.value = '';
-				}}
-			/>
-			<span>Upload files</span>
-		</label>
-		<button onclick={() => (adding = !adding)} aria-expanded={adding}>
+		<button class="quiet" onclick={() => (adding = !adding)} aria-expanded={adding}>
 			{adding ? 'Close' : 'Add by DOI or details'}
 		</button>
-		<span class="muted hint">or drop files anywhere</span>
 	</div>
 
 	{#if adding}<AddItem />{/if}
@@ -222,32 +210,7 @@
 		pointer-events: none;
 	}
 	.actions {
-		margin-top: -8px;
-	}
-	.hint {
-		font-size: var(--step--1);
-	}
-	.pick input {
-		position: absolute;
-		opacity: 0;
-		width: 1px;
-	}
-	.pick span {
-		display: inline-block;
-		border: 1px solid var(--royal);
-		background: var(--royal);
-		color: var(--on-royal);
-		font-weight: 600;
-		border-radius: var(--radius);
-		padding: 7px 14px;
-		cursor: pointer;
-	}
-	.pick span:hover {
-		background: var(--royal-hover);
-	}
-	.pick:focus-within span {
-		outline: 2px solid var(--focus);
-		outline-offset: 2px;
+		margin: -12px 0 0 -8px;
 	}
 	.results-head {
 		justify-content: space-between;

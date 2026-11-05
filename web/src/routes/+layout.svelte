@@ -8,6 +8,7 @@
 	import { loadUser, logout, session } from '#lib/session.svelte.ts';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import ThemeToggle from '#lib/ThemeToggle.svelte';
+	import UploadButton from '#lib/UploadButton.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -48,6 +49,7 @@
 			<a class="brand" href={resolve('/')}><span class="highlight">paperus</span></a>
 		</div>
 		<div class="row">
+			{#if session.user}<UploadButton />{/if}
 			<ThemeToggle />
 			{#if session.user}
 				<span class="user">{session.user.username}</span>
