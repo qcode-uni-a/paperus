@@ -12,13 +12,15 @@ import secrets
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from paperus_ml.config import Settings
-from paperus_ml.manager import ModelManager, UnknownModel
+from paperus_ml.encoder import Encoder
+from paperus_ml.manager import ModelFailed, ModelLoading, ModelManager, UnknownModel
 from paperus_ml.models import MODELS, SCORES, Kind
 from paperus_ml.samples import sample_passages
 
@@ -59,16 +61,22 @@ class ModelInfo(BaseModel):
 
 
 class ServiceConfig(BaseModel):
-    threads: int = Field(ge=0, le=1024)
-    """CPU threads per model; 0: all the service sees."""
+    threads: int | None = Field(default=None, ge=0, le=1024)
+    """CPU threads per model; 0: all the service sees; None: its own
+    setting (``PAPERUS_ML_INTRA_OP_THREADS``)."""
     keep: list[str]
     """Models to keep loaded (paperus sends the one in use)."""
 
 
-class ServiceState(ServiceConfig):
+class ServiceState(BaseModel):
+    threads: int
+    keep: list[str]
     cores: int
     """CPU cores this service may use."""
     loaded: list[str]
+    loading: list[str]
+    started: str
+    """When this service started (an ID: a new value means a restart)."""
 
 
 class Speed(BaseModel):
@@ -76,8 +84,6 @@ class Speed(BaseModel):
     passages: int
     seconds: float
     passages_per_second: float
-    load_seconds: float
-    """Downloading and loading first, if the model was not loaded."""
 
 
 def usable_cores() -> int:
@@ -93,6 +99,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     models = manager or ModelManager(settings)
+    started = datetime.now(UTC).isoformat()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -101,7 +108,7 @@ def create_app(
         async def unload_loop() -> None:
             while True:
                 await asyncio.sleep(UNLOAD_CHECK_SECONDS)
-                models.unload_idle()
+                await asyncio.to_thread(models.unload_idle)
 
         task = asyncio.create_task(unload_loop())
         yield
@@ -127,7 +134,8 @@ def create_app(
     app.state.models = models
 
     @app.get("/ping")
-    def ping() -> str:
+    async def ping() -> str:
+        # Async: answers even when every worker thread is busy.
         return "pong"
 
     @app.get("/models", dependencies=[Depends(check_token)])
@@ -166,6 +174,8 @@ def create_app(
             keep=models.kept,
             cores=usable_cores(),
             loaded=models.loaded(),
+            loading=models.loading(),
+            started=started,
         )
 
     @app.put("/config", dependencies=[Depends(check_token)])
@@ -182,35 +192,42 @@ def create_app(
     @app.post("/models/{name}/speed", dependencies=[Depends(check_token)])
     def measure_speed(name: str) -> Speed:
         """Embed sample passages (about 250 words each, like paperus'
-        passages) and time it: speed differs much between machines. Downloads
-        and loads the model first if needed."""
-        started = time.monotonic()
-        try:
-            encoder = models.get(name)
-        except UnknownModel as error:
-            raise HTTPException(404, f"unknown model {name!r}") from error
-        load_seconds = time.monotonic() - started
+        passages) and time it: speed differs much between machines. A model
+        not loaded yet starts loading and the answer is 503 "loading": ask
+        again. Other requests for the model wait while it measures, so they
+        do not slow the measurement (other models still can)."""
+        encoder = _model(name)
         passages = sample_passages()
-        encoder.embed(passages[:2], "passage")  # warm up
-        started = time.monotonic()
-        encoder.embed(passages, "passage")
-        seconds = time.monotonic() - started
+        with encoder.running:
+            encoder.embed(passages[:2], "passage")  # warm up
+            started = time.monotonic()
+            encoder.embed(passages, "passage")
+            seconds = time.monotonic() - started
         return Speed(
             model=name,
             passages=len(passages),
             seconds=round(seconds, 2),
-            passages_per_second=round(len(passages) / seconds, 1),
-            load_seconds=round(load_seconds, 1),
+            passages_per_second=round(len(passages) / max(seconds, 1e-6), 1),
         )
+
+    def _model(name: str) -> Encoder:
+        try:
+            return models.get(name, wait=settings.load_wait)
+        except UnknownModel as error:
+            raise HTTPException(404, f"unknown model {name!r}") from error
+        except ModelLoading as error:
+            raise HTTPException(
+                503, f"model {name!r} is loading", headers={"Retry-After": "10"}
+            ) from error
+        except ModelFailed as error:
+            raise HTTPException(
+                502, f"loading model {name!r} failed: {error.args[1]}"
+            ) from error
 
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:
         """Runs in FastAPI's thread pool; ONNX Runtime releases the GIL."""
-        try:
-            encoder = models.get(body.model)
-        except UnknownModel as error:
-            raise HTTPException(404, f"unknown model {body.model!r}") from error
-        vectors = encoder.embed(body.texts, body.kind)
+        vectors = _model(body.model).embed(body.texts, body.kind)
         return EmbedResponse(
             model=body.model,
             dimensions=vectors.shape[1],

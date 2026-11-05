@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
-from paperus.ml import MLClient, MLUnavailable
+from paperus.ml import MLClient, MLRejected, MLUnavailable
 from paperus.system import load_config
 
 log = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ def _query_vector(ml: MLClient, model: str, query: str) -> str | None:
     """The query's vector as pgvector text, or None if the ML service is down."""
     try:
         [vector] = ml.embed([query], model=model, kind="query", timeout=QUERY_TIMEOUT)
-    except MLUnavailable:
+    except (MLUnavailable, MLRejected):
         log.warning("search by meaning unavailable; keyword search only", exc_info=True)
         return None
     return "[" + ",".join(f"{x:.6g}" for x in vector) + "]"

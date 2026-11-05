@@ -44,13 +44,21 @@ class Access:
     """Library of each group the person belongs to."""
     own_allowed: bool = True
     """False for an access token limited to some groups' libraries."""
+    site_admin: bool = False
+    """A site administrator acting in person (never through a token, which
+    gets no administration)."""
 
     @classmethod
     def of(
-        cls, db: Session, user: User, only: list[uuid.UUID] | None = None
+        cls,
+        db: Session,
+        user: User,
+        only: list[uuid.UUID] | None = None,
+        *,
+        token: bool = False,
     ) -> "Access":
         """What ``user`` may do; with ``only`` (an access token's owner limit),
-        nothing outside these libraries."""
+        nothing outside these libraries; ``token``: through an access token."""
         own = db.scalar(select(Library.id).where(Library.user_id == user.id))
         if own is None:  # users from before libraries existed get one now
             library = Library(user_id=user.id)
@@ -88,12 +96,20 @@ class Access:
             )
             if group_id is not None
         }
+        site_admin = user.is_admin and not token
         if only is None:
-            return cls(user, own, roles, libraries)
+            return cls(user, own, roles, libraries, site_admin=site_admin)
         allowed = set(only)
         libraries = {g: lib for g, lib in libraries.items() if lib in allowed}
         roles = {g: r for g, r in roles.items() if g in libraries}
-        return cls(user, own, roles, libraries, own_allowed=own in allowed)
+        return cls(
+            user,
+            own,
+            roles,
+            libraries,
+            own_allowed=own in allowed,
+            site_admin=site_admin,
+        )
 
     @property
     def readable(self) -> list[uuid.UUID]:
@@ -108,10 +124,11 @@ class Access:
         return None
 
     def can_read(self, library_id: uuid.UUID) -> bool:
-        return (
-            library_id == self.own_library
-            or library_id in self.group_libraries.values()
-        )
+        """The person's own library (unless a token is limited to others) or
+        one of their groups' (only those a limited token allows)."""
+        if library_id == self.own_library:
+            return self.own_allowed
+        return library_id in self.group_libraries.values()
 
     def can_write(self, library_id: uuid.UUID) -> bool:
         """Add, change and delete items, tags and collections."""

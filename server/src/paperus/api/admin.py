@@ -8,8 +8,12 @@ from sqlalchemy import func, select, text
 
 from paperus import system
 from paperus.api.deps import DB, CurrentUser
-from paperus.jobs import queue_embedding_sweep, queue_text_sweep
-from paperus.ml import MLClient, MLUnavailable
+from paperus.jobs import (
+    queue_embedding_sweep,
+    queue_ml_configuration,
+    queue_text_sweep,
+)
+from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
 from paperus.models import Chunk, Embedding, File, FileChunk, Item, TextStatus, User
 from paperus.processing import reread_all
 
@@ -50,18 +54,23 @@ class MLModel(BaseModel):
 
 class MLSpeed(BaseModel):
     model: str
-    passages: int
-    seconds: float
-    passages_per_second: float
-    load_seconds: float
+    loading: bool = False
+    """The model is still downloading or loading: ask again in a while."""
+    passages: int = 0
+    seconds: float = 0
+    passages_per_second: float = 0
+    url: str | None = None
+    """The ML service that measured it."""
 
 
 class MLServiceState(BaseModel):
+    url: str
     threads: int
     keep: list[str]
     cores: int
-    """CPU cores the (first) ML service may use."""
+    """CPU cores this ML service may use."""
     loaded: list[str]
+    loading: list[str] = []
 
 
 class MLStatus(BaseModel):
@@ -112,7 +121,7 @@ def set_config(
     if model_changed:
         try:
             known = {m.name for m in _models(_ml(request)) if m.task == "embedding"}
-        except MLUnavailable as error:
+        except (MLUnavailable, MLRejected) as error:
             raise HTTPException(
                 503, "ML service unreachable; cannot check the model"
             ) from error
@@ -124,8 +133,9 @@ def set_config(
     db.commit()
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
-    # Applied at once where the service answers; the worker repeats it.
-    _ml(request).configure(threads=body.ml_threads, keep=[body.embedding_model])
+    if model_changed or body.ml_threads != current.ml_threads:
+        # The worker sends it at once (first in its queue), and every minute.
+        queue_ml_configuration(request.app.state.jobs)
     return body
 
 
@@ -135,25 +145,30 @@ def ml_status(request: Request, admin: Admin) -> MLStatus:
     services = [MLService(url=u, ok=e is None, error=e) for u, e in ml.status()]
     try:
         models = _models(ml)
-    except MLUnavailable:
+    except (MLUnavailable, MLRejected):
         models = []
     try:
         service = MLServiceState.model_validate(ml.service_config())
-    except (MLUnavailable, ValueError):
+    except (MLUnavailable, MLRejected, ValueError):
         service = None
     return MLStatus(services=services, models=models, service=service)
 
 
 @router.post("/ml/models/{name}/speed")
 def measure_ml_speed(name: str, request: Request, admin: Admin) -> MLSpeed:
-    """Time a model on this installation's ML service with sample passages
-    (downloads it first if needed, which can take minutes)."""
+    """Time a model on this installation's ML service with sample passages.
+    A model not downloaded yet starts downloading: the answer then says
+    ``loading``; ask again in a while."""
     try:
         return MLSpeed.model_validate(_ml(request).measure_speed(name))
-    except MLUnavailable as error:
+    except MLLoading:
+        return MLSpeed(model=name, loading=True)
+    except MLRejected as error:
         raise HTTPException(
-            503, f"ML service unreachable or failed: {error}"
+            404 if error.status == 404 else 502, error.detail
         ) from error
+    except MLUnavailable as error:
+        raise HTTPException(503, f"ML service unreachable: {error}") from error
 
 
 @router.delete("/ml/models/{name}", status_code=204)
@@ -163,6 +178,8 @@ def delete_ml_model(name: str, request: Request, db: DB, admin: Admin) -> None:
         raise HTTPException(409, "this model is in use")
     try:
         _ml(request).delete_model(name)
+    except MLRejected as error:
+        raise HTTPException(404, error.detail) from error
     except MLUnavailable as error:
         raise HTTPException(503, "ML service unreachable") from error
 

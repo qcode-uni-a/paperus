@@ -81,7 +81,8 @@ class Encoder:
         # One batch at a time: each already uses all cores, so batches of
         # simultaneous requests would only compete for them. Per batch, not
         # per request, so a search query waits for one batch at most.
-        self._running = threading.Lock()
+        # Reentrant: the speed test holds it across all its batches.
+        self.running = threading.RLock()
 
     def embed(self, texts: Sequence[str], kind: Kind) -> Vectors:
         prefix = self.spec.prefix(kind)
@@ -104,6 +105,6 @@ class Encoder:
         feed = {"input_ids": ids, "attention_mask": mask}
         if "token_type_ids" in self.input_names:
             feed["token_type_ids"] = np.zeros_like(ids)
-        with self._running:
+        with self.running:
             hidden = self.session.run(None, feed)[0]
         return pool(np.asarray(hidden, dtype=np.float32), mask, self.spec.pooling)

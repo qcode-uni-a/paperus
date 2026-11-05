@@ -22,11 +22,23 @@ class UnknownModel(KeyError):
     pass
 
 
+class ModelLoading(Exception):
+    """The model is still downloading or loading; ask again shortly."""
+
+
+class ModelFailed(Exception):
+    """Loading the model failed (e.g. the download); the message says why."""
+
+
 class ModelManager:
     def __init__(self, settings: Settings, loader: Loader | None = None) -> None:
         self.settings = settings
         self._load = loader or self._download_and_load
-        self._models: dict[str, tuple[Encoder, float]] = {}
+        # name → (encoder, last used, threads it was loaded with)
+        self._models: dict[str, tuple[Encoder, float, int]] = {}
+        self._loading: dict[str, threading.Event] = {}
+        self._errors: dict[str, str] = {}
+        self._guard = threading.Lock()
         self._locks: dict[str, threading.Lock] = {
             name: threading.Lock() for name in MODELS
         }
@@ -54,6 +66,7 @@ class ModelManager:
             raise UnknownModel(name)
         with self._locks[name]:
             self._models.pop(name, None)
+            self._errors.pop(name, None)
             shutil.rmtree(self.model_dir(spec), ignore_errors=True)
 
     def _download_and_load(self, spec: ModelSpec) -> Encoder:
@@ -73,37 +86,107 @@ class ModelManager:
             max_batch_tokens=self.settings.max_batch_tokens,
         )
 
-    def get(self, name: str) -> Encoder:
-        """The model, downloading and loading it on first use."""
+    def get(self, name: str, wait: float | None = None) -> Encoder:
+        """The model, downloading and loading it on first use (and again when
+        the threads changed). ``wait=None`` blocks until it is ready; with
+        ``wait`` in seconds, loading continues in the background and
+        ``ModelLoading`` is raised if it takes longer, so requests do not pile
+        up behind a download."""
         spec = MODELS.get(name)
         if spec is None:
             raise UnknownModel(name)
+        ready = self._ready(name)
+        if ready is not None:
+            return ready
+        if wait is None:
+            return self._load_now(name, spec)
+        done = self._load_in_background(name)
+        done.wait(wait)
+        ready = self._ready(name)
+        if ready is not None:
+            return ready
+        if name in self._errors and not self._loading_now(name):
+            raise ModelFailed(name, self._errors[name])
+        raise ModelLoading(name)
+
+    def _ready(self, name: str) -> Encoder | None:
+        """The loaded model, if loaded with the current threads."""
+        entry = self._models.get(name)
+        if entry is None or entry[2] != self.threads:
+            return None
+        self._models[name] = (entry[0], time.monotonic(), entry[2])
+        return entry[0]
+
+    def _load_now(self, name: str, spec: ModelSpec) -> Encoder:
         with self._locks[name]:
-            if name not in self._models:
-                log.info("loading model %s", name)
-                started = time.monotonic()
+            ready = self._ready(name)
+            if ready is not None:
+                return ready
+            # Drop an old copy (other threads) before loading the new one.
+            self._models.pop(name, None)
+            threads = self.threads
+            log.info("loading model %s", name)
+            started = time.monotonic()
+            try:
                 encoder = self._load(spec)
-                log.info("loaded %s in %.1f s", name, time.monotonic() - started)
-            else:
-                encoder = self._models[name][0]
-            self._models[name] = (encoder, time.monotonic())
+            except Exception as error:
+                self._errors[name] = str(error) or type(error).__name__
+                raise
+            self._errors.pop(name, None)
+            log.info("loaded %s in %.1f s", name, time.monotonic() - started)
+            self._models[name] = (encoder, time.monotonic(), threads)
             return encoder
+
+    def _load_in_background(self, name: str) -> threading.Event:
+        with self._guard:
+            if name in self._loading:
+                return self._loading[name]
+            done = threading.Event()
+            self._loading[name] = done
+
+        def load() -> None:
+            try:
+                self.get(name)
+            except Exception:
+                log.warning("loading %s failed", name, exc_info=True)
+            finally:
+                with self._guard:
+                    self._loading.pop(name, None)
+                done.set()
+
+        threading.Thread(target=load, name=f"load-{name}", daemon=True).start()
+        return done
+
+    def _loading_now(self, name: str) -> bool:
+        with self._guard:
+            return name in self._loading
+
+    def loading(self) -> list[str]:
+        with self._guard:
+            return sorted(self._loading)
 
     def loaded(self) -> list[str]:
         return sorted(self._models)
 
     def unload_idle(self, now: float | None = None) -> list[str]:
-        """Unload models idle longer than the TTL, except preloaded ones."""
+        """Unload models idle longer than the TTL, except kept ones. Skips a
+        model that is busy loading; checks again under its lock."""
         ttl = self.settings.model_ttl
         if ttl <= 0:
             return []
         now = time.monotonic() if now is None else now
         unloaded = []
-        for name, (_, last_used) in list(self._models.items()):
-            if name in self._keep or now - last_used < ttl:
+        for name in list(self._models):
+            lock = self._locks[name]
+            if not lock.acquire(blocking=False):
                 continue
-            with self._locks[name]:
+            try:
+                entry = self._models.get(name)
+                if entry is None or name in self._keep or now - entry[1] < ttl:
+                    continue
                 self._models.pop(name, None)
+            finally:
+                lock.release()
             unloaded.append(name)
             log.info("unloaded idle model %s", name)
         return unloaded
@@ -112,21 +195,18 @@ class ModelManager:
     def kept(self) -> list[str]:
         return sorted(self._keep)
 
-    def configure(self, *, threads: int, keep: list[str]) -> list[str]:
-        """Settings from paperus' administration: threads per model, and the
-        models to keep loaded (the one in use). Models loaded with other
-        threads are unloaded; returns the models still to load (``load_kept``
-        loads them, which can take a while)."""
+    def configure(self, *, threads: int | None, keep: list[str]) -> list[str]:
+        """Settings from paperus' administration: threads per model (None:
+        this service's own setting), and the models to keep loaded (the one
+        in use). Models loaded with other threads load again when next used
+        (requests running keep theirs). Returns the kept models still to load
+        (``load_kept`` loads them, which can take a while)."""
         unknown = [name for name in keep if name not in MODELS]
         if unknown:
             raise UnknownModel(unknown[0])
-        if threads != self.threads:
-            self.threads = threads
-            for name in list(self._models):
-                with self._locks[name]:
-                    self._models.pop(name, None)
+        self.threads = self.settings.intra_op_threads if threads is None else threads
         self._keep = set(keep)
-        return [name for name in keep if name not in self._models]
+        return [name for name in keep if self._ready(name) is None]
 
     def load_kept(self) -> None:
         for name in self.kept:

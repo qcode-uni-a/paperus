@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from paperus import organize
-from paperus.access import Access
+from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
 from paperus.models import (
     ROLE_RANK,
@@ -126,12 +126,12 @@ def _library_of(db: DB, group_id: uuid.UUID) -> uuid.UUID:
 
 
 def _can_manage(access: Access, group_id: uuid.UUID) -> bool:
-    return access.user.is_admin or access.is_group_admin(group_id)
+    return access.site_admin or access.is_group_admin(group_id)
 
 
 def _visible_group(db: DB, access: Access, group_id: uuid.UUID) -> Group:
     group = db.get(Group, group_id)
-    if group is None or not (access.user.is_admin or group_id in access.roles):
+    if group is None or not (access.site_admin or group_id in access.roles):
         raise HTTPException(404, "group not found")
     return group
 
@@ -149,7 +149,10 @@ def _managed_group(db: DB, access: Access, group_id: uuid.UUID) -> Group:
 @router.get("/api/libraries")
 def list_libraries(db: DB, access: CurrentAccess) -> list[LibraryOut]:
     """The libraries the person can read: their own first, then their groups'."""
-    default = access.target_library(None)
+    try:
+        default: uuid.UUID | None = access.target_library(None)
+    except Forbidden:  # a read-only token limited to groups
+        default = None
     groups = {
         group.id: group
         for group in db.scalars(select(Group).where(Group.id.in_(access.roles)))
@@ -165,18 +168,22 @@ def list_libraries(db: DB, access: CurrentAccess) -> list[LibraryOut]:
             current = parents.get(current)
         return above
 
-    libraries = [
-        LibraryOut(
-            id=access.own_library,
-            name="Me",
-            kind="personal",
-            group_id=None,
-            path=[],
-            role=None,
-            writable=True,
-            default=default == access.own_library,
-        )
-    ]
+    libraries = (
+        [
+            LibraryOut(
+                id=access.own_library,
+                name="Me",
+                kind="personal",
+                group_id=None,
+                path=[],
+                role=None,
+                writable=True,
+                default=default == access.own_library,
+            )
+        ]
+        if access.own_allowed
+        else []
+    )
     group_libraries = sorted(
         access.group_libraries.items(),
         key=lambda pair: [n.lower() for n in [*path(pair[0]), groups[pair[0]].name]],
@@ -241,7 +248,7 @@ def list_groups(db: DB, access: CurrentAccess) -> list[GroupOut]:
     """The groups the person belongs to (directly or through a group above);
     site administrators see every group. Flat; ``parent_id`` gives the tree."""
     query = select(Group).order_by(func.lower(Group.name))
-    if not access.user.is_admin:
+    if not access.site_admin:
         query = query.where(Group.id.in_(access.roles))
     return [_group_out(db, access, group) for group in db.scalars(query)]
 
@@ -256,7 +263,7 @@ def create_group(body: GroupIn, db: DB, access: CurrentAccess) -> GroupOut:
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
     if body.parent_id is None:
-        if not access.user.is_admin:
+        if not access.site_admin:
             raise HTTPException(403, "only site administrators create top-level groups")
         admin_id = body.admin_id or access.user.id
         if db.get(User, admin_id) is None:
@@ -306,7 +313,7 @@ def change_group(
 
 def _move(db: DB, access: Access, group: Group, parent_id: uuid.UUID | None) -> None:
     if parent_id is None:
-        if not access.user.is_admin:
+        if not access.site_admin:
             raise HTTPException(403, "only site administrators make top-level groups")
     else:
         _managed_group(db, access, parent_id)
@@ -470,7 +477,7 @@ def find_users(
 ) -> list[UserBrief]:
     """People to add to a group, by username; for site administrators and
     group admins."""
-    if not (access.user.is_admin or Role.ADMIN in access.roles.values()):
+    if not (access.site_admin or Role.ADMIN in access.roles.values()):
         raise HTTPException(403, "only admins look up people")
     query = select(User).order_by(func.lower(User.username)).limit(20)
     if q.strip():

@@ -175,6 +175,8 @@ class FakeML:
             self.deleted.append(request.url.path.rsplit("/", 1)[1])
             return httpx2.Response(204)
         body = json.loads(request.content)
+        if body.get("model") not in self.MODELS:
+            return httpx2.Response(404, json={"detail": "unknown model"})
         self.requests.append(body)
         vectors = [self.vector(t) for t in body["texts"]]
         return httpx2.Response(

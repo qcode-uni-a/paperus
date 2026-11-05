@@ -61,7 +61,7 @@ def current_access(request: Request, user: CurrentUser, db: DB) -> Access:
     only = None
     if token is not None and token.library_ids is not None:
         only = [uuid.UUID(i) for i in token.library_ids]
-    return Access.of(db, user, only)
+    return Access.of(db, user, only, token=token is not None)
 
 
 def session_user(request: Request, user: CurrentUser) -> User:

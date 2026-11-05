@@ -18,7 +18,7 @@ from paperus.embedding import (
     notes_missing_embeddings,
 )
 from paperus.jobs import queue_embedding
-from paperus.ml import MLClient, MLUnavailable
+from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
 from paperus.models import Embedding
 from paperus.processing import process_file
 from paperus.storage import BlobStore
@@ -143,7 +143,7 @@ def test_ml_client_falls_back_and_sends_token(fake_ml: FakeML) -> None:
     def route(request: httpx2.Request) -> httpx2.Response:
         seen.append(request)
         if request.url.host == "gpu":
-            return httpx2.Response(503)
+            return httpx2.Response(500)
         return fake_ml(request)
 
     http = httpx2.Client(transport=httpx2.MockTransport(route))
@@ -156,6 +156,23 @@ def test_ml_client_falls_back_and_sends_token(fake_ml: FakeML) -> None:
     # The failing address is tried last for a while.
     client.embed(["rain"], model=MODEL, kind="query")
     assert [r.url.host for r in seen[2:]] == ["local"]
+
+
+def test_ml_client_loading_and_rejected(fake_ml: FakeML) -> None:
+    """A model still loading is not a broken service; an unknown model is
+    not worth trying elsewhere or again."""
+
+    def loading(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(503, json={"detail": "model 'bge-m3' is loading"})
+
+    client = MLClient(
+        ["http://ml"], http=httpx2.Client(transport=httpx2.MockTransport(loading))
+    )
+    with pytest.raises(MLLoading, match="loading"):
+        client.embed(["rain"], model=MODEL, kind="query")
+    assert client._failed_at == {}
+    with pytest.raises(MLRejected, match="unknown model"):
+        fake_ml.client().embed(["rain"], model="gpt-9", kind="query")
 
 
 def test_ml_client_raises_when_all_fail() -> None:

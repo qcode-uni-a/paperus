@@ -196,24 +196,31 @@ def run_worker(settings: Settings) -> None:
         app.run_worker(queues=["text", "ml", "backup", "import"], concurrency=3)
 
 
-@tasks.periodic(cron="*/5 * * * *")
-@tasks.task(name="configure_ml", queue="ml", queueing_lock="configure-ml")
+# First in the queue: a restarted ML service should not wait behind hundreds
+# of embedding jobs for its settings.
+@tasks.periodic(cron="* * * * *")
+@tasks.task(name="configure_ml", queue="ml", queueing_lock="configure-ml", priority=100)
 def configure_ml(timestamp: int) -> None:
-    """Send the administration's ML settings to the ML services again, in
-    case one restarted (they start from their environment variables)."""
+    """Send the administration's ML settings to the ML services, every
+    minute, in case one restarted (it starts from its environment
+    variables). Cheap: unchanged settings change nothing there."""
     context = _worker_context()
     with context.sessions() as db:
-        config = load_config(db, context.settings)
-    errors = context.ml.configure(
-        threads=config.ml_threads, keep=[config.embedding_model]
-    )
-    for error in errors:
+        send_ml_config(db, context.settings, context.ml)
+
+
+def send_ml_config(db: Session, settings: Settings, ml: MLClient) -> None:
+    """The ML settings of the administration, to every ML service."""
+    config = load_config(db, settings)
+    for error in ml.configure(threads=config.ml_threads, keep=[config.embedding_model]):
         log.info("ML service not configured: %s", error)
 
 
 def queue_ml_configuration(app: App) -> None:
     """Send the ML settings soon (e.g. when the server starts)."""
-    task = app.configure_task("paperus:configure_ml", queueing_lock="configure-ml")
+    task = app.configure_task(
+        "paperus:configure_ml", queueing_lock="configure-ml", priority=100
+    )
     with contextlib.suppress(AlreadyEnqueued):
         task.defer(timestamp=0)
 

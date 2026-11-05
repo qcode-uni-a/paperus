@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # Most texts and tokens per inference batch (memory grows with both).
     max_batch_texts: int = 32
     max_batch_tokens: int = 16384
+    # How long a request waits for a model that is still loading before the
+    # service answers 503 "loading" (the model keeps loading meanwhile).
+    load_wait: float = 2.0
 
 
 def default_cache_path() -> Path:

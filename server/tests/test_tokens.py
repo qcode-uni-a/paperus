@@ -151,3 +151,46 @@ def test_scope_table() -> None:
     assert needed_scope("GET", "/api/groups") == "groups.read"
     assert needed_scope("PATCH", "/api/groups/x") is None
     assert needed_scope("GET", "/api/admin/backups") is None
+
+
+def test_owner_limit_holds_everywhere(client: TestClient, db: Session) -> None:
+    """A token limited to a group reaches none of the person's private
+    things, not by id, not with ?library=, not as notes or files."""
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    chair = group(root, "Chair", ada)
+    private = ada.add("Private")
+    own = ada.libraries()["Me"]["id"]
+    file = ada.post(
+        f"/api/items/{private['id']}/files",
+        files={"upload": ("p.pdf", b"%PDF-1.7\n" + b"x" * 3000, "application/pdf")},
+    ).json()
+    note = ada.note("Private note")
+    token = make_token(
+        ada,
+        scopes=["papers.read", "files.read", "search", "groups.read"],
+        library_ids=[chair["library_id"]],
+    )
+    headers = as_token(client, token["token"])
+    client.cookies.clear()
+    get = lambda path: client.get(path, headers=headers)  # noqa: E731
+    assert get(f"/api/items/{private['id']}").status_code == 404
+    assert get(f"/api/items?library={own}").json() == []
+    assert get(f"/api/search?q=private&library={own}").json() == []
+    assert get(f"/api/notes/{note['id']}").status_code == 404
+    assert get(f"/api/files/{file['id']}/content").status_code == 404
+    # The libraries it may use: the group only (even read-only tokens).
+    assert [lib["name"] for lib in get("/api/libraries").json()] == ["Chair"]
+
+
+def test_admin_tokens_get_no_administration(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    group(root, "Chair", ada)
+    group(root, "Lab", root)
+    # In person, a site admin sees every group; through a token, only theirs.
+    assert len(root.get("/api/groups").json()) == 2
+    token = make_token(root, scopes=["groups.read"])
+    client.cookies.clear()
+    groups = client.get("/api/groups", headers=as_token(client, token["token"]))
+    assert [g["name"] for g in groups.json()] == ["Lab"]

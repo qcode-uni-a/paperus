@@ -23,6 +23,27 @@ class MLUnavailable(RuntimeError):
     pass
 
 
+class MLLoading(MLUnavailable):
+    """The service is downloading or loading the model; ask again later."""
+
+
+class MLRejected(RuntimeError):
+    """The service refused the request (e.g. an unknown model): trying
+    again or another address would not help."""
+
+    def __init__(self, status: int, detail: str) -> None:
+        super().__init__(f"{status}: {detail}")
+        self.status = status
+        self.detail = detail
+
+
+def _detail(response: httpx2.Response) -> str:
+    try:
+        return str(response.json().get("detail") or response.text)
+    except ValueError:
+        return response.text
+
+
 class MLClient:
     def __init__(
         self,
@@ -52,6 +73,7 @@ class MLClient:
     ) -> list[list[float]]:
         """One vector per text; raises MLUnavailable if no service answers."""
         errors = []
+        loading = False
         for url in self._ordered_urls():
             try:
                 response = self.http.post(
@@ -59,15 +81,25 @@ class MLClient:
                     json={"model": model, "kind": kind, "texts": texts},
                     timeout=timeout or httpx2.USE_CLIENT_DEFAULT,
                 )
-                response.raise_for_status()
             except httpx2.HTTPError as error:
                 self._failed_at[url] = time.monotonic()
                 errors.append(f"{url}: {error}")
                 continue
+            if response.status_code == 503:  # loading the model: not broken
+                loading = True
+                errors.append(f"{url}: {_detail(response)}")
+                continue
+            if 400 <= response.status_code < 500:
+                raise MLRejected(response.status_code, _detail(response))
+            if response.is_error:
+                self._failed_at[url] = time.monotonic()
+                errors.append(f"{url}: {response.status_code} {_detail(response)}")
+                continue
             self._failed_at.pop(url, None)
             embeddings: list[list[float]] = response.json()["embeddings"]
             return embeddings
-        raise MLUnavailable("; ".join(errors) or "no ML service configured")
+        message = "; ".join(errors) or "no ML service configured"
+        raise MLLoading(message) if loading else MLUnavailable(message)
 
     def status(self) -> list[tuple[str, str | None]]:
         """Each address with None if it answers, else the error."""
@@ -89,10 +121,12 @@ class MLClient:
         self._call("DELETE", f"/models/{name}")
 
     def service_config(self) -> dict[str, Any]:
-        """Threads, kept models and usable cores of the first service."""
-        return dict(self._call("GET", "/config").json())
+        """Threads, kept models and usable cores of the first service that
+        answers, with its address as ``url``."""
+        response = self._call("GET", "/config")
+        return {**response.json(), "url": str(response.url).removesuffix("/config")}
 
-    def configure(self, *, threads: int, keep: list[str]) -> list[str]:
+    def configure(self, *, threads: int | None, keep: list[str]) -> list[str]:
         """Send the administration's settings to every service; returns the
         errors of those that did not take them."""
         errors = []
@@ -108,18 +142,35 @@ class MLClient:
         return errors
 
     def measure_speed(self, name: str) -> dict[str, Any]:
-        """Time the model on sample passages on the service's machine (it may
-        download the model first: allow for that)."""
-        return dict(self._call("POST", f"/models/{name}/speed", timeout=900).json())
+        """Time the model on sample passages, on the first service that
+        answers (not again on the next one: a measurement can take a
+        minute). Raises MLLoading while the model downloads or loads."""
+        for url in self._ordered_urls():
+            try:
+                response = self.http.post(f"{url}/models/{name}/speed", timeout=300)
+            except httpx2.HTTPError as error:
+                self._failed_at[url] = time.monotonic()
+                log.info("speed test: %s unreachable: %s", url, error)
+                continue
+            if response.status_code == 503:
+                raise MLLoading(_detail(response))
+            if response.is_error:
+                raise MLRejected(response.status_code, _detail(response))
+            return {**response.json(), "url": url}
+        raise MLUnavailable("no ML service answers")
 
     def _call(self, method: str, path: str, timeout: float = 10) -> httpx2.Response:
         errors = []
         for url in self._ordered_urls():
             try:
                 response = self.http.request(method, f"{url}{path}", timeout=timeout)
-                response.raise_for_status()
             except httpx2.HTTPError as error:
                 errors.append(f"{url}: {error}")
+                continue
+            if 400 <= response.status_code < 500:
+                raise MLRejected(response.status_code, _detail(response))
+            if response.is_error:
+                errors.append(f"{url}: {response.status_code}")
                 continue
             return response
         raise MLUnavailable("; ".join(errors) or "no ML service configured")

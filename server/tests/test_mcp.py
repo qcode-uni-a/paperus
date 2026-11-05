@@ -322,3 +322,24 @@ def test_notes(client: TestClient, ada: Person) -> None:
         reader.call("create_note", text="x")
     with pytest.raises(ToolFailed, match="no group called"):
         assistant.call("create_note", text="x", group="Nowhere")
+
+
+def test_full_text_needs_files_read_and_no_trash(
+    client: TestClient, ada: Person
+) -> None:
+    searcher = Assistant(client, token(ada, "search"))
+    [paper] = searcher.call("search", query="diffusion", mode="keyword")["papers"]
+    hit = paper["passages"][0]
+    # Search gives snippets; the full passage needs the right to read files.
+    with pytest.raises(ToolFailed, match=r"files\.read"):
+        searcher.call("get_passage", file_id=paper["file_id"], n=hit["n"])
+    reader = Assistant(client, token(ada, *ALL))
+    assert reader.call("get_passage", file_id=paper["file_id"], n=hit["n"])
+    # A paper in the trash is out of reach.
+    ada.delete(f"/api/items/{paper['paper_id']}")
+    with pytest.raises(ToolFailed, match="No such passage"):
+        reader.call("get_passage", file_id=paper["file_id"], n=hit["n"])
+    with pytest.raises(ToolFailed, match="No such file"):
+        reader.call("get_file", file_id=paper["file_id"])
+    with pytest.raises(ToolFailed, match="1 to 500"):
+        reader.call("search", query="x" * 501)

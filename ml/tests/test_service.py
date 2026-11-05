@@ -1,3 +1,5 @@
+import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -163,3 +165,58 @@ def test_config_from_paperus(tiny: Encoder) -> None:
         )
     # Kept models are not unloaded when idle.
     assert manager.unload_idle(now=1e12) == []
+
+
+class SlowLoader(CountingLoader):
+    """Loads only when released, like a long download."""
+
+    def __init__(self, encoder: Encoder) -> None:
+        super().__init__(encoder)
+        self.release = threading.Event()
+
+    def __call__(self, spec: ModelSpec) -> Encoder:
+        self.release.wait(5)
+        return super().__call__(spec)
+
+
+def test_requests_do_not_wait_for_a_download(tiny: Encoder) -> None:
+    loader = SlowLoader(tiny)
+    manager = ModelManager(Settings(load_wait=0.05), loader)
+    with TestClient(create_app(Settings(load_wait=0.05), manager)) as client:
+        body = {"model": "bge-m3", "texts": ["rain"]}
+        response = client.post("/embed", json=body)
+        assert response.status_code == 503 and response.headers["Retry-After"]
+        assert client.get("/config").json()["loading"] == ["bge-m3"]
+        assert client.post("/models/bge-m3/speed").status_code == 503
+        assert client.get("/ping").status_code == 200  # still answers
+        loader.release.set()
+        for _ in range(100):  # the background load finishes
+            if manager.loaded() == ["bge-m3"]:
+                break
+            time.sleep(0.01)
+        assert client.post("/embed", json=body).status_code == 200
+        assert loader.loads == ["bge-m3"]  # loaded once
+
+
+def test_failed_loads_are_reported(tiny: Encoder) -> None:
+    def failing(spec: ModelSpec) -> Encoder:
+        raise OSError("disk full")
+
+    manager = ModelManager(Settings(load_wait=1), failing)
+    with TestClient(create_app(Settings(load_wait=1), manager)) as client:
+        response = client.post("/embed", json={"model": "bge-m3", "texts": ["x"]})
+        assert response.status_code == 502
+        assert "disk full" in response.json()["detail"]
+
+
+def test_new_threads_reload_when_used(tiny: Encoder) -> None:
+    loader = CountingLoader(tiny)
+    manager = ModelManager(Settings(intra_op_threads=3), loader)
+    manager.get("bge-m3")
+    assert manager.configure(threads=5, keep=["bge-m3"]) == ["bge-m3"]
+    assert manager.loaded() == ["bge-m3"]  # still there for running requests
+    manager.load_kept()
+    assert loader.loads == ["bge-m3", "bge-m3"]
+    # None: back to the service's own setting.
+    manager.configure(threads=None, keep=[])
+    assert manager.threads == 3

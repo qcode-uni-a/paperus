@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from paperus.config import Settings
 from paperus.embedding import embed_file
+from paperus.jobs import send_ml_config
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from paperus.system import load_config
@@ -28,7 +29,7 @@ def test_change_embedding_model(
 ) -> None:
     assert admin.get("/api/admin/config").json() == {
         "embedding_model": "bge-m3",
-        "ml_threads": 0,
+        "ml_threads": None,  # the ML service's own setting
     }
     response = admin.put(
         "/api/admin/config",
@@ -36,12 +37,17 @@ def test_change_embedding_model(
     )
     assert response.status_code == 200
     assert load_config(db, settings).embedding_model == "multilingual-e5-small"
-    # The library is re-embedded in the background.
-    assert queued(job_app) == ["paperus:queue_missing_embeddings"]
-    # The ML service keeps the new model loaded, with the threads chosen.
+    # The library is re-embedded in the background, and the ML service gets
+    # the new settings (first in the worker's queue).
+    assert queued(job_app) == [
+        "paperus:queue_missing_embeddings",
+        "paperus:configure_ml",
+    ]
+    send_ml_config(db, settings, fake_ml.client())
     assert fake_ml.config == {"threads": 6, "keep": ["multilingual-e5-small"]}
     service = admin.get("/api/admin/ml").json()["service"]
     assert (service["threads"], service["cores"]) == (6, 8)
+    assert service["url"] == "http://ml"
     assert (
         admin.put(
             "/api/admin/config", json={"embedding_model": "bge-m3", "ml_threads": -1}
@@ -79,7 +85,7 @@ def test_ml_status(admin: TestClient, fake_ml: FakeML) -> None:
 def test_measure_speed(admin: TestClient, fake_ml: FakeML) -> None:
     speed = admin.post("/api/admin/ml/models/bge-m3/speed").json()
     assert (speed["model"], speed["passages_per_second"]) == ("bge-m3", 8.0)
-    assert admin.post("/api/admin/ml/models/nope/speed").status_code == 503
+    assert admin.post("/api/admin/ml/models/nope/speed").status_code == 404
     fake_ml.down = True
     assert admin.post("/api/admin/ml/models/bge-m3/speed").status_code == 503
 
