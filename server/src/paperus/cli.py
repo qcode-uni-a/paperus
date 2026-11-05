@@ -75,6 +75,9 @@ def main(argv: list[str] | None = None) -> None:
             reload=args.reload,
             proxy_headers=True,
             forwarded_allow_ips=Settings().trusted_proxies,
+            # Don't wait forever for open connections (e.g. an AI assistant's
+            # MCP stream) when stopping or reloading.
+            timeout_graceful_shutdown=5,
         )
     elif args.command == "worker":
         logging.basicConfig(level=logging.INFO)

@@ -16,12 +16,15 @@ happens in the user's own AI client. paperus never calls an LLM vendor.
 **Built (first version):** `/mcp` in the server (Streamable HTTP, official
 Python SDK). Clients connect with a personal access token (Settings → Access
 tokens) as `Authorization: Bearer …`; the page shows the setup for Claude
-Code, Claude Desktop (via `mcp-remote`) and Cursor. Tools: `search`,
-`get_passage`, `get_document` (details with file download links, or text by
+Code, Claude Desktop (via `mcp-remote`) and Cursor. Tools: `search`
+(papers, best first, each with its best passages; compact JSON, optional
+abstracts), `get_abstracts`, `get_passage`, `get_document` (details with file download links, or text by
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 `list_collections`, `list_documents`, `list_tags`, `my_access` (who the
 token acts for, its rights and the tools they allow, groups with
-`groups.read`); with write scopes `add_tags` and `add_document`. Not yet: OAuth (needed for claude.ai and ChatGPT
+`groups.read`); with write scopes `add_tags` and `add_document`. The
+server's instructions describe the search workflow: search, pick 2–5
+papers, compare their abstracts, read the best one's passage, repeat. Not yet: OAuth (needed for claude.ai and ChatGPT
 connectors), notes and annotations, the AI inbox, citation export.
 
 The plan:

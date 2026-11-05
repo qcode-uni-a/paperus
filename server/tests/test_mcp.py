@@ -67,7 +67,15 @@ ALL = ("search", "papers.read", "files.read", "tags.write", "papers.write")
 def ada(client: TestClient, db: Session, blobs: BlobStore) -> Person:
     """Ada with a paper whose PDF has searchable text."""
     person = Person(client, db, "ada")
-    paper = person.add("Radar gap filling")
+    paper = person.post(
+        "/api/items",
+        json={
+            "metadata": {
+                "title": "Radar gap filling",
+                "abstract": "Filling gaps below the beam.",
+            }
+        },
+    ).json()
     pdf = make_pdf(
         [
             ["Radar gap filling", "Blind zones below the beam hide rainfall."],
@@ -97,6 +105,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
     assert set(tools) == {
         "search",
         "get_passage",
+        "get_abstracts",
         "get_document",
         "get_file",
         "my_access",
@@ -120,16 +129,29 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
 def test_search_and_read(client: TestClient, ada: Person) -> None:
     assistant = Assistant(client, token(ada, *ALL))
     found = assistant.call("search", query="diffusion", mode="keyword")
-    [hit] = found["passages"]
-    assert hit["paper_title"] == "Radar gap filling"
+    [paper] = found["papers"]
+    assert paper["title"] == "Radar gap filling"
+    assert paper["link"].startswith("https://testserver/items/")
+    assert "abstract" not in paper
+    [hit] = paper["passages"]
     assert hit["page"] == 2
     assert "diffusion" in hit["text"] and "<mark>" not in hit["text"]
-    assert (
-        hit["link"].startswith("https://testserver/items/") and "page=2" in hit["link"]
+    # Compact: no repeated titles or ids per passage, no empty fields.
+    assert set(hit) == {"n", "page", "text"}
+    result = assistant.rpc(
+        "tools/call", {"name": "search", "arguments": {"query": "diffusion"}}
     )
+    assert "\n " not in result["content"][0]["text"]
 
-    passage = assistant.call("get_passage", passage_id=hit["passage_id"], context=1)
-    assert len(passage["passages"]) >= 2
+    passage = assistant.call(
+        "get_passage", file_id=paper["file_id"], n=hit["n"], context=1
+    )
+    assert len(passage["passages"]) >= 2 and "page=2" in passage["link"]
+    with_abstract = assistant.call("search", query="diffusion", abstracts=True)
+    assert with_abstract["papers"][0]["abstract"] == "Filling gaps below the beam."
+    [abstract] = assistant.call("get_abstracts", paper_ids=[paper["paper_id"]])
+    assert abstract["abstract"] == "Filling gaps below the beam."
+    hit = {"paper_id": paper["paper_id"]}
     details = assistant.call("get_document", paper_id=hit["paper_id"])
     assert details["versions"][0]["files"] == ["radar.pdf"]
     text = assistant.call("get_document", paper_id=hit["paper_id"], part="text")
@@ -168,7 +190,7 @@ def test_search_and_read(client: TestClient, ada: Person) -> None:
 
 def test_scopes_and_owner_limits(client: TestClient, db: Session, ada: Person) -> None:
     only_search = Assistant(client, token(ada, "search"))
-    assert only_search.call("search", query="radar", mode="keyword")["passages"]
+    assert only_search.call("search", query="radar", mode="keyword")["papers"]
     with pytest.raises(ToolFailed, match=r"lacks the scope papers\.read"):
         only_search.call("list_documents")
     no_files = Assistant(client, token(ada, "papers.read"))
@@ -188,12 +210,12 @@ def test_scopes_and_owner_limits(client: TestClient, db: Session, ada: Person) -
     only_chair = Assistant(client, token(ada, *ALL, library_ids=[chair["library_id"]]))
     titles = [p["title"] for p in only_chair.call("list_documents")["papers"]]
     assert titles == ["Group paper"]
-    assert only_chair.call("search", query="radar", mode="keyword")["passages"] == []
+    assert only_chair.call("search", query="radar", mode="keyword")["papers"] == []
 
     # The assistant can see what it may do.
     rights = only_chair.call("my_access")
     assert rights["acting_for"] == "ada" and rights["sees"] == "only: Chair"
-    assert "groups" not in rights and rights["expires"] is None
+    assert "groups" not in rights and "expires" not in rights
     assert {"search", "get_file", "add_tags", "my_access"} <= set(rights["tools"])
     with_groups = Assistant(client, token(ada, "groups.read", expires_in_days=30))
     rights = with_groups.call("my_access")
@@ -201,7 +223,7 @@ def test_scopes_and_owner_limits(client: TestClient, db: Session, ada: Person) -
     assert rights["groups"] == [
         {"group": "Chair", "role": "admin", "may_add_and_change": True}
     ]
-    assert rights["expires"] is not None
+    assert rights["expires"]
 
     # Revoked: refused at once.
     listed = ada.get("/api/me/tokens").json()
