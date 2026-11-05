@@ -131,6 +131,41 @@
         }
       }
     },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "description": "Change one's password (the current one is needed); other devices are\nlogged out, this one stays logged in.",
+        "operationId": "change_password",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items": {
       "post": {
         "tags": [
@@ -3792,6 +3827,26 @@
           "in_references"
         ],
         "title": "Passage"
+      },
+      "PasswordChange": {
+        "properties": {
+          "current": {
+            "type": "string",
+            "title": "Current"
+          },
+          "new": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "New"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "new"
+        ],
+        "title": "PasswordChange"
       },
       "Role": {
         "type": "string",

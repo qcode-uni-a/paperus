@@ -80,6 +80,17 @@ def end_session(db: Session, token: str) -> None:
     )
 
 
+def change_password(db: Session, user: User, password: str, keep_token: str) -> None:
+    """Set a new password and end every other login session of the user."""
+    user.password_hash = hash_password(password)
+    db.execute(
+        delete(LoginSession).where(
+            LoginSession.user_id == user.id,
+            LoginSession.token_hash != _token_hash(keep_token),
+        )
+    )
+
+
 def user_for_token(db: Session, token: str) -> User | None:
     return db.scalar(
         select(User)

@@ -21,7 +21,10 @@ export const theme = {
 		return state.theme;
 	},
 	next(): void {
-		state.theme = ORDER[(ORDER.indexOf(state.theme) + 1) % ORDER.length];
+		theme.set(ORDER[(ORDER.indexOf(state.theme) + 1) % ORDER.length]);
+	},
+	set(choice: Theme): void {
+		state.theme = choice;
 		const root = document.documentElement;
 		if (state.theme === 'system') delete root.dataset.theme;
 		else root.dataset.theme = state.theme;

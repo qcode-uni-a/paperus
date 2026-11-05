@@ -85,3 +85,33 @@ def test_cookie_is_secure_by_default(client: TestClient, db: Session) -> None:
     )
     cookie = response.headers["set-cookie"].lower()
     assert "secure" in cookie and "httponly" in cookie and "samesite=lax" in cookie
+
+
+def test_change_password(client: TestClient, db: Session) -> None:
+    make_user(db)
+    other_device = login(client)
+    client.cookies.clear()
+    this_device = login(client)
+    client.cookies.clear()
+    headers = {"Authorization": f"Bearer {this_device}"}
+
+    wrong = {"current": "wrong", "new": "a new password"}
+    assert (
+        client.post("/api/auth/password", json=wrong, headers=headers).status_code
+        == 403
+    )
+    short = {"current": "secret", "new": "short"}
+    assert (
+        client.post("/api/auth/password", json=short, headers=headers).status_code
+        == 422
+    )
+    body = {"current": "secret", "new": "a new password"}
+    assert (
+        client.post("/api/auth/password", json=body, headers=headers).status_code == 204
+    )
+
+    # This device stays logged in, the other one is logged out.
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    other = {"Authorization": f"Bearer {other_device}"}
+    assert client.get("/api/auth/me", headers=other).status_code == 401
+    assert login(client, password="a new password")

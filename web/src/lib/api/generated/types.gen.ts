@@ -821,6 +821,20 @@ export type Passage = {
 };
 
 /**
+ * PasswordChange
+ */
+export type PasswordChange = {
+    /**
+     * Current
+     */
+    current: string;
+    /**
+     * New
+     */
+    new: string;
+};
+
+/**
  * Role
  *
  * What a member may do in a group (and every group inside it).
@@ -1224,6 +1238,31 @@ export type MeResponses = {
 };
 
 export type MeResponse = MeResponses[keyof MeResponses];
+
+export type ChangePasswordData = {
+    body: PasswordChange;
+    path?: never;
+    query?: never;
+    url: '/api/auth/password';
+};
+
+export type ChangePasswordErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
+
+export type ChangePasswordResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
 
 export type ListItemsData = {
     body?: never;

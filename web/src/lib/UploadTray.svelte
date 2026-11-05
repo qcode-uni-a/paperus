@@ -22,6 +22,13 @@
 	}
 </script>
 
+<!-- Moving around the website keeps uploads going; leaving it would not. -->
+<svelte:window
+	onbeforeunload={(event) => {
+		if (active) event.preventDefault();
+	}}
+/>
+
 {#if uploads.list.length}
 	<aside
 		class="tray card"

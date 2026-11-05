@@ -1,9 +1,10 @@
 """Login, logout and the current user."""
 
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from paperus import auth
 from paperus.api.deps import DB, SESSION_COOKIE, CurrentUser, request_token
@@ -20,6 +21,11 @@ class UserOut(BaseModel):
     id: uuid.UUID
     username: str
     is_admin: bool
+
+
+class PasswordChange(BaseModel):
+    current: str
+    new: Annotated[str, Field(min_length=8, max_length=200)]
 
 
 class LoginResponse(BaseModel):
@@ -63,3 +69,15 @@ def logout(request: Request, response: Response, db: DB) -> None:
 @router.get("/me")
 def me(user: CurrentUser) -> UserOut:
     return user_out(user)
+
+
+@router.post("/password", status_code=204)
+def change_password(
+    body: PasswordChange, request: Request, db: DB, user: CurrentUser
+) -> None:
+    """Change one's password (the current one is needed); other devices are
+    logged out, this one stays logged in."""
+    if not auth.verify_password(user.password_hash, body.current):
+        raise HTTPException(403, "the current password is wrong")
+    auth.change_password(db, user, body.new, keep_token=request_token(request) or "")
+    db.commit()
