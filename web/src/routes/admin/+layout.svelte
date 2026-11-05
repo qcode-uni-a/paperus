@@ -14,8 +14,16 @@
 		return () => clearInterval(timer);
 	});
 
-	function current(path: string): boolean {
-		return page.url.pathname === path;
+	const settingsPath = resolve('/admin/settings');
+	const MAIN = [
+		[resolve('/admin/users'), 'Users'],
+		[resolve('/admin/jobs'), 'Jobs'],
+		[settingsPath, 'Settings'],
+		[resolve('/admin/server'), 'Server stats']
+	] as const;
+
+	function active(path: string): boolean {
+		return page.url.pathname === path || page.url.pathname.startsWith(`${path}/`);
 	}
 </script>
 
@@ -26,11 +34,14 @@
 {:else}
 	<div class="admin">
 		<nav aria-label="Administration">
-			<a href={resolve('/admin')} class:current={current(resolve('/admin'))}>Overview</a>
-			<span class="group muted">Settings</span>
-			{#each SETTINGS as [slug, label] (slug)}
-				{@const href = resolve('/admin/settings/[section]', { section: slug })}
-				<a {href} class:current={current(href)}>{label}</a>
+			{#each MAIN as [path, label] (path)}
+				<a href={path} class:current={active(path)}>{label}</a>
+				{#if path === settingsPath && active(settingsPath)}
+					{#each SETTINGS as [slug, sublabel] (slug)}
+						{@const href = resolve('/admin/settings/[section]', { section: slug })}
+						<a {href} class="sub" class:current={page.url.pathname === href}>{sublabel}</a>
+					{/each}
+				{/if}
 			{/each}
 		</nav>
 		<div class="content">{@render children()}</div>
@@ -64,11 +75,12 @@
 		color: var(--accent);
 		font-weight: 600;
 	}
-	.group {
-		margin: 12px 10px 4px;
-		font-size: 0.8em;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
+	nav a.sub {
+		padding-left: 24px;
+		font-size: 0.95em;
+	}
+	nav a.current:not(.sub):has(+ .sub) {
+		background: none;
 	}
 	.content {
 		min-width: 0;
@@ -90,8 +102,9 @@
 		nav a {
 			white-space: nowrap;
 		}
-		.group {
-			display: none;
+		nav a.sub {
+			padding-left: 10px;
+			color: var(--muted);
 		}
 	}
 </style>

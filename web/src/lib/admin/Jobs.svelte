@@ -31,7 +31,7 @@
 	}
 </script>
 
-<h1>Job settings</h1>
+<h1>Jobs</h1>
 {#if message}<p class="muted">{message}</p>{/if}
 
 {#each QUEUES as q (q.queue)}
@@ -50,7 +50,7 @@
 	</section>
 {/each}
 
-<p class="muted">Concurrency and schedules are fixed for now; making them settings is planned.</p>
+<p class="muted">Concurrency and schedules will be in Settings › Job settings.</p>
 
 <style>
 	section {

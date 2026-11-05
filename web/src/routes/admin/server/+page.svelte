@@ -9,7 +9,7 @@
 	const servicesUp = $derived(admin.ml?.services.filter((s) => s.ok).length ?? 0);
 </script>
 
-<h1>Overview</h1>
+<h1>Server stats</h1>
 
 {#if stats}
 	<section class="card numbers">

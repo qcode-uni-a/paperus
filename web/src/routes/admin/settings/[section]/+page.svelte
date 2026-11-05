@@ -1,5 +1,4 @@
 <script lang="ts">
-	import JobSettings from '#lib/admin/JobSettings.svelte';
 	import MlSettings from '#lib/admin/MlSettings.svelte';
 	import Planned from '#lib/admin/Planned.svelte';
 	import type { PageProps } from './$types';
@@ -12,6 +11,10 @@
 			'Files in the database whose contents are missing from storage',
 			'Stored contents that no file uses any more (to clean up)',
 			'Verifying stored contents against their SHA-256'
+		],
+		jobs: [
+			'How many jobs of each kind run at the same time',
+			'When the periodic checks run (pending files, missing vectors)'
 		],
 		logging: ['Log level of the server and worker', 'Where logs go (console, file)'],
 		server: [
@@ -39,8 +42,6 @@
 
 {#if data.section === 'ml'}
 	<MlSettings />
-{:else if data.section === 'jobs'}
-	<JobSettings />
 {:else}
 	<Planned title={data.title} items={PLANNED[data.section] ?? []} />
 {/if}
