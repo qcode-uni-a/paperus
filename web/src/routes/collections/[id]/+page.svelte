@@ -4,7 +4,6 @@
 	import { page } from '$app/state';
 	import { deleteCollection } from '#lib/api/client.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
-	import CollectionStack from '#lib/CollectionStack.svelte';
 	import ItemList from '#lib/ItemList.svelte';
 	import { childrenOf, loadOrganize, organize } from '#lib/organize.svelte.ts';
 
@@ -68,17 +67,6 @@
 		</div>
 	</header>
 
-	{#if inside.length}
-		<section>
-			<h2>Inside</h2>
-			<div class="grid">
-				{#each inside as child (child.id)}
-					<CollectionStack collection={child} />
-				{/each}
-			</div>
-		</section>
-	{/if}
-
 	<section>
 		{#if inside.length}
 			<label class="toggle">
@@ -141,15 +129,6 @@
 		display: grid;
 		gap: 14px;
 		margin-bottom: 32px;
-	}
-	section h2 {
-		margin: 0;
-		font-size: var(--step-1);
-	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-		gap: 20px 16px;
 	}
 	.toggle {
 		display: flex;

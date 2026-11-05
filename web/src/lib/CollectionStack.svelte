@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { childrenOf, type Collection } from '#lib/organize.svelte.ts';
+	import { type Collection } from '#lib/organize.svelte.ts';
 
 	let { collection }: { collection: Collection } = $props();
 
-	const inside = $derived(childrenOf(collection.id).length);
 	// Back to front: the newest item lies on top.
 	const sheets = $derived([...(collection.recent ?? [])].reverse());
 	// Back sheets fan out to the sides, so the stack reads as a stack.
@@ -13,13 +12,6 @@
 		{ angle: 8, shift: 20 },
 		{ angle: 0, shift: 0 }
 	];
-
-	function summary(): string {
-		const parts = [];
-		parts.push(`${collection.count} ${collection.count === 1 ? 'item' : 'items'}`);
-		if (inside) parts.push(`${inside} ${inside === 1 ? 'collection' : 'collections'} inside`);
-		return parts.join(', ');
-	}
 </script>
 
 <a class="stack" href={resolve('/collections/[id]', { id: collection.id })}>
@@ -46,7 +38,7 @@
 	</div>
 	<div class="label">
 		<strong>{collection.name}</strong>
-		<span>{summary()}</span>
+		<span>{collection.count} {collection.count === 1 ? 'item' : 'items'}</span>
 	</div>
 </a>
 

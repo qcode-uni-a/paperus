@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import CollectionStack from '#lib/CollectionStack.svelte';
-	import { childrenOf, loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import { flatTree, loadOrganize, organize } from '#lib/organize.svelte.ts';
 
 	let dialog = $state<CollectionDialog>();
 	let loaded = $state(false);
@@ -12,7 +12,8 @@
 		loadOrganize().then(() => (loaded = true));
 	});
 
-	const top = $derived(childrenOf(null));
+	// All collections; nesting only organizes them, so each is shown alike.
+	const all = $derived(flatTree().map((row) => row.collection));
 </script>
 
 <svelte:head><title>Collections · paperus</title></svelte:head>
@@ -31,7 +32,7 @@
 	<button class="primary" onclick={() => dialog?.open()}>New collection</button>
 </header>
 
-{#if loaded && top.length === 0}
+{#if loaded && all.length === 0}
 	<div class="empty">
 		<div class="sheet" aria-hidden="true"></div>
 		<div>
@@ -45,7 +46,7 @@
 	</div>
 {:else}
 	<div class="grid">
-		{#each top as collection (collection.id)}
+		{#each all as collection (collection.id)}
 			<CollectionStack {collection} />
 		{/each}
 	</div>
