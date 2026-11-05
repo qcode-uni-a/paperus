@@ -15,5 +15,19 @@ services:
       interval: 2s
       retries: 15
 
+  # Machine learning service; for development usually run with
+  # `uv run paperus-ml` instead. Start with: docker compose --profile ml up -d
+  ml:
+    profiles: ["ml"]
+    build: ./ml
+    environment:
+      PAPERUS_ML_TOKEN: ${PAPERUS_ML_TOKEN:-}
+      PAPERUS_ML_PRELOAD: ${PAPERUS_ML_PRELOAD:-[]}
+    ports:
+      - "127.0.0.1:3003:3003"
+    volumes:
+      # A folder on the host (owned by uid 1000), like Immich's library.
+      - ${MODEL_CACHE_LOCATION:-./data/model-cache}:/cache
+
 volumes:
   db-data:

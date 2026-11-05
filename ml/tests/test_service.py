@@ -100,3 +100,30 @@ def test_models_listing(client: TestClient) -> None:
     listed = {m["name"]: m for m in client.get("/models").json()}
     assert set(listed) == set(MODELS)
     assert listed["bge-m3"]["dimensions"] == 1024
+
+
+def test_cache_layout_and_delete(tmp_path: Path, tiny: Encoder) -> None:
+    manager = ModelManager(Settings(cache_path=tmp_path), CountingLoader(tiny))
+    spec = MODELS["bge-m3"]
+    directory = manager.model_dir(spec)
+    assert directory == tmp_path / "embedding" / "bge-m3"
+    assert manager.cached_bytes(spec) is None
+    (directory / "onnx").mkdir(parents=True)
+    (directory / spec.onnx_file).write_bytes(b"x" * 10)
+    assert manager.cached_bytes(spec) == 10
+
+    manager.get("bge-m3")
+    with TestClient(create_app(Settings(cache_path=tmp_path), manager)) as client:
+        listed = {m["name"]: m for m in client.get("/models").json()}
+        assert listed["bge-m3"]["cached_bytes"] == 10
+        assert listed["bge-m3"]["loaded"] is True
+        assert client.delete("/models/bge-m3").status_code == 204
+        assert client.delete("/models/nope").status_code == 404
+    assert not directory.exists()
+    assert manager.loaded() == []
+
+
+def test_default_cache_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.delenv("PAPERUS_ML_CACHE_PATH", raising=False)
+    assert Settings().cache_path == tmp_path / "paperus-ml"

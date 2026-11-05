@@ -45,6 +45,11 @@ uv run paperus user create alice --admin   # asks for a password
 uv run paperus serve --reload              # API on http://localhost:8000
 uv run paperus worker                      # background jobs, in a second terminal
 
+cd ml                                      # machine learning service (search by meaning)
+PAPERUS_ML_CACHE_PATH=../data/model-cache uv run paperus-ml
+# or in a container, with the same model folder:
+# docker compose --profile ml up -d
+
 cd web
 npm install
 npm run dev                                # website on http://localhost:5173

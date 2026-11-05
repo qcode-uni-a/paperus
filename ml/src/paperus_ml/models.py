@@ -7,6 +7,7 @@ file upstream cannot silently change the vectors stored in paperus.
 from dataclasses import dataclass
 from typing import Literal
 
+Task = Literal["embedding"]
 Pooling = Literal["cls", "mean"]
 Kind = Literal["query", "passage"]
 
@@ -23,6 +24,7 @@ class ModelSpec:
     max_tokens: int
     query_prefix: str = ""
     passage_prefix: str = ""
+    task: Task = "embedding"
 
     def prefix(self, kind: Kind) -> str:
         return self.query_prefix if kind == "query" else self.passage_prefix

@@ -1,9 +1,11 @@
 """Loading models on first use, sharing them, and unloading idle ones."""
 
 import logging
+import shutil
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
@@ -30,11 +32,31 @@ class ModelManager:
         }
         self._keep = set(settings.preload)
 
+    def model_dir(self, spec: ModelSpec) -> Path:
+        """<cache>/<task>/<model>, with plain files: the shared Hugging Face
+        cache uses symlinks, and ONNX Runtime refuses weight files that
+        resolve outside the model's folder."""
+        return self.settings.cache_path / spec.task / spec.name
+
+    def cached_bytes(self, spec: ModelSpec) -> int | None:
+        """Size on disk if the model is downloaded, else None."""
+        directory = self.model_dir(spec)
+        if not (directory / spec.onnx_file).is_file():
+            return None
+        return sum(p.stat().st_size for p in directory.rglob("*") if p.is_file())
+
+    def delete_cached(self, name: str) -> None:
+        """Unload a model and remove its files; it downloads again when used."""
+        spec = MODELS.get(name)
+        if spec is None:
+            raise UnknownModel(name)
+        with self._locks[name]:
+            self._models.pop(name, None)
+            shutil.rmtree(self.model_dir(spec), ignore_errors=True)
+
     def _download_and_load(self, spec: ModelSpec) -> Encoder:
-        # Plain files in a folder per model and revision: the shared Hugging
-        # Face cache uses symlinks, and ONNX Runtime refuses weight files
-        # that resolve outside the model's folder.
-        model_dir = self.settings.cache_path / spec.name / spec.revision
+        model_dir = self.model_dir(spec)
+        # Revision changes download the changed files into the same folder.
         snapshot_download(
             spec.repo,
             revision=spec.revision,

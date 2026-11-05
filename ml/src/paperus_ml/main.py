@@ -38,11 +38,14 @@ class EmbedResponse(BaseModel):
 
 class ModelInfo(BaseModel):
     name: str
+    task: str
     repo: str
     revision: str
     dimensions: int
     max_tokens: int
     loaded: bool
+    cached_bytes: int | None
+    """Size of the downloaded files; None if not downloaded yet."""
 
 
 def create_app(
@@ -93,14 +96,24 @@ def create_app(
         return [
             ModelInfo(
                 name=s.name,
+                task=s.task,
                 repo=s.repo,
                 revision=s.revision,
                 dimensions=s.dimensions,
                 max_tokens=s.max_tokens,
                 loaded=s.name in loaded,
+                cached_bytes=models.cached_bytes(s),
             )
             for s in MODELS.values()
         ]
+
+    @app.delete("/models/{name}", status_code=204, dependencies=[Depends(check_token)])
+    def delete_model(name: str) -> None:
+        """Remove a downloaded model to free disk space."""
+        try:
+            models.delete_cached(name)
+        except UnknownModel as error:
+            raise HTTPException(404, f"unknown model {name!r}") from error
 
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:
