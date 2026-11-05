@@ -4,8 +4,9 @@
 
 The first release with packages besides the container images.
 
-- **PyPI**: `paperus` (the server) and `paperus-ml` (the ML service), e.g.
-  `uv tool install paperus`.
+- **PyPI**: `paperus` (the server, worker and command line; the website
+  comes with the container image) and `paperus-ml` (the ML service). The
+  container images remain the way to install paperus.
 - **npm**: `paperus`, the TypeScript client for the API.
 
 ## 0.0.7 (2026-11-05)
