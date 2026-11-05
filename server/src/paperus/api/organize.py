@@ -6,7 +6,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library, organize
 from paperus.access import Access, Forbidden
@@ -16,6 +17,7 @@ from paperus.models import (
     CollectionItem,
     Item,
     ItemTag,
+    PinnedCollection,
     Tag,
     TagColor,
     TagSource,
@@ -83,6 +85,8 @@ class CollectionOut(BaseModel):
     """Of those, the items directly in this collection."""
     recent: list[ItemPreview] = []
     """The last items added (up to three), for previews."""
+    pinned: bool = False
+    """The person pinned it to their sidebar."""
 
 
 class CollectionIn(BaseModel):
@@ -351,6 +355,17 @@ def _collection_out(db: DB, access: Access, collection: Collection) -> Collectio
         count=count,
         direct=_direct_counts(db, access, collection.id).get(collection.id, 0),
         recent=recent,
+        pinned=collection.id in _pinned(db, access),
+    )
+
+
+def _pinned(db: DB, access: Access) -> set[uuid.UUID]:
+    return set(
+        db.scalars(
+            select(PinnedCollection.collection_id).where(
+                PinnedCollection.user_id == access.user.id
+            )
+        )
     )
 
 
@@ -374,6 +389,7 @@ def list_collections(db: DB, access: CurrentAccess) -> list[CollectionOut]:
     ``parent_id`` gives the tree."""
     contents = _contents(db, access)
     direct = _direct_counts(db, access)
+    pinned = _pinned(db, access)
     collections = db.scalars(
         select(Collection)
         .where(Collection.library_id.in_(access.readable))
@@ -389,6 +405,7 @@ def list_collections(db: DB, access: CurrentAccess) -> list[CollectionOut]:
             count=contents.get(c.id, (0, []))[0],
             direct=direct.get(c.id, 0),
             recent=contents.get(c.id, (0, []))[1],
+            pinned=c.id in pinned,
         )
         for c in collections
     ]
@@ -569,6 +586,34 @@ def delete_collection(
     # Links first, before the database's cascade removes them under the ORM.
     db.flush()
     db.delete(collection)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.put("/api/collections/{collection_id}/pin", status_code=204)
+def pin_collection(collection_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Pin the collection to the person's sidebar (readers may too)."""
+    _collection(db, access, collection_id)
+    db.execute(
+        insert(PinnedCollection)
+        .values(user_id=access.user.id, collection_id=collection_id)
+        .on_conflict_do_nothing()
+    )
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/api/collections/{collection_id}/pin", status_code=204)
+def unpin_collection(
+    collection_id: uuid.UUID, db: DB, access: CurrentAccess
+) -> Response:
+    _collection(db, access, collection_id)
+    db.execute(
+        delete(PinnedCollection).where(
+            PinnedCollection.user_id == access.user.id,
+            PinnedCollection.collection_id == collection_id,
+        )
+    )
     db.commit()
     return Response(status_code=204)
 

@@ -300,6 +300,10 @@ class Item(Record, Trashable, Base):
     collection_links: Mapped[list[CollectionItem]] = relationship(
         back_populates="item", cascade="all, delete-orphan", lazy="selectin"
     )
+    favourites: Mapped[list[Favourite]] = relationship(
+        cascade="all, delete-orphan", lazy="selectin"
+    )
+    """Who starred it (lists show each person only their own star)."""
 
 
 class ItemView(Base):
@@ -719,6 +723,38 @@ class NotDuplicate(Base):
     )
     decided_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Favourite(Base):
+    """A paper a person starred (each person their own)."""
+
+    __tablename__ = "favourites"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PinnedCollection(Base):
+    """A collection a person pinned to their sidebar."""
+
+    __tablename__ = "pinned_collections"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

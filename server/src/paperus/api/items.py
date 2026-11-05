@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Self
 import httpx2
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
+    Favourite,
     File,
     Item,
     ItemTag,
@@ -107,6 +108,8 @@ class ItemOut(BaseModel):
     """Tags the reader can see: the library's own and the reader's private ones."""
     collection_ids: list[uuid.UUID]
     """Collections the reader can see that hold the item."""
+    favourite: bool = False
+    """The reader starred it."""
 
 
 class ItemDetail(ItemOut):
@@ -180,6 +183,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
             for v in item.versions
             for f in v.files
         ),
+        favourite=any(f.user_id == access.user.id for f in item.favourites),
     )
 
 
@@ -499,6 +503,7 @@ def list_items(
     sort: Literal["added", "recent", "opened"] = "added",
     offset: Annotated[int, Query(ge=0)] = 0,
     unsorted: bool = False,
+    favourite: bool = False,
 ) -> list[ItemOut]:
     """Items the person can read, newest first; ``before`` = last ``id`` for
     the next page. ``library`` shows one library only. ``sort=recent``:
@@ -543,6 +548,12 @@ def list_items(
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():
         conditions.append(Item.title.icontains(word, autoescape=True))
+    if favourite:
+        conditions.append(
+            Item.id.in_(
+                select(Favourite.item_id).where(Favourite.user_id == access.user.id)
+            )
+        )
     if unsorted:
         conditions.append(
             Item.id.not_in(
@@ -607,6 +618,31 @@ def list_items(
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item, access) for item in db.scalars(query)]
+
+
+@router.put("/api/items/{item_id}/favourite", status_code=204)
+def star_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Star the paper (for the person only; any paper they can see)."""
+    get_readable_item(db, access, item_id)
+    db.execute(
+        insert(Favourite)
+        .values(user_id=access.user.id, item_id=item_id)
+        .on_conflict_do_nothing()
+    )
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/api/items/{item_id}/favourite", status_code=204)
+def unstar_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    get_readable_item(db, access, item_id)
+    db.execute(
+        delete(Favourite).where(
+            Favourite.user_id == access.user.id, Favourite.item_id == item_id
+        )
+    )
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/api/items/{item_id}/viewed", status_code=204)
