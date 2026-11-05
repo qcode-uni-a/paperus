@@ -98,7 +98,18 @@ Item: the work; notes, tags, collections, citation metadata
   OpenAlex author IDs, then normalized names ("Huber, A." vs "Anna Huber")
   only as a suggestion. Users can merge and split people, since names are
   ambiguous both ways (two people, one name; one person, several spellings).
-- **Collection, tag, group, membership, role.**
+- **Tag, collection**: tags are labels (each link records its source:
+  manual, automatic from metadata, or AI); collections nest and an item can
+  be in several. **Both have an owner: a user (private) or a group
+  (shared).** Names are unique per owner, so a private "to read" and a
+  group's "to read" are different tags. People see their own tags and
+  collections and those of their groups; filters, counts and the sidebar
+  show only those. A private tag on a group's item is visible only to its
+  owner (personal reading notes on shared papers). Collections nest only
+  within one owner. Who in a group may create, rename or delete shared ones
+  follows the group's roles. (Built so far without owners: everything
+  belongs to the one library until groups exist.)
+- **Group, membership, role.**
 - **Provenance**: who or what created each object (user, AI via client X,
   import, sync), for labels, the AI inbox and the audit log.
 
