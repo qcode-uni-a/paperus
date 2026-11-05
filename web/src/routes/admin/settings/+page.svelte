@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { SETTINGS } from '#lib/admin/data.svelte.ts';
+	import { admin, SETTINGS } from '#lib/admin/data.svelte.ts';
 	import AuthSettings from '#lib/admin/AuthSettings.svelte';
 	import CopySettings from '#lib/admin/CopySettings.svelte';
 	import UsersSettings from '#lib/admin/UsersSettings.svelte';
@@ -23,26 +23,6 @@
 		url.searchParams.set('open', next.join(','));
 		goto(`${url.pathname}${url.search}`, { replaceState: true, reset: false });
 	}
-
-	// What each section is meant to hold, until it is built.
-	const PLANNED: Record<string, string[]> = {
-		integrity: [
-			'Files in the database whose contents are missing from storage',
-			'Stored contents that no file uses any more (to clean up)',
-			'Verifying stored contents against their SHA-256'
-		],
-		logging: ['Log level of the server and worker', 'Where logs go (console, file)'],
-		server: [
-			'Public address of the server (for links and the browser extension)',
-			'Contact email sent to Crossref and other metadata services',
-			'Upload size limit'
-		],
-		'storage-template': [
-			'An optional readable copy of the library on disk, e.g. {year}/{first author} - {title}.pdf',
-			'Files themselves stay stored once by content (SHA-256)'
-		],
-		trash: ['Days until the trash is emptied automatically', 'Emptying the trash now']
-	};
 </script>
 
 <svelte:head><title>Settings · paperus</title></svelte:head>
@@ -53,12 +33,13 @@
 </p>
 
 <div class="sections">
-	{#each SETTINGS as [slug, title, subtitle, later] (slug)}
+	{#each SETTINGS as { slug, title, subtitle, icon, status } (slug)}
 		<SettingSection
 			id={slug}
 			{title}
 			{subtitle}
-			{later}
+			{icon}
+			status={admin.config ? status(admin.config) : null}
 			open={open.includes(slug)}
 			ontoggle={(opened) => toggle(slug, opened)}
 		>
@@ -80,11 +61,6 @@
 				<TrashSettings />
 			{:else if slug === 'logging'}
 				<LoggingSettings />
-			{:else}
-				<p class="muted">Not available yet. Planned for this section:</p>
-				<ul class="planned">
-					{#each PLANNED[slug] ?? [] as item (item)}<li>{item}</li>{/each}
-				</ul>
 			{/if}
 		</SettingSection>
 	{/each}
@@ -101,10 +77,5 @@
 		display: grid;
 		gap: 12px;
 		max-width: 900px;
-	}
-	.planned {
-		margin: 0;
-		padding-left: 20px;
-		color: var(--muted);
 	}
 </style>

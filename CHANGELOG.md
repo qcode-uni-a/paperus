@@ -45,7 +45,7 @@
   backups); also as Prometheus metrics.
 - **Empty trash** on the trash page: deletes for good what one may change.
 - The search bar is hidden in the administration; the settings sections
-  start folded.
+  start folded, each with an icon and how it is set at a glance.
 - The backups page mentions restoring a backup on a new server from the
   welcome page, without commands.
 

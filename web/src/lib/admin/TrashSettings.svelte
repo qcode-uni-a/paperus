@@ -3,6 +3,7 @@
 	import { saveConfig } from '#lib/admin/config.svelte.ts';
 	import SectionButtons from '#lib/admin/SectionButtons.svelte';
 	import SettingRow from '#lib/admin/SettingRow.svelte';
+	import Stepper from '#lib/admin/Stepper.svelte';
 	import Switch from '#lib/admin/Switch.svelte';
 	import { runJob } from '#lib/api/client.ts';
 	import { localTime } from '#lib/format.ts';
@@ -60,7 +61,8 @@
 		title="Days in the trash"
 		description="How long things stay restorable before they are deleted for good."
 	>
-		<input id="trash-days" type="number" min="1" max="3650" bind:value={days} />
+		<Stepper id="trash-days" label="Days in the trash" bind:value={days} min={1} max={3650} />
+		<span class="unit">days</span>
 	</SettingRow>
 {/if}
 <SectionButtons {changed} {saving} onreset={reset} onsave={save} />
@@ -72,6 +74,10 @@
 {/if}
 
 <style>
+	.unit {
+		align-self: center;
+		color: var(--muted);
+	}
 	.small {
 		margin: 8px 0 0;
 		font-size: var(--step--1);

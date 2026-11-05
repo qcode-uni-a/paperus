@@ -8,16 +8,19 @@
 		id,
 		title,
 		subtitle,
+		icon,
+		status = null,
 		open = false,
-		later = false,
 		ontoggle,
 		children
 	}: {
 		id: string;
 		title: string;
 		subtitle: string;
+		icon: string;
+		/** How it is set, in a word or two (shown while folded). */
+		status?: string | null;
 		open?: boolean;
-		later?: boolean;
 		ontoggle: (open: boolean) => void;
 		children: Snippet;
 	} = $props();
@@ -30,12 +33,12 @@
 		aria-controls="{id}-body"
 		onclick={() => ontoggle(!open)}
 	>
+		<span class="icon"><Icon path={icon} size={22} /></span>
 		<span class="text">
-			<span class="title"
-				>{title}{#if later}<span class="badge">Later</span>{/if}</span
-			>
+			<span class="title">{title}</span>
 			<span class="subtitle">{subtitle}</span>
 		</span>
+		{#if status && !open}<span class="status">{status}</span>{/if}
 		<span class="chevron"><Icon path={mdiChevronDown} size={24} /></span>
 	</button>
 	{#if open}
@@ -66,6 +69,37 @@
 	}
 	.open .head {
 		border-radius: 18px 18px 0 0;
+	}
+	.icon {
+		display: grid;
+		flex: none;
+		place-items: center;
+		width: 42px;
+		height: 42px;
+		border-radius: 12px;
+		background: color-mix(in srgb, var(--royal) 10%, var(--surface));
+		color: var(--royal);
+	}
+	.open .icon {
+		background: var(--royal);
+		color: var(--on-royal);
+	}
+	.status {
+		flex: none;
+		max-width: 40%;
+		overflow: hidden;
+		padding: 3px 10px;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		color: var(--muted);
+		font-size: var(--step--1);
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	@media (max-width: 560px) {
+		.status {
+			display: none;
+		}
 	}
 	.text {
 		display: grid;
