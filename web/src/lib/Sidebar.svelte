@@ -26,7 +26,7 @@
 	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 
-	// Like Immich: inside the administration, its menu replaces the normal one.
+	// Inside the administration, its menu replaces the normal one.
 	const adminPath = resolve('/admin');
 	const settingsPath = resolve('/admin/settings');
 	// Only admins see the administration menu, even when opening its address.
@@ -122,7 +122,7 @@
 </nav>
 
 <style>
-	/* Like Immich: icons and labels, the current entry a rounded pill in the
+	/* Icons and labels, the current entry a rounded pill in the
 	   accent colour, flush with the left edge. */
 	nav {
 		display: grid;

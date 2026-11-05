@@ -45,7 +45,8 @@
 - Self-hosted NotebookLM-style tools (with built-in chat): Open Notebook,
   SurfSense; also AnythingLLM, Khoj, PaperQA2.
 - Paperless-ngx (office documents) and its MCP servers.
-- Immich (architecture and operations, see [operations.md](operations.md)).
+- A self-hosted photo library (architecture and operations, see
+  [operations.md](operations.md)).
 
 ## Lessons from Zotero
 

@@ -2,7 +2,7 @@
 
 ## 0.0.6 (2026-11-05)
 
-A new look inspired by Immich, faster search by meaning with a choice of
+A new look, faster search by meaning with a choice of
 models, tidying up the library (duplicates, unsorted papers, favourites),
 and fixes from a code review, including security fixes for access tokens.
 
@@ -11,7 +11,7 @@ and fixes from a code review, including security fixes for access tokens.
   all are ready (with how many need their details by hand, linking to
   Unsorted). An import says when it is done, with its summary, also after
   leaving the import page. As long as paperus is open in the browser.
-- **A new look, inspired by Immich**: the search moved into the top bar (on
+- **A new look**: the search moved into the top bar (on
   every page; "/" jumps to it), the menu got icons and a rounded highlight
   for the current page, buttons are rounded, and pages start right next to
   the menu. Administration → Settings is one page of sections that open

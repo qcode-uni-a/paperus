@@ -30,7 +30,7 @@ services:
     ports:
       - "127.0.0.1:3003:3003"
     volumes:
-      # A folder on the host (owned by uid 1000), like Immich's library.
+      # A folder on the host (owned by uid 1000).
       - ${MODEL_CACHE_LOCATION:-./data/model-cache}:/cache
 
 volumes:

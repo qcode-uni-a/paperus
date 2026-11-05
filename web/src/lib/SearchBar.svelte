@@ -7,7 +7,7 @@
 	import Icon from '#lib/Icon.svelte';
 	import SearchFilters, { type Filters } from '#lib/SearchFilters.svelte';
 
-	/** The search in the top bar, on every page (like Immich). The search
+	/** The search in the top bar, on every page. The search
 	 * lives in the library's address (?q=…), so Back and links keep it;
 	 * typing elsewhere goes to the library with the results. */
 	const library = resolve('/');

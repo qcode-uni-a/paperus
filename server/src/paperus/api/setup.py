@@ -1,6 +1,6 @@
 """First start: create the first administrator, or restore a backup.
 
-Only while no user exists (like Immich's onboarding); afterwards these
+Only while no user exists; afterwards these
 answer 409. The database is empty then, so a restore needs no downtime.
 """
 

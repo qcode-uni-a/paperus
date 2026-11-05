@@ -1,7 +1,7 @@
 """Client for the machine learning service (paperus-ml).
 
 Several addresses can be configured; the ones that answered last are tried
-first and a failing one is skipped for a while (like Immich), so a GPU
+first and a failing one is skipped for a while, so a GPU
 machine can be added in front of a local fallback.
 """
 

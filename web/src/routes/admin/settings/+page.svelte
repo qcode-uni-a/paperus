@@ -5,8 +5,8 @@
 	import MlSettings from '#lib/admin/MlSettings.svelte';
 	import SettingSection from '#lib/admin/SettingSection.svelte';
 
-	/** All settings on one page, each section opened as needed (like
-	 * Immich); the open ones are in the address (?open=ml,trash). */
+	/** All settings on one page, each section opened as needed; the open
+	 * ones are in the address (?open=ml,trash). */
 	const open = $derived(
 		page.url.searchParams.has('open')
 			? (page.url.searchParams.get('open') ?? '').split(',').filter(Boolean)

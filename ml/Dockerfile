@@ -1,5 +1,5 @@
 # paperus-ml: CPU image. Models are downloaded to /cache on first use;
-# mount a volume there so they survive updates (like Immich's model-cache).
+# mount a volume there so they survive updates.
 FROM python:3.13-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus machine learning service (embeddings)" \

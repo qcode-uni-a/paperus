@@ -289,7 +289,7 @@ textarea:focus-visible {
 	color: var(--faint);
 }
 
-/* Rounded buttons, as in Immich. */
+/* Rounded buttons. */
 button {
 	background: var(--surface);
 	border: 1px solid var(--rule);

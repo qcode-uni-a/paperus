@@ -58,7 +58,7 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
   out of search and lists unless asked for.
 - **Smart collections.** Rule-based first (tags, type, year, library), later
   by meaning (papers similar to a query or a set of papers).
-- **Notifications**, like Immich: a newer version of a paper was found,
+- **Notifications**: a newer version of a paper was found,
   someone uploaded to a group, a workflow imported papers.
 - **Workflows.** Scheduled jobs with rules, e.g. every night query arXiv for
   new papers matching rules and import them (into an inbox).
@@ -66,7 +66,7 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
 - **Database maintenance.** Check whether Postgres needs scheduled work
   beyond autovacuum (e.g. reindexing vector indexes) and run it nightly.
 - **Storage on slow disks or network shares** with a fast local cache, as
-  Immich does. Less pressing without preview images; revisit with them.
+  other self-hosted libraries do. Less pressing without preview images; revisit with them.
 - **Preview images** (first page thumbnails): only if a design needs them,
   e.g. a grid view or richer collection stacks.
 - **Mobile app** and **desktop app with a local cache** (offline reading).

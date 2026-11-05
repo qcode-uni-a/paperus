@@ -59,7 +59,7 @@ or pull `release` again, then `docker compose up -d`.
 | [Search](docs/search.md) | Chunking, embeddings, hybrid search, deduplication across versions, pgvector |
 | [Permissions](docs/permissions.md) | Who may do what with papers, tags, collections and groups |
 | [AI integration](docs/ai.md) | MCP tools, permissions, the AI inbox, skill draft |
-| [Operations](docs/operations.md) | Hosting at the university, data protection, lessons from Immich |
+| [Operations](docs/operations.md) | Hosting at the university, data protection, lessons from similar projects |
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |
 | [Pilot](docs/pilot.md) | Pilot plan and questions for testers |
 

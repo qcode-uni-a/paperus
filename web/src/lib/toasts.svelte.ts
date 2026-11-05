@@ -1,4 +1,4 @@
-/** Short messages in the corner (like Immich's notifications), e.g. when
+/** Short messages in the corner, e.g. when
  * uploads are read or an import is done. They close themselves; while the
  * pointer rests on one, it waits. */
 

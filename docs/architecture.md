@@ -29,7 +29,7 @@ client; the server does retrieval, permissions and provenance.
 | API | Python, FastAPI + Pydantic; OpenAPI schema generates the TypeScript client |
 | Database | Postgres + pgvector; SQLAlchemy 2 or psycopg; Alembic migrations |
 | Task queue | Procrastinate (queue in Postgres, no Redis); alternatives Dramatiq/Celery |
-| Model service | Separate container like Immich's ML service: embeddings, reranker, OCR |
+| Model service | Separate container: embeddings, reranker, OCR |
 | MCP | Official Python SDK, mounted in the same FastAPI app; Streamable HTTP |
 | Frontend | TypeScript, SvelteKit (static, served by the API server), PDF.js; client generated with @hey-api/openapi-ts |
 | Browser extension | TypeScript, WebExtensions (Chrome + Firefox) |

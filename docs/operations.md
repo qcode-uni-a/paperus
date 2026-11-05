@@ -207,11 +207,11 @@ settings), so `docker compose pull` works without logging in.
 - One-command backup and restore; full export in open formats.
 - Helm chart later for university IT.
 
-## Lessons from Immich
+## Lessons from similar projects
 
 - Separate model container, callable over HTTP, can run on a GPU machine or be
   turned off; models configurable in the admin UI and downloaded automatically.
-- Vector extension changes happen (Immich moved from pgvecto.rs to
+- Vector extension changes happen (others moved from pgvecto.rs to
   VectorChord): hide the extension behind our own layer.
 - Job queue with an admin page: status and concurrency per job type, "process
   missing" and "re-run all" buttons (metadata, parsing, embeddings, OA checks,

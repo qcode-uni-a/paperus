@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PAPERUS_ML_", env_file=".env")
 
-    # Downloaded models, one folder per task and model like Immich's:
+    # Downloaded models, one folder per task and model:
     # <cache>/embedding/bge-m3/. "/cache" (a volume) in the container.
     cache_path: Path = Field(default_factory=lambda: default_cache_path())
     # Shared secret: requests need "Authorization: Bearer <token>" when set.

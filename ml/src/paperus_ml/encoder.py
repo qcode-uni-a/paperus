@@ -17,7 +17,7 @@ Vectors = npt.NDArray[np.float32]
 def session_options(intra_op_threads: int) -> onnxruntime.SessionOptions:
     options = onnxruntime.SessionOptions()
     options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    # One graph at a time, parallel inside operators (as in Immich).
+    # One graph at a time, parallel inside operators.
     options.inter_op_num_threads = 1
     options.intra_op_num_threads = intra_op_threads
     # Denormal floats are slow on CPUs and irrelevant for embeddings.

@@ -27,6 +27,9 @@
 	});
 
 	$effect(() => menu.watch());
+
+	// The administration is about the installation, not the library: no search.
+	const inAdmin = $derived(page.url.pathname.startsWith(resolve('/admin')));
 </script>
 
 <svelte:head>
@@ -51,7 +54,8 @@
 				><img src={asset('favicon.svg')} alt="" width="30" height="30" />paperus</a
 			>
 		</div>
-		{#if session.user}<div class="find"><SearchBar /></div>{/if}
+		{#if session.user && !inAdmin}<div class="find"><SearchBar /></div>{:else}<span class="spacer"
+			></span>{/if}
 		<div class="end">
 			{#if session.user}<AddMenu />{/if}
 			<ThemeToggle />
@@ -73,7 +77,7 @@
 {/if}
 
 <style>
-	/* Like Immich: the logo over the menu, a wide search in the middle,
+	/* The logo over the menu, a wide search in the middle,
 	   actions at the end; on phones the search takes a row of its own. */
 	header {
 		position: sticky;
@@ -106,6 +110,9 @@
 		header {
 			grid-template-columns: 1fr auto;
 			padding: 8px 12px 10px 4px;
+		}
+		.spacer {
+			display: none;
 		}
 		.find {
 			grid-column: 1 / -1;

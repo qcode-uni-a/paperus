@@ -21,7 +21,7 @@ export function formatSize(bytes: number | null | undefined): string {
 	return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
-/** The sections of the settings page (Immich-like): slug, title, what it is
+/** The sections of the settings page: slug, title, what it is
  * about, and whether it can be set yet. */
 export const SETTINGS = [
 	[

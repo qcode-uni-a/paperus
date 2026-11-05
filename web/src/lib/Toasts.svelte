@@ -36,7 +36,7 @@
 </div>
 
 <style>
-	/* Top right, below the bar, like Immich's notifications. */
+	/* Top right, below the bar. */
 	.toasts {
 		position: fixed;
 		top: 84px;

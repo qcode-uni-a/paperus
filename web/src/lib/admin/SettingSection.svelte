@@ -3,7 +3,7 @@
 	import type { Snippet } from 'svelte';
 	import Icon from '#lib/Icon.svelte';
 
-	/** One section of the settings page, opened and closed like Immich's. */
+	/** One section of the settings page, opened and closed. */
 	let {
 		id,
 		title,
