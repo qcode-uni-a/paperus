@@ -1,0 +1,39 @@
+{
+	"name": "paperus",
+	"version": "0.0.1",
+	"description": "TypeScript client for the paperus API (self-hosted research library for groups)",
+	"license": "Apache-2.0",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/qcode-uni-a/paperus.git",
+		"directory": "client"
+	},
+	"homepage": "https://github.com/qcode-uni-a/paperus",
+	"keywords": [
+		"paperus",
+		"research",
+		"library",
+		"api",
+		"client"
+	],
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"generate": "openapi-ts",
+		"build": "npm run generate && tsc -p tsconfig.json"
+	},
+	"devDependencies": {
+		"@hey-api/openapi-ts": "^0.99.0",
+		"typescript": "^6.0.3"
+	}
+}

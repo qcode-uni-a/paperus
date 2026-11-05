@@ -70,6 +70,23 @@ jobs:
       - run: npm run check
       - run: npm run build
 
+  client:
+    name: TypeScript client (generate, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm pack --dry-run
+
   images:
     name: Container images (build only)
     runs-on: ubuntu-latest
