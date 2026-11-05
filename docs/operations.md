@@ -94,6 +94,20 @@ server {
 Tested with Caddy in front of the container images: HTTPS, login with the
 Secure session cookie, uploads, downloads with range requests.
 
+## ML service (search by meaning)
+
+The `ml` container computes the vectors for search by meaning on the CPU.
+
+- **Cores**: `ML_THREADS` in `.env` (default 0: all cores it sees). Lower
+  it to keep cores free for the database and the server on the same
+  machine. Docker's `cpus:` limit alone is not enough: inside a container
+  the host's cores are still seen, and too many threads slow it down.
+- **One batch at a time per model**: each batch uses all of its cores;
+  simultaneous requests (several uploads, a search) take turns batch by
+  batch, so a search waits for one batch at most.
+- **The model** is chosen under Administration → Settings → Machine
+  learning.
+
 ## Backups
 
 Administration → Backups writes backups now or on a schedule (daily or

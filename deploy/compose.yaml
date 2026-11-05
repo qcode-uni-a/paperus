@@ -45,6 +45,7 @@ services:
     environment:
       PAPERUS_ML_TOKEN: ${ML_TOKEN}
       PAPERUS_ML_PRELOAD: '["bge-m3"]'
+      PAPERUS_ML_INTRA_OP_THREADS: ${ML_THREADS:-0}
     volumes:
       - ${MODEL_CACHE_LOCATION}:/cache
     restart: unless-stopped

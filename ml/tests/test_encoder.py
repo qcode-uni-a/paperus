@@ -1,6 +1,10 @@
+import threading
+import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import pytest
 
 from paperus_ml.encoder import Encoder, batches, pool
 from tests.tiny_model import DIMENSIONS, write_tiny_model
@@ -42,3 +46,35 @@ def test_long_texts_are_truncated(tmp_path: Path) -> None:
     encoder = Encoder(spec, tmp_path)
     long = " ".join(["rain"] * 1000)
     assert encoder.embed([long], "passage").shape == (1, DIMENSIONS)
+
+
+def test_one_batch_at_a_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simultaneous requests take turns per batch instead of competing for
+    the cores."""
+    encoder = Encoder(write_tiny_model(tmp_path), tmp_path, max_batch_texts=1)
+    running, most = 0, 0
+    guard = threading.Lock()
+    run = encoder.session.run
+
+    def counting_run(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        nonlocal running, most
+        with guard:
+            running += 1
+            most = max(most, running)
+        time.sleep(0.01)
+        try:
+            return run(*args, **kwargs)
+        finally:
+            with guard:
+                running -= 1
+
+    monkeypatch.setattr(encoder.session, "run", counting_run)
+    threads = [
+        threading.Thread(target=encoder.embed, args=(["rain", "drought"], "passage"))
+        for _ in range(4)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert most == 1

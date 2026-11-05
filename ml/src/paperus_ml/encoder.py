@@ -1,5 +1,6 @@
 """Running an embedding model with ONNX Runtime."""
 
+import threading
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -77,6 +78,10 @@ class Encoder:
             providers=["CPUExecutionProvider"],
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
+        # One batch at a time: each already uses all cores, so batches of
+        # simultaneous requests would only compete for them. Per batch, not
+        # per request, so a search query waits for one batch at most.
+        self._running = threading.Lock()
 
     def embed(self, texts: Sequence[str], kind: Kind) -> Vectors:
         prefix = self.spec.prefix(kind)
@@ -99,5 +104,6 @@ class Encoder:
         feed = {"input_ids": ids, "attention_mask": mask}
         if "token_type_ids" in self.input_names:
             feed["token_type_ids"] = np.zeros_like(ids)
-        hidden = self.session.run(None, feed)[0]
+        with self._running:
+            hidden = self.session.run(None, feed)[0]
         return pool(np.asarray(hidden, dtype=np.float32), mask, self.spec.pooling)
