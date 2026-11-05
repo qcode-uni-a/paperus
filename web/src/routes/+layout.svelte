@@ -1,15 +1,15 @@
 <script lang="ts">
 	import '../app.css';
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import DropZone from '#lib/DropZone.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
-	import { loadUser, logout, session } from '#lib/session.svelte.ts';
+	import { loadUser, session } from '#lib/session.svelte.ts';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import ThemeToggle from '#lib/ThemeToggle.svelte';
 	import AddMenu from '#lib/AddMenu.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
+	import UserMenu from '#lib/UserMenu.svelte';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -21,11 +21,6 @@
 	});
 
 	$effect(() => menu.watch());
-
-	async function signOut() {
-		await logout();
-		await goto(resolve('/login'));
-	}
 </script>
 
 <svelte:head>
@@ -51,10 +46,7 @@
 		<div class="row">
 			{#if session.user}<AddMenu />{/if}
 			<ThemeToggle />
-			{#if session.user}
-				<span class="user">{session.user.username}</span>
-				<button class="quiet" onclick={signOut}>Log out</button>
-			{/if}
+			{#if session.user}<UserMenu />{/if}
 		</div>
 	</header>
 
@@ -116,19 +108,6 @@
 		border-radius: 1px;
 		background: var(--ink);
 	}
-	.user {
-		color: var(--muted);
-		margin-left: 4px;
-	}
-	.quiet {
-		border-color: transparent;
-		background: none;
-		color: var(--royal);
-	}
-	.quiet:hover:not(:disabled) {
-		background: var(--rail);
-		border-color: transparent;
-	}
 	.body {
 		display: flex;
 		gap: 24px;
@@ -145,9 +124,6 @@
 		padding: 16px;
 	}
 	@media (max-width: 720px) {
-		.user {
-			display: none;
-		}
 		.body {
 			padding: 16px;
 		}
