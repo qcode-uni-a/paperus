@@ -315,12 +315,12 @@ def test_sharing_and_taking_back(client: TestClient, db: Session) -> None:
         ).status_code
         == 403
     )
-    # A member takes it for himself: the group's tag comes off.
+    # A member takes it for himself; the group's tag stays on it.
     taken = bob.put(
         f"/api/items/{paper['id']}/owner",
         json={"library_id": bob.libraries()["Me"]["id"]},
     ).json()
-    assert taken["tags"] == []
+    assert [t["name"] for t in taken["tags"]] == ["method"]
     assert ada.titles() == []
     assert bob.titles() == ["Ada's paper"]
 
@@ -383,3 +383,59 @@ def test_moving_a_collection_to_another_library(
         "Bob's",
         "Thesis",
     ]
+
+
+def test_group_tags_on_own_papers(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    shared = ada.add("Group paper", chair["library_id"])
+    ada.post(
+        f"/api/items/{shared['id']}/tags",
+        json={"name": "methods", "library_id": chair["library_id"]},
+    )
+    # A reader uses the group's tag on his own paper, invisibly to others.
+    mine = bob.add("Bob's paper")
+    tags = bob.post(
+        f"/api/items/{mine['id']}/tags",
+        json={"name": "methods", "library_id": chair["library_id"]},
+    ).json()
+    assert [t["name"] for t in tags] == ["methods"]
+    [tag] = [t for t in ada.get("/api/tags").json() if t["name"] == "methods"]
+    assert tag["count"] == 1  # Ada does not see Bob's paper
+    assert bob.titles(tag=tag["id"]) == ["Bob's paper", "Group paper"]
+    # But he creates no group tags, and changes none on the group's papers.
+    assert (
+        bob.post(
+            f"/api/items/{mine['id']}/tags",
+            json={"name": "new", "library_id": chair["library_id"]},
+        ).status_code
+        == 403
+    )
+    assert (
+        bob.client.delete(
+            f"/api/items/{shared['id']}/tags/{tag['id']}", headers=bob.headers
+        ).status_code
+        == 403
+    )
+
+    # Giving a private tag to the group keeps it on every paper.
+    private = ada.add("Ada's paper")
+    ada.post(f"/api/items/{private['id']}/tags", json={"name": "reading"})
+    [reading] = [t for t in ada.get("/api/tags").json() if t["name"] == "reading"]
+    given = ada.patch(
+        f"/api/tags/{reading['id']}", json={"library_id": chair["library_id"]}
+    )
+    assert given.json()["library_id"] == chair["library_id"]
+    assert [
+        t["name"] for t in ada.get(f"/api/items/{private['id']}").json()["tags"]
+    ] == ["reading"]
+    assert any(t["name"] == "reading" for t in bob.get("/api/tags").json())
+    assert (
+        bob.patch(
+            f"/api/tags/{reading['id']}",
+            json={"library_id": bob.libraries()["Me"]["id"]},
+        ).status_code
+        == 403
+    )

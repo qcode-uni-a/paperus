@@ -122,6 +122,9 @@ inside the search query itself.
 
 ### Groups and owners
 
+The full list of who may do what is in [permissions](permissions.md).
+
+
 - **Owners.** Every paper, tag and collection has one owner: a person
   (private) or a group (shared with its members). People see what they
   own and what their groups own, mixed in one list; group papers carry a
@@ -133,9 +136,11 @@ inside the search query itself.
   paper one can already see finds that paper. Papers in someone else's
   private space stay invisible, so two people adding the same paper
   independently get two items (merging duplicates comes later).
-- **Tags and collections** of a group hold only that group's papers;
-  private ones hold any paper one can see and stay private. When a paper
-  leaves a group, the group's tags and collections come off it.
+- **Tags and collections**: a group's collections hold only that group's
+  papers; private ones hold any paper one can see. Tags are freer: a
+  group's tags may also go on one's own papers (its vocabulary), private
+  tags on any paper one sees; each stays visible only to those who see
+  both. When a paper leaves a group, the group's collections let it go.
 - **Nested groups.** A group can sit inside another (faculty → chair →
   project), like GitLab. Membership is inherited downwards: members of a
   group are members of every group inside it with the same role; a

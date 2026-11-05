@@ -2,7 +2,14 @@
 	import { deleteTag, errorMessage } from '#lib/api/client.ts';
 	import IconButton from '#lib/IconButton.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
-	import { libraryById, isShared, loadOrganize, organize, type Tag } from '#lib/organize.svelte.ts';
+	import {
+		isShared,
+		libraryById,
+		libraryName,
+		loadOrganize,
+		organize,
+		type Tag
+	} from '#lib/organize.svelte.ts';
 	import TagDialog from '#lib/TagDialog.svelte';
 	import { ago } from '#lib/format.ts';
 
@@ -22,11 +29,12 @@
 
 	const writable = (tag: Tag) => libraryById(tag.library_id)?.writable ?? false;
 
+	let owner = $state('');
 	const shown = $derived.by(() => {
 		const words = filter.trim().toLowerCase();
 		const matching = organize.tags.filter(
 			(tag) =>
-				!words ||
+				((!owner || tag.library_id === owner) && !words) ||
 				tag.name.toLowerCase().includes(words) ||
 				(tag.description ?? '').toLowerCase().includes(words)
 		);
@@ -119,6 +127,14 @@
 			placeholder="Filter by name or description"
 			aria-label="Filter tags"
 		/>
+		{#if organize.libraries.length > 1}
+			<select bind:value={owner} aria-label="Owner">
+				<option value="">All owners</option>
+				{#each organize.libraries as library (library.id)}
+					<option value={library.id}>{libraryName(library.id)}</option>
+				{/each}
+			</select>
+		{/if}
 
 		{#if selected.length}
 			<div class="bulk">

@@ -136,10 +136,19 @@ class Access:
         """Items owned by these (by default: everything the person reads)."""
         return Item.library_id.in_(self.readable if libraries is None else libraries)
 
+    def may_tag(self, library_id: uuid.UUID, item: Item) -> bool:
+        """Whether the person may put a tag of ``library_id`` on (or take it
+        off) the item: their private tags on any item they see; a group's
+        tags (they read) on any item they may change, e.g. their own papers
+        with the group's vocabulary."""
+        if library_id == self.own_library:
+            return self.can_read_item(item)
+        return self.can_read(library_id) and self.can_write_item(item)
+
     def may_hold(self, library_id: uuid.UUID, item: Item) -> bool:
-        """Whether a tag or collection of ``library_id`` may hold the item: a
-        group's only the group's items, a person's private ones any item the
-        person can read."""
+        """Whether a collection of ``library_id`` may hold the item: a group's
+        only the group's items, a person's private ones any item the person
+        can read."""
         if library_id == self.own_library:
             return self.can_read_item(item)
         return library_id == item.library_id

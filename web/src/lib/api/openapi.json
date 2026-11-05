@@ -1487,7 +1487,7 @@
           "organize"
         ],
         "summary": "Change Tag",
-        "description": "Rename a tag everywhere (409 if another tag of its library has that\nname), or set its colour or description.",
+        "description": "Rename a tag everywhere (409 if another tag of its owner has that\nname), set its colour or description, or give it to another owner.",
         "operationId": "change_tag",
         "parameters": [
           {
@@ -1517,7 +1517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TagOut"
+                  "$ref": "#/components/schemas/TagChanged"
                 }
               }
             }
@@ -3912,11 +3912,111 @@
               }
             ],
             "title": "Description"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
           }
         },
         "type": "object",
         "title": "TagChange",
         "description": "Only the fields given are changed; ``null`` clears colour or description."
+      },
+      "TagChanged": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/TagSource"
+            },
+            "type": "object",
+            "title": "Sources"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used"
+          },
+          "left_out": {
+            "type": "integer",
+            "title": "Left Out",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "name",
+          "color",
+          "description",
+          "count",
+          "sources",
+          "created_at",
+          "last_used"
+        ],
+        "title": "TagChanged"
       },
       "TagColor": {
         "type": "string",

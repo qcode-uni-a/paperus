@@ -55,6 +55,7 @@ Back up the files folder and the database folder together. To update, change
 | [Architecture](docs/architecture.md) | Components, stack, data model, scaling |
 | [Ingestion](docs/ingestion.md) | Adding items, metadata, PDFs, browser extension, versions, other sources |
 | [Search](docs/search.md) | Chunking, embeddings, hybrid search, deduplication across versions, pgvector |
+| [Permissions](docs/permissions.md) | Who may do what with papers, tags, collections and groups |
 | [AI integration](docs/ai.md) | MCP tools, permissions, the AI inbox, skill draft |
 | [Operations](docs/operations.md) | Hosting at the university, data protection, lessons from Immich |
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |

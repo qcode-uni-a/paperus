@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from paperus import library, organize
-from paperus.access import Access
+from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
 from paperus.models import (
     Collection,
@@ -62,6 +62,8 @@ class TagChange(BaseModel):
     name: Name | None = None
     color: TagColor | None = None
     description: Annotated[str | None, Field(max_length=2000)] = None
+    library_id: uuid.UUID | None = None
+    """A new owner the person may change (the tag stays on all its papers)."""
 
 
 class ItemPreview(BaseModel):
@@ -255,8 +257,9 @@ def create_tag(body: TagNew, db: DB, access: CurrentAccess) -> TagOut:
 def add_tag(
     item_id: uuid.UUID, body: TagIn, db: DB, access: CurrentAccess
 ) -> list[ItemTagOut]:
-    """Tag an item; the tag is created if its library has none of that name
-    (any case)."""
+    """Tag an item with its owner's, the person's or one of their groups' tag
+    (see ``Access.may_tag``); the tag is created if that owner has none of
+    that name (any case), which for a group needs member rights there."""
     item = _item(db, access, item_id)
     library_id = body.library_id
     if library_id is None:
@@ -264,9 +267,14 @@ def add_tag(
         library_id = item.library_id if writable else access.own_library
     if not access.can_read(library_id):
         raise HTTPException(404, "library not found")
-    access.require_write(library_id)
-    if not access.may_hold(library_id, item):
-        raise HTTPException(409, "a group's tags go only on that group's items")
+    if not access.may_tag(library_id, item):
+        raise Forbidden("you may not change this item's tags")
+    try:
+        known = organize.find_tag(db, library_id, body.name)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    if known is None:
+        access.require_write(library_id)  # new tags of a group: members
     try:
         organize.tag_item(
             db, item, body.name, library_id=library_id, user_id=access.user.id
@@ -282,7 +290,9 @@ def remove_tag(
     item_id: uuid.UUID, tag_id: uuid.UUID, db: DB, access: CurrentAccess
 ) -> list[ItemTagOut]:
     item = _item(db, access, item_id)
-    _tag(db, access, tag_id, write=True)
+    tag = _tag(db, access, tag_id)
+    if not access.may_tag(tag.library_id, item):
+        raise Forbidden("you may not change this item's tags")
     organize.untag_item(item, tag_id)
     db.commit()
     return item_tags(item, access)
@@ -292,9 +302,15 @@ def remove_tag(
 def change_tag(
     tag_id: uuid.UUID, body: TagChange, db: DB, access: CurrentAccess
 ) -> TagOut:
-    """Rename a tag everywhere (409 if another tag of its library has that
-    name), or set its colour or description."""
+    """Rename a tag everywhere (409 if another tag of its owner has that
+    name), set its colour or description, or give it to another owner."""
     tag = _tag(db, access, tag_id, write=True)
+    target = body.library_id
+    if target is not None and target != tag.library_id:
+        access.target_library(target)
+        if organize.find_tag(db, target, body.name or tag.name) is not None:
+            raise HTTPException(409, "the new owner has a tag of that name already")
+        tag.library_id = target
     if body.name is not None:
         try:
             organize.rename_tag(db, tag, body.name)

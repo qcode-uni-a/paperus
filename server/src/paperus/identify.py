@@ -213,7 +213,7 @@ def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
         file.role = FileRole.OTHER if has_main else FileRole.MAIN
 
     def may_hold(library_id: uuid.UUID) -> bool:
-        """Private tags and collections hold any paper, a group's only its own."""
+        """Private collections hold any paper, a group's only its own."""
         owner = db.get(Library, library_id)
         return library_id == target.library_id or (
             owner is not None and owner.user_id is not None
@@ -229,7 +229,7 @@ def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
             )
     tagged = {link.tag_id for link in target.tag_links}
     for link in item.tag_links:
-        if link.tag_id not in tagged and may_hold(link.tag.library_id):
+        if link.tag_id not in tagged:
             target.tag_links.append(
                 ItemTag(
                     tag_id=link.tag_id,

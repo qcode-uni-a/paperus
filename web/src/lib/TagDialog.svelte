@@ -2,7 +2,12 @@
 	import { changeTag, createTag, errorMessage } from '#lib/api/client.ts';
 	import type { TagColor, TagOut } from '#lib/api/generated/types.gen.ts';
 	import { TAG_COLORS } from '#lib/tags.ts';
-	import { defaultLibrary, libraryName, writableLibraries } from '#lib/organize.svelte.ts';
+	import {
+		defaultLibrary,
+		isShared,
+		libraryName,
+		writableLibraries
+	} from '#lib/organize.svelte.ts';
 
 	/** Create a tag, or edit one: name, colour and description. */
 	let { onsaved }: { onsaved?: () => void } = $props();
@@ -21,7 +26,7 @@
 		name = editing?.name ?? '';
 		color = editing?.color ?? null;
 		description = editing?.description ?? '';
-		library = defaultLibrary()?.id ?? '';
+		library = editing?.library_id ?? defaultLibrary()?.id ?? '';
 		error = '';
 		dialog?.showModal();
 	}
@@ -30,8 +35,9 @@
 		event.preventDefault();
 		saving = true;
 		const body = { name, color, description: description.trim() || null };
+		const transfer = tag && library !== tag.library_id ? { library_id: library } : {};
 		const result = tag
-			? await changeTag({ path: { tag_id: tag.id }, body })
+			? await changeTag({ path: { tag_id: tag.id }, body: { ...body, ...transfer } })
 			: await createTag({ body: { ...body, library_id: library || undefined } });
 		saving = false;
 		if (!result.data) {
@@ -47,7 +53,7 @@
 	<form onsubmit={save}>
 		<h2 id="tag-dialog-title">{tag ? 'Edit tag' : 'New tag'}</h2>
 		<label>Name <input bind:value={name} required maxlength="100" /></label>
-		{#if !tag && writableLibraries().length > 1}
+		{#if writableLibraries().length > 1}
 			<label
 				>Owner
 				<select bind:value={library}>
@@ -56,6 +62,13 @@
 					{/each}
 				</select>
 			</label>
+			{#if tag && library !== tag.library_id}
+				<p class="note">
+					{isShared(library)
+						? `${libraryName(library)} gets the tag; it stays on all papers it is on.`
+						: 'The tag becomes yours; the group no longer sees it.'}
+				</p>
+			{/if}
 		{/if}
 		<fieldset>
 			<legend>Colour</legend>
@@ -119,6 +132,11 @@
 	form > label :global(select),
 	form > label :global(textarea) {
 		font-weight: 400;
+	}
+	.note {
+		margin: -6px 0 0;
+		color: var(--muted);
+		font-size: var(--step--1);
 	}
 	.optional {
 		font-weight: 400;

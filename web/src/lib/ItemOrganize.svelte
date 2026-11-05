@@ -35,11 +35,23 @@
 	// Who else could own it: the person and groups they may add to.
 	const owners = $derived(organize.libraries.filter((l) => l.writable));
 
-	const suggestions = $derived(
+	/** Whether the person may put tags of this owner on the item (and take
+	 * them off): private tags anywhere, a group's on papers they may change. */
+	function mayTag(libraryId: string | undefined): boolean {
+		if (!libraryId) return false;
+		return libraryId === own?.id || (itemWritable && libraryById(libraryId) !== undefined);
+	}
+	// Existing tags that fit: the item owner's first, then one's own, then
+	// the other groups' (the same name in several: the first wins).
+	const usable = $derived(
 		organize.tags
-			.filter((t) => t.library_id === tagLibrary && !item.tags.some((on) => on.id === t.id))
-			.map((t) => t.name)
+			.filter((t) => mayTag(t.library_id) && !item.tags.some((on) => on.id === t.id))
+			.toSorted((a, b) => rank(a.library_id) - rank(b.library_id) || a.name.localeCompare(b.name))
 	);
+	function rank(libraryId: string): number {
+		return libraryId === tagLibrary ? 0 : libraryId === own?.id ? 1 : 2;
+	}
+	const suggestions = $derived([...new Set(usable.map((t) => t.name))]);
 	// A group's collections hold only its items; private ones any item.
 	const choices = $derived(
 		[...(itemWritable ? flatTree(item.library_id) : []), ...flatTree(own?.id)].filter(
@@ -71,7 +83,15 @@
 		if (!name) return;
 		tagInput = '';
 		tagging = false;
-		await done(await addTag({ path: { item_id: item.id }, body: { name } }));
+		// An existing tag of that name (any owner that fits), else a new one
+		// where the server puts it.
+		const existing = usable.find((t) => t.name.toLowerCase() === name.toLowerCase());
+		await done(
+			await addTag({
+				path: { item_id: item.id },
+				body: { name, library_id: existing?.library_id }
+			})
+		);
 	}
 
 	/** Open the list right away; the + was the click that asked for it. */
@@ -131,7 +151,7 @@
 			<span class="chip" data-tag-color={tag.color}>
 				{#if isPrivate(library)}{@render lock()}{/if}
 				<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
-				{#if writableLibrary(library)}
+				{#if mayTag(library)}
 					<button
 						onclick={async () =>
 							done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}

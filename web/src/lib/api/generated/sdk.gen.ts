@@ -339,8 +339,8 @@ export const deleteTag = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Change Tag
  *
- * Rename a tag everywhere (409 if another tag of its library has that
- * name), or set its colour or description.
+ * Rename a tag everywhere (409 if another tag of its owner has that
+ * name), set its colour or description, or give it to another owner.
  */
 export const changeTag = <ThrowOnError extends boolean = false>(options: Options<ChangeTagData, ThrowOnError>): RequestResult<ChangeTagResponses, ChangeTagErrors, ThrowOnError> => (options.client ?? client).patch<ChangeTagResponses, ChangeTagErrors, ThrowOnError>({
     url: '/api/tags/{tag_id}',

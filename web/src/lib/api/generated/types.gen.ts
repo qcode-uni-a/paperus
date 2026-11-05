@@ -895,6 +895,55 @@ export type TagChange = {
      * Description
      */
     description?: string | null;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
+ * TagChanged
+ */
+export type TagChanged = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    color: TagColor | null;
+    /**
+     * Description
+     */
+    description: string | null;
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Sources
+     */
+    sources: {
+        [key in TagSource]?: number;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used
+     */
+    last_used: string | null;
+    /**
+     * Left Out
+     */
+    left_out?: number;
 };
 
 /**
@@ -2085,7 +2134,7 @@ export type ChangeTagResponses = {
     /**
      * Successful Response
      */
-    200: TagOut;
+    200: TagChanged;
 };
 
 export type ChangeTagResponse = ChangeTagResponses[keyof ChangeTagResponses];

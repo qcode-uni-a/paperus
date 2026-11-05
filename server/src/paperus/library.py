@@ -227,15 +227,13 @@ def replace_metadata(
 
 
 def set_owner(db: Session, item: Item, library_id: uuid.UUID) -> None:
-    """Give the item to another owner (a person's or a group's library). Tags
-    and collections of a group that no longer owns it come off; private
-    ones stay."""
+    """Give the item to another owner (a person's or a group's library). The
+    collections of a group that no longer owns it let it go (a group's
+    collections hold only its papers); tags stay."""
     if item.library_id == library_id:
         return
     item.library_id = library_id
-    held = {link.tag.library_id for link in item.tag_links} | {
-        link.collection.library_id for link in item.collection_links
-    }
+    held = {link.collection.library_id for link in item.collection_links}
     groups = set(
         db.scalars(
             select(Library.id).where(
