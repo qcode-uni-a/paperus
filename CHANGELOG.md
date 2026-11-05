@@ -17,8 +17,9 @@
   Settings → Authentication or right after creating the first
   administrator. Accounts are created on first login (or only for people
   added beforehand), linked by username, or linked by hand with "Link my
-  account" (also in one's own settings). Password login can be limited to
-  administrators.
+  account" (also in one's own settings); the identity provider's picture
+  becomes the profile picture if there is none. Password login can be
+  limited to administrators.
 - **Profile pictures**: chosen in one's own settings (cut to a square and
   scaled down in the browser), shown in the menu, with group members and
   in Administration → Users.

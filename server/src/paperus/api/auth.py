@@ -234,8 +234,11 @@ def oidc_callback(
             if current is None:
                 raise oidc.LoginFailed("you were logged out meanwhile")
             oidc.link(db, current, claims)
+            oidc.take_picture(request.app.state.http, current, claims, provider.issuer)
         else:
-            user = oidc.user_for(db, claims, config)
+            user, linked = oidc.user_for(db, claims, config)
+            if linked:
+                oidc.take_picture(request.app.state.http, user, claims, provider.issuer)
     except oidc.LoginFailed as failure:
         db.rollback()
         reason = f"OIDC login failed: {failure}."

@@ -9,9 +9,12 @@ issuer, audience, expiry and nonce are.
 
 import base64
 import hashlib
+import ipaddress
 import json
+import logging
 import re
 import secrets
+import socket
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -22,9 +25,11 @@ import httpx2
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import auth
+from paperus import auth, avatars
 from paperus.models import User
 from paperus.system import SystemConfig
+
+log = logging.getLogger(__name__)
 
 # Discovery documents are kept this long.
 CACHE_SECONDS = 3600
@@ -202,11 +207,15 @@ def finish(
     return claims
 
 
-def user_for(db: Session, claims: dict[str, Any], config: SystemConfig) -> User:
+def user_for(
+    db: Session, claims: dict[str, Any], config: SystemConfig
+) -> tuple[User, bool]:
     """The account for these claims: the one linked before, else the one of
-    the same username (then linked), else a new one if allowed."""
+    the same username (then linked), else a new one if allowed; and whether
+    it was linked just now."""
     subject = f"{claims['iss']} {claims['sub']}"
     user = db.scalar(select(User).where(User.oidc_subject == subject))
+    linked = user is None
     if user is None:
         username = str(claims.get(config.oidc_username_claim) or "")
         if not USERNAME.fullmatch(username):
@@ -229,7 +238,7 @@ def user_for(db: Session, claims: dict[str, Any], config: SystemConfig) -> User:
     if user.deactivated_at is not None:
         raise LoginFailed("this account is deactivated")
     user.last_login_at = datetime.now(UTC)
-    return user
+    return user, linked
 
 
 def link(db: Session, user: User, claims: dict[str, Any]) -> None:
@@ -239,3 +248,49 @@ def link(db: Session, user: User, claims: dict[str, Any]) -> None:
     if other is not None and other.id != user.id:
         raise LoginFailed(f"this OIDC login belongs to the account {other.username}")
     user.oidc_subject = subject
+
+
+def take_picture(
+    http: httpx2.Client, user: User, claims: dict[str, Any], issuer: str
+) -> None:
+    """The ``picture`` the identity provider names, as the profile picture,
+    if the person has none. Best effort: whatever fails is skipped."""
+    url = claims.get("picture")
+    if user.avatar_version is not None or not isinstance(url, str):
+        return
+    try:
+        data = fetch_picture(http, url, issuer)
+        if data is not None:
+            avatars.set_avatar(user, data)
+    except (httpx2.HTTPError, avatars.BadPicture, OSError, ValueError) as error:
+        log.info("no picture from the identity provider: %s", error)
+
+
+def fetch_picture(http: httpx2.Client, url: str, issuer: str) -> bytes | None:
+    """Download a picture over https, without redirects, up to the size a
+    profile picture may have, from the identity provider's own host or from
+    a public address (never from this server's private network)."""
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not parts.hostname:
+        return None
+    if parts.hostname != urlsplit(issuer).hostname and not _public(parts.hostname):
+        return None
+    with http.stream("GET", url, timeout=5, follow_redirects=False) as response:
+        if response.status_code != 200:
+            return None
+        data = b""
+        for chunk in response.iter_bytes():
+            data += chunk
+            if len(data) > avatars.MAX_BYTES:
+                return None
+    avatars.image_type(data)
+    return data
+
+
+def _public(host: str) -> bool:
+    try:
+        found = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return False
+    addresses = {ipaddress.ip_address(info[4][0]) for info in found}
+    return bool(addresses) and all(a.is_global for a in addresses)

@@ -23,6 +23,7 @@ from paperus.models import User
 from tests.conftest import FakeDOIRegistry, FakeML
 
 ISSUER = "https://idp.test/realms/uni"
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
 
 def _jwt(claims: dict[str, Any]) -> str:
@@ -40,6 +41,7 @@ class FakeProvider:
         self.nonce = ""
         self.forms: list[dict[str, list[str]]] = []
         self.audience = "paperus"
+        self.pictures = 0
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         path = request.url.path
@@ -70,6 +72,9 @@ class FakeProvider:
             )
         if path.endswith("/userinfo"):
             return httpx2.Response(200, json=self.person)
+        if path.endswith("/pic.png"):
+            self.pictures += 1
+            return httpx2.Response(200, content=PNG)
         return httpx2.Response(404)
 
 
@@ -306,3 +311,28 @@ def test_link_the_logged_in_account(
     site.post("/api/auth/login", json={"username": "root", "password": "secret12"})
     assert site.delete("/api/auth/oidc/link").status_code == 204
     assert site.get("/api/auth/me").json()["oidc_linked"] is False
+
+
+def test_picture_from_the_identity_provider(
+    site: TestClient, provider: FakeProvider, db: Session
+) -> None:
+    enable_oidc(site)
+    provider.person["picture"] = f"{ISSUER}/pic.png"
+    log_in_with_oidc(site, provider)
+    me = site.get("/api/auth/me").json()
+    assert me["avatar_url"] is not None
+    assert site.get(me["avatar_url"]).content == PNG
+    # Only when linking: later logins fetch nothing.
+    log_in_with_oidc(site, provider)
+    assert provider.pictures == 1
+
+
+def test_no_picture_from_elsewhere(site: TestClient, provider: FakeProvider) -> None:
+    enable_oidc(site)
+    # Another host that does not resolve to a public address; plain http.
+    for url in ("https://pictures.internal.test/pic.png", "http://idp.test/pic.png"):
+        provider.person = {"sub": url, "preferred_username": f"p{len(url)}"}
+        provider.person["picture"] = url
+        assert log_in_with_oidc(site, provider).status_code == 303
+        assert site.get("/api/auth/me").json()["avatar_url"] is None
+    assert provider.pictures == 0
