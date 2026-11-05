@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { startNote } from '#lib/notes.ts';
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import AddItem from '#lib/AddItem.svelte';
 	import { addFiles } from '#lib/uploads.svelte.ts';
@@ -21,6 +24,16 @@
 		dialog?.showModal();
 	}
 
+	async function writeNote() {
+		menu?.hidePopover();
+		await startNote();
+	}
+
+	function importLibrary() {
+		menu?.hidePopover();
+		goto(resolve('/import'));
+	}
+
 	function closeForm() {
 		dialog?.close();
 	}
@@ -39,6 +52,14 @@
 	<button role="menuitem" onclick={openForm}>
 		<strong>Add by DOI or details</strong>
 		<span>A paper by its DOI, or notes without a file</span>
+	</button>
+	<button role="menuitem" onclick={writeNote}>
+		<strong>New note</strong>
+		<span>Your own writing, in Markdown</span>
+	</button>
+	<button role="menuitem" onclick={importLibrary}>
+		<strong>Import a library</strong>
+		<span>From Zotero, JabRef, Mendeley, EndNote…</span>
 	</button>
 </div>
 

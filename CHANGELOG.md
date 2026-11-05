@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Import a library** (Add → Import a library): from Zotero, JabRef,
+  Mendeley, EndNote and others, as BibTeX, RIS or CSL-JSON, alone or
+  zipped with the PDFs. Papers already here are recognized and not added
+  twice (importing again is safe); JabRef groups become collections,
+  keywords tags, notes notes, and citation keys stay. Runs in the
+  background with progress and a report of missing files. For very large
+  libraries: `paperus import <zip|folder> --user <name>` on the server.
 - **Notes**: your own writing about papers, in Markdown with formulas
   (rendered like Markdown files). A note can be about several papers (at a
   page) or none, sits in collections next to papers, and belongs to you or

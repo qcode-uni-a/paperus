@@ -92,6 +92,20 @@ export type Backups = {
 };
 
 /**
+ * Body_start_import
+ */
+export type BodyStartImport = {
+    /**
+     * Upload
+     */
+    upload: Blob | File;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
  * Body_upload_new_item
  */
 export type BodyUploadNewItem = {
@@ -367,7 +381,7 @@ export type FileRole = 'main' | 'supplementary' | 'slides' | 'transcript' | 'rec
  *
  * Where a file came from; matters for sharing rules.
  */
-export type FileSource = 'upload' | 'open_access' | 'browser';
+export type FileSource = 'upload' | 'open_access' | 'browser' | 'import';
 
 /**
  * GroupChange
@@ -483,6 +497,60 @@ export type IdentifierOut = {
      */
     value: string;
 };
+
+/**
+ * ImportOut
+ */
+export type ImportOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Format
+     */
+    format: string | null;
+    status: ImportStatus;
+    /**
+     * Done
+     */
+    done: number;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Report
+     */
+    report: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+};
+
+/**
+ * ImportStatus
+ */
+export type ImportStatus = 'waiting' | 'running' | 'done' | 'failed';
 
 /**
  * ItemDetail
@@ -3093,6 +3161,79 @@ export type RemoveNoteResponses = {
 };
 
 export type RemoveNoteResponse = RemoveNoteResponses[keyof RemoveNoteResponses];
+
+export type ListImportsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/imports';
+};
+
+export type ListImportsResponses = {
+    /**
+     * Response List Imports
+     *
+     * Successful Response
+     */
+    200: Array<ImportOut>;
+};
+
+export type ListImportsResponse = ListImportsResponses[keyof ListImportsResponses];
+
+export type StartImportData = {
+    body: BodyStartImport;
+    path?: never;
+    query?: never;
+    url: '/api/imports';
+};
+
+export type StartImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartImportError = StartImportErrors[keyof StartImportErrors];
+
+export type StartImportResponses = {
+    /**
+     * Successful Response
+     */
+    201: ImportOut;
+};
+
+export type StartImportResponse = StartImportResponses[keyof StartImportResponses];
+
+export type GetImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}';
+};
+
+export type GetImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetImportError = GetImportErrors[keyof GetImportErrors];
+
+export type GetImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportOut;
+};
+
+export type GetImportResponse = GetImportResponses[keyof GetImportResponses];
 
 export type GetConfigData = {
     body?: never;
