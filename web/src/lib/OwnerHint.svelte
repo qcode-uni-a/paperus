@@ -30,8 +30,8 @@
 		</p>
 		<ol>
 			<li>
-				<strong>New papers, tags and collections</strong> go to {libraryName(hint.libraryId)}.
-				Change that under <em>Settings → Owner of new things</em>.
+				<strong>New papers, tags and collections</strong> belong to {owner}. Change that under
+				<em>Settings → Owner of new things</em>.
 			</li>
 			<li>
 				<strong>To give one paper to someone else</strong>, open it and pick another
