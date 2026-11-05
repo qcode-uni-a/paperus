@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, ListBackupsData, ListBackupsResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddNotesData, AddNotesErrors, AddNotesResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeNoteData, ChangeNoteErrors, ChangeNoteResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateNoteData, CreateNoteErrors, CreateNoteResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, LinkItemData, LinkItemErrors, LinkItemResponses, ListBackupsData, ListBackupsResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListNotesData, ListNotesErrors, ListNotesResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, NoteHistoryData, NoteHistoryErrors, NoteHistoryResponses, NoteMarkdownData, NoteMarkdownErrors, NoteMarkdownResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, ReadNoteData, ReadNoteErrors, ReadNoteResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveNoteData, RemoveNoteErrors, RemoveNoteResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreNoteData, RestoreNoteErrors, RestoreNoteResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetNoteOwnerData, SetNoteOwnerErrors, SetNoteOwnerResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, TrashNoteData, TrashNoteErrors, TrashNoteResponses, UnlinkItemData, UnlinkItemErrors, UnlinkItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -313,6 +313,132 @@ export const search = <ThrowOnError extends boolean = false>(options: Options<Se
  * (``.bib`` or ``.json``).
  */
 export const exportCitations = <ThrowOnError extends boolean = false>(options?: Options<ExportCitationsData, ThrowOnError>): RequestResult<ExportCitationsResponses, ExportCitationsErrors, ThrowOnError> => (options?.client ?? client).get<ExportCitationsResponses, ExportCitationsErrors, ThrowOnError>({ url: '/api/citations', ...options });
+
+/**
+ * List Notes
+ *
+ * Notes the person can read, last changed first: all of them, those
+ * about a paper (``item``) or in a collection (with its subcollections
+ * unless ``nested=false``); ``trashed=true`` lists the trash instead.
+ * ``X-Total-Count`` is the number of matching notes.
+ */
+export const listNotes = <ThrowOnError extends boolean = false>(options?: Options<ListNotesData, ThrowOnError>): RequestResult<ListNotesResponses, ListNotesErrors, ThrowOnError> => (options?.client ?? client).get<ListNotesResponses, ListNotesErrors, ThrowOnError>({ url: '/api/notes', ...options });
+
+/**
+ * Create Note
+ *
+ * A new note for the given owner (or the person's default owner), about
+ * the given papers, optionally put into a collection.
+ */
+export const createNote = <ThrowOnError extends boolean = false>(options: Options<CreateNoteData, ThrowOnError>): RequestResult<CreateNoteResponses, CreateNoteErrors, ThrowOnError> => (options.client ?? client).post<CreateNoteResponses, CreateNoteErrors, ThrowOnError>({
+    url: '/api/notes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Trash Note
+ */
+export const trashNote = <ThrowOnError extends boolean = false>(options: Options<TrashNoteData, ThrowOnError>): RequestResult<TrashNoteResponses, TrashNoteErrors, ThrowOnError> => (options.client ?? client).delete<TrashNoteResponses, TrashNoteErrors, ThrowOnError>({ url: '/api/notes/{note_id}', ...options });
+
+/**
+ * Read Note
+ *
+ * The note with its text; the ``ETag`` goes into ``If-Match`` when saving.
+ */
+export const readNote = <ThrowOnError extends boolean = false>(options: Options<ReadNoteData, ThrowOnError>): RequestResult<ReadNoteResponses, ReadNoteErrors, ThrowOnError> => (options.client ?? client).get<ReadNoteResponses, ReadNoteErrors, ThrowOnError>({ url: '/api/notes/{note_id}', ...options });
+
+/**
+ * Change Note
+ *
+ * Save the text. Needs ``If-Match`` with the ETag the editor started
+ * from: 412 if someone else saved in between (then reload and merge).
+ */
+export const changeNote = <ThrowOnError extends boolean = false>(options: Options<ChangeNoteData, ThrowOnError>): RequestResult<ChangeNoteResponses, ChangeNoteErrors, ThrowOnError> => (options.client ?? client).patch<ChangeNoteResponses, ChangeNoteErrors, ThrowOnError>({
+    url: '/api/notes/{note_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Unlink Item
+ */
+export const unlinkItem = <ThrowOnError extends boolean = false>(options: Options<UnlinkItemData, ThrowOnError>): RequestResult<UnlinkItemResponses, UnlinkItemErrors, ThrowOnError> => (options.client ?? client).delete<UnlinkItemResponses, UnlinkItemErrors, ThrowOnError>({ url: '/api/notes/{note_id}/items/{item_id}', ...options });
+
+/**
+ * Link Item
+ *
+ * Say the note is about the paper (at a page); changes the page if it
+ * is linked already.
+ */
+export const linkItem = <ThrowOnError extends boolean = false>(options: Options<LinkItemData, ThrowOnError>): RequestResult<LinkItemResponses, LinkItemErrors, ThrowOnError> => (options.client ?? client).put<LinkItemResponses, LinkItemErrors, ThrowOnError>({
+    url: '/api/notes/{note_id}/items/{item_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Set Note Owner
+ *
+ * Give the note to another owner the person may add to. Collections of a
+ * group that no longer owns it let it go.
+ */
+export const setNoteOwner = <ThrowOnError extends boolean = false>(options: Options<SetNoteOwnerData, ThrowOnError>): RequestResult<SetNoteOwnerResponses, SetNoteOwnerErrors, ThrowOnError> => (options.client ?? client).put<SetNoteOwnerResponses, SetNoteOwnerErrors, ThrowOnError>({
+    url: '/api/notes/{note_id}/owner',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Restore Note
+ */
+export const restoreNote = <ThrowOnError extends boolean = false>(options: Options<RestoreNoteData, ThrowOnError>): RequestResult<RestoreNoteResponses, RestoreNoteErrors, ThrowOnError> => (options.client ?? client).post<RestoreNoteResponses, RestoreNoteErrors, ThrowOnError>({ url: '/api/notes/{note_id}/restore', ...options });
+
+/**
+ * Note History
+ *
+ * Earlier texts of the note, newest first.
+ */
+export const noteHistory = <ThrowOnError extends boolean = false>(options: Options<NoteHistoryData, ThrowOnError>): RequestResult<NoteHistoryResponses, NoteHistoryErrors, ThrowOnError> => (options.client ?? client).get<NoteHistoryResponses, NoteHistoryErrors, ThrowOnError>({ url: '/api/notes/{note_id}/history', ...options });
+
+/**
+ * Note Markdown
+ *
+ * The note as a Markdown file.
+ */
+export const noteMarkdown = <ThrowOnError extends boolean = false>(options: Options<NoteMarkdownData, ThrowOnError>): RequestResult<NoteMarkdownResponses, NoteMarkdownErrors, ThrowOnError> => (options.client ?? client).get<NoteMarkdownResponses, NoteMarkdownErrors, ThrowOnError>({ url: '/api/notes/{note_id}/markdown', ...options });
+
+/**
+ * Add Notes
+ *
+ * Put notes into a collection; those it may not hold (a group's
+ * collection holds only the group's notes) or unknown ones are skipped.
+ */
+export const addNotes = <ThrowOnError extends boolean = false>(options: Options<AddNotesData, ThrowOnError>): RequestResult<AddNotesResponses, AddNotesErrors, ThrowOnError> => (options.client ?? client).post<AddNotesResponses, AddNotesErrors, ThrowOnError>({
+    url: '/api/collections/{collection_id}/notes',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Remove Note
+ */
+export const removeNote = <ThrowOnError extends boolean = false>(options: Options<RemoveNoteData, ThrowOnError>): RequestResult<RemoveNoteResponses, RemoveNoteErrors, ThrowOnError> => (options.client ?? client).delete<RemoveNoteResponses, RemoveNoteErrors, ThrowOnError>({ url: '/api/collections/{collection_id}/notes/{note_id}', ...options });
 
 /**
  * Get Config

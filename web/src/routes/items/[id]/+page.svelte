@@ -24,6 +24,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
+	import ItemNotes from '#lib/ItemNotes.svelte';
 	import MergeDialog from '#lib/MergeDialog.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
@@ -230,6 +231,7 @@
 
 		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
+		{#if !item.deleted_at}<ItemNotes item={item.id} />{/if}
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
 			<MergeDialog bind:this={mergeDialog} {item} />

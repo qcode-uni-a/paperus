@@ -1,0 +1,97 @@
+<script lang="ts">
+	import { resolve } from '$app/paths';
+	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
+	import { ago } from '#lib/format.ts';
+	import { isShared } from '#lib/organize.svelte.ts';
+	import SharedIcon from '#lib/SharedIcon.svelte';
+
+	/** A note in a list; ``about`` false hides the papers it is about (on a paper's page). */
+	let { note, about = true }: { note: NoteOut; about?: boolean } = $props();
+</script>
+
+<li>
+	{#if isShared(note.library_id)}<span class="corner"><SharedIcon owner={note.library_id} /></span
+		>{/if}
+	<a class="title" href={resolve('/notes/[id]', { id: note.id })}>
+		<svg viewBox="0 0 24 24" aria-hidden="true"
+			><path d="M6 3.5h8.5L19 8v12.5H6zM14 3.5V8.5h5M9 12.5h7M9 16h5" /></svg
+		>
+		<span>{note.title || 'Untitled note'}</span>
+	</a>
+	{#if note.excerpt}<p class="excerpt">{note.excerpt}</p>{/if}
+	<p class="meta">
+		{#if about && note.items.length}
+			<span
+				>About {#each note.items as paper, i (paper.item_id)}{i ? ', ' : ''}<a
+						href={resolve('/items/[id]', { id: paper.item_id })}>{paper.title}</a
+					>{/each}</span
+			>
+		{/if}
+		<span>{note.changed_by ? `${note.changed_by}, ` : ''}{ago(note.changed_at)}</span>
+	</p>
+</li>
+
+<style>
+	li {
+		position: relative;
+		list-style: none;
+		padding: 14px 0 16px;
+		border-bottom: 1px solid var(--rule);
+		display: grid;
+		gap: 4px;
+	}
+	.corner {
+		position: absolute;
+		top: 16px;
+		right: 0;
+		display: flex;
+	}
+	.title {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 8px;
+		max-width: 70ch;
+		font-family: var(--serif);
+		font-size: var(--step-1);
+		font-weight: 600;
+		line-height: 1.3;
+		color: var(--ink);
+		text-decoration: none;
+	}
+	.title:hover span {
+		color: var(--royal);
+		text-decoration: underline;
+	}
+	svg {
+		flex: none;
+		width: 18px;
+		height: 18px;
+		align-self: center;
+		fill: none;
+		stroke: var(--royal);
+		stroke-width: 1.6;
+		stroke-linejoin: round;
+	}
+	p {
+		margin: 0;
+		max-width: 70ch;
+	}
+	.excerpt {
+		color: var(--ink);
+		overflow: hidden;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 14px;
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
+	.meta a {
+		color: inherit;
+	}
+</style>

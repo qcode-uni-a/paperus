@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Notes**: your own writing about papers, in Markdown with formulas
+  (rendered like Markdown files). A note can be about several papers (at a
+  page) or none, sits in collections next to papers, and belongs to you or
+  a group like everything else. Written on its own page with autosave;
+  someone else's newer save is never overwritten silently; earlier
+  versions can be brought back. Notes are searched with the papers (by
+  words and by meaning), shown on each paper they are about, and can be
+  downloaded as Markdown. AI assistants read them and, with the new right
+  "Write and change notes", write them.
 - **Citation export**: BibTeX and CSL-JSON for a paper (⋯ → Copy or
   Download BibTeX), a collection (⋯ → Export, with or without the
   collections inside) or everything, also for AI assistants

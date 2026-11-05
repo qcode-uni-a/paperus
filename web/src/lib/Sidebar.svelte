@@ -73,6 +73,7 @@
 		<a href={resolve('/recent')} class:current={active(resolve('/recent'))}><span>Recent</span></a>
 
 		<a href={collectionsPath} class:current={active(collectionsPath)}><span>Collections</span></a>
+		<a href={resolve('/notes')} class:current={active(resolve('/notes'))}><span>Notes</span></a>
 
 		<div class="bottom">
 			<span class="group">Manage</span>

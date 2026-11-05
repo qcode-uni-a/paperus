@@ -42,19 +42,18 @@
 	}
 	let passages = $state<Passage[] | null>(null);
 
-	/** Passages grouped by item, items in the order of their best passage. */
+	/** Passages grouped by paper or note, in the order of their best passage. */
 	const groups = $derived.by(() => {
-		const byItem = new Map<string, { id: string; title: string; passages: Passage[] }>();
+		type Group = { id: string; kind: 'paper' | 'note'; title: string; passages: Passage[] };
+		const bySource = new Map<string, Group>();
 		for (const passage of passages ?? []) {
-			const group = byItem.get(passage.item_id) ?? {
-				id: passage.item_id,
-				title: passage.item_title,
-				passages: []
-			};
+			const id = passage.item_id ?? passage.note_id ?? '';
+			const kind = passage.kind ?? 'paper';
+			const group = bySource.get(id) ?? { id, kind, title: passage.item_title, passages: [] };
 			group.passages.push(passage);
-			byItem.set(passage.item_id, group);
+			bySource.set(id, group);
 		}
-		return [...byItem.values()];
+		return [...bySource.values()];
 	});
 
 	let total = $state<number | null>(null);
@@ -219,18 +218,26 @@
 			<ul class="results">
 				{#each groups as group (group.id)}
 					<li>
-						<a class="source" href={resolve('/items/[id]', { id: group.id })}>{group.title}</a>
+						{#if group.kind === 'note'}
+							<a class="source" href={resolve('/notes/[id]', { id: group.id })}
+								><span class="badge">Note</span> {group.title || 'Untitled note'}</a
+							>
+						{:else}
+							<a class="source" href={resolve('/items/[id]', { id: group.id })}>{group.title}</a>
+						{/if}
 						<ul class="passages">
 							{#each group.passages as passage (passage.passage_id)}
 								<li>
-									<a
-										class="where"
-										href="{resolve('/items/[id]', { id: passage.item_id })}{passage.page
-											? `?page=${passage.page}`
-											: ''}"
-									>
-										{passage.page ? `Page ${passage.page}` : 'Open'}
-									</a>
+									{#if group.kind === 'paper'}
+										<a
+											class="where"
+											href="{resolve('/items/[id]', { id: group.id })}{passage.page
+												? `?page=${passage.page}`
+												: ''}"
+										>
+											{passage.page ? `Page ${passage.page}` : 'Open'}
+										</a>
+									{/if}
 									{#if passage.in_references}
 										<span class="badge">In the references</span>
 									{:else if !passage.matched.includes('keyword')}

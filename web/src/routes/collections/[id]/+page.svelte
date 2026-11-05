@@ -5,6 +5,10 @@
 	import { deleteCollection } from '#lib/api/client.ts';
 	import CollectionAdd from '#lib/CollectionAdd.svelte';
 	import MenuButton from '#lib/MenuButton.svelte';
+	import NoteRow from '#lib/NoteRow.svelte';
+	import { listNotes } from '#lib/api/client.ts';
+	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
+	import { startNote } from '#lib/notes.ts';
 	import { downloadCitations } from '#lib/citations.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
@@ -15,6 +19,22 @@
 	let editDialog = $state<CollectionDialog>();
 	let list = $state<ItemList>();
 	let includeInside = $state(true);
+
+	// Notes in the collection (and the collections inside), above its papers.
+	let notes = $state<NoteOut[]>([]);
+	let noteError = $state('');
+	$effect(() => {
+		const shown = id;
+		listNotes({ query: { collection: shown, nested: includeInside, limit: 200 } }).then(
+			({ data }) => {
+				if (shown === id) notes = data ?? [];
+			}
+		);
+	});
+
+	async function writeNote() {
+		noteError = (await startNote({ collection: id, library: collection?.library_id })) ?? '';
+	}
 
 	$effect(() => {
 		loadOrganize().then(() => (loaded = true));
@@ -92,6 +112,7 @@
 					>
 					{#if writable}
 						<hr />
+						<button role="menuitem" onclick={writeNote}>New note here</button>
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" class="danger" onclick={remove}>Delete</button>
 					{/if}
@@ -107,6 +128,15 @@
 		</div>
 	</header>
 
+	{#if notes.length}
+		<section class="notes" aria-label="Notes">
+			<ul>
+				{#each notes as note (note.id)}<NoteRow {note} />{/each}
+			</ul>
+		</section>
+	{/if}
+	{#if noteError}<p class="error">{noteError}</p>{/if}
+
 	<section>
 		{#key id}
 			<ItemList bind:this={list} collection={id} nested={includeInside} />
@@ -119,6 +149,10 @@
 {/if}
 
 <style>
+	.notes ul {
+		margin: 0 0 8px;
+		padding: 0;
+	}
 	.top {
 		display: flex;
 		align-items: center;

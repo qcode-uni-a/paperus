@@ -760,6 +760,30 @@ export type LibraryOut = {
 };
 
 /**
+ * LinkChange
+ */
+export type LinkChange = {
+    /**
+     * Page
+     */
+    page?: number | null;
+};
+
+/**
+ * LinkIn
+ */
+export type LinkIn = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Page
+     */
+    page?: number | null;
+};
+
+/**
  * LoginRequest
  */
 export type LoginRequest = {
@@ -1003,6 +1027,170 @@ export type NewUser = {
 };
 
 /**
+ * NoteChange
+ */
+export type NoteChange = {
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * NoteDetail
+ */
+export type NoteDetail = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+    /**
+     * Items
+     */
+    items: Array<NoteLinkOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Changed By
+     */
+    changed_by: string | null;
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Deleted At
+     */
+    deleted_at: string | null;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
+ * NoteIds
+ */
+export type NoteIds = {
+    /**
+     * Note Ids
+     */
+    note_ids: Array<string>;
+};
+
+/**
+ * NoteIn
+ */
+export type NoteIn = {
+    /**
+     * Text
+     */
+    text?: string;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+    /**
+     * Items
+     */
+    items?: Array<LinkIn>;
+    /**
+     * Collection Id
+     */
+    collection_id?: string | null;
+};
+
+/**
+ * NoteLinkOut
+ */
+export type NoteLinkOut = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Page
+     */
+    page: number | null;
+};
+
+/**
+ * NoteOut
+ */
+export type NoteOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+    /**
+     * Items
+     */
+    items: Array<NoteLinkOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Changed By
+     */
+    changed_by: string | null;
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Deleted At
+     */
+    deleted_at: string | null;
+};
+
+/**
  * Owner
  */
 export type Owner = {
@@ -1021,9 +1209,13 @@ export type Passage = {
      */
     passage_id: string;
     /**
+     * Kind
+     */
+    kind?: 'paper' | 'note';
+    /**
      * Item Id
      */
-    item_id: string;
+    item_id: string | null;
     /**
      * Item Title
      */
@@ -1031,11 +1223,15 @@ export type Passage = {
     /**
      * Version Id
      */
-    version_id: string;
+    version_id: string | null;
     /**
      * File Id
      */
-    file_id: string;
+    file_id: string | null;
+    /**
+     * Note Id
+     */
+    note_id?: string | null;
     /**
      * Position
      */
@@ -1129,6 +1325,28 @@ export type RestoreRequest = {
 };
 
 /**
+ * RevisionOut
+ */
+export type RevisionOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Written By
+     */
+    written_by: string | null;
+    /**
+     * Written At
+     */
+    written_at: string;
+};
+
+/**
  * Role
  *
  * What a member may do in a group (and every group inside it).
@@ -1143,7 +1361,7 @@ export type Scheme = 'doi' | 'arxiv' | 'isbn' | 'pmid' | 'url';
 /**
  * Scope
  */
-export type Scope = 'search' | 'papers.read' | 'files.read' | 'papers.write' | 'tags.write' | 'collections.write' | 'groups.read';
+export type Scope = 'search' | 'papers.read' | 'files.read' | 'papers.write' | 'tags.write' | 'collections.write' | 'notes.write' | 'groups.read';
 
 /**
  * SetupState
@@ -2450,6 +2668,431 @@ export type ExportCitationsResponses = {
      */
     200: unknown;
 };
+
+export type ListNotesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Item
+         */
+        item?: string | null;
+        /**
+         * Collection
+         */
+        collection?: string | null;
+        /**
+         * Nested
+         */
+        nested?: boolean;
+        /**
+         * Trashed
+         */
+        trashed?: boolean;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/notes';
+};
+
+export type ListNotesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListNotesError = ListNotesErrors[keyof ListNotesErrors];
+
+export type ListNotesResponses = {
+    /**
+     * Response List Notes
+     *
+     * Successful Response
+     */
+    200: Array<NoteOut>;
+};
+
+export type ListNotesResponse = ListNotesResponses[keyof ListNotesResponses];
+
+export type CreateNoteData = {
+    body: NoteIn;
+    path?: never;
+    query?: never;
+    url: '/api/notes';
+};
+
+export type CreateNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateNoteError = CreateNoteErrors[keyof CreateNoteErrors];
+
+export type CreateNoteResponses = {
+    /**
+     * Successful Response
+     */
+    201: NoteDetail;
+};
+
+export type CreateNoteResponse = CreateNoteResponses[keyof CreateNoteResponses];
+
+export type TrashNoteData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}';
+};
+
+export type TrashNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TrashNoteError = TrashNoteErrors[keyof TrashNoteErrors];
+
+export type TrashNoteResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type TrashNoteResponse = TrashNoteResponses[keyof TrashNoteResponses];
+
+export type ReadNoteData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}';
+};
+
+export type ReadNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadNoteError = ReadNoteErrors[keyof ReadNoteErrors];
+
+export type ReadNoteResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type ReadNoteResponse = ReadNoteResponses[keyof ReadNoteResponses];
+
+export type ChangeNoteData = {
+    body: NoteChange;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'if-match'?: string | null;
+    };
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}';
+};
+
+export type ChangeNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangeNoteError = ChangeNoteErrors[keyof ChangeNoteErrors];
+
+export type ChangeNoteResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type ChangeNoteResponse = ChangeNoteResponses[keyof ChangeNoteResponses];
+
+export type UnlinkItemData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/items/{item_id}';
+};
+
+export type UnlinkItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnlinkItemError = UnlinkItemErrors[keyof UnlinkItemErrors];
+
+export type UnlinkItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type UnlinkItemResponse = UnlinkItemResponses[keyof UnlinkItemResponses];
+
+export type LinkItemData = {
+    body: LinkChange;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/items/{item_id}';
+};
+
+export type LinkItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LinkItemError = LinkItemErrors[keyof LinkItemErrors];
+
+export type LinkItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type LinkItemResponse = LinkItemResponses[keyof LinkItemResponses];
+
+export type SetNoteOwnerData = {
+    body: Owner;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/owner';
+};
+
+export type SetNoteOwnerErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetNoteOwnerError = SetNoteOwnerErrors[keyof SetNoteOwnerErrors];
+
+export type SetNoteOwnerResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type SetNoteOwnerResponse = SetNoteOwnerResponses[keyof SetNoteOwnerResponses];
+
+export type RestoreNoteData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/restore';
+};
+
+export type RestoreNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RestoreNoteError = RestoreNoteErrors[keyof RestoreNoteErrors];
+
+export type RestoreNoteResponses = {
+    /**
+     * Successful Response
+     */
+    200: NoteDetail;
+};
+
+export type RestoreNoteResponse = RestoreNoteResponses[keyof RestoreNoteResponses];
+
+export type NoteHistoryData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/history';
+};
+
+export type NoteHistoryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type NoteHistoryError = NoteHistoryErrors[keyof NoteHistoryErrors];
+
+export type NoteHistoryResponses = {
+    /**
+     * Response Note History
+     *
+     * Successful Response
+     */
+    200: Array<RevisionOut>;
+};
+
+export type NoteHistoryResponse = NoteHistoryResponses[keyof NoteHistoryResponses];
+
+export type NoteMarkdownData = {
+    body?: never;
+    path: {
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/notes/{note_id}/markdown';
+};
+
+export type NoteMarkdownErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type NoteMarkdownError = NoteMarkdownErrors[keyof NoteMarkdownErrors];
+
+export type NoteMarkdownResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type AddNotesData = {
+    body: NoteIds;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/notes';
+};
+
+export type AddNotesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddNotesError = AddNotesErrors[keyof AddNotesErrors];
+
+export type AddNotesResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type AddNotesResponse = AddNotesResponses[keyof AddNotesResponses];
+
+export type RemoveNoteData = {
+    body?: never;
+    path: {
+        /**
+         * Collection Id
+         */
+        collection_id: string;
+        /**
+         * Note Id
+         */
+        note_id: string;
+    };
+    query?: never;
+    url: '/api/collections/{collection_id}/notes/{note_id}';
+};
+
+export type RemoveNoteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveNoteError = RemoveNoteErrors[keyof RemoveNoteErrors];
+
+export type RemoveNoteResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RemoveNoteResponse = RemoveNoteResponses[keyof RemoveNoteResponses];
 
 export type GetConfigData = {
     body?: never;

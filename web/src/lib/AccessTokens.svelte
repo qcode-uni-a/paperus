@@ -12,7 +12,8 @@
 		{ value: 'groups.read', label: 'See groups and members' },
 		{ value: 'papers.write', label: 'Add and change papers' },
 		{ value: 'tags.write', label: 'Tag papers' },
-		{ value: 'collections.write', label: 'Change collections' }
+		{ value: 'collections.write', label: 'Change collections' },
+		{ value: 'notes.write', label: 'Write and change notes' }
 	];
 	const PRESETS: { id: string; label: string; help: string; scopes: Scope[] }[] = [
 		{
@@ -23,9 +24,9 @@
 		},
 		{
 			id: 'helper',
-			label: 'AI assistant that may tag and add',
-			help: 'also tags papers and adds papers by DOI',
-			scopes: ['search', 'papers.read', 'files.read', 'tags.write', 'papers.write']
+			label: 'AI assistant that may write',
+			help: 'also writes notes, tags papers and adds papers by DOI',
+			scopes: ['search', 'papers.read', 'files.read', 'notes.write', 'tags.write', 'papers.write']
 		},
 		{
 			id: 'all',
