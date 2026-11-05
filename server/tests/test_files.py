@@ -142,3 +142,29 @@ def test_uploaded_html_cannot_run_scripts(logged_in: TestClient, item_id: str) -
     response = logged_in.get(f"/api/files/{file['id']}/content")
     assert response.headers["content-security-policy"] == "sandbox"
     assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_lists_name_file_types(logged_in: TestClient, item_id: str) -> None:
+    """For the icon in lists: the PDF first; none without files."""
+    [listed] = logged_in.get("/api/items").json()
+    assert listed["files"] == []
+    for name, data, media_type in (
+        ("notes.md", b"# Notes", "text/markdown"),
+        ("paper.pdf", PDF_BYTES, "application/pdf"),
+        ("more.md", b"# More", "text/markdown"),
+    ):
+        response = logged_in.post(
+            f"/api/items/{item_id}/files",
+            files={"upload": (name, data, media_type)},
+            data={"role": "main" if name == "paper.pdf" else "other"},
+        )
+        assert response.status_code == 201, response.text
+    [listed] = logged_in.get("/api/items").json()
+    names = [(f["filename"], f["media_type"]) for f in listed["files"]]
+    assert names == [
+        ("paper.pdf", "application/pdf"),
+        ("notes.md", "text/markdown"),
+        ("more.md", "text/markdown"),
+    ]
+    opened = logged_in.get(f"/api/files/{listed['files'][0]['id']}/content")
+    assert opened.content == PDF_BYTES

@@ -4,6 +4,7 @@
 	import type { Item } from '#lib/api/client.ts';
 	import { shortAuthors, typeName } from '#lib/format.ts';
 	import { isShared } from '#lib/organize.svelte.ts';
+	import FileIcon from '#lib/FileIcon.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import StarButton from '#lib/StarButton.svelte';
 
@@ -15,11 +16,9 @@
 
 <li>
 	<span class="corner"
-		>{#if isShared(item.library_id)}<SharedIcon owner={item.library_id} />{/if}<StarButton
-			item={item.id}
-			starred={item.favourite ?? false}
-			size={16}
-		/></span
+		><FileIcon files={item.files ?? []} />{#if isShared(item.library_id)}<SharedIcon
+				owner={item.library_id}
+			/>{/if}<StarButton item={item.id} starred={item.favourite ?? false} size={16} /></span
 	>
 	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
@@ -66,7 +65,7 @@
 	}
 	/* Room for the corner's icons. */
 	.title {
-		padding-right: 56px;
+		padding-right: 84px;
 	}
 	.title {
 		font-family: var(--serif);

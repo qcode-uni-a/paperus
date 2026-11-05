@@ -646,7 +646,8 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
  * ``trash`` (delete what is older than the trash days), ``integrity``
  * (check stored contents), ``integrity-deep`` (also their SHA-256) or
  * ``integrity-clean`` (check and remove unused stored contents), ``copy``
- * (update the readable copy) or ``copy-remove`` (delete it).
+ * (update the readable copy), ``copy-remove`` (delete it) or ``tidy``
+ * (retry stalled jobs, delete old jobs and expired logins).
  */
 export const runJob = <ThrowOnError extends boolean = false>(options: Options<RunJobData, ThrowOnError>): RequestResult<RunJobResponses, RunJobErrors, ThrowOnError> => (options.client ?? client).post<RunJobResponses, RunJobErrors, ThrowOnError>({ url: '/api/admin/jobs/{job}', ...options });
 

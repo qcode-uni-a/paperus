@@ -22,6 +22,7 @@ from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, norma
 from paperus.models import (
     Favourite,
     File,
+    FileRole,
     Item,
     ItemTag,
     ItemView,
@@ -87,6 +88,15 @@ class VersionOut(BaseModel):
     created_at: datetime
 
 
+PDF_TYPE = "application/pdf"
+
+
+class FileLink(BaseModel):
+    id: uuid.UUID
+    media_type: str
+    filename: str
+
+
 class ItemOut(BaseModel):
     id: uuid.UUID
     library_id: uuid.UUID
@@ -112,6 +122,9 @@ class ItemOut(BaseModel):
     """Collections the reader can see that hold the item."""
     favourite: bool = False
     """The reader starred it."""
+    files: list[FileLink] = []
+    """The files one opens (the preferred version's, main file first; a PDF
+    before others); empty without files."""
 
 
 class Person(BaseModel):
@@ -173,7 +186,17 @@ def item_out(item: Item, access: Access) -> ItemOut:
             for f in v.files
         ),
         favourite=any(f.user_id == access.user.id for f in item.favourites),
+        files=_files(item),
     )
+
+
+def _files(item: Item) -> list[FileLink]:
+    version = library.preferred_version(item)
+    files = [f for f in version.files if f.deleted_at is None] if version else []
+    files.sort(key=lambda f: (f.role != FileRole.MAIN, f.media_type != PDF_TYPE))
+    return [
+        FileLink(id=f.id, media_type=f.media_type, filename=f.filename) for f in files
+    ]
 
 
 def version_out(version: Version) -> VersionOut:

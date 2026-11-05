@@ -3094,7 +3094,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy) or ``copy-remove`` (delete it).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -5817,6 +5817,30 @@
         ],
         "title": "Emptied"
       },
+      "FileLink": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "media_type",
+          "filename"
+        ],
+        "title": "FileLink"
+      },
       "FileOut": {
         "properties": {
           "id": {
@@ -6393,6 +6417,14 @@
             "title": "Favourite",
             "default": false
           },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileLink"
+            },
+            "type": "array",
+            "title": "Files",
+            "default": []
+          },
           "added_by": {
             "anyOf": [
               {
@@ -6662,6 +6694,14 @@
             "type": "boolean",
             "title": "Favourite",
             "default": false
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileLink"
+            },
+            "type": "array",
+            "title": "Files",
+            "default": []
           }
         },
         "type": "object",

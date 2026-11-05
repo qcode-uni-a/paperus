@@ -461,6 +461,24 @@ export type Emptied = {
 };
 
 /**
+ * FileLink
+ */
+export type FileLink = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * Filename
+     */
+    filename: string;
+};
+
+/**
  * FileOut
  */
 export type FileOut = {
@@ -770,6 +788,10 @@ export type ItemDetail = {
      * Favourite
      */
     favourite?: boolean;
+    /**
+     * Files
+     */
+    files?: Array<FileLink>;
     added_by?: Person | null;
     /**
      * Csl
@@ -904,6 +926,10 @@ export type ItemOut = {
      * Favourite
      */
     favourite?: boolean;
+    /**
+     * Files
+     */
+    files?: Array<FileLink>;
 };
 
 /**

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Lists show a small icon when a paper has a file (PDF, text, image, …);
+  a click opens the file in a new tab.
 - **Tidying up**: the worker retries jobs whose worker stopped in the middle
   (hourly), and deletes old finished jobs and expired login sessions
   (nightly). See Job settings and docs/operations.md.
