@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Duplicates**: "Review one by one" shows each pair side by side (first
+  page, details with differences marked) and what merging does, with
+  keyboard shortcuts; clearer cards in the list ("Keep this one" ← "Merged
+  into it"). The same title alone no longer counts when the first authors
+  differ (two books called "Introduction to Quantum Optics").
+- **Files that could not be read**: listed under Manage → Unsorted with the
+  reason in plain words, and "Read again" there and on the paper's page.
+- Importing the same export again repeats nothing: papers without
+  identifiers (e.g. web pages saved in Zotero) are recognised by type and
+  title.
+- Jobs page: a chart per queue (two minutes, with scales and times), shown
+  with the chart button in its header.
+- Long collection names wrap (after an underscore where possible) instead
+  of running into the next one.
 - **Fixed: reading PDFs in parallel.** PDFium is not thread-safe; two files
   read at once could make the worker grow until it was killed (15 GB with a
   Zotero import), or fail on valid PDFs. One file at a time inside PDFium.

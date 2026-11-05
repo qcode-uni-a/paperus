@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 from paperus.access import Access
 from paperus.cli import main
 from paperus.identifiers import Scheme
+from paperus.importing import Export, ExportedPaper, bibtex, csljson, ris, zotero
 from paperus.importing import apply as apply_module
-from paperus.importing import bibtex, csljson, ris, zotero
 from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
 from paperus.importing.run import run_import
 from paperus.models import Import, User
@@ -579,3 +579,30 @@ def test_same_file_names_in_a_zip_folder() -> None:
     absolute = files.open("C:/Users/ada/Zotero/files/373/2310.html")
     assert absolute is not None and absolute.read() == b"second"
     assert files.open("files/999/2310.html") is None
+
+
+def test_importing_again_repeats_nothing(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    """Papers without identifiers or files (e.g. web pages saved in Zotero)
+    are recognised by type and title when the same export comes again; two
+    such entries of one title in an export stay two."""
+    ada = Person(client, db, "ada")
+    owner = uuid.UUID(ada.libraries()["Me"]["id"])
+    page = {"type": "webpage", "title": "Gauge principle in two-level systems"}
+    export = Export(
+        format="zotero-rdf",
+        papers=[ExportedPaper(csl=dict(page)), ExportedPaper(csl=dict(page))],
+    )
+
+    def run() -> Report:
+        return apply(
+            db, blobs, access_of(db, ada), export, NoFiles(), owner=owner,
+            max_file_bytes=10**6,
+        )  # fmt: skip
+
+    first = run()
+    assert (first.added, first.found) == (2, 0)
+    again = run()
+    assert (again.added, again.found) == (0, 2)
+    assert len(ada.get("/api/items").json()) == 2

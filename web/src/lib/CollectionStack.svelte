@@ -42,7 +42,12 @@
 			{/each}
 		</div>
 		<div class="label">
-			<strong>{collection.name}</strong>
+			<!-- Long names (Zotero's "Bachelor_thesis_COMSOL") may wrap after an
+				underscore, and anywhere as a last resort. -->
+			<strong
+				>{#each collection.name.split('_') as part, index (index)}{#if index}_<wbr
+						/>{/if}{part}{/each}</strong
+			>
 			<span>{collection.count} {collection.count === 1 ? 'item' : 'items'}</span>
 		</div>
 	</a>
@@ -149,9 +154,11 @@
 	.label {
 		display: grid;
 		gap: 2px;
+		min-width: 0;
 		padding: 0 4px;
 	}
 	.label strong {
+		overflow-wrap: anywhere;
 		font-family: var(--serif);
 		font-size: var(--step-1);
 		font-weight: 600;

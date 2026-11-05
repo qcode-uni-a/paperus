@@ -58,6 +58,8 @@ class FileOut(BaseModel):
     sha256: str
     source: FileSource
     text_status: TextStatus
+    text_error: str | None = None
+    """Why reading the text failed (with ``text_status`` "failed")."""
     created_at: datetime
     deleted_at: datetime | None
 
@@ -73,6 +75,7 @@ def file_out(file: File) -> FileOut:
         sha256=file.blob_sha256.hex(),
         source=FileSource(file.source),
         text_status=TextStatus(file.text_status),
+        text_error=file.text_error,
         created_at=file.created_at,
         deleted_at=file.deleted_at,
     )
@@ -356,6 +359,64 @@ def _get_file(
     if write:
         access.require_write_item(file.version.item)
     return file
+
+
+class UnreadableFile(BaseModel):
+    file_id: uuid.UUID
+    filename: str
+    media_type: str
+    error: str | None
+    item_id: uuid.UUID
+    item_title: str
+    library_id: uuid.UUID
+    writable: bool
+    """The person may read it again, replace or remove it."""
+
+
+@router.get("/api/files/unreadable")
+def unreadable_files(db: DB, access: CurrentAccess) -> list[UnreadableFile]:
+    """Files whose text could not be read, of the papers the person can see
+    (Manage → Unsorted): to read again, replace or remove."""
+    rows = db.execute(
+        select(File, Item)
+        .join(Version, Version.id == File.version_id)
+        .join(Item, Item.id == Version.item_id)
+        .where(
+            File.text_status == TextStatus.FAILED,
+            File.deleted_at.is_(None),
+            Item.deleted_at.is_(None),
+            Item.library_id.in_(access.readable),
+        )
+        .order_by(Item.title, File.filename)
+        .limit(500)
+    ).all()
+    return [
+        UnreadableFile(
+            file_id=file.id,
+            filename=file.filename,
+            media_type=file.media_type,
+            error=file.text_error,
+            item_id=item.id,
+            item_title=item.title,
+            library_id=item.library_id,
+            writable=access.can_write_item(item),
+        )
+        for file, item in rows
+        if access.can_read_item(item)
+    ]
+
+
+@router.post("/api/files/{file_id}/read-again", status_code=202)
+def read_file_again(
+    file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> FileOut:
+    """Read the file's text once more (e.g. after a fix in paperus)."""
+    file = _get_file(db, access, file_id, write=True)
+    file.text_status = TextStatus.PENDING
+    file.text_error = None
+    db.commit()
+    queue_text_extraction(request.app.state.jobs, file.id)
+    return file_out(file)
 
 
 @router.delete("/api/files/{file_id}", status_code=204)

@@ -10,6 +10,7 @@
 		getItem,
 		markViewed,
 		passageText,
+		readFileAgain,
 		pinVersion,
 		restoreFile,
 		restoreItem,
@@ -33,7 +34,7 @@
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
 	import { isShared, libraryById } from '#lib/organize.svelte.ts';
-	import { ago, fullName } from '#lib/format.ts';
+	import { ago, fullName, readingProblem } from '#lib/format.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Avatar from '#lib/Avatar.svelte';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
@@ -358,6 +359,16 @@
 								>
 								<span class="badge">{file.role}</span>
 								<span class="muted">{size(file.size)} · {TEXT_STATUS[file.text_status]}</span>
+								{#if file.text_status === 'failed' && !file.deleted_at}
+									<span class="problem" title={file.text_error ?? ''}
+										>{readingProblem(file.text_error)}</span
+									>
+									{#if writable}
+										<button onclick={() => act(() => readFileAgain({ path: { file_id: file.id } }))}
+											>Read again</button
+										>
+									{/if}
+								{/if}
 								{#if file.deleted_at}
 									<button onclick={() => act(() => restoreFile({ path: { file_id: file.id } }))}
 										>Restore</button
@@ -412,6 +423,11 @@
 {/if}
 
 <style>
+	.problem {
+		flex-basis: 100%;
+		color: var(--danger);
+		font-size: var(--step--1);
+	}
 	.added-by {
 		display: flex;
 		align-items: center;

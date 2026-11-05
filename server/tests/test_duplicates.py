@@ -174,3 +174,30 @@ def test_readers_cannot_dismiss_for_the_group(client: TestClient, db: Session) -
     db.commit()
     ada.note("Group note", chair["library_id"])
     assert root.delete(f"/api/groups/{chair['id']}").status_code == 409
+
+
+def test_same_title_by_other_authors_is_no_duplicate(
+    client: TestClient, db: Session
+) -> None:
+    """Two books called "Introduction to Quantum Optics" by different
+    authors are two works; with the same first author (or none) a pair."""
+    ada = Person(client, db, "ada")
+
+    def add(title: str, *families: str) -> str:
+        metadata = {"title": title, "author": [{"family": f} for f in families]}
+        item: str = ada.post("/api/items", json={"metadata": metadata}).json()["id"]
+        return item
+
+    add("Introduction to Quantum Optics", "Navarrete-Benlloch")
+    add("Introduction to Quantum Optics", "Grynberg", "Aspect", "Fabre")
+    same = {
+        add("Floquet engineering of qubits", "Peri"),
+        add("Floquet Engineering of Qubits", "Peri", "Benito"),
+    }
+    anonymous = {
+        add("A lecture on spin qubits"),
+        add("A lecture on spin qubits", "Burkard"),
+    }
+    pairs = ada.get("/api/duplicates").json()
+    found = [{p["keep"]["id"], p["merge"]["id"]} for p in pairs]
+    assert sorted(found, key=sorted) == sorted([same, anonymous], key=sorted)

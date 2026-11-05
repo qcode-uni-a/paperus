@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { mdiChartLine } from '@mdi/js';
 	import { resolve } from '$app/paths';
 	import { admin, history, loadAdmin, type Sample } from '#lib/admin/data.svelte.ts';
 	import { listImports, runJob } from '#lib/api/client.ts';
 	import type { ImportOut } from '#lib/api/generated/types.gen.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import Icon from '#lib/Icon.svelte';
+	import QueueChart from '#lib/admin/QueueChart.svelte';
 
 	/** What the background jobs are doing now, with the last minutes as a
 	 * chart (sampled while an admin page is open). */
@@ -35,6 +38,25 @@
 	] as const;
 
 	const stats = $derived(admin.stats);
+
+	// Which queues show their chart (remembered in this browser).
+	const CHARTS_KEY = 'paperus.jobs.charts';
+	let charts = $state<Record<string, boolean>>(readCharts());
+	function readCharts(): Record<string, boolean> {
+		try {
+			return JSON.parse(localStorage.getItem(CHARTS_KEY) ?? '{}');
+		} catch {
+			return {};
+		}
+	}
+	function toggleChart(queue: string) {
+		charts = { ...charts, [queue]: !charts[queue] };
+		try {
+			localStorage.setItem(CHARTS_KEY, JSON.stringify(charts));
+		} catch {
+			// Storage may be blocked; the chart still shows for this visit.
+		}
+	}
 	const counts = (queue: string) => stats?.jobs[queue] ?? {};
 	const total = (status: string) =>
 		Object.values(stats?.jobs ?? {}).reduce((sum, c) => sum + (c[status] ?? 0), 0);
@@ -65,39 +87,6 @@
 		return Math.round((finished * 60_000) / (now.at - before.at));
 	}
 	const rate = $derived(perMinute(history.samples, Date.now()));
-
-	// The chart: the last ten minutes.
-	const WINDOW = 10 * 60_000;
-	const W = 600;
-	const H = 150;
-	const chart = $derived.by(() => {
-		const samples = history.samples;
-		const end = samples.at(-1)?.at ?? Date.now();
-		const shown = samples.filter((s) => s.at >= end - WINDOW);
-		const top = Math.max(
-			5,
-			...shown.flatMap((s) =>
-				QUEUES.map((q) => (s.waiting[q.queue] ?? 0) + (s.running[q.queue] ?? 0))
-			)
-		);
-		const x = (at: number) => W - ((end - at) / WINDOW) * W;
-		const y = (n: number) => H - (n / top) * (H - 10);
-		const lines = QUEUES.map((q) => ({
-			...q,
-			points: shown
-				.map(
-					(s) =>
-						`${x(s.at).toFixed(1)},${y((s.waiting[q.queue] ?? 0) + (s.running[q.queue] ?? 0)).toFixed(1)}`
-				)
-				.join(' ')
-		}));
-		const rates = shown.map((s) => ({ at: s.at, n: perMinute(samples, s.at) }));
-		const rateTop = Math.max(10, ...rates.map((r) => r.n));
-		const ratePoints = rates
-			.map((r) => `${x(r.at).toFixed(1)},${(H - (r.n / rateTop) * (H - 10)).toFixed(1)}`)
-			.join(' ');
-		return { lines, top, ratePoints, rateTop, enough: shown.length > 1 };
-	});
 
 	async function run(job: 'text' | 'embeddings' | 'text-all' | 'text-failed') {
 		if (
@@ -130,40 +119,6 @@
 	</div>
 </div>
 
-<section class="card chart">
-	<div class="chart-head">
-		<h2>Last ten minutes</h2>
-		<ul class="legend">
-			{#each QUEUES as q (q.queue)}<li><span style:background={q.color}></span>{q.title}</li>{/each}
-			<li><span class="dashed"></span>Finished per minute</li>
-		</ul>
-	</div>
-	{#if chart.enough}
-		<svg
-			viewBox="0 0 {W} {H}"
-			preserveAspectRatio="none"
-			role="img"
-			aria-label="Waiting and running jobs per queue over the last ten minutes"
-		>
-			<line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} class="axis" />
-			{#each chart.lines as line (line.queue)}
-				<polyline points={line.points} style:stroke={line.color} />
-			{/each}
-			<polyline points={chart.ratePoints} class="rate" />
-		</svg>
-		<div class="scale muted">
-			<span
-				>Up to {chart.top} jobs waiting or running; up to {chart.rateTop} finished per minute</span
-			>
-			<span>now</span>
-		</div>
-	{:else}
-		<p class="muted">
-			Collecting… the chart starts after a few seconds and fills while this page is open.
-		</p>
-	{/if}
-</section>
-
 {#each imports as running (running.id)}
 	<section class="card import">
 		<div class="row">
@@ -180,8 +135,23 @@
 	{#each QUEUES as q (q.queue)}
 		{@const c = counts(q.queue)}
 		<section class="card queue">
-			<h2><span class="dot" style:background={q.color}></span>{q.title}</h2>
+			<div class="queue-head">
+				<h2><span class="dot" style:background={q.color}></span>{q.title}</h2>
+				<button
+					class="chart-toggle"
+					class:on={charts[q.queue]}
+					aria-pressed={charts[q.queue] ?? false}
+					aria-label="Chart of the last two minutes"
+					title="Chart of the last two minutes"
+					onclick={() => toggleChart(q.queue)}
+				>
+					<Icon path={mdiChartLine} size={20} />
+				</button>
+			</div>
 			<p class="muted">{q.description}</p>
+			{#if charts[q.queue]}
+				<QueueChart samples={history.samples} queue={q.queue} color={q.color} />
+			{/if}
 			<dl>
 				<div>
 					<dt>Waiting</dt>
@@ -210,7 +180,8 @@
 					<p class="failed">
 						{stats.files_failed.toLocaleString()}
 						{stats.files_failed === 1 ? 'file' : 'files'} could not be read. They are not tried again
-						by themselves (a broken file would fail for ever); try once more after a fix.
+						by themselves (a broken file would fail for ever); try once more after a fix. Everyone finds
+						their own, with the reason, under Manage → Unsorted.
 					</p>
 				{/if}
 				<div class="buttons">
@@ -282,65 +253,6 @@
 	section {
 		margin-bottom: 16px;
 	}
-	.chart {
-		display: grid;
-		gap: 10px;
-	}
-	.chart-head {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		gap: 8px 16px;
-	}
-	.legend {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px 14px;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-		color: var(--muted);
-		font-size: var(--step--1);
-	}
-	.legend li {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.legend span {
-		width: 14px;
-		height: 3px;
-		border-radius: 2px;
-	}
-	.legend .dashed {
-		background: none;
-		border-top: 2px dashed var(--ink);
-	}
-	svg {
-		width: 100%;
-		height: 150px;
-		overflow: visible;
-	}
-	polyline {
-		fill: none;
-		stroke-width: 2;
-		stroke-linejoin: round;
-		vector-effect: non-scaling-stroke;
-	}
-	polyline.rate {
-		stroke: var(--ink);
-		stroke-dasharray: 4 3;
-		opacity: 0.6;
-	}
-	.axis {
-		stroke: var(--rule);
-		vector-effect: non-scaling-stroke;
-	}
-	.scale {
-		display: flex;
-		justify-content: space-between;
-		font-size: var(--step--1);
-	}
 	.import .row {
 		display: flex;
 		justify-content: space-between;
@@ -356,6 +268,28 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 		gap: 16px;
+	}
+	.queue-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.chart-toggle {
+		display: grid;
+		place-items: center;
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: none;
+		color: var(--muted);
+	}
+	.chart-toggle:hover,
+	.chart-toggle.on {
+		background: var(--rail);
+		color: var(--royal);
 	}
 	.queue {
 		display: grid;

@@ -2,11 +2,13 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from procrastinate import App
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from paperus.config import Settings
-from paperus.models import Blob
+from paperus.models import Blob, File, TextStatus
+from tests.people import Person
 
 PDF_BYTES = b"%PDF-1.7\n" + b"x" * 5000 + b"\n%%EOF\n"
 
@@ -168,3 +170,37 @@ def test_lists_name_file_types(logged_in: TestClient, item_id: str) -> None:
     ]
     opened = logged_in.get(f"/api/files/{listed['files'][0]['id']}/content")
     assert opened.content == PDF_BYTES
+
+
+def test_unreadable_files_and_reading_again(
+    client: TestClient, db: Session, job_app: App
+) -> None:
+    """Each person sees the unreadable files of the papers they can see,
+    with the reason, and may read them again (not other people's)."""
+    ada = Person(client, db, "ada")
+    ben = Person(client, db, "ben")
+    paper = ada.add("Damaged scan")
+    stored = ada.post(
+        f"/api/items/{paper['id']}/files",
+        files={"upload": ("scan.pdf", PDF_BYTES, "application/pdf")},
+    ).json()
+    db.execute(
+        update(File).values(
+            text_status=TextStatus.FAILED,
+            text_error="PdfiumError: Failed to load document (PDFium: Data format"
+            " error).",
+        )
+    )
+    db.commit()
+    [listed] = ada.get("/api/files/unreadable").json()
+    assert (listed["filename"], listed["item_title"]) == ("scan.pdf", "Damaged scan")
+    assert "Data format error" in listed["error"] and listed["writable"]
+    assert ben.get("/api/files/unreadable").json() == []
+    assert ben.post(f"/api/files/{stored['id']}/read-again").status_code == 404
+    again = ada.post(f"/api/files/{stored['id']}/read-again")
+    assert again.status_code == 202
+    assert (again.json()["text_status"], again.json()["text_error"]) == (
+        "pending",
+        None,
+    )
+    assert ada.get("/api/files/unreadable").json() == []

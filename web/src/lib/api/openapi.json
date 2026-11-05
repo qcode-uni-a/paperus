@@ -1666,6 +1666,76 @@
         }
       }
     },
+    "/api/files/unreadable": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Unreadable Files",
+        "description": "Files whose text could not be read, of the papers the person can see\n(Manage \u2192 Unsorted): to read again, replace or remove.",
+        "operationId": "unreadable_files",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnreadableFile"
+                  },
+                  "type": "array",
+                  "title": "Response Unreadable Files"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/files/{file_id}/read-again": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Read File Again",
+        "description": "Read the file's text once more (e.g. after a fix in paperus).",
+        "operationId": "read_file_again",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}": {
       "delete": {
         "tags": [
@@ -5878,6 +5948,17 @@
           "text_status": {
             "$ref": "#/components/schemas/TextStatus"
           },
+          "text_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Error"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -9162,6 +9243,64 @@
           "last_used_at"
         ],
         "title": "TokenOut"
+      },
+      "UnreadableFile": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "item_title": {
+            "type": "string",
+            "title": "Item Title"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "writable": {
+            "type": "boolean",
+            "title": "Writable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "filename",
+          "media_type",
+          "error",
+          "item_id",
+          "item_title",
+          "library_id",
+          "writable"
+        ],
+        "title": "UnreadableFile"
       },
       "Usage": {
         "properties": {

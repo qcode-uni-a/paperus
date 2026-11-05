@@ -36,8 +36,10 @@ export interface Sample {
 	/** Per queue: waiting ("todo") and running ("doing"). */
 	waiting: Record<string, number>;
 	running: Record<string, number>;
-	/** All queues together, as counted so far (finished jobs are deleted
-	 * after a week, so only differences mean something). */
+	/** Finished so far, per queue (finished jobs are deleted after a week,
+	 * so only differences mean something). */
+	done: Record<string, number>;
+	/** All queues together. */
 	succeeded: number;
 	failed: number;
 }
@@ -45,10 +47,18 @@ export const history = $state<{ samples: Sample[] }>({ samples: [] });
 const KEEP_MS = 30 * 60 * 1000;
 
 function record(stats: Stats): void {
-	const sample: Sample = { at: Date.now(), waiting: {}, running: {}, succeeded: 0, failed: 0 };
+	const sample: Sample = {
+		at: Date.now(),
+		waiting: {},
+		running: {},
+		done: {},
+		succeeded: 0,
+		failed: 0
+	};
 	for (const [queue, counts] of Object.entries(stats.jobs)) {
 		sample.waiting[queue] = counts.todo ?? 0;
 		sample.running[queue] = counts.doing ?? 0;
+		sample.done[queue] = counts.succeeded ?? 0;
 		sample.succeeded += counts.succeeded ?? 0;
 		sample.failed += counts.failed ?? 0;
 	}

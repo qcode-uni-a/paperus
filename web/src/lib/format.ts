@@ -71,3 +71,18 @@ export function localTime(utcHour: number, minute = 0): string {
 	date.setUTCHours(utcHour, minute, 0, 0);
 	return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+/** Why a file's text could not be read, in plain words (the technical
+ * message stays available beside it). */
+export function readingProblem(error: string | null | undefined): string {
+	const text = error ?? '';
+	if (/password|encrypt/i.test(text)) return 'The PDF is protected with a password.';
+	if (/Data format error|Failed to load document/i.test(text))
+		return 'The PDF is damaged, or not a real PDF (e.g. a login page saved as one). Replace it with a good copy.';
+	if (/Failed to load page/i.test(text))
+		return 'A page of the PDF could not be read; the file may be damaged.';
+	if (/too long for tsvector/i.test(text))
+		return 'A passage was too long to index; fixed since. Read the file again.';
+	if (!text) return 'Reading stopped without a reason; try again.';
+	return 'Reading failed.';
+}

@@ -1,6 +1,8 @@
 """Likely duplicates across the library, with a recommendation which paper
 to keep (Manage → Duplicates). Merging itself is ``paperus.merge``."""
 
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 
@@ -8,6 +10,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import library
 from paperus.access import Access
 from paperus.models import (
     FileRole,
@@ -102,7 +105,25 @@ def find(db: Session, access: Access, limit: int = 200) -> list[Pair]:
     return [
         _recommend(access, items[row.a], items[row.b], list(row.reasons), notes)
         for row in rows
+        # The same title alone: two works can share one ("Introduction to
+        # Quantum Optics" by different authors); only with the same first
+        # author, or where one names none.
+        if list(row.reasons) != ["title"]
+        or _same_first_author(items[row.a], items[row.b])
     ]
+
+
+def _first_author(item: Item) -> str | None:
+    names = library.author_names(library.citation_csl(item))
+    if not names:
+        return None
+    family = names[0].split(",")[0]
+    return re.sub(r"[^\w]+", "", unicodedata.normalize("NFKD", family).lower()) or None
+
+
+def _same_first_author(a: Item, b: Item) -> bool:
+    first, second = _first_author(a), _first_author(b)
+    return first is None or second is None or first == second
 
 
 def _merits(

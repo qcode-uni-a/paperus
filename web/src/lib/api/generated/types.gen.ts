@@ -510,6 +510,10 @@ export type FileOut = {
     source: FileSource;
     text_status: TextStatus;
     /**
+     * Text Error
+     */
+    text_error?: string | null;
+    /**
      * Created At
      */
     created_at: string;
@@ -2296,6 +2300,44 @@ export type TokenOut = {
 };
 
 /**
+ * UnreadableFile
+ */
+export type UnreadableFile = {
+    /**
+     * File Id
+     */
+    file_id: string;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Item Title
+     */
+    item_title: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Writable
+     */
+    writable: boolean;
+};
+
+/**
  * Usage
  */
 export type Usage = {
@@ -3537,6 +3579,54 @@ export type PassageTextResponses = {
 };
 
 export type PassageTextResponse = PassageTextResponses[keyof PassageTextResponses];
+
+export type UnreadableFilesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/files/unreadable';
+};
+
+export type UnreadableFilesResponses = {
+    /**
+     * Response Unreadable Files
+     *
+     * Successful Response
+     */
+    200: Array<UnreadableFile>;
+};
+
+export type UnreadableFilesResponse = UnreadableFilesResponses[keyof UnreadableFilesResponses];
+
+export type ReadFileAgainData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/read-again';
+};
+
+export type ReadFileAgainErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadFileAgainError = ReadFileAgainErrors[keyof ReadFileAgainErrors];
+
+export type ReadFileAgainResponses = {
+    /**
+     * Successful Response
+     */
+    202: FileOut;
+};
+
+export type ReadFileAgainResponse = ReadFileAgainResponses[keyof ReadFileAgainResponses];
 
 export type TrashFileData = {
     body?: never;

@@ -23,7 +23,7 @@ from paperus import library, notes, organize
 from paperus.access import Access
 from paperus.identifiers import Scheme
 from paperus.importing import Export, ExportedFile, ExportedNote, ExportedPaper
-from paperus.metadata import version_kind
+from paperus.metadata import csl_title, csl_type, version_kind
 from paperus.models import (
     Blob,
     Collection,
@@ -31,6 +31,7 @@ from paperus.models import (
     File,
     FileRole,
     FileSource,
+    Identifier,
     Item,
     MetadataSource,
     Note,
@@ -153,6 +154,9 @@ class _Run:
     seen: dict[tuple[str, str], uuid.UUID] = field(default_factory=dict)
     """Identifiers and file hashes met in this import → item."""
     collections: dict[tuple[str, ...], Collection] = field(default_factory=dict)
+    added: set[uuid.UUID] = field(default_factory=set)
+    """Papers this import created (never matched by title: an export may
+    hold two entries of the same title)."""
 
 
 def apply(
@@ -286,6 +290,7 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
             added_by=access.user.id,
         )
         run.report.added += 1
+        run.added.add(item.id)
     else:
         run.report.found += 1
     for scheme, value in paper.identifiers:
@@ -379,6 +384,27 @@ def _existing(run: _Run, paper: ExportedPaper, shas: list[bytes]) -> Item | None
         )
         if item is not None:
             return item
+    if not paper.identifiers:
+        # Nothing to go by but the title (e.g. a web page saved in Zotero):
+        # the same type and title, without identifiers either, owned by the
+        # same owner; imported before, so a new import does not repeat it.
+        has_identifiers = (
+            select(Identifier.id)
+            .join(Version, Version.id == Identifier.version_id)
+            .where(Version.item_id == Item.id)
+            .exists()
+        )
+        for item in run.db.scalars(
+            select(Item).where(
+                Item.library_id == run.owner,
+                Item.type == csl_type(paper.csl),
+                Item.title == csl_title(paper.csl),
+                Item.deleted_at.is_(None),
+                ~has_identifiers,
+            )
+        ):
+            if item.id not in run.added:
+                return item
     return None
 
 

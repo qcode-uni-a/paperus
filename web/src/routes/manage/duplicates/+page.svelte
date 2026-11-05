@@ -4,6 +4,7 @@
 	import { errorMessage, listDuplicatesEverywhere, markDifferent } from '#lib/api/client.ts';
 	import type { DuplicateOut, ItemOut } from '#lib/api/generated/types.gen.ts';
 	import { shortAuthors } from '#lib/format.ts';
+	import DuplicateReview from '#lib/DuplicateReview.svelte';
 	import MergeDialog from '#lib/MergeDialog.svelte';
 	import { isShared, libraryName, loadOrganize } from '#lib/organize.svelte.ts';
 	import SharedIcon from '#lib/SharedIcon.svelte';
@@ -20,6 +21,7 @@
 	/** The pair being merged: its paper to merge, and the one to keep. */
 	let active = $state<{ merge: ItemOut; keep: ItemOut } | null>(null);
 	let dialog = $state<MergeDialog>();
+	let reviewing = $state(false);
 
 	async function load() {
 		const { data, error: failure } = await listDuplicatesEverywhere();
@@ -77,7 +79,22 @@
 		title. Merging keeps one and moves the other's versions, files, tags and collections to it; the
 		merged one goes to the trash, where it can be restored.
 	</p>
+	{#if pairs?.length}
+		<button class="primary review" onclick={() => (reviewing = true)}>
+			Review one by one ({pairs.length})
+		</button>
+	{/if}
 </header>
+
+{#if reviewing && pairs}
+	<DuplicateReview
+		{pairs}
+		onclose={async (changed) => {
+			reviewing = false;
+			if (changed) await load();
+		}}
+	/>
+{/if}
 
 {#if error}<p class="error">{error}</p>{/if}
 {#if merged}<p class="saved" role="status">
@@ -100,9 +117,14 @@
 				</div>
 				<div class="cards">
 					{#each [pair.keep, pair.merge] as item, index (item.id)}
+						{#if index === 1}<span class="arrow" aria-hidden="true">←</span>{/if}
 						<article class:recommended={index === 0}>
 							<span class="role"
-								>{index === 0 ? 'Keep' : pair.can_merge ? 'Merge into it' : 'The other one'}</span
+								>{index === 0
+									? 'Keep this one'
+									: pair.can_merge
+										? 'Merged into it, then to the trash'
+										: 'The other one'}</span
 							>
 							<div class="title">
 								<a href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
@@ -173,12 +195,25 @@
 	}
 	.cards {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+		align-items: center;
 		gap: 10px;
+	}
+	.arrow {
+		color: var(--royal);
+		font-size: 1.6em;
+		font-weight: 700;
+	}
+	.review {
+		margin-top: 12px;
 	}
 	@media (max-width: 720px) {
 		.cards {
 			grid-template-columns: minmax(0, 1fr);
+		}
+		.arrow {
+			justify-self: center;
+			transform: rotate(90deg);
 		}
 	}
 	article {

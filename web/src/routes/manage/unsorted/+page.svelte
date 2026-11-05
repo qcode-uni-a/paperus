@@ -1,5 +1,15 @@
 <script lang="ts">
-	import { addVersion, errorMessage, listItems, type Item } from '#lib/api/client.ts';
+	import { resolve } from '$app/paths';
+	import {
+		addVersion,
+		errorMessage,
+		listItems,
+		readFileAgain,
+		unreadableFiles,
+		type Item
+	} from '#lib/api/client.ts';
+	import type { UnreadableFile } from '#lib/api/generated/types.gen.ts';
+	import { readingProblem } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 
 	/** Papers whose details were only guessed from their file: no DOI or
@@ -19,7 +29,20 @@
 
 	$effect(() => {
 		load();
+		loadUnreadable();
 	});
+
+	// Files whose text could not be read.
+	let unreadable = $state<UnreadableFile[]>([]);
+	let retried = $state<Record<string, boolean>>({});
+	async function loadUnreadable() {
+		const { data } = await unreadableFiles();
+		unreadable = data ?? [];
+	}
+	async function readAgain(file: UnreadableFile) {
+		const { error } = await readFileAgain({ path: { file_id: file.file_id } });
+		if (!error) retried[file.file_id] = true;
+	}
 
 	/** A DOI, a doi.org link, or an arXiv ID (as its DOI). */
 	function asDoi(text: string): string {
@@ -59,6 +82,37 @@
 		{fixed}
 		{fixed === 1 ? 'paper' : 'papers'} sorted.
 	</p>{/if}
+
+{#if unreadable.length}
+	<section class="unreadable">
+		<h2>Files that could not be read</h2>
+		<p class="muted">
+			Their text is missing, so they are not found by search and AI assistants cannot read them.
+			Read one again after a fix in paperus, or open the paper to replace or remove the file.
+		</p>
+		<ul>
+			{#each unreadable as file (file.file_id)}
+				<li>
+					<div class="what">
+						<a href={resolve('/items/[id]', { id: file.item_id })}>{file.item_title}</a>
+						<span class="muted">{file.filename}</span>
+						<span>{readingProblem(file.error)}</span>
+						{#if file.error}<small class="muted" title={file.error}>{file.error}</small>{/if}
+					</div>
+					<div class="actions">
+						<a href="/api/files/{file.file_id}/content" target="_blank" rel="noopener">Open file</a>
+						{#if file.writable}
+							<button onclick={() => readAgain(file)} disabled={retried[file.file_id]}>
+								{retried[file.file_id] ? 'Reading…' : 'Read again'}
+							</button>
+						{/if}
+					</div>
+				</li>
+			{/each}
+		</ul>
+	</section>
+	<h2>Papers without details</h2>
+{/if}
 
 {#if items === null}
 	<p class="muted">Loading…</p>
@@ -117,5 +171,44 @@
 	}
 	.saved {
 		color: var(--success);
+	}
+	h2 {
+		margin: 20px 0 6px;
+		font-size: var(--step-1);
+	}
+	.unreadable p {
+		max-width: 70ch;
+		margin: 0 0 10px;
+	}
+	.unreadable li {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 8px 16px;
+		padding: 10px 12px;
+		border-left: 3px solid var(--danger);
+		border-radius: 0 8px 8px 0;
+		background: var(--rail);
+		margin-bottom: 8px;
+	}
+	.what {
+		display: grid;
+		gap: 2px;
+		min-width: 0;
+		flex: 1 1 380px;
+	}
+	.what a {
+		font-family: var(--serif);
+		font-weight: 600;
+	}
+	.what small {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: 10px;
 	}
 </style>
