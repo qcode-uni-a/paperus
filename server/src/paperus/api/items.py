@@ -414,12 +414,14 @@ def list_items(
     tag: Annotated[list[uuid.UUID] | None, Query()] = None,
     collection: uuid.UUID | None = None,
     nested: bool = True,
+    title: Annotated[str | None, Query(max_length=200)] = None,
 ) -> list[ItemOut]:
     """Items, newest first; ``before`` = last ``id`` for the next page.
 
     ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
     with all of them) and ``collection`` (with its subcollections unless
-    ``nested=false``) filter the list. ``X-Total-Count`` is the number of
+    ``nested=false``) filter the list, and ``title`` to items with all of its
+    words in their title (any case). ``X-Total-Count`` is the number of
     matching items, for showing the total while paging.
     ``since=N`` is for syncing:
     every item changed after change number N, trashed or not, in change
@@ -439,6 +441,8 @@ def list_items(
         )
     if collection is not None:
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
+    for word in (title or "").split():
+        conditions.append(Item.title.icontains(word, autoescape=True))
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
     query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)

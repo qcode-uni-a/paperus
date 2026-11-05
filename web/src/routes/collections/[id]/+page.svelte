@@ -3,7 +3,8 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { deleteCollection } from '#lib/api/client.ts';
-	import DotsMenu from '#lib/DotsMenu.svelte';
+	import CollectionAdd from '#lib/CollectionAdd.svelte';
+	import MenuButton from '#lib/MenuButton.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
 	import { childrenOf, loadOrganize, organize } from '#lib/organize.svelte.ts';
@@ -11,6 +12,7 @@
 	const id = $derived(page.params.id ?? '');
 	let loaded = $state(false);
 	let editDialog = $state<CollectionDialog>();
+	let list = $state<ItemList>();
 	let includeInside = $state(true);
 
 	$effect(() => {
@@ -57,23 +59,26 @@
 				<a href={resolve('/collections/[id]', { id: step.id })}>{step.name}</a>
 			{/each}
 		</nav>
-		<DotsMenu label="Collection actions">
-			{#if inside.length}
-				<button
-					role="menuitemcheckbox"
-					aria-checked={includeInside}
-					onclick={() => (includeInside = !includeInside)}
-				>
-					<svg viewBox="0 0 24 24" aria-hidden="true">
-						{#if includeInside}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
-					</svg>
-					Include items of the collections inside
-				</button>
-				<hr />
-			{/if}
-			<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
-			<button role="menuitem" class="danger" onclick={remove}>Delete</button>
-		</DotsMenu>
+		<div class="tools">
+			<CollectionAdd collection={collection.id} onadded={() => list?.refresh()} />
+			<MenuButton label="Collection actions">
+				{#if inside.length}
+					<button
+						role="menuitemcheckbox"
+						aria-checked={includeInside}
+						onclick={() => (includeInside = !includeInside)}
+					>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							{#if includeInside}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
+						</svg>
+						Include items of the collections inside
+					</button>
+					<hr />
+				{/if}
+				<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+				<button role="menuitem" class="danger" onclick={remove}>Delete</button>
+			</MenuButton>
+		</div>
 	</div>
 
 	<header class="head">
@@ -85,7 +90,7 @@
 
 	<section>
 		{#key id}
-			<ItemList collection={id} nested={includeInside} />
+			<ItemList bind:this={list} collection={id} nested={includeInside} />
 		{/key}
 	</section>
 
@@ -101,6 +106,10 @@
 		justify-content: space-between;
 		gap: 12px;
 		margin-bottom: 2px;
+	}
+	.tools {
+		display: flex;
+		margin-right: -6px;
 	}
 	.trail {
 		display: flex;

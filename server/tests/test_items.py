@@ -230,6 +230,19 @@ def test_list_items_newest_first_with_paging(logged_in: TestClient) -> None:
     assert response.headers["X-Total-Count"] == "3"
 
 
+def test_list_items_by_title_words(logged_in: TestClient) -> None:
+    for title in ["Radar clouds", "Cloud radar 100% done", "Ocean waves"]:
+        logged_in.post("/api/items", json={"metadata": {"title": title}})
+
+    def titles(words: str) -> list[str]:
+        response = logged_in.get("/api/items", params={"title": words})
+        return sorted(i["title"] for i in response.json())
+
+    assert titles("RADAR cloud") == ["Cloud radar 100% done", "Radar clouds"]
+    assert titles("100%") == ["Cloud radar 100% done"]
+    assert titles("1_0") == []
+
+
 def test_items_need_login(client: TestClient) -> None:
     assert client.get("/api/items").status_code == 401
     assert client.post("/api/items", json={"doi": DOI}).status_code == 401

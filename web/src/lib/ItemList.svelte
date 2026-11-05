@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { listItems, type Item } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { uploads } from '#lib/uploads.svelte.ts';
 
 	/** Items of a collection, loading more while scrolling. */
 	let { collection, nested = false }: { collection: string; nested?: boolean } = $props();
@@ -40,6 +41,11 @@
 		return () => clearInterval(timer);
 	});
 
+	// Reload when uploads (dropped here, or added with +) finish.
+	$effect(() => {
+		if (uploads.finished) untrack(() => load());
+	});
+
 	function loadMoreNearby(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			([entry]) => {
@@ -61,7 +67,7 @@
 	<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
 {/if}
 {#if total === 0}
-	<p class="muted">No items here yet. Add them from an item's page, under Collections.</p>
+	<p class="muted">No items here yet. Add them with + above, or drop files here.</p>
 {/if}
 <ul>
 	{#each items as item (item.id)}<ItemRow {item} />{/each}

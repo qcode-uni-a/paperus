@@ -1,4 +1,5 @@
-import { errorMessage } from '#lib/api/client.ts';
+import { addItems, errorMessage } from '#lib/api/client.ts';
+import { loadOrganize } from '#lib/organize.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
@@ -11,6 +12,8 @@ export interface Upload {
 	status: UploadStatus;
 	error?: string;
 	itemId?: string;
+	/** Also put the new item into this collection. */
+	collection?: string;
 }
 
 /** Files being added; each becomes a new item, identified by the server. */
@@ -23,10 +26,11 @@ const queue: { upload: Upload; file: File }[] = [];
 let running = 0;
 let nextId = 1;
 
-export function addFiles(files: Iterable<File>): void {
+export function addFiles(files: Iterable<File>, collection?: string): void {
 	for (const file of files) {
 		const upload: Upload = {
 			id: nextId++,
+			collection,
 			name: file.name,
 			size: file.size,
 			loaded: 0,
@@ -63,6 +67,14 @@ async function run(upload: Upload, file: File): Promise<void> {
 	try {
 		const result = await send('/api/uploads', file, (loaded) => (upload.loaded = loaded));
 		upload.itemId = result.item_id;
+		if (upload.collection) {
+			const { error } = await addItems({
+				path: { collection_id: upload.collection },
+				body: { item_ids: [result.item_id] }
+			});
+			if (error) throw new Error(errorMessage(error));
+			await loadOrganize();
+		}
 		upload.loaded = upload.size;
 		upload.status = 'done';
 		uploads.finished++;

@@ -859,6 +859,10 @@ export type ListItemsData = {
          * Nested
          */
         nested?: boolean;
+        /**
+         * Title
+         */
+        title?: string | null;
     };
     url: '/api/items';
 };

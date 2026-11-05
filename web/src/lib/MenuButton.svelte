@@ -2,8 +2,12 @@
 	import type { Snippet } from 'svelte';
 	import { closeOnScroll } from '#lib/dismiss.ts';
 
-	// A quiet ⋯ button with a menu of actions; choosing one closes the menu.
-	let { label, children }: { label: string; children: Snippet } = $props();
+	// A quiet ⋯ (or +) button with a menu of actions; choosing one closes it.
+	let {
+		label,
+		icon = 'dots',
+		children
+	}: { label: string; icon?: 'dots' | 'plus'; children: Snippet } = $props();
 
 	const id = $props.id();
 	const WIDTH = 250;
@@ -30,11 +34,15 @@
 	title={label}
 >
 	<svg viewBox="0 0 24 24" aria-hidden="true">
-		<circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle
-			cx="19"
-			cy="12"
-			r="1.8"
-		/>
+		{#if icon === 'plus'}
+			<path class="stroke" d="M12 5v14M5 12h14" />
+		{:else}
+			<circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle
+				cx="19"
+				cy="12"
+				r="1.8"
+			/>
+		{/if}
 	</svg>
 </button>
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -61,7 +69,6 @@
 		place-items: center;
 		width: 36px;
 		height: 36px;
-		margin-right: -6px;
 		padding: 0;
 		border-color: transparent;
 		border-radius: 50%;
@@ -76,6 +83,12 @@
 		width: 20px;
 		height: 20px;
 		fill: var(--muted);
+	}
+	.more .stroke {
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 2.2;
+		stroke-linecap: round;
 	}
 	.menu {
 		position: fixed;

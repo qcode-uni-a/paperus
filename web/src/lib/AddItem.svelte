@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { addItem, errorMessage } from '#lib/api/client.ts';
+	import { addItem, addItems, errorMessage } from '#lib/api/client.ts';
+	import { loadOrganize } from '#lib/organize.svelte.ts';
 
-	/** Called once the item exists, before opening it. */
-	let { ondone }: { ondone?: () => void } = $props();
+	/** Called once the item exists. Without ``collection`` the item opens
+	 * then; with it, the item is put into that collection and stays closed. */
+	let { ondone, collection }: { ondone?: () => void; collection?: string } = $props();
 
 	let doi = $state('');
 	let manual = $state(false);
@@ -45,6 +47,20 @@
 				}
 			: { doi };
 		const { data, error: failure } = await addItem({ body });
+		if (data && collection) {
+			const added = await addItems({
+				path: { collection_id: collection },
+				body: { item_ids: [data.id] }
+			});
+			busy = false;
+			if (added.error) {
+				error = errorMessage(added.error);
+				return;
+			}
+			await loadOrganize();
+			ondone?.();
+			return;
+		}
 		busy = false;
 		if (!data) {
 			error = errorMessage(failure);

@@ -20,7 +20,7 @@
 		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
-	import DotsMenu from '#lib/DotsMenu.svelte';
+	import MenuButton from '#lib/MenuButton.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import { fullName } from '#lib/format.ts';
@@ -182,7 +182,7 @@
 			<div class="title">
 				<h1>{item.title}</h1>
 				{#if !item.deleted_at}
-					<DotsMenu label="Item actions">
+					<MenuButton label="Item actions">
 						{#if pdfFile}
 							<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
 								{showDetails ? 'Hide details' : 'Details and files'}
@@ -196,7 +196,7 @@
 							}}>Edit title</button
 						>
 						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
-					</DotsMenu>
+					</MenuButton>
 				{/if}
 			</div>
 		{/if}

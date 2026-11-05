@@ -177,7 +177,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items, newest first; ``before`` = last ``id`` for the next page.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list. ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items, newest first; ``before`` = last ``id`` for the next page.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -281,6 +281,23 @@
               "type": "boolean",
               "default": true,
               "title": "Nested"
+            }
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Title"
             }
           }
         ],

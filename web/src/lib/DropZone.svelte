@@ -1,5 +1,14 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { organize } from '#lib/organize.svelte.ts';
 	import { addFiles } from '#lib/uploads.svelte.ts';
+
+	// On a collection's page, dropped files go into that collection too.
+	const collection = $derived(
+		page.route.id === '/collections/[id]'
+			? organize.collections.find((c) => c.id === page.params.id)
+			: undefined
+	);
 
 	// dragenter/dragleave fire for every element passed; count them.
 	let depth = $state(0);
@@ -23,13 +32,13 @@
 		if (!hasFiles(event)) return;
 		event.preventDefault();
 		depth = 0;
-		addFiles(event.dataTransfer?.files ?? []);
+		addFiles(event.dataTransfer?.files ?? [], collection?.id);
 	}}
 />
 
 {#if depth > 0}
 	<div class="overlay" aria-hidden="true">
-		<div>Drop files to add them</div>
+		<div>Drop files to add them{collection ? ` to ${collection.name}` : ''}</div>
 	</div>
 {/if}
 

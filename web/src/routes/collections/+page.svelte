@@ -29,7 +29,6 @@
 			</p>
 		{/if}
 	</div>
-	<button class="primary" onclick={() => dialog?.open()}>New collection</button>
 </header>
 
 {#if loaded && all.length === 0}
@@ -49,6 +48,13 @@
 		{#each all as collection (collection.id)}
 			<CollectionStack {collection} />
 		{/each}
+		<!-- A ghost collection: the place for the next one. -->
+		<button class="ghost" onclick={() => dialog?.open()}>
+			<span class="desk" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+			</span>
+			<span class="label">New collection</span>
+		</button>
 	</div>
 {/if}
 
@@ -73,6 +79,47 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 		gap: 20px 16px;
+	}
+	.ghost {
+		display: grid;
+		align-content: start;
+		gap: 10px;
+		padding: 6px 6px 10px;
+		border: none;
+		border-radius: 12px;
+		background: none;
+		color: var(--muted);
+		text-align: left;
+		font: inherit;
+	}
+	.ghost:hover:not(:disabled) {
+		background: var(--rail);
+		color: var(--ink);
+	}
+	.ghost .desk {
+		display: grid;
+		place-items: center;
+		height: 150px;
+		border: 2px dashed var(--rule);
+		border-radius: 10px;
+	}
+	.ghost:hover .desk {
+		border-color: var(--royal);
+	}
+	.ghost svg {
+		width: 36px;
+		height: 36px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.6;
+		stroke-linecap: round;
+	}
+	.ghost .label {
+		padding: 0 4px;
+		font-family: var(--serif);
+		font-size: var(--step-1);
+		font-weight: 600;
+		line-height: 1.25;
 	}
 	.empty {
 		display: flex;

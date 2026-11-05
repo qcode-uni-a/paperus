@@ -57,7 +57,8 @@ export const me = <ThrowOnError extends boolean = false>(options?: Options<MeDat
  *
  * ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
  * with all of them) and ``collection`` (with its subcollections unless
- * ``nested=false``) filter the list. ``X-Total-Count`` is the number of
+ * ``nested=false``) filter the list, and ``title`` to items with all of its
+ * words in their title (any case). ``X-Total-Count`` is the number of
  * matching items, for showing the total while paging.
  * ``since=N`` is for syncing:
  * every item changed after change number N, trashed or not, in change
