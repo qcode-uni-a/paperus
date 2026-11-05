@@ -11,7 +11,9 @@ export const TYPE_NAMES: Record<string, string> = {
 	dataset: 'Dataset',
 	software: 'Software',
 	speech: 'Talk',
-	document: 'Document'
+	document: 'Document',
+	// Not a paper's type: notes, which search finds too.
+	note: 'Note'
 };
 
 export function typeName(type: string): string {

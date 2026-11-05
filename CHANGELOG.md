@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Search options: "Note" among the types, so notes can be searched alone
+  or together with some types of paper.
 - The search field says what the search options are set to, e.g. "Search
   preprints by meaning".
 - Fixed: the search options panel was squeezed to the width of its button.
