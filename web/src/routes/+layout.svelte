@@ -4,7 +4,9 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import DropZone from '#lib/DropZone.svelte';
+	import { menu } from '#lib/menu.svelte.ts';
 	import { loadUser, logout, session } from '#lib/session.svelte.ts';
+	import Sidebar from '#lib/Sidebar.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -16,6 +18,8 @@
 		if (!session.checked && !onLoginPage) loadUser();
 	});
 
+	$effect(() => menu.watch());
+
 	async function signOut() {
 		await logout();
 		await goto(resolve('/login'));
@@ -26,14 +30,22 @@
 	<title>paperus</title>
 </svelte:head>
 
-{#if !onLoginPage}
+{#if onLoginPage}
+	<main class="login">{@render children()}</main>
+{:else}
 	<header>
-		<nav>
+		<div class="row">
+			<button
+				class="burger"
+				onclick={() => menu.toggle()}
+				aria-expanded={menu.open}
+				aria-controls="menu"
+				aria-label={menu.open ? 'Close menu' : 'Open menu'}
+			>
+				<span></span><span></span><span></span>
+			</button>
 			<a class="brand" href={resolve('/')}>paperus</a>
-			<a href={resolve('/')}>Library</a>
-			<a href={resolve('/trash')}>Trash</a>
-			{#if session.user?.is_admin}<a href={resolve('/admin')}>Admin</a>{/if}
-		</nav>
+		</div>
 		{#if session.user}
 			<div class="row">
 				<span class="muted">{session.user.username}</span>
@@ -41,11 +53,12 @@
 			</div>
 		{/if}
 	</header>
-{/if}
 
-<main>
-	{@render children()}
-</main>
+	<div class="body">
+		<Sidebar />
+		<main>{@render children()}</main>
+	</div>
+{/if}
 
 {#if session.user && !onLoginPage}
 	<DropZone />
@@ -58,26 +71,45 @@
 		justify-content: space-between;
 		align-items: center;
 		gap: var(--gap);
-		flex-wrap: wrap;
-		padding: 10px 16px;
+		padding: 8px 16px;
 		border-bottom: 1px solid var(--border);
 		background: var(--surface);
-	}
-	nav {
-		display: flex;
-		gap: 18px;
-		align-items: center;
-	}
-	nav a {
-		text-decoration: none;
 	}
 	.brand {
 		color: var(--text);
 		font-size: 1.15em;
+		text-decoration: none;
+	}
+	.burger {
+		display: grid;
+		gap: 4px;
+		padding: 9px 8px;
+		border-color: transparent;
+		background: none;
+	}
+	.burger:hover {
+		background: var(--bg);
+	}
+	.burger span {
+		display: block;
+		width: 18px;
+		height: 2px;
+		border-radius: 1px;
+		background: var(--text);
+	}
+	.body {
+		display: flex;
+		gap: 16px;
+		padding: 16px;
+		align-items: flex-start;
 	}
 	main {
+		flex: 1;
+		min-width: 0;
 		max-width: 960px;
 		margin: 0 auto;
+	}
+	main.login {
 		padding: 16px;
 	}
 </style>
