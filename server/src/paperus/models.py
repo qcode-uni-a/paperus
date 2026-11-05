@@ -222,6 +222,8 @@ class FileSource(StrEnum):
     UPLOAD = "upload"
     OPEN_ACCESS = "open_access"
     BROWSER = "browser"
+    IMPORT = "import"
+    """From another reference manager's export."""
 
 
 class TagColor(StrEnum):

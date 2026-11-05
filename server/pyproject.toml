@@ -24,9 +24,12 @@ dependencies = [
     "pgvector>=0.5.1",
     "procrastinate>=3.10,<3.11",  # schema frozen in src/paperus/migrations/
     "psycopg[binary]>=3.3.8",
+    "pybtex>=0.26.1",
     "pydantic-settings>=2.16.2",
+    "pylatexenc>=2.11",
     "pypdfium2>=5.14.0",
     "python-multipart>=0.0.33",
+    "rispy>=0.10.0",
     "sqlalchemy>=2.1.8",
     "uvicorn[standard]>=0.54.0",
 ]
