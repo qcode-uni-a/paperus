@@ -8,7 +8,8 @@
 	// Like Immich: inside the administration, its menu replaces the normal one.
 	const adminPath = resolve('/admin');
 	const settingsPath = resolve('/admin/settings');
-	const inAdmin = $derived(active(adminPath));
+	// Only admins see the administration menu, even when opening its address.
+	const inAdmin = $derived(active(adminPath) && Boolean(session.user?.is_admin));
 
 	const MAIN = [
 		[resolve('/'), 'Library'],
