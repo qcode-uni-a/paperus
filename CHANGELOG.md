@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.0.7 (2026-11-05)
+
+All settings in one place: background jobs, OIDC login, users leaving, a
+readable copy of the library on disk; profile pictures, storage use and
+Prometheus metrics.
 
 - **More settings** (Administration → Settings):
   - Server: the public address (for links the server makes, e.g. for AI
