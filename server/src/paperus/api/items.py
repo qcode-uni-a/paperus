@@ -507,8 +507,9 @@ def list_items(
     ``sort=opened``: only items the reader opened, by when.
 
     ``trashed=true`` lists the trash instead. ``unsorted=true``: only papers
-    whose details could not be found (all guessed from their file; papers
-    still being read are left out). ``tag`` (repeatable: items
+    with a PDF whose details could not be found (all guessed from the file;
+    papers still being read, and notes or other files without a DOI to
+    find, are left out). ``tag`` (repeatable: items
     with all of them) and ``collection`` (with its subcollections unless
     ``nested=false``) filter the list, and ``title`` to items with all of its
     words in their title (any case). ``X-Total-Count`` is the number of
@@ -557,6 +558,13 @@ def list_items(
                 .where(
                     File.text_status == TextStatus.PENDING, File.deleted_at.is_(None)
                 )
+            )
+        )
+        conditions.append(
+            Item.id.in_(
+                select(Version.item_id)
+                .join(File)
+                .where(File.media_type == "application/pdf", File.deleted_at.is_(None))
             )
         )
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0

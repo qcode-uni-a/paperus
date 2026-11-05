@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from paperus.models import MetadataSource, Version
+from paperus.models import File, MetadataSource, TextStatus, Version
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 3000 + b"\n%%EOF\n"
@@ -118,12 +118,20 @@ def test_recommendation(client: TestClient, db: Session) -> None:
 def test_unsorted(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     guessed = paper(ada, "scan_2024_03.pdf")
+    meeting = paper(ada, "Meeting notes")  # a Markdown file: no DOI to find
     paper(ada, "A paper with details")
+    for item, name, data, kind in (
+        (guessed, "scan.pdf", PDF, "application/pdf"),
+        (meeting, "notes.md", b"# Meeting", "text/markdown"),
+    ):
+        ada.post(f"/api/items/{item}/files", files={"upload": (name, data, kind)})
     db.execute(
         update(Version)
-        .where(Version.item_id == guessed)
+        .where(Version.item_id.in_([guessed, meeting]))
         .values(metadata_source=MetadataSource.FILE)
     )
+    # Files are read (otherwise they count as still being looked at).
+    db.execute(update(File).values(text_status=TextStatus.DONE))
     db.commit()
     unsorted = ada.get("/api/items", params={"unsorted": True}).json()
     assert [i["title"] for i in unsorted] == ["scan_2024_03.pdf"]
