@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.0.4 (2026-11-05)
+
+AI assistants: paperus speaks MCP, with access tokens.
 
 - **AI assistants (MCP)**: paperus speaks MCP at `/mcp`, so Claude, Cursor
   and others can search the library, read passages and papers, list
