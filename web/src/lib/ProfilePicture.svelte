@@ -1,64 +1,32 @@
 <script lang="ts">
 	import { errorMessage, removeAvatar, setAvatar } from '#lib/api/client.ts';
 	import Avatar from '#lib/Avatar.svelte';
+	import AvatarEditor from '#lib/AvatarEditor.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
-	/** One's profile picture: cut to a square in the middle and scaled to
-	 * 256 pixels here in the browser, then sent. */
-	const SIZE = 256;
+	/** One's profile picture: placed in the circle in an editor here, then
+	 * only the small result is sent. */
 	let busy = $state(false);
+	let chosen = $state<File | null>(null);
 
-	async function square(file: File): Promise<Blob> {
-		const image = await createImageBitmap(file);
-		const side = Math.min(image.width, image.height);
-		const canvas = document.createElement('canvas');
-		canvas.width = canvas.height = SIZE;
-		const context = canvas.getContext('2d');
-		if (!context) throw new Error('this browser cannot scale pictures');
-		context.imageSmoothingQuality = 'high';
-		context.drawImage(
-			image,
-			(image.width - side) / 2,
-			(image.height - side) / 2,
-			side,
-			side,
-			0,
-			0,
-			SIZE,
-			SIZE
-		);
-		image.close();
-		const encode = (type: string) =>
-			new Promise<Blob | null>((done) => canvas.toBlob(done, type, 0.86));
-		// WebP where the browser writes it, else JPEG.
-		const webp = await encode('image/webp');
-		const blob = webp?.type === 'image/webp' ? webp : await encode('image/jpeg');
-		if (!blob) throw new Error('the picture could not be converted');
-		return blob;
+	function choose(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		chosen = input.files?.[0] ?? null;
+		input.value = '';
 	}
 
-	async function choose(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file) return;
+	async function upload(picture: Blob) {
+		chosen = null;
 		busy = true;
-		try {
-			const blob = await square(file);
-			const { data, error } = await setAvatar({ body: { upload: blob } });
-			if (error || !data) throw new Error(errorMessage(error));
-			session.user = data;
-			notify({ kind: 'success', title: 'Profile picture saved' });
-		} catch (failure) {
-			notify({
-				kind: 'warning',
-				title: 'Picture not saved',
-				text: failure instanceof Error ? failure.message : String(failure)
-			});
-		} finally {
-			busy = false;
+		const { data, error } = await setAvatar({ body: { upload: picture } });
+		busy = false;
+		if (error || !data) {
+			notify({ kind: 'warning', title: 'Picture not saved', text: errorMessage(error) });
+			return;
 		}
+		session.user = data;
+		notify({ kind: 'success', title: 'Profile picture saved' });
 	}
 
 	async function remove() {
@@ -67,6 +35,10 @@
 		notify({ kind: 'success', title: 'Profile picture removed' });
 	}
 </script>
+
+{#if chosen}
+	<AvatarEditor file={chosen} onsave={upload} oncancel={() => (chosen = null)} />
+{/if}
 
 <div class="picture">
 	<Avatar name={session.user?.username ?? ''} url={session.user?.avatar_url} size={88} />

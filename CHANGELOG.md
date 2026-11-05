@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Profile picture editor**: move and zoom the picture in a circle, with
+  previews at the sizes others see. Only the 256-pixel result leaves the
+  browser; the server refuses pictures larger than 512 pixels on a side.
 - The menu's Manage part sits at the bottom of the window; Administration
   is only in the profile menu, whose entries now have icons.
 

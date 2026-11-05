@@ -23,7 +23,12 @@ from paperus.models import User
 from tests.conftest import FakeDOIRegistry, FakeML
 
 ISSUER = "https://idp.test/realms/uni"
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR"
+    + (96).to_bytes(4)
+    + (96).to_bytes(4)
+    + b"\x00" * 100
+)
 
 
 def _jwt(claims: dict[str, Any]) -> str:
