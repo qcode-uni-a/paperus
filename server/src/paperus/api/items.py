@@ -685,6 +685,29 @@ def mark_viewed(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
     return Response(status_code=204)
 
 
+@router.get("/api/items/lookup")
+def lookup_items(
+    db: DB,
+    access: CurrentAccess,
+    id: Annotated[list[str], Query(max_length=200)],
+) -> dict[str, uuid.UUID | None]:
+    """For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the
+    person can see that has it, else null; e.g. to mark the papers one has
+    on a web page (the browser extension on arXiv)."""
+    found: dict[str, uuid.UUID | None] = {}
+    for key in id:
+        name, _, value = key.partition(":")
+        try:
+            scheme = Scheme(name.lower())
+            known = library.find_identifier(
+                db, access.readable, [(scheme, normalize(scheme, value))]
+            )
+        except (ValueError, InvalidIdentifier):
+            known = None
+        found[key] = known.version.item_id if known else None
+    return found
+
+
 @router.get("/api/items/{item_id}")
 def get_item(
     item_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess

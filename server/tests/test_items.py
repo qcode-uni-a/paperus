@@ -274,3 +274,26 @@ def test_recent_activity(logged_in: TestClient) -> None:
     assert [i["title"] for i in opened.json()] == ["Old"]
     assert opened.headers["X-Total-Count"] == "1"
     assert new
+
+
+def test_lookup_by_identifiers(logged_in: TestClient) -> None:
+    """Which of these identifiers one has (for marks on web pages)."""
+    item = logged_in.post(
+        "/api/items",
+        json={
+            "metadata": {"title": "Floquet engineering"},
+            "identifiers": [{"scheme": "arxiv", "value": "2601.01704"}],
+        },
+    ).json()
+    found = logged_in.get(
+        "/api/items/lookup",
+        params={
+            "id": ["arxiv:2601.01704v2", "arxiv:2601.99999", "doi:nonsense", "x:y"]
+        },
+    ).json()
+    assert found == {
+        "arxiv:2601.01704v2": item["id"],
+        "arxiv:2601.99999": None,
+        "doi:nonsense": None,
+        "x:y": None,
+    }

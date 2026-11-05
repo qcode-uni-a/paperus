@@ -39,6 +39,8 @@ class Scope(StrEnum):
 PRESETS: dict[str, list[Scope]] = {
     "read": [Scope.SEARCH, Scope.PAPERS_READ, Scope.FILES_READ, Scope.GROUPS_READ],
     "assistant": [Scope.SEARCH, Scope.PAPERS_READ, Scope.FILES_READ],
+    # The browser extension: add papers with their files, see which one has.
+    "extension": [Scope.PAPERS_READ, Scope.PAPERS_WRITE, Scope.GROUPS_READ],
     "everything": list(Scope),
 }
 

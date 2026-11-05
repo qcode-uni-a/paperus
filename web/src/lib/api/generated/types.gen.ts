@@ -3310,6 +3310,40 @@ export type MarkViewedResponses = {
 
 export type MarkViewedResponse = MarkViewedResponses[keyof MarkViewedResponses];
 
+export type LookupItemsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Id
+         */
+        id: Array<string>;
+    };
+    url: '/api/items/lookup';
+};
+
+export type LookupItemsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type LookupItemsError = LookupItemsErrors[keyof LookupItemsErrors];
+
+export type LookupItemsResponses = {
+    /**
+     * Response Lookup Items
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: string | null;
+    };
+};
+
+export type LookupItemsResponse = LookupItemsResponses[keyof LookupItemsResponses];
+
 export type ListDuplicatesData = {
     body?: never;
     path: {

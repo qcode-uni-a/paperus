@@ -1224,6 +1224,65 @@
         }
       }
     },
+    "/api/items/lookup": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Lookup Items",
+        "description": "For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the\nperson can see that has it, else null; e.g. to mark the papers one has\non a web page (the browser extension on arXiv).",
+        "operationId": "lookup_items",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 200,
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": "Response Lookup Items"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/duplicates": {
       "get": {
         "tags": [

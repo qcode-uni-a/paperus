@@ -208,10 +208,11 @@ backup, so search works right away.
 ## Releases
 
 Pushing a tag `vX.Y.Z` (matching the versions in `server/pyproject.toml`,
-`ml/pyproject.toml`, `web/package.json` and `client/package.json`) runs
-`.github/workflows/release.yml`: the tests, then the container images on
-ghcr.io (tags `vX.Y.Z`, `X.Y.Z` and `release`), then a GitHub release with
-the notes from `CHANGELOG.md`.
+`ml/pyproject.toml`, `web/package.json`, `client/package.json` and
+`extension/package.json`) runs `.github/workflows/release.yml`: the tests,
+then the container images on ghcr.io (tags `vX.Y.Z`, `X.Y.Z` and
+`release`), then a GitHub release with the notes from `CHANGELOG.md` and the
+browser extension's zips (for Chrome and Firefox).
 
 The packages are published only once their setup is done and switched on
 with repository variables (Settings → Secrets and variables → Actions →

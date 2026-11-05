@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>paperus</title>
+		<link rel="stylesheet" href="options.css" />
+	</head>
+	<body>
+		<main>
+			<h1><img src="icons/icon-48.png" alt="" width="32" height="32" /> paperus</h1>
+			<p class="muted">
+				One click on the paperus button saves the paper you are reading, with its PDF, to your
+				library. On arXiv, a small button next to each paper does the same.
+			</p>
+
+			<section id="disconnected">
+				<h2>Connect</h2>
+				<label
+					>Your paperus address
+					<input id="server" type="url" placeholder="https://papers.example.org" required />
+				</label>
+				<p class="muted small">
+					paperus opens in a tab; confirm there. The extension then may add papers to your library
+					and see which ones you have, nothing else.
+				</p>
+				<button id="connect" class="primary">Connect</button>
+			</section>
+
+			<section id="connected" hidden>
+				<h2>Connected</h2>
+				<p>To <a id="server-link" target="_blank"></a>.</p>
+				<label
+					>New papers belong to
+					<select id="owner"></select>
+				</label>
+				<p class="muted small">Papers you have already are recognised and not added twice.</p>
+				<button id="disconnect">Disconnect</button>
+			</section>
+
+			<p id="message" role="status"></p>
+		</main>
+		<script src="options.js" type="module"></script>
+	</body>
+</html>

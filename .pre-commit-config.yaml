@@ -33,6 +33,12 @@ repos:
         language: system
         files: ^ml/.*\.py$
         pass_filenames: false
+      - id: tsc-extension
+        name: tsc (extension)
+        entry: npm --prefix extension run check
+        language: system
+        files: ^extension/
+        pass_filenames: false
       - id: prettier
         name: prettier (web)
         entry: npm --prefix web run lint

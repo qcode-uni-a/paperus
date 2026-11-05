@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Browser extension** (Chrome and Firefox, `extension/`): one click saves
+  the paper you are reading with its PDF (downloaded with your own access)
+  to your default owner; on arXiv, a button next to each paper saves it, and
+  shows which ones you have. Connected from its settings with a token that
+  may only add papers. Until it is in the stores: the zips on the GitHub
+  release, loaded unpacked.
+- `GET /api/items/lookup?id=arxiv:…&id=doi:…`: which of these papers one has.
 - **Download again** for a damaged file: a fresh open-access copy from
   arXiv, or by DOI via Unpaywall (with the contact email set), replaces it;
   only a whole PDF that opens is taken. Without a known source, "Upload a

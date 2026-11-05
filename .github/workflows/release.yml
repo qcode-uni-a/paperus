@@ -28,7 +28,7 @@ jobs:
             found=$(grep -m1 '^version = ' "$file" | cut -d'"' -f2)
             [ "$found" = "$version" ] || { echo "::error file=$file::version $found, tag $version"; status=1; }
           done
-          for file in web/package.json client/package.json; do
+          for file in web/package.json client/package.json extension/package.json; do
             found=$(node -p "require('./$file').version")
             [ "$found" = "$version" ] || { echo "::error file=$file::version $found, tag $version"; status=1; }
           done
@@ -147,6 +147,16 @@ jobs:
             found { print }
           ' CHANGELOG.md > notes.md
           test -s notes.md || echo "See CHANGELOG.md." > notes.md
-      - run: gh release create "$GITHUB_REF_NAME" --title "paperus $GITHUB_REF_NAME" --notes-file notes.md
+      # The browser extension, to load unpacked until it is in the stores.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: extension
+      - run: >
+          gh release create "$GITHUB_REF_NAME" --title "paperus $GITHUB_REF_NAME"
+          --notes-file notes.md extension/dist/paperus-*.zip
         env:
           GH_TOKEN: ${{ github.token }}
