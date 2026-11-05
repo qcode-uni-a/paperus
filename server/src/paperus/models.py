@@ -670,3 +670,36 @@ class NoteChunk(Base):
     )
     position: Mapped[int] = mapped_column(Integer, primary_key=True)
     chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
+
+
+class ImportStatus(StrEnum):
+    WAITING = "waiting"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class Import(Record, Base):
+    """An import from another reference manager, run by the worker."""
+
+    __tablename__ = "imports"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="CASCADE")
+    )
+    """Who owns what the import adds."""
+    filename: Mapped[str] = mapped_column(String(255))
+    blob_sha256: Mapped[bytes | None] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="SET NULL")
+    )
+    """The uploaded file (dropped from the import when done)."""
+    format: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16))
+    done: Mapped[int] = mapped_column(server_default=text("0"))
+    total: Mapped[int] = mapped_column(server_default=text("0"))
+    report: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    error: Mapped[str | None]
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

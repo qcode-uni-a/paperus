@@ -4,15 +4,22 @@ import io
 import json
 import uuid
 import zipfile
+from pathlib import Path
+from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from procrastinate import App
+from procrastinate.testing import InMemoryConnector
 from sqlalchemy.orm import Session
 
 from paperus.access import Access
+from paperus.cli import main
 from paperus.identifiers import Scheme
 from paperus.importing import bibtex, csljson, ris
 from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
-from paperus.models import User
+from paperus.importing.run import run_import
+from paperus.models import Import, User
 from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
 from tests.people import Person, group
@@ -268,3 +275,121 @@ def test_apply_to_a_group_and_without_files(
         assert "readers" in str(error)
     else:
         raise AssertionError("a reader imported into the group")
+
+
+def zip_bytes(**files: bytes) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in files.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def run_queued(db: Session, blobs: BlobStore, job_app: App) -> list[str]:
+    """Run the queued imports as the worker would; the files they queued."""
+    assert isinstance(job_app.connector, InMemoryConnector)
+    queued: list[str] = []
+    for job in list(job_app.connector.jobs.values()):
+        if job["task_name"] != "paperus:import_library":
+            continue
+        record = db.get(Import, uuid.UUID(job["args"]["import_id"]))
+        assert record is not None and record.blob_sha256 is not None
+        with blobs.local_file(record.blob_sha256) as path:
+            run_import(
+                db,
+                blobs,
+                record,
+                path=path,
+                max_file_bytes=10_000_000,
+                file_added=lambda file_id: queued.append(str(file_id)),
+            )
+    return queued
+
+
+def test_upload_and_progress(
+    client: TestClient, db: Session, blobs: BlobStore, job_app: App
+) -> None:
+    ada = Person(client, db, "ada")
+    pdf = make_pdf([["Radar gaps over the Alps"]])
+    upload = zip_bytes(
+        **{
+            "My Library/My Library.bib": BIB.encode(),
+            "My Library/files/vangogh.pdf": pdf,
+        }
+    )
+    response = client.post(
+        "/api/imports",
+        headers=ada.headers,
+        files={"upload": ("My Library.zip", upload, "application/zip")},
+    )
+    assert response.status_code == 201, response.text
+    started = response.json()
+    assert (started["status"], started["filename"]) == ("waiting", "My Library.zip")
+
+    queued = run_queued(db, blobs, job_app)
+    assert len(queued) == 1  # the PDF, for its text
+    done = ada.get(f"/api/imports/{started['id']}").json()
+    assert (done["status"], done["format"]) == ("done", "bibtex")
+    assert done["done"] == done["total"] == 3
+    report = done["report"]
+    assert (report["added"], report["files"], report["collections"]) == (3, 1, 2)
+    assert report["missing_files"] == ["files/12/missing.pdf"]
+    assert [i["id"] for i in ada.get("/api/imports").json()] == [started["id"]]
+    # Someone else's import is not visible.
+    bob = Person(client, db, "bob")
+    assert bob.get(f"/api/imports/{started['id']}").status_code == 404
+
+
+def test_upload_formats_and_failures(
+    client: TestClient, db: Session, blobs: BlobStore, job_app: App
+) -> None:
+    ada = Person(client, db, "ada")
+
+    def upload(name: str, data: bytes) -> dict[str, Any]:
+        response = client.post(
+            "/api/imports", headers=ada.headers, files={"upload": (name, data)}
+        )
+        assert response.status_code == 201, response.text
+        result: dict[str, Any] = response.json()
+        return result
+
+    imports = {
+        "ris": upload("export.ris", RIS.encode()),
+        "rdf": upload("Exported Items.rdf", b'<?xml version="1.0"?>\n<rdf:RDF/>'),
+        "nothing": upload("notes.txt", b"just words"),
+        "zip": upload("empty.zip", zip_bytes(**{"a.pdf": b"%PDF-1.4"})),
+    }
+    run_queued(db, blobs, job_app)
+    result = {k: ada.get(f"/api/imports/{v['id']}").json() for k, v in imports.items()}
+    assert (result["ris"]["status"], result["ris"]["format"]) == ("done", "ris")
+    assert result["rdf"]["status"] == "failed"
+    assert "Zotero RDF is not supported yet" in result["rdf"]["error"]
+    assert "not an export paperus can read" in result["nothing"]["error"]
+    assert "No .bib, .ris or .json file in the zip" in result["zip"]["error"]
+
+
+def test_import_command(
+    client: TestClient,
+    db: Session,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    database_url: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ada = Person(client, db, "ada")
+    folder = tmp_path / "export"
+    (folder / "Papers").mkdir(parents=True)
+    (folder / "library.bib").write_text(BIB)
+    (folder / "Papers" / "vangogh.pdf").write_bytes(make_pdf([["Radar"]]))
+    monkeypatch.setenv("PAPERUS_DATABASE_URL", database_url)
+    monkeypatch.setenv("PAPERUS_STORAGE_PATH", str(tmp_path / "files"))
+    with pytest.raises(SystemExit) as exit:
+        main(["import", str(folder), "--user", "ada"])
+    assert exit.value.code == 0
+    out = capsys.readouterr().out
+    assert "3 papers: 3 added, 0 already there; 1 files" in out
+    assert "Missing file: files/12/missing.pdf" in out
+    assert len(ada.get("/api/items").json()) == 3
+    with pytest.raises(SystemExit) as exit:
+        main(["import", str(folder), "--user", "ada", "--group", "Nowhere"])
+    assert exit.value.code == 1

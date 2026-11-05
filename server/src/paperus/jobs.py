@@ -25,8 +25,10 @@ from paperus.embedding import (
     files_missing_embeddings,
     notes_missing_embeddings,
 )
+from paperus.importing.run import run_import
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLUnavailable, make_ml_client
+from paperus.models import Import, ImportStatus
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
 from paperus.system import load_backup_config, load_config
@@ -190,7 +192,33 @@ def run_worker(settings: Settings) -> None:
     )
     app = make_job_app(settings)
     with app.open():
-        app.run_worker(queues=["text", "ml", "backup"])
+        # Several at once, so a long import does not hold up new uploads.
+        app.run_worker(queues=["text", "ml", "backup", "import"], concurrency=3)
+
+
+@tasks.task(name="import_library", queue="import", pass_context=True)
+def import_library(job: JobContext, import_id: str) -> None:
+    """Run an import someone uploaded (see ``paperus.importing``)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        record = db.get(Import, uuid.UUID(import_id))
+        if record is None or record.status != ImportStatus.WAITING:
+            return
+        if record.blob_sha256 is None:
+            return
+        with context.blobs.local_file(record.blob_sha256) as path:
+            run_import(
+                db,
+                context.blobs,
+                record,
+                path=path,
+                max_file_bytes=context.settings.max_upload_bytes,
+                file_added=lambda file_id: queue_text_extraction(job.app, file_id),
+            )
+
+
+def queue_import(app: App, import_id: uuid.UUID) -> None:
+    app.configure_task("paperus:import_library").defer(import_id=str(import_id))
 
 
 @tasks.task(name="backup", queue="backup", queueing_lock="backup")

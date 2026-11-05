@@ -46,3 +46,5 @@ class Settings(BaseSettings):
     # Temporary files for the s3 backend (uploads, text extraction).
     temp_path: Path | None = None
     max_upload_bytes: int = 512 * 1024 * 1024
+    # Imports from other reference managers, files included.
+    max_import_bytes: int = 20 * 1024 * 1024 * 1024

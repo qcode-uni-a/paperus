@@ -1,14 +1,17 @@
 """Command line: ``paperus serve``, ``worker``, ``migrate``, ``user create``,
-``backup create|list|restore``."""
+``backup create|list|restore``, ``import``."""
 
 import argparse
 import getpass
 import logging
 import sys
+from pathlib import Path
 
 import uvicorn
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from paperus.access import Access, Forbidden, NotVisible
 from paperus.auth import create_user
 from paperus.backup import (
     BackupError,
@@ -19,8 +22,10 @@ from paperus.backup import (
 )
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
-from paperus.jobs import run_worker
+from paperus.importing.run import run_import
+from paperus.jobs import make_job_app, queue_text_extraction, run_worker
 from paperus.migrate import migrate
+from paperus.models import Group, Import, ImportStatus, User
 from paperus.storage import make_blob_store
 
 
@@ -64,6 +69,17 @@ def main(argv: list[str] | None = None) -> None:
         help="drop everything in the database first (it must be empty otherwise)",
     )
 
+    import_ = commands.add_parser(
+        "import",
+        help="import a BibTeX, RIS or CSL-JSON export (zip, folder or file)",
+    )
+    import_.add_argument("path", help="the export: a zip, a folder or the file")
+    import_.add_argument("--user", required=True, help="who imports (username)")
+    import_.add_argument(
+        "--group",
+        help="give everything new to this group (default: the user's default owner)",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "serve":
@@ -88,6 +104,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "backup":
         logging.basicConfig(level=logging.INFO)
         sys.exit(backup_command(args))
+    elif args.command == "import":
+        logging.basicConfig(level=logging.WARNING)
+        sys.exit(import_command(args.path, args.user, args.group))
     elif args.command == "user" and args.user_command == "create":
         sys.exit(
             create_user_command(
@@ -180,6 +199,69 @@ def backup_command(args: argparse.Namespace) -> int:
             )
             print(f"Restored {args.name}. Start paperus again.")
     except BackupError as error:
+        print(error, file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
+    return 0
+
+
+def import_command(path_text: str, username: str, group: str | None) -> int:
+    """Import on the server, for libraries too large to upload."""
+    path = Path(path_text)
+    if not path.exists():
+        print(f"{path} does not exist.", file=sys.stderr)
+        return 1
+    settings = Settings()
+    engine = make_engine(settings.database_url)
+    jobs = make_job_app(settings)
+    try:
+        with make_sessionmaker(engine)() as db, jobs.open():
+            user = db.scalar(select(User).where(User.username == username))
+            if user is None:
+                print(f"No user {username!r}.", file=sys.stderr)
+                return 1
+            access = Access.of(db, user)
+            owner = access.target_library(None)
+            if group is not None:
+                found = db.scalar(select(Group).where(Group.name == group))
+                if found is None or found.id not in access.group_libraries:
+                    print(f"{username} is in no group {group!r}.", file=sys.stderr)
+                    return 1
+                owner = access.group_libraries[found.id]
+            record = Import(
+                user_id=user.id,
+                library_id=owner,
+                filename=path.name,
+                status=ImportStatus.WAITING,
+            )
+            db.add(record)
+            db.commit()
+            record_id = record.id
+            run_import(
+                db,
+                make_blob_store(settings),
+                record,
+                path=path,
+                max_file_bytes=settings.max_upload_bytes,
+                file_added=lambda file_id: queue_text_extraction(jobs, file_id),
+            )
+            done = db.get(Import, record_id)
+            if done is None or done.status != ImportStatus.DONE:
+                print(done.error if done else "The import failed.", file=sys.stderr)
+                return 1
+            report = done.report or {}
+            print(
+                f"{report.get('papers', 0)} papers: {report.get('added', 0)} added, "
+                f"{report.get('found', 0)} already there; {report.get('files', 0)} "
+                f"files, {report.get('notes', 0)} notes, "
+                f"{report.get('collections', 0)} new collections."
+            )
+            for missing in report.get("missing_files", []):
+                print(f"Missing file: {missing}")
+            for problem in report.get("problems", []):
+                print(f"Problem: {problem}")
+    except (Forbidden, NotVisible) as error:
         print(error, file=sys.stderr)
         return 1
     finally:
