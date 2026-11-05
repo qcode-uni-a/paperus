@@ -208,6 +208,7 @@ ROUTES = {
     ("DELETE", "/api/admin/backups/{name}"): None,
     ("GET", "/api/admin/config"): None,
     ("PUT", "/api/admin/config"): None,
+    ("GET", "/api/admin/integrity"): None,
     ("POST", "/api/admin/jobs/{job}"): None,
     ("GET", "/api/admin/ml"): None,
     ("DELETE", "/api/admin/ml/models/{name}"): None,
