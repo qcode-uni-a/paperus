@@ -904,6 +904,30 @@ export type MlModel = {
      * Cached Bytes
      */
     cached_bytes: number | null;
+    /**
+     * Description
+     */
+    description?: string;
+    /**
+     * Licence
+     */
+    licence?: string;
+    /**
+     * Download Mb
+     */
+    download_mb?: number;
+    /**
+     * Scores
+     */
+    scores?: {
+        [key: string]: number;
+    };
+    /**
+     * Benchmarks
+     */
+    benchmarks?: {
+        [key: string]: string;
+    };
 };
 
 /**
@@ -922,6 +946,32 @@ export type MlService = {
      * Error
      */
     error: string | null;
+};
+
+/**
+ * MLSpeed
+ */
+export type MlSpeed = {
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Passages
+     */
+    passages: number;
+    /**
+     * Seconds
+     */
+    seconds: number;
+    /**
+     * Passages Per Second
+     */
+    passages_per_second: number;
+    /**
+     * Load Seconds
+     */
+    load_seconds: number;
 };
 
 /**
@@ -3291,6 +3341,36 @@ export type MlStatusResponses = {
 };
 
 export type MlStatusResponse = MlStatusResponses[keyof MlStatusResponses];
+
+export type MeasureMlSpeedData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/admin/ml/models/{name}/speed';
+};
+
+export type MeasureMlSpeedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MeasureMlSpeedError = MeasureMlSpeedErrors[keyof MeasureMlSpeedErrors];
+
+export type MeasureMlSpeedResponses = {
+    /**
+     * Successful Response
+     */
+    200: MlSpeed;
+};
+
+export type MeasureMlSpeedResponse = MeasureMlSpeedResponses[keyof MeasureMlSpeedResponses];
 
 export type DeleteMlModelData = {
     body?: never;

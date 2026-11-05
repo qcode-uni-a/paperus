@@ -1,33 +1,72 @@
 <script lang="ts">
 	import { admin, formatSize, loadAdmin } from '#lib/admin/data.svelte.ts';
-	import { deleteMlModel, errorMessage, runJob, setConfig } from '#lib/api/client.ts';
+	import {
+		deleteMlModel,
+		errorMessage,
+		measureMlSpeed,
+		runJob,
+		setConfig
+	} from '#lib/api/client.ts';
+	import type { MlModel, MlSpeed } from '#lib/api/generated/types.gen.ts';
 
-	let chosen = $state('');
 	let message = $state('');
 	let error = $state('');
 	let saving = $state(false);
+	let speeds = $state<Record<string, MlSpeed>>({});
+	let measuring = $state<string | null>(null);
 
 	const config = $derived(admin.config);
-	const embeddingModels = $derived(admin.ml?.models.filter((m) => m.task === 'embedding') ?? []);
+	const current = $derived(config?.embedding_model ?? '');
+	const models = $derived(admin.ml?.models.filter((m) => m.task === 'embedding') ?? []);
+	const passages = $derived(admin.stats?.chunks ?? 0);
+	/** The score columns, from what the service says they mean. */
+	const benchmarks = $derived(
+		Object.entries(models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {})
+	);
 
-	$effect(() => {
-		if (config && !chosen) chosen = config.embedding_model;
-	});
+	function duration(seconds: number): string {
+		if (seconds < 90) return 'about a minute';
+		if (seconds < 3600 * 1.5) return `about ${Math.round(seconds / 60)} minutes`;
+		if (seconds < 86400 * 1.5) return `about ${Math.round(seconds / 3600)} hours`;
+		return `about ${Math.round(seconds / 86400)} days`;
+	}
 
-	async function save() {
-		if (!config || chosen === config.embedding_model) return;
+	/** How long the library would take, if the model's speed was measured. */
+	function estimate(name: string): string | null {
+		const speed = speeds[name];
+		if (!speed || !passages) return null;
+		return duration(passages / speed.passages_per_second);
+	}
+
+	async function measure(model: MlModel) {
+		measuring = model.name;
+		error = '';
+		const { data, error: failure } = await measureMlSpeed({ path: { name: model.name } });
+		measuring = null;
+		if (data) speeds[model.name] = data;
+		else error = errorMessage(failure);
+		await loadAdmin();
+	}
+
+	async function use(model: MlModel) {
+		if (!config) return;
+		const time = estimate(model.name);
 		const ok = confirm(
-			`Switch search by meaning to ${chosen}? The whole library is embedded again in the ` +
-				'background. Until that is done, search by meaning only covers part of it; keyword ' +
-				'search keeps working.'
+			`Use ${model.name} for search by meaning?\n\n` +
+				`All ${passages.toLocaleString()} passages of the library get new vectors in the ` +
+				`background${time ? ` (${time} on this server)` : ''}. Until then, search by meaning ` +
+				'finds only what is done; search by words works as always.\n\n' +
+				`The vectors of ${current} are kept: switching back is immediate.`
 		);
 		if (!ok) return;
 		saving = true;
 		error = message = '';
-		const { error: failure } = await setConfig({ body: { ...config, embedding_model: chosen } });
+		const { error: failure } = await setConfig({
+			body: { ...config, embedding_model: model.name }
+		});
 		saving = false;
 		if (failure) error = errorMessage(failure);
-		else message = `Now using ${chosen}; embedding the library in the background.`;
+		else message = `Now using ${model.name}; computing the vectors in the background.`;
 		await loadAdmin();
 	}
 
@@ -51,25 +90,87 @@
 <section class="card">
 	<h2>Search by meaning</h2>
 	<p class="muted">
-		The model that turns passages and queries into vectors. Changing it embeds the library again.
+		The model turns passages and queries into vectors. Better models find more of what is meant;
+		faster ones get a large library ready sooner.
 	</p>
-	<div class="row">
-		<select bind:value={chosen} disabled={!embeddingModels.length} aria-label="Embedding model">
-			{#each embeddingModels as model (model.name)}
-				<option value={model.name}>
-					{model.name} ({model.dimensions} dimensions, {formatSize(model.cached_bytes)})
-				</option>
-			{:else}
-				<option value={chosen}>{chosen} (service unreachable)</option>
-			{/each}
-		</select>
-		<button
-			class="primary"
-			onclick={save}
-			disabled={saving || !config || chosen === config.embedding_model}>Use this model</button
-		>
-		<button onclick={embedMissing}>Embed missing now</button>
+	<p class="warning" role="note">
+		<strong>Changing the model computes new vectors for the whole library</strong>
+		({passages.toLocaleString()} passages), which can take hours on a CPU. Until it is done, search by
+		meaning finds only part of the library; search by words is not affected. The old vectors are kept,
+		so switching back is immediate. Measure a model's speed first to see how long it would take.
+	</p>
+
+	<div class="models">
+		{#each models as model (model.name)}
+			{@const inUse = model.name === current}
+			<article class:in-use={inUse}>
+				<div class="head">
+					<strong>{model.name}</strong>
+					{#if inUse}<span class="badge current">In use</span>{/if}
+					{#if model.loaded}<span class="badge">In memory</span>{/if}
+				</div>
+				{#if model.description}<p>{model.description}</p>{/if}
+				{#if Object.keys(model.scores ?? {}).length}
+					<dl class="scores">
+						{#each benchmarks as [key, label] (key)}
+							<div>
+								<dt>{label.replace(/^Retrieval, /, '')}</dt>
+								<dd>
+									{#if model.scores?.[key] != null}
+										<span class="bar" style:--score="{model.scores[key]}%"></span>
+										{model.scores[key].toFixed(1)}
+									{:else}
+										<span class="muted">not published</span>
+									{/if}
+								</dd>
+							</div>
+						{/each}
+					</dl>
+				{/if}
+				<p class="facts muted">
+					{model.dimensions} dimensions · inputs up to {model.max_tokens.toLocaleString()} tokens ·
+					{model.licence || 'licence: see the model'} ·
+					{model.cached_bytes != null
+						? `downloaded, ${formatSize(model.cached_bytes)}`
+						: `${model.download_mb ? `${model.download_mb} MB to download` : 'not downloaded'}`}
+				</p>
+				{#if speeds[model.name]}
+					{@const speed = speeds[model.name]}
+					<p class="speed">
+						{speed.passages_per_second} passages per second on this server{estimate(model.name)
+							? `: the library in ${estimate(model.name)}`
+							: ''}.
+					</p>
+				{/if}
+				<div class="buttons">
+					<button onclick={() => measure(model)} disabled={measuring !== null}>
+						{measuring === model.name
+							? model.cached_bytes == null
+								? 'Downloading and measuring…'
+								: 'Measuring…'
+							: 'Measure speed'}
+					</button>
+					{#if !inUse}
+						<button class="primary" onclick={() => use(model)} disabled={saving || !config}
+							>Use this model</button
+						>
+						{#if model.cached_bytes != null}
+							<button class="link danger" onclick={() => remove(model.name)}>Delete download</button
+							>
+						{/if}
+					{/if}
+				</div>
+			</article>
+		{:else}
+			<p class="muted">The ML service is not reachable; using {current}.</p>
+		{/each}
 	</div>
+	<p class="muted small">
+		Scores: published retrieval results (nDCG@10, out of 100) of the full-precision models from the
+		MTEB leaderboard and the MMTEB paper; int8 versions lose about a point. They compare models on
+		general search tasks, not on your library.
+	</p>
+	<div><button onclick={embedMissing}>Embed missing now</button></div>
 </section>
 
 <section class="card">
@@ -84,28 +185,9 @@
 		{/each}
 	</ul>
 	<p class="muted">
-		Addresses are set with <code>PAPERUS_ML_URLS</code> for now; tried in order, so a GPU machine can
-		come first.
+		Addresses are set with <code>PAPERUS_ML_URLS</code> for now; tried in order, so a GPU machine
+		can come first. The CPU cores it uses: <code>ML_THREADS</code> in <code>.env</code>.
 	</p>
-</section>
-
-<section class="card">
-	<h2>Models</h2>
-	<ul>
-		{#each admin.ml?.models ?? [] as model (model.name)}
-			<li class="row">
-				<span>{model.name}</span>
-				<span class="badge">{model.task}</span>
-				<span class="muted">{formatSize(model.cached_bytes)}</span>
-				{#if model.loaded}<span class="badge">in memory</span>{/if}
-				{#if model.cached_bytes != null && model.name !== config?.embedding_model}
-					<button class="danger" onclick={() => remove(model.name)}>Delete</button>
-				{/if}
-			</li>
-		{:else}
-			<li class="muted">The service is not reachable.</li>
-		{/each}
-	</ul>
 </section>
 
 <style>
@@ -118,9 +200,82 @@
 	p {
 		margin: 0;
 	}
-	select {
-		width: auto;
-		max-width: 100%;
+	.warning {
+		padding: 10px 14px;
+		border-radius: 8px;
+		background: color-mix(in srgb, var(--highlighter) 18%, var(--surface));
+	}
+	.models {
+		display: grid;
+		gap: 10px;
+	}
+	article {
+		display: grid;
+		gap: 6px;
+		padding: 12px 14px;
+		border: 1px solid var(--rule);
+		border-radius: 10px;
+	}
+	article.in-use {
+		border-color: var(--royal);
+	}
+	.head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+	.current {
+		color: var(--royal);
+	}
+	.scores {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 4px 16px;
+		margin: 2px 0;
+	}
+	.scores dt {
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
+	.scores dd {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0;
+		font-variant-numeric: tabular-nums;
+	}
+	/* Scores are drawn from 40 to 65, where these models differ. */
+	.bar {
+		width: 80px;
+		height: 6px;
+		border-radius: 3px;
+		background: linear-gradient(
+			to right,
+			var(--royal) clamp(0%, calc((var(--score) - 40%) * 4), 100%),
+			var(--rail) 0
+		);
+	}
+	.facts,
+	.small {
+		font-size: var(--step--1);
+	}
+	.speed {
+		color: var(--ink);
+	}
+	.buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		align-items: center;
+	}
+	.link {
+		border: none;
+		background: none;
+		padding: 4px 6px;
+	}
+	.link.danger {
+		color: var(--danger);
 	}
 	ul {
 		margin: 0;

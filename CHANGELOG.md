@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **More models for search by meaning** (Administration → Settings →
+  Machine learning): Snowflake Arctic Embed M/L v2, GTE multilingual,
+  multilingual-e5 base/large and bge-m3 in int8, next to bge-m3 and
+  e5-small. Each shows its published retrieval scores (English, German,
+  multilingual), size and licence, and "Measure speed" times it on your
+  server, with how long the library would take. A clear warning before
+  switching: the library gets new vectors (the old ones are kept).
+- **New installations use arctic-embed-m-v2**: about three times faster
+  than bge-m3 and at least as good in published retrieval scores.
+  Installations already using bge-m3 keep it until an admin switches.
+- **ML service**: one batch at a time per model (simultaneous requests no
+  longer fight over the cores); `ML_THREADS` and `ML_MODEL` in `.env`.
+
 ## 0.0.5 (2026-11-05)
 
 Notes, importing a library from Zotero, JabRef or Mendeley, and citation

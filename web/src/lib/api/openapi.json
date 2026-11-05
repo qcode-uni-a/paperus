@@ -2397,6 +2397,49 @@
         }
       }
     },
+    "/api/admin/ml/models/{name}/speed": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Measure Ml Speed",
+        "description": "Time a model on this installation's ML service with sample passages\n(downloads it first if needed, which can take minutes).",
+        "operationId": "measure_ml_speed",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MLSpeed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/ml/models/{name}": {
       "delete": {
         "tags": [
@@ -5681,6 +5724,37 @@
               }
             ],
             "title": "Cached Bytes"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "licence": {
+            "type": "string",
+            "title": "Licence",
+            "default": ""
+          },
+          "download_mb": {
+            "type": "integer",
+            "title": "Download Mb",
+            "default": 0
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Scores",
+            "default": {}
+          },
+          "benchmarks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Benchmarks",
+            "default": {}
           }
         },
         "type": "object",
@@ -5723,6 +5797,39 @@
           "error"
         ],
         "title": "MLService"
+      },
+      "MLSpeed": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "passages": {
+            "type": "integer",
+            "title": "Passages"
+          },
+          "seconds": {
+            "type": "number",
+            "title": "Seconds"
+          },
+          "passages_per_second": {
+            "type": "number",
+            "title": "Passages Per Second"
+          },
+          "load_seconds": {
+            "type": "number",
+            "title": "Load Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "passages",
+          "seconds",
+          "passages_per_second",
+          "load_seconds"
+        ],
+        "title": "MLSpeed"
       },
       "MLStatus": {
         "properties": {
