@@ -19,10 +19,14 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
   a newer version.
 - **Personal access tokens.** For scripts, the MCP server (an AI assistant
   acting for its user) and the browser extension, instead of the login
-  session. In Settings: create a named token, shown once; choose read-only
-  or read and write, and optionally an expiry; see when each was last
-  used; revoke. Stored only as a hash like login sessions; a token acts
-  with exactly its owner's permissions (never more, possibly less);
+  session. In Settings: create a named token, shown once, with scoped
+  rights like Immich's API keys: pick permissions per kind and action
+  (e.g. `papers.read`, `papers.write`, `files.download`, `search`,
+  `tags.write`, `collections.write`, `groups.read`), with presets ("read
+  only", "AI assistant: search and read", "everything"), optionally only
+  for some owners (just me, or one group), and an expiry; see when each
+  was last used; revoke. Stored only as a hash like login sessions; a token acts
+  with its owner's permissions narrowed by its scopes (never more);
   deactivating a user stops their tokens. Administrators see that tokens
   exist, not their values.
 - **Onboarding.** Create the first administrator in the browser on first
