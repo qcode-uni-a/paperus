@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.0.5 (2026-11-05)
+
+Notes, importing a library from Zotero, JabRef or Mendeley, and citation
+export.
 
 - **Import a library** (Add → Import a library): from Zotero, JabRef,
   Mendeley, EndNote and others, as Zotero RDF, BibTeX, RIS or CSL-JSON,
