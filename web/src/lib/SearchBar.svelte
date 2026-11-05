@@ -141,10 +141,10 @@
 		pointer-events: none;
 	}
 	/* In the same grid cell, so the options panel is positioned against the
-	   whole search box. */
+	   whole search box: not positioned itself (a grid item stacks with
+	   z-index alone), or the panel would be as narrow as these buttons. */
 	.tools {
 		grid-area: 1 / 1;
-		position: relative;
 		z-index: 1;
 		justify-self: end;
 		align-self: center;
