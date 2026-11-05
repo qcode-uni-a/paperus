@@ -59,8 +59,8 @@ class VersionIn(BaseModel):
 
 class ItemIn(VersionIn):
     library_id: uuid.UUID | None = None
-    """Where the item goes; the person's default library if not given. A
-    paper already in a library the person can read is added to this one."""
+    """The owner (a person's or a group's library); the person's default if
+    not given. A paper the person can already see is not added again."""
 
 
 class IdentifierOut(BaseModel):
@@ -82,8 +82,8 @@ class VersionOut(BaseModel):
 
 class ItemOut(BaseModel):
     id: uuid.UUID
-    library_ids: list[uuid.UUID]
-    """The libraries the item is in (those the reader can see)."""
+    library_id: uuid.UUID
+    """The owner: a person's or a group's library."""
     type: str
     title: str
     authors: list[str]
@@ -150,7 +150,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
     csl = library.citation_csl(item)
     return ItemOut(
         id=item.id,
-        library_ids=access.item_libraries(item),
+        library_id=item.library_id,
         type=item.type,
         title=item.title,
         authors=_authors(csl),
@@ -267,17 +267,16 @@ def _identifier_conflict(error: library.IdentifierTaken) -> HTTPException:
 def add_item(
     body: ItemIn, request: Request, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
-    """A new item; if one of its identifiers is known in a library the person
-    can read, the existing item (put into this library too, 200)."""
+    """A new item; if one of its identifiers is known among the items the
+    person can see, the existing item (200)."""
     library_id = access.target_library(body.library_id)
     identifiers = _normalized_identifiers(body)
     known = library.find_identifier(db, access.readable, identifiers)
     if known is not None:
         existing = known.version.item
-        if existing.deleted_at is not None:
+        if existing.deleted_at is not None and access.can_write_item(existing):
             library.restore(existing)
-        library.add_to_library(existing, library_id, access.user.id)
-        db.commit()
+            db.commit()
         response.status_code = 200
         return item_detail(existing, access, response)
 
@@ -341,7 +340,7 @@ def add_version(
     """Another version of an item, e.g. the published one of a preprint."""
     item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     identifiers = _normalized_identifiers(body)
-    known = library.find_identifier(db, item.library_ids, identifiers)
+    known = library.find_identifier(db, [item.library_id], identifiers)
     if known is not None:
         if known.version.item_id != item.id:
             raise _identifier_conflict(
@@ -427,49 +426,30 @@ def set_overrides(
 
 @router.delete("/api/items/{item_id}", status_code=204)
 def trash_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> None:
-    """Move to the trash, for everyone; restorable with ``POST …/restore``.
-    Only for people who may change every library the item is in; others
-    take it out of their library (``DELETE …/libraries/{id}``)."""
-    item = get_readable_item(db, access, item_id, write=True)
-    if not all(access.can_write(library_id) for library_id in item.library_ids):
-        raise HTTPException(
-            409, "the item is in other libraries too; remove it from yours instead"
-        )
-    library.trash(item, access.user.id)
+    """Move to the trash; restorable with ``POST …/restore``."""
+    library.trash(get_readable_item(db, access, item_id, write=True), access.user.id)
     db.commit()
 
 
-@router.put("/api/items/{item_id}/libraries/{library_id}")
-def add_item_to_library(
+class Owner(BaseModel):
+    library_id: uuid.UUID
+    """A person's or a group's library, see ``GET /api/libraries``."""
+
+
+@router.put("/api/items/{item_id}/owner")
+def set_owner(
     item_id: uuid.UUID,
-    library_id: uuid.UUID,
+    body: Owner,
     response: Response,
     db: DB,
     access: CurrentAccess,
 ) -> ItemDetail:
-    """Put the item into another library the person may change (share it)."""
-    item = get_readable_item(db, access, item_id, allow_trashed=False)
-    access.target_library(library_id)
-    library.add_to_library(item, library_id, access.user.id)
-    db.commit()
-    return item_detail(item, access, response)
-
-
-@router.delete("/api/items/{item_id}/libraries/{library_id}")
-def remove_item_from_library(
-    item_id: uuid.UUID,
-    library_id: uuid.UUID,
-    response: Response,
-    db: DB,
-    access: CurrentAccess,
-) -> ItemDetail:
-    """Take the item out of one library, with that library's tags and
-    collections on it; out of its last library, it goes to the trash."""
-    item = get_readable_item(db, access, item_id)
-    if library_id not in item.library_ids or not access.can_read(library_id):
-        raise HTTPException(404, "the item is not in this library")
-    access.require_write(library_id)
-    library.remove_from_library(item, library_id, access.user.id)
+    """Give the item to another owner the person may add to: share it with a
+    group, or take a group's paper for oneself (members may delete it
+    anyway). Tags and collections of the group that gave it up come off."""
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    access.target_library(body.library_id)
+    library.set_owner(db, item, body.library_id)
     db.commit()
     return item_detail(item, access, response)
 
@@ -516,7 +496,7 @@ def list_items(
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []
-    in_libraries = Item.id.in_(access.readable_items(libraries))
+    in_libraries = access.item_filter(libraries)
     if since is not None:
         query = (
             select(Item)

@@ -20,7 +20,6 @@ from paperus.models import (
     ROLE_RANK,
     Group,
     Item,
-    ItemLibrary,
     Library,
     Membership,
     Role,
@@ -35,7 +34,7 @@ Name = Annotated[str, Field(min_length=1, max_length=200)]
 class LibraryOut(BaseModel):
     id: uuid.UUID
     name: str
-    """"My library" or the group's name."""
+    """"Me" or the group's name."""
     kind: Literal["personal", "group"]
     group_id: uuid.UUID | None
     path: list[str]
@@ -166,7 +165,7 @@ def list_libraries(db: DB, access: CurrentAccess) -> list[LibraryOut]:
     libraries = [
         LibraryOut(
             id=access.own_library,
-            name="My library",
+            name="Me",
             kind="personal",
             group_id=None,
             path=[],
@@ -216,10 +215,9 @@ def _group_out(db: DB, access: Access, group: Group) -> GroupOut:
     items = None
     if role is not None:
         items = db.scalar(
-            select(func.count())
-            .select_from(ItemLibrary)
-            .join(Item, Item.id == ItemLibrary.item_id)
-            .where(ItemLibrary.library_id == library_id, Item.deleted_at.is_(None))
+            select(func.count()).where(
+                Item.library_id == library_id, Item.deleted_at.is_(None)
+            )
         )
     return GroupOut(
         id=group.id,
@@ -309,7 +307,7 @@ def delete_group(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response
     if db.scalar(select(func.count()).where(Group.parent_id == group.id)):
         raise HTTPException(409, "delete or move the groups inside first")
     library_id = _library_of(db, group.id)
-    if db.scalar(select(func.count()).where(ItemLibrary.library_id == library_id)):
+    if db.scalar(select(func.count()).where(Item.library_id == library_id)):
         raise HTTPException(409, "the group's library still has items")
     db.delete(group)
     db.commit()

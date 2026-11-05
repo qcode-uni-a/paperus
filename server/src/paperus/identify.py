@@ -34,6 +34,7 @@ from paperus.models import (
     FileChunk,
     FileRole,
     ItemTag,
+    Library,
     MetadataSource,
     TextStatus,
     User,
@@ -189,15 +190,15 @@ def _known_to_uploader(db: Session, file: File) -> list[uuid.UUID]:
     paper exists once), else just the upload's own."""
     uploader = db.get(User, file.uploaded_by) if file.uploaded_by else None
     if uploader is None:
-        return file.version.item.library_ids
-    return [*Access.of(db, uploader).readable, *file.version.item.library_ids]
+        return [file.version.item.library_id]
+    return [*Access.of(db, uploader).readable, file.version.item.library_id]
 
 
 def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
-    """An upload turned out to be a paper already known: its files join the
-    known version, the known item joins the upload's libraries, collections
-    and tags, and the upload's own item goes (it only ever held the
-    placeholder)."""
+    """An upload turned out to be a paper the uploader can already see: its
+    files join the known version, the known item takes over the upload's
+    collections and tags (where it may), and the upload's own item goes (it
+    only ever held the placeholder)."""
     known = db.get(Version, known_id)
     item = upload.item
     if known is None or known.item.deleted_at is not None or len(item.versions) > 1:
@@ -210,17 +211,25 @@ def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
         has_main = any(f.role == FileRole.MAIN for f in live)
         file.version = known
         file.role = FileRole.OTHER if has_main else FileRole.MAIN
-    for link in item.library_links:
-        library.add_to_library(target, link.library_id, link.added_by)
+
+    def may_hold(library_id: uuid.UUID) -> bool:
+        """Private tags and collections hold any paper, a group's only its own."""
+        owner = db.get(Library, library_id)
+        return library_id == target.library_id or (
+            owner is not None and owner.user_id is not None
+        )
+
     in_collections = {link.collection_id for link in target.collection_links}
     for link in item.collection_links:
-        if link.collection_id not in in_collections:
+        if link.collection_id not in in_collections and may_hold(
+            link.collection.library_id
+        ):
             target.collection_links.append(
                 CollectionItem(collection_id=link.collection_id, added_by=link.added_by)
             )
     tagged = {link.tag_id for link in target.tag_links}
     for link in item.tag_links:
-        if link.tag_id not in tagged:
+        if link.tag_id not in tagged and may_hold(link.tag.library_id):
             target.tag_links.append(
                 ItemTag(
                     tag_id=link.tag_id,

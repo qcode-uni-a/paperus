@@ -51,9 +51,9 @@ class ItemTagOut(BaseModel):
 class TagIn(BaseModel):
     name: Name
     library_id: uuid.UUID | None = None
-    """Whose tag: one of the item's libraries the person may change, or the
-    person's own (a private tag). Default: their own if the item is in it,
-    else the first of the item's libraries they may change, else their own."""
+    """Whose tag: the item's owner (for members of its group) or the person's
+    own (a private tag). Default: the item's owner if the person may change
+    it, else their own."""
 
 
 class TagChange(BaseModel):
@@ -108,8 +108,8 @@ class CollectionChange(BaseModel):
     parent_id: uuid.UUID | None = None
     library_id: uuid.UUID | None = None
     add_papers: bool = False
-    """On a move into a group: put the papers that are not in the group's
-    library yet into it (share them) instead of leaving them out."""
+    """On a move into a group: give the papers the group does not own yet to
+    the group (those the person may change) instead of leaving them out."""
 
 
 class MovePreview(BaseModel):
@@ -118,8 +118,9 @@ class MovePreview(BaseModel):
     papers: int
     """Papers in the collections the person can read."""
     not_in_library: int
-    """Of those, papers not in the target library yet: they join it (with
-    ``add_papers``) or leave the collections."""
+    """Of those, papers the target does not own: with ``add_papers`` they
+    become its papers (if the person may change them), else they leave the
+    collections."""
 
 
 class CollectionChanged(CollectionOut):
@@ -190,7 +191,7 @@ def list_tags(db: DB, access: CurrentAccess) -> list[TagOut]:
             ItemTag.tag_id, ItemTag.source, func.count(), func.max(ItemTag.created_at)
         )
         .join(Item, Item.id == ItemTag.item_id)
-        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
+        .where(Item.deleted_at.is_(None), access.item_filter())
         .group_by(ItemTag.tag_id, ItemTag.source)
     )
     sources: dict[uuid.UUID, dict[TagSource, int]] = {}
@@ -259,11 +260,8 @@ def add_tag(
     item = _item(db, access, item_id)
     library_id = body.library_id
     if library_id is None:
-        writable = [lib for lib in item.library_ids if access.can_write(lib)]
-        if access.own_library in item.library_ids or not writable:
-            library_id = access.own_library
-        else:
-            library_id = writable[0]
+        writable = access.can_write(item.library_id)
+        library_id = item.library_id if writable else access.own_library
     if not access.can_read(library_id):
         raise HTTPException(404, "library not found")
     access.require_write(library_id)
@@ -346,7 +344,7 @@ def _direct_counts(
     query = (
         select(CollectionItem.collection_id, func.count())
         .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
+        .where(Item.deleted_at.is_(None), access.item_filter())
         .group_by(CollectionItem.collection_id)
     )
     if only is not None:
@@ -404,7 +402,7 @@ def _contents(
         )
         .join(CollectionItem, CollectionItem.collection_id == tree.c.member)
         .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
+        .where(Item.deleted_at.is_(None), access.item_filter())
         .group_by(tree.c.root, CollectionItem.item_id)
         .subquery()
     )
@@ -476,8 +474,13 @@ def change_collection(
         if target is not None and target != collection.library_id:
             access.target_library(target)  # readable and writable
             if body.add_papers:
+                # Papers the person may change become the target's; others
+                # stay where they are (and leave the collection).
                 for item in _papers_in(db, access, collection):
-                    library.add_to_library(item, target, access.user.id)
+                    if access.can_write_item(item) and not access.may_hold(
+                        target, item
+                    ):
+                        library.set_owner(db, item, target)
                 db.flush()
             left_out = organize.move_to_library(
                 db,
@@ -509,7 +512,7 @@ def _papers_in(db: DB, access: Access, collection: Collection) -> list[Item]:
             .join(CollectionItem)
             .where(
                 CollectionItem.collection_id.in_(ids),
-                Item.id.in_(access.readable_items()),
+                access.item_filter(),
             )
         ).unique()
     )

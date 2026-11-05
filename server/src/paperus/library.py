@@ -13,7 +13,7 @@ from paperus.metadata import csl_title, csl_type
 from paperus.models import (
     Identifier,
     Item,
-    ItemLibrary,
+    Library,
     MetadataSource,
     Trashable,
     Version,
@@ -85,14 +85,11 @@ def find_identifier(
         found = db.scalar(
             select(Identifier)
             .join(Version)
+            .join(Item)
             .where(
                 Identifier.scheme == scheme,
                 Identifier.value == value,
-                Version.item_id.in_(
-                    select(ItemLibrary.item_id).where(
-                        ItemLibrary.library_id.in_(libraries)
-                    )
-                ),
+                Item.library_id.in_(libraries),
             )
             .order_by(Identifier.id)
             .limit(1)
@@ -113,7 +110,7 @@ def add_version(
     identifiers: list[IdentifierValue],
     created_by: uuid.UUID | None,
 ) -> Version:
-    taken = find_identifier(db, item.library_ids, identifiers)
+    taken = find_identifier(db, [item.library_id], identifiers)
     if taken is not None:
         raise IdentifierTaken(
             taken.scheme, taken.value, taken.version.item_id, taken.version_id
@@ -148,7 +145,7 @@ def create_item(
 ) -> Item:
     """A new item in the library, with its first version."""
     item = Item(
-        library_links=[ItemLibrary(library_id=library_id, added_by=added_by)],
+        library_id=library_id,
         type="",
         title="",
         overrides={},
@@ -210,7 +207,7 @@ def replace_metadata(
     ``IdentifierTaken`` if an item in the libraries ``known_in`` (default:
     the item's own) already has one of them.
     """
-    libraries = version.item.library_ids if known_in is None else known_in
+    libraries = [version.item.library_id] if known_in is None else known_in
     taken = find_identifier(db, libraries, identifiers)
     if taken is not None and taken.version_id != version.id:
         raise IdentifierTaken(
@@ -229,36 +226,27 @@ def replace_metadata(
     refresh_item(version.item)
 
 
-def add_to_library(
-    item: Item, library_id: uuid.UUID, user_id: uuid.UUID | None
-) -> bool:
-    """Put the item into another library too (sharing it); False if it was
-    there already."""
-    if library_id in item.library_ids:
-        return False
-    item.library_links.append(ItemLibrary(library_id=library_id, added_by=user_id))
-    return True
-
-
-def remove_from_library(
-    item: Item, library_id: uuid.UUID, user_id: uuid.UUID | None
-) -> None:
-    """Take the item out of one library; out of the last one, it goes to the
-    trash instead (and keeps that library, for restoring)."""
-    if library_id not in item.library_ids:
+def set_owner(db: Session, item: Item, library_id: uuid.UUID) -> None:
+    """Give the item to another owner (a person's or a group's library). Tags
+    and collections of a group that no longer owns it come off; private
+    ones stay."""
+    if item.library_id == library_id:
         return
-    if len(item.library_links) == 1:
-        trash(item, user_id)
-        return
-    item.library_links = [
-        link for link in item.library_links if link.library_id != library_id
-    ]
-    # Its tags and collections of that library no longer apply.
+    item.library_id = library_id
+    held = {link.tag.library_id for link in item.tag_links} | {
+        link.collection.library_id for link in item.collection_links
+    }
+    groups = set(
+        db.scalars(
+            select(Library.id).where(
+                Library.id.in_(held), Library.group_id.is_not(None)
+            )
+        )
+    )
+    gone = groups - {library_id}
     item.tag_links = [
-        link for link in item.tag_links if link.tag.library_id != library_id
+        link for link in item.tag_links if link.tag.library_id not in gone
     ]
     item.collection_links = [
-        link
-        for link in item.collection_links
-        if link.collection.library_id != library_id
+        link for link in item.collection_links if link.collection.library_id not in gone
     ]

@@ -11,14 +11,13 @@ memberships; lists and searches then filter by library ID in SQL.
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import Select, select
+from sqlalchemy import ColumnElement, select
 from sqlalchemy.orm import Session
 
 from paperus.models import (
     ROLE_RANK,
     Group,
     Item,
-    ItemLibrary,
     Library,
     Membership,
     Role,
@@ -119,40 +118,31 @@ class Access:
         if not self.can_write(library_id):
             raise Forbidden("readers cannot change this library")
 
-    # Items: a paper exists once and can be in several libraries.
+    # Items have one owner (``Item.library_id``): a person or a group.
 
     def can_read_item(self, item: Item) -> bool:
-        return any(self.can_read(library) for library in item.library_ids)
+        return self.can_read(item.library_id)
 
     def can_write_item(self, item: Item) -> bool:
-        """Change the item's metadata, versions and files: allowed with the
-        right to change any one of its libraries."""
-        return any(self.can_write(library) for library in item.library_ids)
+        return self.can_write(item.library_id)
 
     def require_write_item(self, item: Item) -> None:
         if not self.can_write_item(item):
             raise Forbidden("readers cannot change this item")
 
-    def item_libraries(self, item: Item) -> list[uuid.UUID]:
-        """The item's libraries this person can see."""
-        return [library for library in item.library_ids if self.can_read(library)]
-
-    def readable_items(self, libraries: list[uuid.UUID] | None = None) -> Select:
-        """IDs of items in these libraries (by default: all the person reads),
-        for ``Item.id.in_(…)``."""
-        return select(ItemLibrary.item_id).where(
-            ItemLibrary.library_id.in_(
-                self.readable if libraries is None else libraries
-            )
-        )
+    def item_filter(
+        self, libraries: list[uuid.UUID] | None = None
+    ) -> ColumnElement[bool]:
+        """Items owned by these (by default: everything the person reads)."""
+        return Item.library_id.in_(self.readable if libraries is None else libraries)
 
     def may_hold(self, library_id: uuid.UUID, item: Item) -> bool:
         """Whether a tag or collection of ``library_id`` may hold the item: a
-        group's only items in that group's library, a person's private ones
-        any item the person can read."""
+        group's only the group's items, a person's private ones any item the
+        person can read."""
         if library_id == self.own_library:
             return self.can_read_item(item)
-        return library_id in item.library_ids
+        return library_id == item.library_id
 
     def target_library(self, requested: uuid.UUID | None) -> uuid.UUID:
         """Where something new goes: the library asked for (if the person may

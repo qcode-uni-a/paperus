@@ -100,20 +100,19 @@ Item: the work; notes, tags, collections, citation metadata
   ambiguous both ways (two people, one name; one person, several spellings).
 - **Tag, collection**: tags are labels (each link records its source:
   manual, automatic from metadata, or AI); collections nest and an item can
-  be in several. **Both belong to a library: a person's (private) or a
-  group's (shared).** Names are unique per library, so a private "to read"
-  and a group's "to read" are different tags. People see the tags and
-  collections of the libraries they can read; filters and counts show only
-  those. A private tag or collection may hold items of a group's library
-  (personal reading lists of shared papers); it stays visible only to its
-  owner. A collection's own place in a tree is within its library; a
-  private collection may also show a group's collection inside it (a
-  personal link, so the group's tree stays as it is), never the other way
-  round (planned). Who may create, rename
-  or delete a group's tags and collections follows the roles below.
-- **Library**: where items are. Every person has one (private), every
-  group has one. An item can be in several libraries at once; see "Groups
-  and libraries" below.
+  be in several. **Both have an owner: a person (private) or a group
+  (shared).** Names are unique per owner, so a private "to read" and a
+  group's "to read" are different tags. People see their own tags and
+  collections and those of their groups. A private tag or collection may
+  hold group papers (personal reading lists of shared papers) and stays
+  visible only to its owner; a group's hold only that group's papers. A
+  collection's own place in a tree is within its owner's; a private
+  collection may also show a group's collection inside it (a personal
+  link, so the group's tree stays as it is), never the other way round
+  (planned). Who may create, rename or delete a group's tags and
+  collections follows the roles below.
+- **Owner**: every item, tag and collection belongs to a person or a
+  group; see "Groups and owners" below.
 - **Group, membership, role**: see below.
 - **Provenance**: who or what created each object (user, AI via client X,
   import, sync), for labels, the AI inbox and the audit log.
@@ -121,23 +120,22 @@ Item: the work; notes, tags, collections, citation metadata
 Every chunk and note carries owner and visibility, so permission filters run
 inside the search query itself.
 
-### Groups and libraries
+### Groups and owners
 
-- **Libraries.** Each person has a private library; each group has one.
-  A paper exists once and can be in several libraries (mine and my
-  groups'); its metadata, versions and files are the same everywhere,
-  while tags, collections and notes belong to one library each (so private
-  ones stay private). Tags and collections belong to exactly one library.
-- **Sharing** adds a library to an item: from the item, by moving a
-  collection into a group (asking whether its papers not yet in the group
-  should join it), or by adding or uploading a paper that is already in
-  another library one can read. Adding a DOI or file finds the existing
-  item only among the libraries one can read: a paper in someone else's
-  private library stays invisible, so independent additions can still make
-  two items (merging duplicates comes later).
-- **Removing** takes one library off an item; when none is left, the item
-  goes to the trash. Changing an item's metadata, versions and files needs
-  the right to change at least one of its libraries.
+- **Owners.** Every paper, tag and collection has one owner: a person
+  (private) or a group (shared with its members). People see what they
+  own and what their groups own, mixed in one list; group papers carry a
+  small shared icon. Internally an owner is a "library" row for a person
+  or a group; the website never says "library".
+- **Sharing** gives a paper or a collection to a group; members may also
+  take a group's paper or collection for themselves (they may delete it
+  anyway). A paper exists once: adding a DOI or a file that matches a
+  paper one can already see finds that paper. Papers in someone else's
+  private space stay invisible, so two people adding the same paper
+  independently get two items (merging duplicates comes later).
+- **Tags and collections** of a group hold only that group's papers;
+  private ones hold any paper one can see and stay private. When a paper
+  leaves a group, the group's tags and collections come off it.
 - **Nested groups.** A group can sit inside another (faculty → chair →
   project), like GitLab. Membership is inherited downwards: members of a
   group are members of every group inside it with the same role; a
@@ -158,15 +156,13 @@ inside the search query itself.
   person and their AI assistant; not to group admins and not to site
   administrators, who manage users and groups but see no library by virtue
   of being administrators.
-- **Visibility in one query.** The libraries a person can read (their own,
+- **Visibility in one query.** The owners whose things a person can read (their own,
   their groups' and those groups' subgroups) are computed once per request;
   every list, search and file download filters by library ID, so permission
   checks run inside the SQL (and inside the search query).
-- **On the website**: one list of everything a person can read, with a
-  small label for the library of each item and a filter for one library.
-  New items go into a chosen default library; the Add dialog and uploads
-  let people pick another. Change numbers, trash and duplicate detection
-  work per library.
+- **On the website**: one list of everything a person can see. New items
+  belong to a default owner (the person, or a group they choose); the Add
+  dialog lets them pick another.
 
 ### Changes, sync and trash
 

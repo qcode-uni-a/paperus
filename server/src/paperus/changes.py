@@ -20,7 +20,6 @@ from paperus.models import (
     File,
     Identifier,
     Item,
-    ItemLibrary,
     ItemTag,
     Tag,
     Version,
@@ -55,7 +54,7 @@ def _stamped(obj: object) -> Item | Tag | Collection | None:
     match obj:
         case Item() | Tag() | Collection():
             return obj
-        case Version() | ItemTag() | CollectionItem() | ItemLibrary():
+        case Version() | ItemTag() | CollectionItem():
             return obj.item
         case Identifier() | File():
             return obj.version.item if obj.version else None

@@ -58,11 +58,7 @@ _SEARCH = text(
              JOIN items i ON i.id = v.item_id
         WHERE f.deleted_at IS NULL AND i.deleted_at IS NULL
           -- Only libraries the person can read.
-          AND EXISTS (
-              SELECT 1 FROM item_libraries il
-              WHERE il.item_id = i.id
-                AND il.library_id = ANY(CAST(:libraries AS uuid[]))
-          )
+          AND i.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR i.type = ANY(CAST(:types AS text[])))
     ),

@@ -16,9 +16,9 @@
 | PDF fetching | Server: open access only; browser: user's session; manual fallback | Licences, campus IP blocks |
 | IDs | UUIDv7 for every record; SHA-256 only for blobs and chunks | Same bytes can be different files; IDs needed before an upload ends; hashes reveal content; stable links |
 | Licence | Apache-2.0 for everything (server and integrations) | Allows every later use (hosted version, other universities, companies); can still move to AGPL later, not the other way round; patent grant over MIT |
-| Libraries | A paper exists once and can be in several libraries (a person's, groups'); tags, collections and notes belong to one library each. First built as one library per item (like Zotero), changed the same day | Each paper once is what people expect; sharing a collection needs no copies or matching |
+| Owners | Every paper, tag and collection has one owner, a person or a group; sharing gives it to a group. Lists mix everything one can see. (Tried the same day: one library per item like Zotero, then items in several libraries; both felt too complicated) | As simple as possible to use; a paper exists once |
 | Groups | Nested like GitLab: membership inherited downwards (a subgroup may raise a role, not lower it), nothing upwards. Roles reader, member, admin. Site admins create top-level groups; group admins create subgroups | Matches faculty → chair → project; well-known model |
-| Library view | One list of everything a person can read, labelled by library, with a filter per library; a default library for new items | No switching needed for people in one group, still clear for people in several |
+| Overviews | One mixed list of everything one can see; a small shared icon marks group papers and collections; no filter by owner needed | Work should feel like one library |
 | Hosting | Stage 0: local on the developer's machine. Stage 1: a group machine at the university, VPN only, username and password login. Stage 2: a small VM from the computing centre for the pilot | Start without waiting for IT; same compose setup throughout |
 
 ## Open

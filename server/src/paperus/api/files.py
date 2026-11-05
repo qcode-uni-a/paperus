@@ -32,7 +32,6 @@ from paperus.models import (
     FileRole,
     FileSource,
     Item,
-    ItemLibrary,
     MetadataSource,
     TextStatus,
     Version,
@@ -176,9 +175,7 @@ def _known_file(db: DB, sha256: bytes, libraries: list[uuid.UUID]) -> File | Non
             File.blob_sha256 == sha256,
             File.deleted_at.is_(None),
             Item.deleted_at.is_(None),
-            Item.id.in_(
-                select(ItemLibrary.item_id).where(ItemLibrary.library_id.in_(libraries))
-            ),
+            Item.library_id.in_(libraries),
         )
         .order_by(File.created_at)
         .limit(1)
@@ -195,9 +192,6 @@ class NewItemUpload(BaseModel):
 class KnownFile(BaseModel):
     item_id: uuid.UUID
     file: FileOut
-    library_ids: list[uuid.UUID]
-    """The item's libraries the person can see; to put it into another one
-    too, ``PUT /api/items/{item_id}/libraries/{library_id}``."""
 
 
 @router.get("/api/uploads/{sha256}")
@@ -215,7 +209,6 @@ def find_upload(sha256: str, db: DB, access: CurrentAccess) -> KnownFile:
     return KnownFile(
         item_id=file.version.item_id,
         file=file_out(file),
-        library_ids=access.item_libraries(file.version.item),
     )
 
 
@@ -233,14 +226,13 @@ def upload_new_item(
     The background job looks for a DOI or arXiv ID in the file and replaces
     the placeholder metadata (see ``paperus.identify``). A file that is
     already in a library the person can read makes no new item: the answer
-    (200, ``existing``) names the item that has it, now also in this
-    library. ``library_id``: the person's default library if not given.
+    (200, ``existing``) names the item that has it. ``library_id`` (the
+    owner): the person's default if not given.
     """
     target = access.target_library(library_id)
     stored = _put_upload(upload, request, db)
     known = _known_file(db, stored.sha256, access.readable)
     if known is not None:
-        library.add_to_library(known.version.item, target, access.user.id)
         db.commit()
         response.status_code = 200
         return NewItemUpload(

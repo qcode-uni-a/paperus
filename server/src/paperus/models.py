@@ -240,6 +240,10 @@ class Item(Record, Trashable, Base):
 
     __tablename__ = "items"
 
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="RESTRICT"), index=True
+    )
+    """The owner: a person's or a group's library."""
     type: Mapped[str] = mapped_column(String(64))
     title: Mapped[str]
     overrides: Mapped[dict[str, Any]] = mapped_column(
@@ -263,35 +267,6 @@ class Item(Record, Trashable, Base):
     collection_links: Mapped[list[CollectionItem]] = relationship(
         back_populates="item", cascade="all, delete-orphan", lazy="selectin"
     )
-    library_links: Mapped[list[ItemLibrary]] = relationship(
-        back_populates="item", cascade="all, delete-orphan", lazy="selectin"
-    )
-
-    @property
-    def library_ids(self) -> list[uuid.UUID]:
-        """The libraries the item is in (a paper exists once)."""
-        return [link.library_id for link in self.library_links]
-
-
-class ItemLibrary(Base):
-    """An item is in a library: a person's own, or a group's (shared)."""
-
-    __tablename__ = "item_libraries"
-
-    item_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
-    )
-    library_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("libraries.id", ondelete="CASCADE"), primary_key=True, index=True
-    )
-    added_by: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-    item: Mapped[Item] = relationship(back_populates="library_links")
 
 
 class Version(Record, Base):
