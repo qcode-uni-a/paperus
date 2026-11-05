@@ -2,7 +2,7 @@
 # mount a volume there so they survive updates.
 
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
-FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
 FROM python:3.13-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \

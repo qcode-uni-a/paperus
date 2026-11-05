@@ -3,7 +3,7 @@
 #   docker run … paperus-server worker   background jobs
 
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
-FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
 FROM node:24-slim AS web
 WORKDIR /web
