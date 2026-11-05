@@ -75,13 +75,20 @@ def refresh_item(item: Item) -> None:
 
 
 def find_identifier(
-    db: Session, identifiers: list[IdentifierValue]
+    db: Session, library_id: uuid.UUID, identifiers: list[IdentifierValue]
 ) -> Identifier | None:
+    """An identifier among these that a version in the library already has."""
     for scheme, value in identifiers:
         found = db.scalar(
-            select(Identifier).where(
-                Identifier.scheme == scheme, Identifier.value == value
+            select(Identifier)
+            .join(Version)
+            .join(Item)
+            .where(
+                Identifier.scheme == scheme,
+                Identifier.value == value,
+                Item.library_id == library_id,
             )
+            .limit(1)
         )
         if found is not None:
             return found
@@ -99,7 +106,7 @@ def add_version(
     identifiers: list[IdentifierValue],
     created_by: uuid.UUID | None,
 ) -> Version:
-    taken = find_identifier(db, identifiers)
+    taken = find_identifier(db, item.library_id, identifiers)
     if taken is not None:
         raise IdentifierTaken(
             taken.scheme, taken.value, taken.version.item_id, taken.version_id
@@ -123,6 +130,7 @@ def add_version(
 
 def create_item(
     db: Session,
+    library_id: uuid.UUID,
     *,
     kind: VersionKind,
     label: str | None,
@@ -131,8 +139,15 @@ def create_item(
     identifiers: list[IdentifierValue],
     added_by: uuid.UUID | None,
 ) -> Item:
-    """A new item with its first version."""
-    item = Item(type="", title="", overrides={}, added_by=added_by, change=0)
+    """A new item in the library, with its first version."""
+    item = Item(
+        library_id=library_id,
+        type="",
+        title="",
+        overrides={},
+        added_by=added_by,
+        change=0,
+    )
     db.add(item)
     add_version(
         db,
@@ -183,7 +198,7 @@ def replace_metadata(
     identifiers: list[IdentifierValue],
 ) -> None:
     """Give a version new metadata and identifiers (e.g. found in its file)."""
-    taken = find_identifier(db, identifiers)
+    taken = find_identifier(db, version.item.library_id, identifiers)
     if taken is not None and taken.version_id != version.id:
         raise IdentifierTaken(
             taken.scheme, taken.value, taken.version.item_id, taken.version_id

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from paperus.api.deps import DB, CurrentUser
+from paperus.api.deps import DB, CurrentAccess
 from paperus.ml import MLClient, MLUnavailable
 from paperus.system import load_config
 
@@ -57,6 +57,8 @@ _SEARCH = text(
              JOIN versions v ON v.id = f.version_id
              JOIN items i ON i.id = v.item_id
         WHERE f.deleted_at IS NULL AND i.deleted_at IS NULL
+          -- Only libraries the person can read.
+          AND i.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR i.type = ANY(CAST(:types AS text[])))
     ),
@@ -132,13 +134,15 @@ def search(
     request: Request,
     response: Response,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
     q: Annotated[str, Query(min_length=1, max_length=500)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     mode: Mode = "hybrid",
     type: Annotated[list[str] | None, Query()] = None,
+    library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
 ) -> list[Passage]:
-    """Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its
+    """Passages for ``q`` in the libraries the person can read (or one
+    ``library``): its words (quotes for phrases, ``-`` to exclude), its
     meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
     ``X-Search-Mode`` header says what was used: without the ML service,
     hybrid search falls back to keywords."""
@@ -148,6 +152,9 @@ def search(
         vector = _query_vector(request.app.state.ml, model, q)
     used: Mode = mode if vector is not None or mode == "keyword" else "keyword"
     response.headers["X-Search-Mode"] = used
+    libraries = access.readable
+    if library_id is not None:
+        libraries = [library_id] if access.can_read(library_id) else []
     rows = db.execute(
         _SEARCH,
         {
@@ -158,6 +165,7 @@ def search(
             "use_keyword": used != "meaning",
             "use_meaning": vector is not None,
             "types": type or [],
+            "libraries": libraries,
         },
     ).mappings()
     return [

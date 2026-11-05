@@ -9,14 +9,23 @@ from pathlib import Path
 from typing import Annotated, BinaryIO
 from urllib.parse import quote
 
-from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library
-from paperus.api.deps import DB, CurrentUser
+from paperus.access import Access
+from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import queue_text_extraction
 from paperus.models import (
     Blob,
@@ -156,8 +165,9 @@ def _store_upload(
     return _add_file(version, stored, role, request, db, user_id)
 
 
-def _known_file(db: DB, sha256: bytes) -> File | None:
-    """The first file with this content in an item outside the trash."""
+def _known_file(db: DB, sha256: bytes, library_id: uuid.UUID) -> File | None:
+    """The first file with this content in an item of the library outside
+    the trash."""
     return db.scalar(
         select(File)
         .join(Version)
@@ -166,6 +176,7 @@ def _known_file(db: DB, sha256: bytes) -> File | None:
             File.blob_sha256 == sha256,
             File.deleted_at.is_(None),
             Item.deleted_at.is_(None),
+            Item.library_id == library_id,
         )
         .order_by(File.created_at)
         .limit(1)
@@ -185,14 +196,21 @@ class KnownFile(BaseModel):
 
 
 @router.get("/api/uploads/{sha256}")
-def find_upload(sha256: str, db: DB, user: CurrentUser) -> KnownFile:
-    """The item that already has a file with this SHA-256 (hex), so a client
-    can skip uploading it again; 404 if there is none."""
+def find_upload(
+    sha256: str,
+    db: DB,
+    access: CurrentAccess,
+    library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
+) -> KnownFile:
+    """The item in the library (the person's default if not given) that
+    already has a file with this SHA-256 (hex), so a client can skip
+    uploading it again; 404 if there is none."""
+    target = access.target_library(library_id)
     try:
         digest = bytes.fromhex(sha256)
     except ValueError as error:
         raise HTTPException(422, "not a SHA-256 in hex") from error
-    file = _known_file(db, digest) if len(digest) == 32 else None
+    file = _known_file(db, digest, target) if len(digest) == 32 else None
     if file is None:
         raise HTTPException(404, "no such file in the library")
     return KnownFile(item_id=file.version.item_id, file=file_out(file))
@@ -200,17 +218,24 @@ def find_upload(sha256: str, db: DB, user: CurrentUser) -> KnownFile:
 
 @router.post("/api/uploads", status_code=201)
 def upload_new_item(
-    upload: UploadFile, request: Request, response: Response, db: DB, user: CurrentUser
+    upload: UploadFile,
+    request: Request,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+    library_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> NewItemUpload:
     """A new item from a file, titled after the file until its text tells more.
 
     The background job looks for a DOI or arXiv ID in the file and replaces
     the placeholder metadata (see ``paperus.identify``). A file that is
     already in the library makes no new item: the answer (200, ``existing``)
-    names the item that has it.
+    names the item that has it. ``library_id``: the person's default library
+    if not given.
     """
+    target = access.target_library(library_id)
     stored = _put_upload(upload, request, db)
-    known = _known_file(db, stored.sha256)
+    known = _known_file(db, stored.sha256, target)
     if known is not None:
         db.commit()
         response.status_code = 200
@@ -220,14 +245,17 @@ def upload_new_item(
     title = Path(stored.filename).stem or "Untitled"
     item = library.create_item(
         db,
+        target,
         kind=VersionKind.OTHER,
         label=None,
         csl={"type": "document", "title": title},
         source=MetadataSource.FILE,
         identifiers=[],
-        added_by=user.id,
+        added_by=access.user.id,
     )
-    file = _add_file(item.versions[0], stored, FileRole.MAIN, request, db, user.id)
+    file = _add_file(
+        item.versions[0], stored, FileRole.MAIN, request, db, access.user.id
+    )
     return NewItemUpload(item_id=item.id, file=file)
 
 
@@ -237,13 +265,14 @@ def upload_to_version(
     upload: UploadFile,
     request: Request,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
     role: Annotated[FileRole, Form()] = FileRole.MAIN,
 ) -> FileOut:
     version = db.get(Version, version_id)
-    if version is None:
+    if version is None or not access.can_read(version.item.library_id):
         raise HTTPException(404, "version not found")
-    return _store_upload(version, upload, role, request, db, user.id)
+    access.require_write(version.item.library_id)
+    return _store_upload(version, upload, role, request, db, access.user.id)
 
 
 @router.post("/api/items/{item_id}/files", status_code=201)
@@ -252,26 +281,25 @@ def upload_to_item(
     upload: UploadFile,
     request: Request,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
     role: Annotated[FileRole, Form()] = FileRole.MAIN,
 ) -> FileOut:
     """Upload to the item's preferred version."""
     item = db.get(Item, item_id)
-    if item is None:
+    if item is None or not access.can_read(item.library_id):
         raise HTTPException(404, "item not found")
+    access.require_write(item.library_id)
     version = library.preferred_version(item)
     if version is None:
         raise HTTPException(409, "item has no version")
-    return _store_upload(version, upload, role, request, db, user.id)
+    return _store_upload(version, upload, role, request, db, access.user.id)
 
 
 @router.get("/api/files/{file_id}/content")
 def download_file(
-    file_id: uuid.UUID, request: Request, db: DB, user: CurrentUser
+    file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
 ) -> Response:
-    file = db.get(File, file_id)
-    if file is None:
-        raise HTTPException(404, "file not found")
+    file = _get_file(db, access, file_id)
     blobs: BlobStore = request.app.state.blobs
     # Uploaded files open on paperus's own address. An HTML or SVG file
     # must not run scripts there, so everything but PDFs (which browsers
@@ -299,23 +327,27 @@ def download_file(
     )
 
 
-def _get_file(db: DB, file_id: uuid.UUID) -> File:
+def _get_file(
+    db: DB, access: Access, file_id: uuid.UUID, *, write: bool = False
+) -> File:
     file = db.get(File, file_id)
-    if file is None:
+    if file is None or not access.can_read(file.version.item.library_id):
         raise HTTPException(404, "file not found")
+    if write:
+        access.require_write(file.version.item.library_id)
     return file
 
 
 @router.delete("/api/files/{file_id}", status_code=204)
-def trash_file(file_id: uuid.UUID, db: DB, user: CurrentUser) -> None:
+def trash_file(file_id: uuid.UUID, db: DB, access: CurrentAccess) -> None:
     """Move to the trash; restorable with ``POST …/restore``."""
-    library.trash(_get_file(db, file_id), user.id)
+    library.trash(_get_file(db, access, file_id, write=True), access.user.id)
     db.commit()
 
 
 @router.post("/api/files/{file_id}/restore")
-def restore_file(file_id: uuid.UUID, db: DB, user: CurrentUser) -> FileOut:
-    file = _get_file(db, file_id)
+def restore_file(file_id: uuid.UUID, db: DB, access: CurrentAccess) -> FileOut:
+    file = _get_file(db, access, file_id, write=True)
     library.restore(file)
     db.commit()
     return file_out(file)

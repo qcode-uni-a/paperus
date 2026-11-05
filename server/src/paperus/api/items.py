@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from paperus import changes, library, metadata
-from paperus.api.deps import DB, CurrentUser
+from paperus.access import Access
+from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
@@ -56,6 +57,11 @@ class VersionIn(BaseModel):
         return self
 
 
+class ItemIn(VersionIn):
+    library_id: uuid.UUID | None = None
+    """Where the item goes; the person's default library if not given."""
+
+
 class IdentifierOut(BaseModel):
     scheme: Scheme
     value: str
@@ -75,6 +81,7 @@ class VersionOut(BaseModel):
 
 class ItemOut(BaseModel):
     id: uuid.UUID
+    library_id: uuid.UUID
     type: str
     title: str
     authors: list[str]
@@ -87,7 +94,9 @@ class ItemOut(BaseModel):
     processing: bool
     """Files are still being read (text, and metadata for uploads)."""
     tags: list[ItemTagOut]
+    """Tags the reader can see: the library's own and the reader's private ones."""
     collection_ids: list[uuid.UUID]
+    """Collections the reader can see that hold the item."""
 
 
 class ItemDetail(ItemOut):
@@ -133,10 +142,13 @@ def _identifiers(version: Version) -> list[IdentifierOut]:
     ]
 
 
-def item_out(item: Item) -> ItemOut:
+def item_out(item: Item, access: Access) -> ItemOut:
+    """The item as this person sees it: without other people's private tags
+    and collections."""
     csl = library.citation_csl(item)
     return ItemOut(
         id=item.id,
+        library_id=item.library_id,
         type=item.type,
         title=item.title,
         authors=_authors(csl),
@@ -146,8 +158,12 @@ def item_out(item: Item) -> ItemOut:
         created_at=item.created_at,
         change=item.change,
         deleted_at=item.deleted_at,
-        tags=item_tags(item),
-        collection_ids=[link.collection_id for link in item.collection_links],
+        tags=item_tags(item, access),
+        collection_ids=[
+            link.collection_id
+            for link in item.collection_links
+            if access.can_read(link.collection.library_id)
+        ],
         processing=any(
             f.text_status == TextStatus.PENDING and f.deleted_at is None
             for v in item.versions
@@ -170,13 +186,15 @@ def version_out(version: Version) -> VersionOut:
     )
 
 
-def item_detail(item: Item, response: Response | None = None) -> ItemDetail:
+def item_detail(
+    item: Item, access: Access, response: Response | None = None
+) -> ItemDetail:
     """The item; also sets its ``ETag`` (the change number) on ``response``."""
     if response is not None:
         response.headers["ETag"] = f'"{item.change}"'
     preferred = library.preferred_version(item)
     return ItemDetail(
-        **item_out(item).model_dump(),
+        **item_out(item, access).model_dump(),
         csl=library.citation_csl(item),
         overrides=item.overrides,
         preferred_version_id=preferred.id if preferred else None,
@@ -245,47 +263,64 @@ def _identifier_conflict(error: library.IdentifierTaken) -> HTTPException:
 
 @router.post("/api/items", status_code=201)
 def add_item(
-    body: VersionIn, request: Request, response: Response, db: DB, user: CurrentUser
+    body: ItemIn, request: Request, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
-    """A new item; if one of its identifiers is known, the existing item."""
+    """A new item; if one of its identifiers is known in the library, the
+    existing item."""
+    library_id = access.target_library(body.library_id)
     identifiers = _normalized_identifiers(body)
-    known = library.find_identifier(db, identifiers)
+    known = library.find_identifier(db, library_id, identifiers)
     if known is not None:
         existing = known.version.item
         if existing.deleted_at is not None:
             library.restore(existing)
             db.commit()
         response.status_code = 200
-        return item_detail(existing, response)
+        return item_detail(existing, access, response)
 
     resolved = _resolve(body, identifiers, request.app.state.http)
     try:
         item = library.create_item(
             db,
+            library_id,
             kind=resolved.kind,
             label=resolved.label,
             csl=resolved.csl,
             source=resolved.source,
             identifiers=resolved.identifiers,
-            added_by=user.id,
+            added_by=access.user.id,
         )
         db.commit()
     except IntegrityError:
         # Someone added the same identifier meanwhile.
         db.rollback()
-        known = library.find_identifier(db, identifiers)
+        known = library.find_identifier(db, library_id, identifiers)
         if known is None:
             raise
         response.status_code = 200
-        return item_detail(known.version.item, response)
+        return item_detail(known.version.item, access, response)
+    except library.IdentifierTaken as error:
+        # Added meanwhile; the lookup above missed it.
+        raise _identifier_conflict(error) from error
     db.refresh(item)
-    return item_detail(item, response)
+    return item_detail(item, access, response)
 
 
-def _get_item(db: DB, item_id: uuid.UUID, *, allow_trashed: bool = True) -> Item:
+def get_readable_item(
+    db: DB,
+    access: Access,
+    item_id: uuid.UUID,
+    *,
+    write: bool = False,
+    allow_trashed: bool = True,
+) -> Item:
+    """The item if the person may read it (404 otherwise, so items in other
+    libraries stay unknown); with ``write``, 403 for readers."""
     item = db.get(Item, item_id)
-    if item is None:
+    if item is None or not access.can_read(item.library_id):
         raise HTTPException(404, "item not found")
+    if write:
+        access.require_write(item.library_id)
     if not allow_trashed and item.deleted_at is not None:
         raise HTTPException(409, "item is in the trash")
     return item
@@ -298,12 +333,12 @@ def add_version(
     request: Request,
     response: Response,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
 ) -> ItemDetail:
     """Another version of an item, e.g. the published one of a preprint."""
-    item = _get_item(db, item_id, allow_trashed=False)
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     identifiers = _normalized_identifiers(body)
-    known = library.find_identifier(db, identifiers)
+    known = library.find_identifier(db, item.library_id, identifiers)
     if known is not None:
         if known.version.item_id != item.id:
             raise _identifier_conflict(
@@ -312,7 +347,7 @@ def add_version(
                 )
             )
         response.status_code = 200
-        return item_detail(item, response)
+        return item_detail(item, access, response)
 
     resolved = _resolve(body, identifiers, request.app.state.http)
     try:
@@ -324,7 +359,7 @@ def add_version(
             csl=resolved.csl,
             source=resolved.source,
             identifiers=resolved.identifiers,
-            created_by=user.id,
+            created_by=access.user.id,
         )
         db.commit()
     except library.IdentifierTaken as error:
@@ -333,20 +368,21 @@ def add_version(
         db.rollback()
         raise HTTPException(409, "identifier was added meanwhile") from error
     db.refresh(item)
-    return item_detail(item, response)
+    return item_detail(item, access, response)
 
 
 @router.post("/api/versions/{version_id}/pin")
 def pin_version(
-    version_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+    version_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
     """Cite this version, whatever its kind."""
     version = db.get(Version, version_id)
-    if version is None:
+    if version is None or not access.can_read(version.item.library_id):
         raise HTTPException(404, "version not found")
+    access.require_write(version.item.library_id)
     library.pin_version(db, version.item, version)
     db.commit()
-    return item_detail(version.item, response)
+    return item_detail(version.item, access, response)
 
 
 def _parse_if_match(value: str | None) -> int:
@@ -365,7 +401,7 @@ def set_overrides(
     overrides: dict[str, Any],
     response: Response,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
     if_match: Annotated[str | None, Header()] = None,
 ) -> ItemDetail:
     """Replace the manual edits to the metadata for citing.
@@ -376,37 +412,38 @@ def set_overrides(
     """
     expected = _parse_if_match(if_match)
     item = db.get(Item, item_id, with_for_update=True)
-    if item is None:
+    if item is None or not access.can_read(item.library_id):
         raise HTTPException(404, "item not found")
+    access.require_write(item.library_id)
     if item.change != expected:
         raise HTTPException(412, "item changed since it was read")
     library.set_overrides(item, overrides)
     db.commit()
-    return item_detail(item, response)
+    return item_detail(item, access, response)
 
 
 @router.delete("/api/items/{item_id}", status_code=204)
-def trash_item(item_id: uuid.UUID, db: DB, user: CurrentUser) -> None:
+def trash_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> None:
     """Move to the trash; restorable with ``POST …/restore``."""
-    library.trash(_get_item(db, item_id), user.id)
+    library.trash(get_readable_item(db, access, item_id, write=True), access.user.id)
     db.commit()
 
 
 @router.post("/api/items/{item_id}/restore")
 def restore_item(
-    item_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+    item_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
-    item = _get_item(db, item_id)
+    item = get_readable_item(db, access, item_id, write=True)
     library.restore(item)
     db.commit()
-    return item_detail(item, response)
+    return item_detail(item, access, response)
 
 
 @router.get("/api/items")
 def list_items(
     response: Response,
     db: DB,
-    user: CurrentUser,
+    access: CurrentAccess,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     before: uuid.UUID | None = None,
     trashed: bool = False,
@@ -415,8 +452,10 @@ def list_items(
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
+    library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
 ) -> list[ItemOut]:
-    """Items, newest first; ``before`` = last ``id`` for the next page.
+    """Items the person can read, newest first; ``before`` = last ``id`` for
+    the next page. ``library`` shows one library only.
 
     ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
     with all of them) and ``collection`` (with its subcollections unless
@@ -429,11 +468,20 @@ def list_items(
     is the number to pass as ``since`` next time.
     """
     response.headers["Last-Change"] = str(changes.current_change(db))
+    libraries = access.readable
+    if library_id is not None:
+        libraries = [library_id] if access.can_read(library_id) else []
+    in_libraries = Item.library_id.in_(libraries)
     if since is not None:
-        query = select(Item).where(Item.change > since).order_by(Item.change, Item.id)
-        return [item_out(item) for item in db.scalars(query)]
+        query = (
+            select(Item)
+            .where(in_libraries, Item.change > since)
+            .order_by(Item.change, Item.id)
+        )
+        return [item_out(item, access) for item in db.scalars(query)]
     conditions = [
-        Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None)
+        in_libraries,
+        Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None),
     ]
     for tag_id in tag or []:
         conditions.append(
@@ -448,11 +496,11 @@ def list_items(
     query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)
     if before is not None:
         query = query.where(Item.id < before)
-    return [item_out(item) for item in db.scalars(query)]
+    return [item_out(item, access) for item in db.scalars(query)]
 
 
 @router.get("/api/items/{item_id}")
 def get_item(
-    item_id: uuid.UUID, response: Response, db: DB, user: CurrentUser
+    item_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
-    return item_detail(_get_item(db, item_id), response)
+    return item_detail(get_readable_item(db, access, item_id), access, response)

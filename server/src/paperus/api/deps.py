@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from paperus.access import Access
 from paperus.auth import user_for_token
 from paperus.models import User
 
@@ -37,3 +38,11 @@ def current_user(request: Request, db: DB) -> User:
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+def current_access(user: CurrentUser, db: DB) -> Access:
+    """What the person may read and change (see ``paperus.access``)."""
+    return Access.of(db, user)
+
+
+CurrentAccess = Annotated[Access, Depends(current_access)]

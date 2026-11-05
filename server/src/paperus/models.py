@@ -10,6 +10,7 @@ from typing import Any
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     Computed,
     DateTime,
     ForeignKey,
@@ -17,7 +18,6 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
-    UniqueConstraint,
     func,
     text,
 )
@@ -46,6 +46,78 @@ class User(Record, Base):
     username: Mapped[str] = mapped_column(String(64), unique=True)
     password_hash: Mapped[str]
     is_admin: Mapped[bool] = mapped_column(server_default=text("false"))
+    """Manages users and groups; reads no library because of it."""
+    default_library_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("libraries.id", ondelete="SET NULL", use_alter=True)
+    )
+    """Where new items go unless another library is chosen."""
+
+
+class Role(StrEnum):
+    """What a member may do in a group (and every group inside it)."""
+
+    READER = "reader"
+    """Reads and searches; private tags, collections and notes only."""
+    MEMBER = "member"
+    """Also adds, edits and deletes items, tags and collections."""
+    ADMIN = "admin"
+    """Also manages members, settings and subgroups."""
+
+
+ROLE_RANK = {Role.READER: 1, Role.MEMBER: 2, Role.ADMIN: 3}
+
+
+class Group(Record, Base):
+    """A research group; groups nest (faculty, chair, project).
+
+    Members of a group are members of every group inside it, with the same
+    role or a higher one given there; see ``paperus.access``.
+    """
+
+    __tablename__ = "groups"
+
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None]
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("groups.id", ondelete="RESTRICT"), index=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class Membership(Base):
+    __tablename__ = "memberships"
+
+    group_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    added_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Library(Record, Base):
+    """Where items, tags and collections live: a person's or a group's."""
+
+    __tablename__ = "libraries"
+    __table_args__ = (
+        CheckConstraint("(user_id IS NULL) <> (group_id IS NULL)", name="one_owner"),
+    )
+
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True
+    )
+    group_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("groups.id", ondelete="CASCADE"), unique=True
+    )
 
 
 class LoginSession(Record, Base):
@@ -168,6 +240,9 @@ class Item(Record, Trashable, Base):
 
     __tablename__ = "items"
 
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="RESTRICT"), index=True
+    )
     type: Mapped[str] = mapped_column(String(64))
     title: Mapped[str]
     overrides: Mapped[dict[str, Any]] = mapped_column(
@@ -235,10 +310,11 @@ class Version(Record, Base):
 
 
 class Identifier(Record, Base):
-    """A normalized identifier of a version, unique in the library."""
+    """A normalized identifier of a version, unique in its library (checked in
+    ``paperus.library``; the same paper can be in several libraries)."""
 
     __tablename__ = "identifiers"
-    __table_args__ = (UniqueConstraint("scheme", "value"),)
+    __table_args__ = (Index("ix_identifiers_scheme_value", "scheme", "value"),)
 
     version_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("versions.id", ondelete="CASCADE"), index=True
@@ -343,11 +419,22 @@ class SystemSetting(Base):
 
 
 class Tag(Record, Base):
-    """A label for items; names are unique regardless of case."""
+    """A label for items; names are unique per library regardless of case.
+
+    A group's tags go only on that group's items; a person's private tags on
+    any item they can read.
+    """
 
     __tablename__ = "tags"
-    __table_args__ = (Index("ix_tags_name_lower", text("lower(name)"), unique=True),)
+    __table_args__ = (
+        Index(
+            "ix_tags_library_name_lower", "library_id", text("lower(name)"), unique=True
+        ),
+    )
 
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="CASCADE")
+    )
     name: Mapped[str] = mapped_column(String(100))
     color: Mapped[str | None] = mapped_column(String(16))
     description: Mapped[str | None]
@@ -380,11 +467,16 @@ class ItemTag(Base):
 class Collection(Record, Base):
     """A folder of items; collections nest, and an item can be in several.
 
-    Deleting a collection deletes its subcollections, never its items.
+    Deleting a collection deletes its subcollections, never its items. Like
+    tags, a group's collections hold only that group's items; collections
+    nest only within one library.
     """
 
     __tablename__ = "collections"
 
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str | None]
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -415,3 +507,4 @@ class CollectionItem(Base):
     )
 
     item: Mapped[Item] = relationship(back_populates="collection_links")
+    collection: Mapped[Collection] = relationship(lazy="joined", innerjoin=True)

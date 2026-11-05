@@ -9,7 +9,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from paperus.models import LoginSession, User
+from paperus.models import Library, LoginSession, User
 
 SESSION_LIFETIME = timedelta(days=30)
 
@@ -32,11 +32,16 @@ def verify_password(password_hash: str, password: str) -> bool:
 def create_user(
     db: Session, username: str, password: str, *, is_admin: bool = False
 ) -> User:
+    """A user with a private library, which is also where new items go."""
     user = User(
         username=username, password_hash=hash_password(password), is_admin=is_admin
     )
     db.add(user)
     db.flush()
+    library = Library(user_id=user.id)
+    db.add(library)
+    db.flush()
+    user.default_library_id = library.id
     return user
 
 

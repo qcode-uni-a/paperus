@@ -1,6 +1,7 @@
 """Tags and collections: the rules shared by the API and other clients."""
 
 import uuid
+from collections.abc import Callable
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
@@ -24,9 +25,13 @@ def clean_name(name: str) -> str:
     return cleaned
 
 
-def find_tag(db: Session, name: str) -> Tag | None:
+def find_tag(db: Session, library_id: uuid.UUID, name: str) -> Tag | None:
+    """The library's tag of this name, in any case."""
     return db.scalar(
-        select(Tag).where(func.lower(Tag.name) == clean_name(name).lower())
+        select(Tag).where(
+            Tag.library_id == library_id,
+            func.lower(Tag.name) == clean_name(name).lower(),
+        )
     )
 
 
@@ -35,13 +40,16 @@ def tag_item(
     item: Item,
     name: str,
     *,
+    library_id: uuid.UUID,
     source: TagSource = TagSource.MANUAL,
     user_id: uuid.UUID | None = None,
 ) -> Tag:
-    """Put a tag on an item, creating the tag if needed (no duplicates)."""
-    tag = find_tag(db, name)
+    """Put the library's tag of this name on an item, creating the tag if
+    needed (no duplicates). Callers check that the library may tag the item
+    (see ``Access.may_hold``)."""
+    tag = find_tag(db, library_id, name)
     if tag is None:
-        tag = Tag(name=clean_name(name), change=0)
+        tag = Tag(library_id=library_id, name=clean_name(name), change=0)
         db.add(tag)
         db.flush()
     if not any(link.tag_id == tag.id for link in item.tag_links):
@@ -56,7 +64,7 @@ def untag_item(item: Item, tag_id: uuid.UUID) -> None:
 
 
 def rename_tag(db: Session, tag: Tag, name: str) -> None:
-    other = find_tag(db, name)
+    other = find_tag(db, tag.library_id, name)
     if other is not None and other.id != tag.id:
         raise Conflict(f"a tag {other.name!r} exists already")
     tag.name = clean_name(name)
@@ -78,10 +86,14 @@ def descendants(db: Session, collection_id: uuid.UUID) -> list[uuid.UUID]:
 def move_collection(
     db: Session, collection: Collection, parent_id: uuid.UUID | None
 ) -> None:
-    """Move under another collection (or to the top); never into itself."""
+    """Move under another collection of the same library (or to the top);
+    never into itself."""
     if parent_id is not None:
-        if db.get(Collection, parent_id) is None:
+        parent = db.get(Collection, parent_id)
+        if parent is None:
             raise NotFound("parent collection not found")
+        if parent.library_id != collection.library_id:
+            raise Conflict("collections nest only within one library")
         if parent_id in descendants(db, collection.id):
             raise Conflict("a collection cannot move into itself or below itself")
     collection.parent_id = parent_id
@@ -92,12 +104,14 @@ def add_to_collection(
     collection: Collection,
     item_ids: list[uuid.UUID],
     user_id: uuid.UUID | None,
+    may_hold: Callable[[Item], bool] = lambda item: True,
 ) -> int:
-    """Add items (unknown or present ones are skipped); returns how many."""
+    """Add items (unknown or present ones, and those ``may_hold`` refuses,
+    are skipped); returns how many."""
     added = 0
     for item_id in dict.fromkeys(item_ids):
         item = db.get(Item, item_id)
-        if item is None:
+        if item is None or not may_hold(item):
             continue
         if any(link.collection_id == collection.id for link in item.collection_links):
             continue
