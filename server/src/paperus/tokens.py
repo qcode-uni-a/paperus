@@ -101,6 +101,7 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
     (_READ, re.compile(r"/api/search"), Scope.SEARCH),
     (_READ, re.compile(r"/api/files/[^/]+/content"), Scope.FILES_READ),
     (_READ, re.compile(r"/api/(items|tags|collections)(/.*)?"), Scope.PAPERS_READ),
+    (_READ, re.compile(r"/api/citations"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/uploads/[^/]+"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/(libraries|groups)(/.*)?"), Scope.GROUPS_READ),
     (_READ, re.compile(r"/api/auth/me"), Scope.PAPERS_READ),

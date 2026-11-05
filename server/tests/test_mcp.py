@@ -108,6 +108,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "get_abstracts",
         "get_document",
         "get_file",
+        "export_citations",
         "my_access",
         "list_collections",
         "list_documents",
@@ -181,6 +182,14 @@ def test_search_and_read(client: TestClient, ada: Person) -> None:
     assert base64.b64decode(embedded["resource"]["blob"]) == download.content
     with pytest.raises(ToolFailed, match="No such file"):
         assistant.call("get_file", file_id=str(uuid.uuid4()))
+
+    result = assistant.rpc(
+        "tools/call",
+        {"name": "export_citations", "arguments": {"paper_ids": [paper["paper_id"]]}},
+    )
+    assert result["content"][0]["text"].startswith("@misc{noauthor_radar_nodate,")
+    with pytest.raises(ToolFailed, match="Give paper_ids"):
+        assistant.call("export_citations")
 
     papers = assistant.call("list_documents", title="radar")
     assert papers["total"] == 1

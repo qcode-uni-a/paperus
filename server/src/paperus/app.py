@@ -16,6 +16,7 @@ from paperus.api import (
     admin,
     auth,
     backups,
+    citations,
     files,
     groups,
     health,
@@ -77,6 +78,7 @@ def create_app(
     app.include_router(items.router)
     app.include_router(files.router)
     app.include_router(search.router)
+    app.include_router(citations.router)
     app.include_router(admin.router)
     app.include_router(organize.router)
     app.include_router(groups.router)

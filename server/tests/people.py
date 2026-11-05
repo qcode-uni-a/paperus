@@ -1,5 +1,6 @@
 """Several logged-in people on one test client, for permission tests."""
 
+from collections.abc import Mapping
 from typing import Any
 
 import httpx2
@@ -24,7 +25,9 @@ class Person:
         self.headers = {"Authorization": f"Bearer {token}"}
         self.id: str = client.get("/api/auth/me", headers=self.headers).json()["id"]
 
-    def get(self, url: str, params: dict[str, str] | None = None) -> httpx2.Response:
+    def get(
+        self, url: str, params: Mapping[str, str | bool | list[str]] | None = None
+    ) -> httpx2.Response:
         return self.client.get(url, headers=self.headers, params=params)
 
     def post(
