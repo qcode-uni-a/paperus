@@ -64,15 +64,15 @@ class SystemConfig(BaseModel):
     password_min_length: int = Field(8, ge=8, le=128)
     password_login: bool = True
     """Off: only administrators log in with a password (a way in when the
-    university login fails); everyone else uses the university login."""
+    OIDC login fails); everyone else uses the OIDC login."""
     oidc_enabled: bool = False
-    """University login with OpenID Connect (see ``paperus.oidc``)."""
+    """Login with OpenID Connect (OIDC) (see ``paperus.oidc``)."""
     oidc_issuer: str | None = Field(None, max_length=500, pattern=r"^https?://\S+$")
     """The identity provider's address, e.g.
     https://login.uni-example.de/realms/staff (its discovery document is at
     ``/.well-known/openid-configuration`` below it)."""
     oidc_client_id: str | None = Field(None, max_length=200)
-    oidc_label: str = Field("University login", min_length=1, max_length=60)
+    oidc_label: str = Field("Log in with OIDC", min_length=1, max_length=60)
     """The login button's text."""
     oidc_username_claim: str = Field(
         "preferred_username", pattern=r"^[A-Za-z0-9_:.-]{1,60}$"
@@ -80,15 +80,15 @@ class SystemConfig(BaseModel):
     """The claim that becomes the username (e.g. preferred_username, email);
     an existing account of that name is linked on its first login."""
     oidc_create_accounts: bool = True
-    """Create an account on someone's first university login; off: only
+    """Create an account on someone's first OIDC login; off: only
     people an administrator added beforehand."""
 
     @model_validator(mode="after")
     def _login_possible(self) -> Self:
         if self.oidc_enabled and not (self.oidc_issuer and self.oidc_client_id):
-            raise ValueError("the university login needs an issuer and a client ID")
+            raise ValueError("the OIDC login needs an issuer and a client ID")
         if not self.password_login and not self.oidc_enabled:
-            raise ValueError("password login can only be off with university login")
+            raise ValueError("password login can only be off with OIDC login")
         return self
 
 
@@ -134,7 +134,7 @@ OIDC_SECRET_KEY = "oidc_secret"
 
 
 def oidc_secret(db: Session, settings: Settings) -> str | None:
-    """The university login's client secret: from the environment
+    """The OIDC login's client secret: from the environment
     (``PAPERUS_OIDC_CLIENT_SECRET``) or set in the administration. Kept apart
     from the settings, so it is never sent to the website."""
     if settings.oidc_client_secret:

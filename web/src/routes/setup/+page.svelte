@@ -18,14 +18,14 @@
 
 	/** First start: a new administrator, or a backup restored. */
 	let setup = $state<SetupState | null>(null);
-	let choice = $state<'new' | 'restore' | 'university' | null>(null);
+	let choice = $state<'new' | 'restore' | 'oidc' | null>(null);
 	let error = $state('');
 
 	$effect(() => {
 		setupState().then(({ data }) => {
 			setup = data ?? null;
 			// Set up already (e.g. someone else was faster): to the login.
-			if (data && !data.needed && choice !== 'university') goto(resolve('/login'));
+			if (data && !data.needed && choice !== 'oidc') goto(resolve('/login'));
 		});
 	});
 
@@ -51,18 +51,18 @@
 		}
 		session.user = data.user;
 		session.checked = true;
-		// Next, optionally: the university login.
-		choice = 'university';
+		// Next, optionally: the OIDC login.
+		choice = 'oidc';
 		const info = await authentication();
 		redirectUri = info.data?.redirect_uri ?? '';
 	}
 
-	// The university login (optional), linked to the new administrator.
+	// The OIDC login (optional), linked to the new administrator.
 	let redirectUri = $state('');
 	let issuer = $state('');
 	let clientId = $state('');
 	let secret = $state('');
-	let buttonText = $state('University login');
+	let buttonText = $state('Log in with OIDC');
 	let found = $state<ProviderFound | null>(null);
 
 	async function checkIssuer() {
@@ -70,7 +70,7 @@
 		found = data ?? { ok: false, error: errorMessage(failure) };
 	}
 
-	async function saveUniversity(event: SubmitEvent) {
+	async function saveOidc(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
 		busy = true;
@@ -86,7 +86,7 @@
 				oidc_enabled: true,
 				oidc_issuer: issuer.trim(),
 				oidc_client_id: clientId.trim(),
-				oidc_label: buttonText.trim() || 'University login'
+				oidc_label: buttonText.trim() || 'Log in with OIDC'
 			}
 		});
 		if (!saved.error && secret) await setOidcSecret({ body: { secret } });
@@ -182,13 +182,14 @@
 				<button class="primary" disabled={busy}>Create and start</button>
 			</div>
 		</form>
-	{:else if choice === 'university'}
-		<form onsubmit={saveUniversity}>
-			<h2>University login</h2>
+	{:else if choice === 'oidc'}
+		<form onsubmit={saveOidc}>
+			<h2>OIDC login</h2>
 			<p class="muted">
-				Optional: people log in with their university account (OpenID Connect). Your account is
-				linked to it right away; your password stays, as a way in if the university login fails.
-				Also later, under Administration → Settings → Authentication.
+				Optional: people log in through an identity provider with OpenID Connect (OIDC), e.g. their
+				university’s or company’s. Your account is linked to it right away; your password stays, as
+				a way in if the OIDC login fails. Also later, under Administration → Settings →
+				Authentication.
 			</p>
 			<div class="redirect">
 				<span>Register this redirect address at the identity provider:</span>

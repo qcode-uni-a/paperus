@@ -60,7 +60,7 @@ class User(Record, Base):
     """Deactivated people cannot log in; their papers and memberships stay."""
     oidc_subject: Mapped[str | None] = mapped_column(String(500), unique=True)
     """Who the person is at the identity provider (issuer and subject), once
-    they logged in with the university login."""
+    they logged in with the OIDC login."""
 
 
 class Role(StrEnum):

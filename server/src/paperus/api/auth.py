@@ -35,8 +35,8 @@ class UserOut(BaseModel):
     is_admin: bool
     seen_hints: list[str]
     """Tutorial hints already shown to the person."""
-    university_login: bool = False
-    """The account is linked to the university login."""
+    oidc_linked: bool = False
+    """The account is linked to the OIDC login."""
 
 
 class PasswordChange(BaseModel):
@@ -55,7 +55,7 @@ def user_out(user: auth.User) -> UserOut:
         username=user.username,
         is_admin=user.is_admin,
         seen_hints=user.seen_hints,
-        university_login=user.oidc_subject is not None,
+        oidc_linked=user.oidc_subject is not None,
     )
 
 
@@ -100,7 +100,7 @@ class LoginMethods(BaseModel):
     password: bool
     """Everyone may log in with a password (else only administrators)."""
     oidc_label: str | None
-    """The university login's button, if it is on."""
+    """The OIDC login's button, if it is on."""
 
 
 @router.get("/methods")
@@ -159,7 +159,7 @@ def oidc_start(
     request: Request, db: DB, next: str = "/", link: bool = False
 ) -> RedirectResponse:
     """Off to the identity provider; it sends the browser back to
-    ``/api/auth/oidc/callback``. With ``link``, the university login is
+    ``/api/auth/oidc/callback``. With ``link``, the OIDC login is
     linked to the account logged in now instead (whatever its name)."""
     config = load_config(db, request.app.state.settings)
     # Only paths of this site, so the login cannot send one elsewhere.
@@ -167,13 +167,11 @@ def oidc_start(
     if link and _session_user(request, db) is None:
         return _login_page(request, config, "Log in first to link your account.")
     if not config.oidc_enabled or not config.oidc_issuer or not config.oidc_client_id:
-        return _failed(request, config, back, link, "The university login is off.")
+        return _failed(request, config, back, link, "The OIDC login is off.")
     try:
         provider = oidc.discover(request.app.state.http, config.oidc_issuer)
     except oidc.LoginFailed as error:
-        return _failed(
-            request, config, back, link, f"University login failed: {error}."
-        )
+        return _failed(request, config, back, link, f"OIDC login failed: {error}.")
     redirect_uri = public_base(request, config) + OIDC_CALLBACK
     started = oidc.start(provider, config.oidc_client_id, redirect_uri)
     response = RedirectResponse(started.url, status_code=303)
@@ -208,13 +206,13 @@ def oidc_callback(
     except (ValueError, TypeError):
         return _login_page(request, config, "The login took too long; try again.")
     if error:
-        reason = f"University login failed: {error_description or error}."
+        reason = f"OIDC login failed: {error_description or error}."
         return _failed(request, config, back, link, reason)
     if not code or not state or state != saved_state:
         reason = "The login was not started here; try again."
         return _failed(request, config, back, link, reason)
     if not config.oidc_enabled or not config.oidc_issuer or not config.oidc_client_id:
-        return _failed(request, config, back, link, "The university login is off.")
+        return _failed(request, config, back, link, "The OIDC login is off.")
     try:
         provider = oidc.discover(request.app.state.http, config.oidc_issuer)
         claims = oidc.finish(
@@ -236,7 +234,7 @@ def oidc_callback(
             user = oidc.user_for(db, claims, config)
     except oidc.LoginFailed as failure:
         db.rollback()
-        reason = f"University login failed: {failure}."
+        reason = f"OIDC login failed: {failure}."
         return _failed(request, config, back, link, reason)
     response = RedirectResponse(public_base(request, config) + back, status_code=303)
     response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
@@ -248,8 +246,8 @@ def oidc_callback(
 
 
 @router.delete("/oidc/link", status_code=204)
-def unlink_university_login(db: DB, user: SessionUser) -> None:
-    """Unlink one's account from the university login (the password stays)."""
+def unlink_oidc(db: DB, user: SessionUser) -> None:
+    """Unlink one's account from the OIDC login (the password stays)."""
     user.oidc_subject = None
     db.commit()
 

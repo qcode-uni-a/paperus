@@ -11,7 +11,7 @@
 	let error = $state('');
 	let busy = $state(false);
 	const restored = $derived(page.url.searchParams.has('restored'));
-	/** From a failed university login. */
+	/** From a failed OIDC login. */
 	const failed = $derived(page.url.searchParams.get('error'));
 	let methods = $state<LoginMethods | null>(null);
 	/** With password login off: the administrators' way in. */
@@ -26,7 +26,7 @@
 		// Only paths on this site, never another origin.
 		return wanted?.startsWith('/') && !wanted.startsWith('//') ? wanted : '/';
 	});
-	const universityHref = $derived(`/api/auth/oidc/start?next=${encodeURIComponent(next)}`);
+	const oidcHref = $derived(`/api/auth/oidc/start?next=${encodeURIComponent(next)}`);
 	const passwordForm = $derived(!methods || methods.password || showPassword);
 
 	// A server without users yet starts with the setup.
@@ -62,7 +62,7 @@
 	{#if failed}<p class="error" role="alert">{failed}</p>{/if}
 	{#if methods?.oidc_label}
 		<!-- A full page load: the server sends the browser on to the identity provider. -->
-		<a class="university" href={universityHref} data-sveltekit-reload>{methods.oidc_label}</a>
+		<a class="oidc" href={oidcHref} data-sveltekit-reload>{methods.oidc_label}</a>
 		{#if passwordForm}<p class="or"><span>or with a password</span></p>{/if}
 	{/if}
 	{#if passwordForm}
@@ -125,7 +125,7 @@
 	form .error {
 		margin: 0;
 	}
-	.university {
+	.oidc {
 		display: block;
 		padding: 12px 16px;
 		border-radius: 999px;
@@ -135,10 +135,10 @@
 		text-align: center;
 		text-decoration: none;
 	}
-	.university:hover {
+	.oidc:hover {
 		filter: brightness(1.08);
 	}
-	.university:focus-visible {
+	.oidc:focus-visible {
 		outline: 2px solid var(--royal);
 		outline-offset: 3px;
 	}

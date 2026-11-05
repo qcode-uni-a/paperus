@@ -38,7 +38,7 @@ Ask the computing centre for:
   ChatGPT) need the server reachable from the internet over HTTPS: clarify
   early with IT security.
 - **DNS name and TLS certificate** (ACME from the university or Let's Encrypt).
-- **University login**: registration with the identity provider as an
+- **University login (OIDC)**: registration with the identity provider as an
   OpenID Connect client (confidential, authorization code flow with PKCE;
   scopes `openid profile email`). Give them the redirect address shown in
   Administration → Settings → Authentication
@@ -48,7 +48,7 @@ Ask the computing centre for:
   (Keycloak, SATOSA). Group membership from the directory later.
 - **Administrators keep a password**: with password login off, only
   administrators may still use one, their way in if the identity provider
-  fails. Link their accounts to the university login (on first setup, or
+  fails. Link their accounts to the OIDC login (on first setup, or
   "Link my account" under Authentication).
 
 Agree in writing who patches the OS and who updates the application. Automate

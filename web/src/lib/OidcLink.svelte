@@ -1,35 +1,38 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { errorMessage, me, unlinkUniversityLogin } from '#lib/api/client.ts';
+	import { errorMessage, me, unlinkOidc } from '#lib/api/client.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
-	/** Link the account one is logged in with to the university login (one
+	/** Link the account one is logged in with to the OIDC login (one
 	 * login there), or unlink it; the password stays either way. */
 	let { label, next }: { label: string; next: string } = $props();
 
-	const linked = $derived(!!session.user?.university_login);
+	const linked = $derived(!!session.user?.oidc_linked);
 	const failed = $derived(page.url.searchParams.get('link_error'));
 	const href = $derived(`/api/auth/oidc/start?link=true&next=${encodeURIComponent(next)}`);
 
 	async function unlink() {
-		const { error } = await unlinkUniversityLogin();
+		const { error } = await unlinkOidc();
 		if (error) {
 			notify({ kind: 'warning', title: 'Not unlinked', text: errorMessage(error) });
 			return;
 		}
 		const { data } = await me();
 		if (data) session.user = data;
-		notify({ kind: 'success', title: `Unlinked from ${label}` });
+		notify({ kind: 'success', title: 'OIDC login unlinked' });
 	}
 </script>
 
 <div class="link" class:linked>
 	{#if linked}
-		<p><strong>Linked.</strong> You can log in as {session.user?.username} with {label}.</p>
+		<p><strong>Linked.</strong> “{label}” logs you in as {session.user?.username}.</p>
 		<button onclick={unlink}>Unlink</button>
 	{:else}
-		<p>Log in once with {label} to link it to this account ({session.user?.username}).</p>
+		<p>
+			Log in once through OIDC to link it to this account ({session.user?.username}); then “{label}”
+			on the login page logs you in.
+		</p>
 		<a class="button" {href} data-sveltekit-reload>Link my account</a>
 	{/if}
 </div>

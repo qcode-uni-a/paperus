@@ -2132,9 +2132,9 @@ export type UserOut = {
      */
     seen_hints: Array<string>;
     /**
-     * University Login
+     * Oidc Linked
      */
-    university_login?: boolean;
+    oidc_linked?: boolean;
 };
 
 /**
@@ -2430,21 +2430,21 @@ export type OidcCallbackResponses = {
     200: unknown;
 };
 
-export type UnlinkUniversityLoginData = {
+export type UnlinkOidcData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/api/auth/oidc/link';
 };
 
-export type UnlinkUniversityLoginResponses = {
+export type UnlinkOidcResponses = {
     /**
      * Successful Response
      */
     204: void;
 };
 
-export type UnlinkUniversityLoginResponse = UnlinkUniversityLoginResponses[keyof UnlinkUniversityLoginResponses];
+export type UnlinkOidcResponse = UnlinkOidcResponses[keyof UnlinkOidcResponses];
 
 export type LogoutData = {
     body?: never;

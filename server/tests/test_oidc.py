@@ -1,4 +1,4 @@
-"""Authentication settings: university login (OpenID Connect), password
+"""Authentication settings: OIDC login (OpenID Connect), password
 login, session length, password length, logging everyone out."""
 
 import base64
@@ -114,7 +114,7 @@ def configure(client: TestClient, **change: Any) -> httpx2.Response:  # noqa: AN
     return client.put("/api/admin/config", json={**config, **change})
 
 
-def university(client: TestClient, **change: Any) -> None:  # noqa: ANN401
+def enable_oidc(client: TestClient, **change: Any) -> None:  # noqa: ANN401
     response = configure(
         client,
         oidc_enabled=True,
@@ -132,7 +132,7 @@ def university(client: TestClient, **change: Any) -> None:  # noqa: ANN401
     )
 
 
-def log_in_at_university(
+def log_in_with_oidc(
     client: TestClient, provider: FakeProvider, code: str = "good", link: bool = False
 ) -> httpx2.Response:
     start = client.get(
@@ -153,17 +153,17 @@ def log_in_at_university(
     )
 
 
-def test_university_login_creates_an_account(
+def test_oidc_linked_creates_an_account(
     site: TestClient, provider: FakeProvider, db: Session
 ) -> None:
     assert site.get("/api/auth/methods").json() == {
         "password": True,
         "oidc_label": None,
     }
-    university(site)
+    enable_oidc(site)
     assert site.get("/api/auth/methods").json()["oidc_label"] == "Uni login"
 
-    back = log_in_at_university(site, provider)
+    back = log_in_with_oidc(site, provider)
     assert back.status_code == 303, back.text
     assert back.headers["location"] == "https://testserver/collections"
     assert site.get("/api/auth/me").json()["username"] == "ada.l"
@@ -175,7 +175,7 @@ def test_university_login_creates_an_account(
 
     # The second time: the same account, even under another name.
     provider.person["preferred_username"] = "ada.lovelace"
-    log_in_at_university(site, provider)
+    log_in_with_oidc(site, provider)
     assert site.get("/api/auth/me").json()["username"] == "ada.l"
 
 
@@ -184,25 +184,23 @@ def test_existing_account_is_linked(
 ) -> None:
     create_user(db, "ada.l", "password1")
     db.commit()
-    university(site, oidc_create_accounts=False)
-    log_in_at_university(site, provider)
+    enable_oidc(site, oidc_create_accounts=False)
+    log_in_with_oidc(site, provider)
     assert site.get("/api/auth/me").json()["username"] == "ada.l"
 
 
 def test_no_account_without_creating(site: TestClient, provider: FakeProvider) -> None:
-    university(site, oidc_create_accounts=False)
-    back = log_in_at_university(site, provider)
+    enable_oidc(site, oidc_create_accounts=False)
+    back = log_in_with_oidc(site, provider)
     assert back.headers["location"].startswith("https://testserver/login?error=")
     assert "ask%20an%20administrator" in back.headers["location"]
 
 
 def test_refused_logins(site: TestClient, provider: FakeProvider) -> None:
-    university(site)
-    assert "error=" in log_in_at_university(site, provider, "bad").headers["location"]
+    enable_oidc(site)
+    assert "error=" in log_in_with_oidc(site, provider, "bad").headers["location"]
     provider.audience = "someone-else"
-    assert (
-        "another%20client" in log_in_at_university(site, provider).headers["location"]
-    )
+    assert "another%20client" in log_in_with_oidc(site, provider).headers["location"]
     # A callback for a login not started here.
     site.get("/api/auth/oidc/start", follow_redirects=False)
     stray = site.get(
@@ -237,7 +235,7 @@ def test_password_login_off(
 ) -> None:
     # Not without another way to log in.
     assert configure(site, password_login=False).status_code == 422
-    university(site, password_login=False)
+    enable_oidc(site, password_login=False)
     create_user(db, "ben", "password1")
     db.commit()
     refused = site.post(
@@ -245,7 +243,7 @@ def test_password_login_off(
     )
     assert refused.status_code == 403
     assert "Uni login" in refused.json()["detail"]
-    # Administrators still may (a way in if the university login fails).
+    # Administrators still may (a way in if the OIDC login fails).
     admin = site.post(
         "/api/auth/login", json={"username": "root", "password": "secret12"}
     )
@@ -285,15 +283,15 @@ def test_log_everyone_out(site: TestClient, db: Session) -> None:
 def test_link_the_logged_in_account(
     site: TestClient, provider: FakeProvider, db: Session
 ) -> None:
-    university(site)
-    assert site.get("/api/auth/me").json()["university_login"] is False
-    back = log_in_at_university(site, provider, link=True)
+    enable_oidc(site)
+    assert site.get("/api/auth/me").json()["oidc_linked"] is False
+    back = log_in_with_oidc(site, provider, link=True)
     assert back.headers["location"] == "https://testserver/collections"
     me = site.get("/api/auth/me").json()
     assert me["username"] == "root"
-    assert me["university_login"] is True
-    # Now the university login logs in as root, despite the other name.
-    log_in_at_university(site, provider)
+    assert me["oidc_linked"] is True
+    # Now the OIDC login logs in as root, despite the other name.
+    log_in_with_oidc(site, provider)
     assert site.get("/api/auth/me").json()["username"] == "root"
     assert db.scalar(select(User).where(User.username == "ada.l")) is None
 
@@ -301,10 +299,10 @@ def test_link_the_logged_in_account(
     create_user(db, "ben", "password1")
     db.commit()
     site.post("/api/auth/login", json={"username": "ben", "password": "password1"})
-    taken = log_in_at_university(site, provider, link=True)
+    taken = log_in_with_oidc(site, provider, link=True)
     assert "link_error=" in taken.headers["location"]
     assert "root" in taken.headers["location"]
 
     site.post("/api/auth/login", json={"username": "root", "password": "secret12"})
     assert site.delete("/api/auth/oidc/link").status_code == 204
-    assert site.get("/api/auth/me").json()["university_login"] is False
+    assert site.get("/api/auth/me").json()["oidc_linked"] is False

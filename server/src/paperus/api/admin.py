@@ -245,7 +245,7 @@ class Authentication(BaseModel):
     secret_from_environment: bool
     """Set with ``PAPERUS_OIDC_CLIENT_SECRET`` (then not changeable here)."""
     linked: int
-    """Accounts that have logged in with the university login."""
+    """Accounts that have logged in with the OIDC login."""
     sessions: int
     """Devices logged in now."""
 
@@ -274,7 +274,7 @@ class Secret(BaseModel):
 
 @router.put("/authentication/secret", status_code=204)
 def set_oidc_secret(body: Secret, db: DB, admin: Admin) -> None:
-    """The university login's client secret; never sent back."""
+    """The OIDC login's client secret; never sent back."""
     system.save_oidc_secret(db, body.secret or None)
     db.commit()
 

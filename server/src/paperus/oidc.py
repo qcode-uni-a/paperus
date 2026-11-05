@@ -1,4 +1,4 @@
-"""University login with OpenID Connect: the authorization code flow with
+"""Login with OpenID Connect (OIDC): the authorization code flow with
 PKCE, for any provider that publishes a discovery document (Keycloak,
 Shibboleth's OIDC OP, Microsoft Entra, SATOSA in front of SAML, …).
 
@@ -33,7 +33,7 @@ USERNAME = re.compile(r"^[\w.@+-]{1,64}$")
 
 
 class LoginFailed(Exception):
-    """Why a university login did not work, in words for the person."""
+    """Why an OIDC login did not work, in words for the person."""
 
 
 @dataclass
@@ -230,11 +230,9 @@ def user_for(db: Session, claims: dict[str, Any], config: SystemConfig) -> User:
 
 
 def link(db: Session, user: User, claims: dict[str, Any]) -> None:
-    """Link the university login to this account (whatever its name)."""
+    """Link the OIDC login to this account (whatever its name)."""
     subject = f"{claims['iss']} {claims['sub']}"
     other = db.scalar(select(User).where(User.oidc_subject == subject))
     if other is not None and other.id != user.id:
-        raise LoginFailed(
-            f"this university login belongs to the account {other.username}"
-        )
+        raise LoginFailed(f"this OIDC login belongs to the account {other.username}")
     user.oidc_subject = subject

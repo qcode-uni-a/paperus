@@ -12,12 +12,13 @@
   - Integrity checks: whether every file's stored contents are there
     (every Sunday night, or now), deeply also whether they are unchanged,
     and removing stored contents nothing uses any more.
-- **University login** (OpenID Connect: Keycloak, Microsoft Entra,
-  Shibboleth's OIDC provider, …), set up in Administration → Settings →
-  Authentication or right after creating the first administrator. Accounts
-  are created on first login (or only for people added beforehand), linked
-  by username, or linked by hand with "Link my account" (also in one's own
-  settings). Password login can be limited to administrators.
+- **OIDC login** (OpenID Connect: Keycloak, Authentik, Microsoft Entra,
+  Google, Shibboleth's OIDC provider, …), set up in Administration →
+  Settings → Authentication or right after creating the first
+  administrator. Accounts are created on first login (or only for people
+  added beforehand), linked by username, or linked by hand with "Link my
+  account" (also in one's own settings). Password login can be limited to
+  administrators.
 - **Authentication settings**: how long one stays logged in, the shortest
   password, and logging everyone out.
 - **Job settings**: how many files are read, sent to the ML service and

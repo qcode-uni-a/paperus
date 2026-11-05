@@ -14,7 +14,7 @@
 	} from '#lib/api/client.ts';
 	import type { Authentication, ProviderFound } from '#lib/api/generated/types.gen.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
-	import UniversityLink from '#lib/UniversityLink.svelte';
+	import OidcLink from '#lib/OidcLink.svelte';
 
 	const config = $derived(admin.config);
 	let info = $state<Authentication | null>(null);
@@ -24,7 +24,7 @@
 	let issuer = $state('');
 	let clientId = $state('');
 	let secret = $state('');
-	let label = $state('University login');
+	let label = $state('Log in with OIDC');
 	let claim = $state('preferred_username');
 	let create = $state(true);
 	let passwordLogin = $state(true);
@@ -46,7 +46,7 @@
 		oidc = config?.oidc_enabled ?? false;
 		issuer = config?.oidc_issuer ?? '';
 		clientId = config?.oidc_client_id ?? '';
-		label = config?.oidc_label ?? 'University login';
+		label = config?.oidc_label ?? 'Log in with OIDC';
 		claim = config?.oidc_username_claim ?? 'preferred_username';
 		create = config?.oidc_create_accounts ?? true;
 		passwordLogin = config?.password_login ?? true;
@@ -80,13 +80,13 @@
 				oidc !== (config.oidc_enabled ?? false) ||
 				issuer !== (config.oidc_issuer ?? '') ||
 				clientId !== (config.oidc_client_id ?? '') ||
-				label !== (config.oidc_label ?? 'University login') ||
+				label !== (config.oidc_label ?? 'Log in with OIDC') ||
 				claim !== (config.oidc_username_claim ?? 'preferred_username') ||
 				create !== (config.oidc_create_accounts ?? true) ||
 				passwordLogin !== (config.password_login ?? true) ||
 				secret !== '')
 	);
-	// Password login can only be off with the university login.
+	// Password login can only be off with the OIDC login.
 	$effect(() => {
 		if (!oidc) passwordLogin = true;
 	});
@@ -109,7 +109,7 @@
 				oidc_enabled: oidc,
 				oidc_issuer: issuer.trim() || null,
 				oidc_client_id: clientId.trim() || null,
-				oidc_label: label.trim() || 'University login',
+				oidc_label: label.trim() || 'Log in with OIDC',
 				oidc_username_claim: claim.trim() || 'preferred_username',
 				oidc_create_accounts: create,
 				password_login: passwordLogin
@@ -173,17 +173,17 @@
 	/>
 </SettingRow>
 
-<h3>University login</h3>
+<h3>OIDC login</h3>
 <p class="muted note">
 	Single sign-on with OpenID Connect: Keycloak, Microsoft Entra, Shibboleth’s OIDC provider and
 	others. For SAML only, put a bridge in front (e.g. Keycloak or SATOSA).
 </p>
 <SettingRow
 	id="oidc-on"
-	title="Log in with the university account"
+	title="Log in with OIDC"
 	description="A button on the login page; it takes people to the identity provider and back."
 >
-	<Switch id="oidc-on" label="University login" bind:checked={oidc} />
+	<Switch id="oidc-on" label="Log in with OIDC" bind:checked={oidc} />
 </SettingRow>
 {#if oidc}
 	<div class="provider">
@@ -259,14 +259,14 @@
 		<SettingRow
 			id="oidc-create"
 			title="Create accounts"
-			description="On someone’s first university login. Off: only people added under Users beforehand."
+			description="On someone’s first OIDC login. Off: only people added under Users beforehand."
 		>
 			<Switch id="oidc-create" label="Create accounts" bind:checked={create} />
 		</SettingRow>
 		<SettingRow
 			id="password-login"
 			title="Password login for everyone"
-			description="Off: only administrators log in with a password (their way in if the university login fails); everyone else uses the university login."
+			description="Off: only administrators log in with a password (their way in if the OIDC login fails); everyone else uses the OIDC login."
 		>
 			<Switch
 				id="password-login"
@@ -280,14 +280,14 @@
 
 {#if config?.oidc_enabled}
 	<h3>Your account</h3>
-	<UniversityLink
-		label={config.oidc_label ?? 'University login'}
+	<OidcLink
+		label={config.oidc_label ?? 'Log in with OIDC'}
 		next="/admin/settings?open=authentication"
 	/>
 	{#if info}
 		<p class="muted small">
 			{info.linked}
-			{info.linked === 1 ? 'account uses' : 'accounts use'} the university login.
+			{info.linked === 1 ? 'account uses' : 'accounts use'} the OIDC login.
 		</p>
 	{/if}
 {/if}

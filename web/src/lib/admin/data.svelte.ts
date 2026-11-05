@@ -47,12 +47,7 @@ export const SETTINGS = [
 	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],
 	['trash', 'Trash', 'When the trash empties itself', false],
 	['users', 'Users', "What happens to a removed person's papers and notes", true],
-	[
-		'authentication',
-		'Authentication',
-		'University login, passwords, how long one stays logged in',
-		false
-	]
+	['authentication', 'Authentication', 'OIDC login, passwords, how long one stays logged in', false]
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS)[number][0];

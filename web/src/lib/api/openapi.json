@@ -124,7 +124,7 @@
           "auth"
         ],
         "summary": "Oidc Start",
-        "description": "Off to the identity provider; it sends the browser back to\n``/api/auth/oidc/callback``. With ``link``, the university login is\nlinked to the account logged in now instead (whatever its name).",
+        "description": "Off to the identity provider; it sends the browser back to\n``/api/auth/oidc/callback``. With ``link``, the OIDC login is\nlinked to the account logged in now instead (whatever its name).",
         "operationId": "oidc_start",
         "parameters": [
           {
@@ -271,9 +271,9 @@
         "tags": [
           "auth"
         ],
-        "summary": "Unlink University Login",
-        "description": "Unlink one's account from the university login (the password stays).",
-        "operationId": "unlink_university_login",
+        "summary": "Unlink Oidc",
+        "description": "Unlink one's account from the OIDC login (the password stays).",
+        "operationId": "unlink_oidc",
         "responses": {
           "204": {
             "description": "Successful Response"
@@ -3037,7 +3037,7 @@
           "admin"
         ],
         "summary": "Set Oidc Secret",
-        "description": "The university login's client secret; never sent back.",
+        "description": "The OIDC login's client secret; never sent back.",
         "operationId": "set_oidc_secret",
         "requestBody": {
           "content": {
@@ -8094,7 +8094,7 @@
             "maxLength": 60,
             "minLength": 1,
             "title": "Oidc Label",
-            "default": "University login"
+            "default": "Log in with OIDC"
           },
           "oidc_username_claim": {
             "type": "string",
@@ -8583,9 +8583,9 @@
             "type": "array",
             "title": "Seen Hints"
           },
-          "university_login": {
+          "oidc_linked": {
             "type": "boolean",
-            "title": "University Login",
+            "title": "Oidc Linked",
             "default": false
           }
         },

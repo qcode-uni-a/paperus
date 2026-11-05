@@ -14,11 +14,11 @@
 	import AccessTokens from '#lib/AccessTokens.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
-	import UniversityLink from '#lib/UniversityLink.svelte';
+	import OidcLink from '#lib/OidcLink.svelte';
 
-	let university = $state<string | null>(null);
+	let oidcLabel = $state<string | null>(null);
 	$effect(() => {
-		loginMethods().then(({ data }) => (university = data?.oidc_label ?? null));
+		loginMethods().then(({ data }) => (oidcLabel = data?.oidc_label ?? null));
 	});
 
 	$effect(() => {
@@ -134,9 +134,9 @@
 			? ', site administrator'
 			: ''}.
 	</p>
-	{#if university}
-		<h3>{university}</h3>
-		<UniversityLink label={university} next="/settings" />
+	{#if oidcLabel}
+		<h3>OIDC login</h3>
+		<OidcLink label={oidcLabel} next="/settings" />
 		<h3>Password</h3>
 	{/if}
 	<form class="password" onsubmit={savePassword}>

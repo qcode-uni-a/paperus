@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Prometheus metrics on this port (in the container's network, not
     # through the public address); off unless set, e.g. 9464.
     metrics_port: int | None = None
-    # The university login's client secret (else set in Administration →
+    # The OIDC login's client secret (else set in Administration →
     # Settings → Authentication, stored in the database).
     oidc_client_secret: str | None = None
     # Imports from other reference managers, files included.

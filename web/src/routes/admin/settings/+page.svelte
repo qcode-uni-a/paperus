@@ -29,10 +29,6 @@
 			'Stored contents that no file uses any more (to clean up)',
 			'Verifying stored contents against their SHA-256'
 		],
-		jobs: [
-			'How many jobs of each kind run at the same time',
-			'When the periodic checks run (pending files, missing vectors)'
-		],
 		logging: ['Log level of the server and worker', 'Where logs go (console, file)'],
 		server: [
 			'Public address of the server (for links and the browser extension)',
@@ -47,11 +43,6 @@
 		users: [
 			'Making users administrators (now: Administration → Users)',
 			'What happens to a removed user’s papers and notes'
-		],
-		authentication: [
-			'Password login on or off',
-			'University login (OIDC / SAML via an identity provider)',
-			'Session length'
 		]
 	};
 </script>
