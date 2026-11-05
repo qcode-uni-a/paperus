@@ -1,6 +1,6 @@
 /** Readable names and short citations for items in lists. */
 
-const TYPE_NAMES: Record<string, string> = {
+export const TYPE_NAMES: Record<string, string> = {
 	'article-journal': 'Journal article',
 	article: 'Preprint',
 	'paper-conference': 'Conference paper',

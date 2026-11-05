@@ -175,3 +175,16 @@ def test_queue_embedding_once(job_app: App) -> None:
     assert [(j["task_name"], j["args"]) for j in jobs] == [
         ("paperus:embed_file", {"file_id": str(file_id)})
     ]
+
+
+def test_filter_by_type(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    prepare(logged_in, db, blobs, fake_ml)  # type "document"
+    assert len(search(logged_in, "interpolation", type="document")[0]) == 1
+    assert search(logged_in, "interpolation", type="book")[0] == []
+    response = logged_in.get(
+        "/api/search",
+        params=[("q", "interpolation"), ("type", "book"), ("type", "document")],
+    )
+    assert len(response.json()) == 1

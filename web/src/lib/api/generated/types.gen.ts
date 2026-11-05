@@ -1114,6 +1114,10 @@ export type SearchData = {
          * Mode
          */
         mode?: 'hybrid' | 'keyword' | 'meaning';
+        /**
+         * Type
+         */
+        type?: Array<string> | null;
     };
     url: '/api/search';
 };

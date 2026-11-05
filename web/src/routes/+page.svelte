@@ -5,6 +5,7 @@
 	import { untrack } from 'svelte';
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import SearchFilters, { type Filters } from '#lib/SearchFilters.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
 
 	const PAGE = 50;
@@ -14,6 +15,30 @@
 	// The search lives in the address (?q=…), so Back and links keep it.
 	const searched = $derived(page.url.searchParams.get('q')?.trim() ?? '');
 	let query = $state(page.url.searchParams.get('q') ?? '');
+	const mode = $derived(
+		(page.url.searchParams.get('mode') ?? 'hybrid') as 'hybrid' | 'keyword' | 'meaning'
+	);
+	const types = $derived(page.url.searchParams.getAll('type'));
+	const filters = $derived<Filters>({
+		words: mode !== 'meaning',
+		meaning: mode !== 'keyword',
+		types
+	});
+
+	/** The library address for a search with filters. */
+	function searchUrl(q: string, next: Filters): string {
+		const params = new URLSearchParams();
+		if (q) params.set('q', q);
+		if (!next.meaning) params.set('mode', 'keyword');
+		else if (!next.words) params.set('mode', 'meaning');
+		for (const type of next.types) params.append('type', type);
+		const search = params.toString();
+		return search ? `${resolve('/')}?${search}` : resolve('/');
+	}
+
+	function setFilters(next: Filters) {
+		goto(searchUrl(searched, next), { replace: true, reset: false });
+	}
 	let passages = $state<Passage[] | null>(null);
 
 	/** Passages grouped by item, items in the order of their best passage. */
@@ -74,7 +99,10 @@
 		const q = query.trim();
 		const timer = setTimeout(() => {
 			if (q === untrack(() => searched)) return;
-			const url = q ? `${resolve('/')}?q=${encodeURIComponent(q)}` : resolve('/');
+			const url = searchUrl(
+				q,
+				untrack(() => filters)
+			);
 			goto(url, {
 				replace: Boolean(untrack(() => searched)) && Boolean(q),
 				reset: false
@@ -86,18 +114,20 @@
 	// Results for the searched words.
 	$effect(() => {
 		const q = searched;
+		const options = { mode, type: types.length ? types : undefined };
 		if (!q) {
 			passages = null;
 			return;
 		}
-		search({ query: { q } }).then(({ data }) => {
-			if (q === untrack(() => searched)) passages = data ?? [];
+		const key = page.url.search;
+		search({ query: { q, ...options } }).then(({ data }) => {
+			if (key === untrack(() => page.url.search)) passages = data ?? [];
 		});
 	});
 
 	function clearSearch() {
 		query = '';
-		goto(resolve('/'), { reset: false });
+		goto(searchUrl('', filters), { reset: false });
 	}
 
 	// While the server reads new files, refresh to show their real titles.
@@ -128,11 +158,14 @@
 				if (event.key === 'Escape') clearSearch();
 			}}
 		/>
-		{#if query}
-			<button class="clear" onclick={clearSearch} aria-label="Clear search" title="Clear search">
-				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
-			</button>
-		{/if}
+		<div class="tools">
+			{#if query}
+				<button class="clear" onclick={clearSearch} aria-label="Clear search" title="Clear search">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+				</button>
+			{/if}
+			<SearchFilters {filters} onchange={setFilters} />
+		</div>
 	</div>
 
 	{#if searched}
@@ -207,6 +240,10 @@
 	}
 	.search {
 		position: relative;
+		display: grid;
+	}
+	.search input {
+		grid-area: 1 / 1;
 	}
 	.search input {
 		font-size: var(--step-1);
@@ -216,16 +253,22 @@
 		background: var(--surface);
 	}
 	.search input {
-		padding-right: 48px;
+		padding-right: 84px;
 	}
 	.search input::-webkit-search-cancel-button {
 		display: none;
 	}
+	/* Icons inside the field, in the same grid cell, so the options panel is
+	   positioned against the whole search box. */
+	.tools {
+		grid-area: 1 / 1;
+		justify-self: end;
+		align-self: center;
+		margin-right: 8px;
+		display: flex;
+		gap: 2px;
+	}
 	.clear {
-		position: absolute;
-		right: 8px;
-		top: 50%;
-		transform: translateY(-50%);
 		display: grid;
 		place-items: center;
 		width: 34px;

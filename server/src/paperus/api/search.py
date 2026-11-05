@@ -54,6 +54,8 @@ _SEARCH = text(
              JOIN versions v ON v.id = f.version_id
              JOIN items i ON i.id = v.item_id
         WHERE f.deleted_at IS NULL AND i.deleted_at IS NULL
+          AND (cardinality(CAST(:types AS text[])) = 0
+               OR i.type = ANY(CAST(:types AS text[])))
     ),
     keyword AS (
         SELECT vis.file_id, vis.position, row_number() OVER (
@@ -130,10 +132,12 @@ def search(
     q: Annotated[str, Query(min_length=1, max_length=500)],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     mode: Mode = "hybrid",
+    type: Annotated[list[str] | None, Query()] = None,
 ) -> list[Passage]:
     """Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its
-    meaning, or both. The ``X-Search-Mode`` header says what was used: without
-    the ML service, hybrid search falls back to keywords."""
+    meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
+    ``X-Search-Mode`` header says what was used: without the ML service,
+    hybrid search falls back to keywords."""
     model = load_config(db, request.app.state.settings).embedding_model
     vector = None
     if mode != "keyword":
@@ -149,6 +153,7 @@ def search(
             "model": model,
             "use_keyword": used != "meaning",
             "use_meaning": vector is not None,
+            "types": type or [],
         },
     ).mappings()
     return [

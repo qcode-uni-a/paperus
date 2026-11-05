@@ -55,7 +55,9 @@ export const me = <ThrowOnError extends boolean = false>(options?: Options<MeDat
  *
  * Items, newest first; ``before`` = last ``id`` for the next page.
  *
- * ``trashed=true`` lists the trash instead. ``since=N`` is for syncing:
+ * ``trashed=true`` lists the trash instead. ``X-Total-Count`` is the number
+ * of items in the list (or trash), for showing the total while paging.
+ * ``since=N`` is for syncing:
  * every item changed after change number N, trashed or not, in change
  * order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
  * is the number to pass as ``since`` next time.
@@ -199,8 +201,9 @@ export const restoreFile = <ThrowOnError extends boolean = false>(options: Optio
  * Search
  *
  * Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its
- * meaning, or both. The ``X-Search-Mode`` header says what was used: without
- * the ML service, hybrid search falls back to keywords.
+ * meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
+ * ``X-Search-Mode`` header says what was used: without the ML service,
+ * hybrid search falls back to keywords.
  */
 export const search = <ThrowOnError extends boolean = false>(options: Options<SearchData, ThrowOnError>): RequestResult<SearchResponses, SearchErrors, ThrowOnError> => (options.client ?? client).get<SearchResponses, SearchErrors, ThrowOnError>({ url: '/api/search', ...options });
 
