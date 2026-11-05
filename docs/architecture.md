@@ -106,7 +106,10 @@ Item: the work; notes, tags, collections, citation metadata
   collections of the libraries they can read; filters and counts show only
   those. A private tag or collection may hold items of a group's library
   (personal reading lists of shared papers); it stays visible only to its
-  owner. Collections nest only within one library. Who may create, rename
+  owner. A collection's own place in a tree is within its library; a
+  private collection may also show a group's collection inside it (a
+  personal link, so the group's tree stays as it is), never the other way
+  round (planned). Who may create, rename
   or delete a group's tags and collections follows the roles below.
 - **Library**: where items live. Every person has one (private), every
   group has one. An item belongs to exactly one library; see "Groups and
