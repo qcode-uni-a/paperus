@@ -1,35 +1,100 @@
+/* paperus: ink and highlighter.
+   Royal-blue ink for actions, a dark ink for text, cool paper, and a
+   highlighter stroke as the one loud element (search hits, current menu). */
+
+@import '@fontsource-variable/literata/opsz.css';
+@import '@fontsource-variable/literata/opsz-italic.css';
+@import '@fontsource-variable/atkinson-hyperlegible-next/wght.css';
+
 :root {
-	--bg: #fbfaf7;
+	--paper: #fcfcfd;
 	--surface: #ffffff;
-	--text: #1d1d1f;
-	--muted: #6b6b72;
-	--border: #e3e1dc;
-	--accent: #2f5d8a;
-	--accent-text: #ffffff;
-	--mark: #fde68a;
-	--danger: #b42318;
-	--radius: 8px;
+	--desk: #e9ecf2;
+	--rail: #f3f5f9;
+	--ink: #1b2440;
+	--muted: #5d6478;
+	--faint: #8a90a2;
+	--rule: #dde1ea;
+	--royal: #2338a8;
+	--royal-hover: #1a2b85;
+	--on-royal: #ffffff;
+	--highlighter: #ffe45c;
+	--on-highlighter: #1b2440;
+	--danger: #b3261e;
+	--success: #2f7d4a;
+	--focus: #2338a8;
+	--shadow: 0 1px 2px rgb(27 36 64 / 0.08), 0 8px 24px rgb(27 36 64 / 0.1);
+
+	--serif: 'Literata Variable', Georgia, serif;
+	--sans: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif;
+
+	/* Type scale (minor third). */
+	--step--1: 0.833rem;
+	--step-0: 1rem;
+	--step-1: 1.2rem;
+	--step-2: 1.44rem;
+	--step-3: 1.728rem;
+	--step-4: 2.074rem;
+
+	--radius: 6px;
 	--gap: 16px;
+
+	/* Legacy names used across components. */
+	--bg: var(--paper);
+	--text: var(--ink);
+	--border: var(--rule);
+	--accent: var(--royal);
+	--accent-text: var(--on-royal);
+	--mark: var(--highlighter);
+
 	color-scheme: light;
-	font-family:
-		system-ui,
-		-apple-system,
-		'Segoe UI',
-		sans-serif;
+	font-family: var(--sans);
+	font-size: 100%;
 	line-height: 1.5;
+	color: var(--ink);
+}
+
+/* Dark: deep ink paper. Follows the device unless a theme is chosen. */
+:root[data-theme='dark'] {
+	--paper: #121729;
+	--surface: #1a2036;
+	--desk: #0c1020;
+	--rail: #161c31;
+	--ink: #e6e9f2;
+	--muted: #a5abbd;
+	--faint: #7a8197;
+	--rule: #2b3350;
+	--royal: #9aacff;
+	--royal-hover: #b8c5ff;
+	--on-royal: #10173a;
+	--highlighter: #f5d547;
+	--on-highlighter: #1b2440;
+	--danger: #ff8a80;
+	--success: #7fd29a;
+	--focus: #9aacff;
+	--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+	color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #17171a;
-		--surface: #202024;
-		--text: #ececef;
-		--muted: #a0a0a8;
-		--border: #34343a;
-		--accent: #7fb0e0;
-		--accent-text: #0e1620;
-		--mark: #6b5310;
+	:root:not([data-theme='light']) {
+		--paper: #121729;
+		--surface: #1a2036;
+		--desk: #0c1020;
+		--rail: #161c31;
+		--ink: #e6e9f2;
+		--muted: #a5abbd;
+		--faint: #7a8197;
+		--rule: #2b3350;
+		--royal: #9aacff;
+		--royal-hover: #b8c5ff;
+		--on-royal: #10173a;
+		--highlighter: #f5d547;
+		--on-highlighter: #1b2440;
 		--danger: #ff8a80;
+		--success: #7fd29a;
+		--focus: #9aacff;
+		--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
 		color-scheme: dark;
 	}
 }
@@ -40,18 +105,43 @@
 
 body {
 	margin: 0;
-	background: var(--bg);
-	color: var(--text);
-}
-
-a {
-	color: var(--accent);
+	background: var(--paper);
+	color: var(--ink);
+	-webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
-	line-height: 1.25;
+	font-family: var(--serif);
+	font-weight: 600;
+	line-height: 1.2;
+	letter-spacing: -0.01em;
+	font-optical-sizing: auto;
+}
+h1 {
+	font-size: var(--step-3);
+}
+h2 {
+	font-size: var(--step-1);
+}
+h3 {
+	font-size: var(--step-0);
+}
+
+a {
+	color: var(--royal);
+	text-underline-offset: 0.2em;
+	text-decoration-thickness: 1px;
+}
+a:hover {
+	color: var(--royal-hover);
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+	border-radius: 2px;
 }
 
 input,
@@ -66,63 +156,97 @@ input,
 select,
 textarea {
 	background: var(--surface);
-	border: 1px solid var(--border);
+	border: 1px solid var(--rule);
 	border-radius: var(--radius);
 	padding: 8px 10px;
 	width: 100%;
 }
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+	outline-offset: 0;
+	border-color: var(--focus);
+}
+::placeholder {
+	color: var(--faint);
+}
 
 button {
 	background: var(--surface);
-	border: 1px solid var(--border);
+	border: 1px solid var(--rule);
 	border-radius: var(--radius);
 	padding: 7px 14px;
 	cursor: pointer;
+	color: var(--ink);
+	transition:
+		background-color 0.12s,
+		border-color 0.12s;
 }
-
+button:hover:not(:disabled) {
+	border-color: var(--faint);
+}
 button.primary {
-	background: var(--accent);
-	border-color: var(--accent);
-	color: var(--accent-text);
+	background: var(--royal);
+	border-color: var(--royal);
+	color: var(--on-royal);
+	font-weight: 600;
 }
-
+button.primary:hover:not(:disabled) {
+	background: var(--royal-hover);
+	border-color: var(--royal-hover);
+}
 button.danger {
 	color: var(--danger);
 }
-
 button:disabled {
-	opacity: 0.6;
+	opacity: 0.55;
 	cursor: default;
 }
 
-mark {
-	background: var(--mark);
-	color: inherit;
-	border-radius: 2px;
+/* The highlighter: a slightly uneven yellow stroke behind the words. */
+mark,
+.highlight {
+	color: var(--on-highlighter);
+	background: linear-gradient(
+		100deg,
+		transparent 0.2em,
+		var(--highlighter) 0.35em,
+		var(--highlighter) calc(100% - 0.35em),
+		transparent calc(100% - 0.15em)
+	);
+	background-size: 100% 78%;
+	background-position: 0 70%;
+	background-repeat: no-repeat;
+	padding: 0 0.3em;
+	margin: 0 -0.15em;
+	border-radius: 0.4em 0.2em 0.5em 0.25em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
 }
 
 .muted {
 	color: var(--muted);
 }
-
 .error {
 	color: var(--danger);
 }
 
 .card {
 	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: var(--gap);
+	border: 1px solid var(--rule);
+	border-radius: 10px;
+	padding: 20px;
 }
 
+/* Small, quiet labels (types, roles, states). */
 .badge {
 	display: inline-block;
-	font-size: 0.8em;
-	border: 1px solid var(--border);
-	border-radius: 999px;
-	padding: 0 8px;
+	font-size: var(--step--1);
+	line-height: 1.6;
+	border-radius: 4px;
+	padding: 0 7px;
 	color: var(--muted);
+	background: var(--rail);
 	white-space: nowrap;
 }
 
@@ -131,4 +255,13 @@ mark {
 	gap: 8px;
 	align-items: center;
 	flex-wrap: wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+	}
 }

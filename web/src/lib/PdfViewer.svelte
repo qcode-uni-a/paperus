@@ -14,6 +14,8 @@
 	let { url, startPage = 1 }: { url: string; startPage?: number } = $props();
 
 	const MAX_WIDTH = 1000;
+	// Horizontal padding of the desk around the pages (see .pages).
+	const DESK_PADDING = 24;
 	const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 	let pdf = $state.raw<PDFDocumentProxy | null>(null);
@@ -24,7 +26,9 @@
 	let current = $state(1);
 
 	const scale = $derived(
-		firstPage && width ? (Math.min(width, MAX_WIDTH) / firstPage.width) * ZOOMS[zoomIndex] : 0
+		firstPage && width
+			? (Math.min(width - DESK_PADDING, MAX_WIDTH) / firstPage.width) * ZOOMS[zoomIndex]
+			: 0
 	);
 	const pages = $derived(pdf ? Array.from({ length: pdf.numPages }, (_, i) => i + 1) : []);
 
@@ -160,14 +164,15 @@
 	}
 	.toolbar {
 		position: sticky;
-		top: 0;
+		top: 56px;
 		z-index: 5;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		gap: 8px;
 		padding: 6px 0;
-		background: var(--bg);
+		background: color-mix(in srgb, var(--paper) 94%, transparent);
+		backdrop-filter: blur(8px);
 	}
 	.toolbar button {
 		padding: 2px 10px;
@@ -177,12 +182,16 @@
 		justify-items: center;
 		gap: 12px;
 		overflow-x: auto;
-		padding-bottom: 24px;
+		padding: 20px 12px 32px;
+		background: var(--desk);
+		border-radius: 10px;
 	}
 	.page {
 		position: relative;
 		background: white;
-		box-shadow: 0 1px 4px rgb(0 0 0 / 0.2);
+		box-shadow:
+			0 1px 2px rgb(27 36 64 / 0.12),
+			0 4px 16px rgb(27 36 64 / 0.1);
 		max-width: none;
 	}
 	.page :global(canvas) {

@@ -87,14 +87,20 @@ _SEARCH = text(
     )
     SELECT vis.file_id, vis.position, vis.page, vis.version_id, vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
-           ts_headline(
+           CASE WHEN fused.by_keyword THEN ts_headline(
                'simple',
                replace(replace(replace(c.text, '&', '&amp;'), '<', '&lt;'),
                        '>', '&gt;'),
                q.tsq,
                'StartSel=<mark>, StopSel=</mark>, MaxWords=40, MinWords=15,'
                ' MaxFragments=2, FragmentDelimiter=" … "'
-           ) AS snippet
+           )
+           -- Found by meaning only: no words to mark, so the passage's start.
+           ELSE replace(replace(replace(
+               CASE WHEN length(c.text) > 320
+                    THEN left(c.text, 320) || '…' ELSE c.text END,
+               '&', '&amp;'), '<', '&lt;'), '>', '&gt;')
+           END AS snippet
     FROM fused
          JOIN visible vis USING (file_id, position)
          JOIN chunks c ON c.sha256 = vis.chunk_sha256,

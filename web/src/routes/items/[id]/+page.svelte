@@ -21,6 +21,7 @@
 		type VersionKind
 	} from '#lib/api/client.ts';
 	import PdfViewer from '#lib/PdfViewer.svelte';
+	import { fullName } from '#lib/format.ts';
 
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
@@ -179,9 +180,10 @@
 			<h1>{item.title}</h1>
 		{/if}
 		<p class="muted">
-			{item.authors.join('; ')}
-			{#if item.year}· {item.year}{/if}
-			{#if item.container_title}· <em>{item.container_title}</em>{/if}
+			{item.authors
+				.map(fullName)
+				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
+				<em>{item.container_title}</em>{/if}
 		</p>
 		{#if !item.deleted_at}
 			<div class="row actions">

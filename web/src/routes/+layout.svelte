@@ -7,6 +7,7 @@
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadUser, logout, session } from '#lib/session.svelte.ts';
 	import Sidebar from '#lib/Sidebar.svelte';
+	import ThemeToggle from '#lib/ThemeToggle.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -44,14 +45,15 @@
 			>
 				<span></span><span></span><span></span>
 			</button>
-			<a class="brand" href={resolve('/')}>paperus</a>
+			<a class="brand" href={resolve('/')}><span class="highlight">paperus</span></a>
 		</div>
-		{#if session.user}
-			<div class="row">
-				<span class="muted">{session.user.username}</span>
-				<button onclick={signOut}>Log out</button>
-			</div>
-		{/if}
+		<div class="row">
+			<ThemeToggle />
+			{#if session.user}
+				<span class="user">{session.user.username}</span>
+				<button class="quiet" onclick={signOut}>Log out</button>
+			{/if}
+		</div>
 	</header>
 
 	<div class="body">
@@ -67,49 +69,85 @@
 
 <style>
 	header {
+		position: sticky;
+		top: 0;
+		z-index: 30;
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		gap: var(--gap);
-		padding: 8px 16px;
-		border-bottom: 1px solid var(--border);
-		background: var(--surface);
+		height: 56px;
+		padding: 0 12px 0 8px;
+		border-bottom: 1px solid var(--rule);
+		background: color-mix(in srgb, var(--paper) 92%, transparent);
+		backdrop-filter: blur(8px);
 	}
 	.brand {
-		color: var(--text);
-		font-size: 1.15em;
+		font-family: var(--serif);
+		font-size: var(--step-2);
+		font-weight: 650;
+		letter-spacing: -0.02em;
+		color: var(--ink);
 		text-decoration: none;
+	}
+	.brand .highlight {
+		padding: 0 0.25em;
 	}
 	.burger {
 		display: grid;
+		place-content: center;
 		gap: 4px;
-		padding: 9px 8px;
+		width: 40px;
+		height: 40px;
+		padding: 0;
 		border-color: transparent;
 		background: none;
 	}
-	.burger:hover {
-		background: var(--bg);
+	.burger:hover:not(:disabled) {
+		background: var(--rail);
+		border-color: transparent;
 	}
 	.burger span {
 		display: block;
 		width: 18px;
 		height: 2px;
 		border-radius: 1px;
-		background: var(--text);
+		background: var(--ink);
+	}
+	.user {
+		color: var(--muted);
+		margin-left: 4px;
+	}
+	.quiet {
+		border-color: transparent;
+		background: none;
+		color: var(--royal);
+	}
+	.quiet:hover:not(:disabled) {
+		background: var(--rail);
+		border-color: transparent;
 	}
 	.body {
 		display: flex;
-		gap: 16px;
-		padding: 16px;
+		gap: 24px;
+		padding: 24px 16px;
 		align-items: flex-start;
 	}
 	main {
 		flex: 1;
 		min-width: 0;
-		max-width: 960px;
+		max-width: 920px;
 		margin: 0 auto;
 	}
 	main.login {
 		padding: 16px;
+	}
+	@media (max-width: 720px) {
+		.user {
+			display: none;
+		}
+		.body {
+			padding: 16px;
+		}
 	}
 </style>

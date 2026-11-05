@@ -28,34 +28,55 @@
 	}
 </script>
 
-<div class="login card">
-	<h1>paperus</h1>
-	<p class="muted">Papers, for us.</p>
+<div class="login">
+	<h1><span class="highlight">paperus</span></h1>
+	<p class="tagline">Papers, for us: the group's library, searchable by meaning.</p>
 	<form onsubmit={login}>
 		<label>Username <input bind:value={username} autocomplete="username" required /></label>
 		<label>
 			Password
 			<input type="password" bind:value={password} autocomplete="current-password" required />
 		</label>
-		{#if error}<p class="error">{error}</p>{/if}
-		<button class="primary" disabled={busy}>Log in</button>
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		<button class="primary" disabled={busy}>{busy ? 'Logging in…' : 'Log in'}</button>
 	</form>
 </div>
 
 <style>
 	.login {
-		max-width: 360px;
-		margin: 12vh auto 0;
+		max-width: 340px;
+		margin: 14vh auto 0;
 	}
 	h1 {
-		margin: 0;
+		font-size: clamp(2.6rem, 9vw, 3.6rem);
+		font-weight: 650;
+		letter-spacing: -0.03em;
+		margin: 0 0 8px;
+	}
+	h1 .highlight {
+		padding: 0 0.2em;
+	}
+	.tagline {
+		color: var(--muted);
+		margin: 0 0 32px;
 	}
 	form {
 		display: grid;
-		gap: 12px;
+		gap: 16px;
 	}
 	label {
 		display: grid;
-		gap: 4px;
+		gap: 6px;
+		font-weight: 600;
+	}
+	label input {
+		font-weight: 400;
+	}
+	button {
+		padding: 10px 14px;
+		margin-top: 4px;
+	}
+	.error {
+		margin: 0;
 	}
 </style>
