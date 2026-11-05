@@ -17,6 +17,14 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
   database alone or database plus files, with the paperus version and
   migration stored alongside, so a backup can be restored into the same or
   a newer version.
+- **Personal access tokens.** For scripts, the MCP server (an AI assistant
+  acting for its user) and the browser extension, instead of the login
+  session. In Settings: create a named token, shown once; choose read-only
+  or read and write, and optionally an expiry; see when each was last
+  used; revoke. Stored only as a hash like login sessions; a token acts
+  with exactly its owner's permissions (never more, possibly less);
+  deactivating a user stops their tokens. Administrators see that tokens
+  exist, not their values.
 - **Onboarding.** Create the first administrator in the browser on first
   start, like Immich, instead of the command line.
 - **Feature parity with Zotero** as the general goal: citation styles and
