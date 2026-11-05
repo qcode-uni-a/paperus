@@ -80,6 +80,9 @@ class GroupIn(BaseModel):
 class GroupChange(BaseModel):
     name: Name | None = None
     description: str | None = None
+    parent_id: uuid.UUID | None = None
+    """Move into another group (whose admin one is), or ``null`` to the top
+    (site administrators); never into itself or a group inside it."""
 
 
 class MemberOut(BaseModel):
@@ -295,8 +298,25 @@ def change_group(
             raise HTTPException(422, str(error)) from error
     if "description" in body.model_fields_set:
         group.description = (body.description or "").strip() or None
+    if "parent_id" in body.model_fields_set and body.parent_id != group.parent_id:
+        _move(db, access, group, body.parent_id)
     db.commit()
-    return _group_out(db, access, group)
+    return _group_out(db, Access.of(db, access.user), group)
+
+
+def _move(db: DB, access: Access, group: Group, parent_id: uuid.UUID | None) -> None:
+    if parent_id is None:
+        if not access.user.is_admin:
+            raise HTTPException(403, "only site administrators make top-level groups")
+    else:
+        _managed_group(db, access, parent_id)
+        current: uuid.UUID | None = parent_id
+        while current is not None:
+            if current == group.id:
+                raise HTTPException(409, "a group cannot move into itself")
+            above = db.get(Group, current)
+            current = above.parent_id if above else None
+    group.parent_id = parent_id
 
 
 @router.delete("/api/groups/{group_id}", status_code=204)
@@ -400,6 +420,30 @@ def remove_member(
     db.delete(membership)
     db.commit()
     return list_members(group_id, db, access)
+
+
+@router.post("/api/groups/{group_id}/leave", status_code=204)
+def leave_group(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Leave a group one was added to. Membership through a group above can
+    only be left there."""
+    group = _visible_group(db, access, group_id)
+    membership = db.get(Membership, (group_id, access.user.id))
+    if membership is None:
+        above = next(
+            (
+                g
+                for g in _ancestors(db, group)
+                if db.get(Membership, (g.id, access.user.id))
+            ),
+            None,
+        )
+        where = f"through {above.name}; leave that group" if above else "not directly"
+        raise HTTPException(409, f"you are in this group {where} instead")
+    if membership.role == Role.ADMIN:
+        _keep_an_admin(db, group_id, access.user.id)
+    db.delete(membership)
+    db.commit()
+    return Response(status_code=204)
 
 
 def _keep_an_admin(db: DB, group_id: uuid.UUID, leaving: uuid.UUID) -> None:

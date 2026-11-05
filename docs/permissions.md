@@ -96,7 +96,19 @@ because of it; they need a membership like everyone else.
 | Delete (only without papers and subgroups) | no | no | yes | yes |
 | Add people, change roles, remove people | no | no | yes | yes |
 | Look up users to add | no | no | yes | yes |
+| Leave (only a group one was added to directly) | — | yes | yes, unless the last admin | — |
+| Move into another group (admin of both) or to the top (site administrators) | no | no | yes, into groups one administers | yes |
 
 - A top-level group always keeps at least one admin of its own.
+- Who is in a group through a group above leaves it there.
 - When adding people, the website reminds that the group's licences must
   allow sharing its PDFs.
+
+## Users
+
+| Action | Everyone | Site administrator |
+| --- | --- | --- |
+| List users, create users | no | yes |
+| Reset a password (logs the person out everywhere) | no (own password: Settings) | yes |
+| Grant or take administrator rights | no | yes, but one active administrator always stays |
+| Deactivate (no login; papers and groups stay), reactivate | no | yes, not oneself |

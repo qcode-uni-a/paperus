@@ -55,6 +55,9 @@ class User(Record, Base):
         JSONB, server_default=text("'[]'::jsonb")
     )
     """Tutorial hints the person has seen (so they show once, on any device)."""
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Deactivated people cannot log in; their papers and memberships stay."""
 
 
 class Role(StrEnum):

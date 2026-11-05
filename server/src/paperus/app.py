@@ -9,7 +9,17 @@ from fastapi.responses import JSONResponse
 from procrastinate import App
 
 from paperus.access import Forbidden, NotVisible
-from paperus.api import admin, auth, files, groups, health, items, organize, search
+from paperus.api import (
+    admin,
+    auth,
+    files,
+    groups,
+    health,
+    items,
+    organize,
+    search,
+    users,
+)
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import make_job_app
@@ -62,6 +72,7 @@ def create_app(
     app.include_router(admin.router)
     app.include_router(organize.router)
     app.include_router(groups.router)
+    app.include_router(users.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:

@@ -52,8 +52,11 @@ def authenticate(db: Session, username: str, password: str) -> User | None:
         return None
     if not verify_password(user.password_hash, password):
         return None
+    if user.deactivated_at is not None:
+        return None
     if _hasher.check_needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
+    user.last_login_at = datetime.now(UTC)
     return user
 
 
@@ -80,6 +83,11 @@ def end_session(db: Session, token: str) -> None:
     )
 
 
+def end_sessions(db: Session, user: User) -> None:
+    """Log the user out everywhere."""
+    db.execute(delete(LoginSession).where(LoginSession.user_id == user.id))
+
+
 def change_password(db: Session, user: User, password: str, keep_token: str) -> None:
     """Set a new password and end every other login session of the user."""
     user.password_hash = hash_password(password)
@@ -98,5 +106,6 @@ def user_for_token(db: Session, token: str) -> User | None:
         .where(
             LoginSession.token_hash == _token_hash(token),
             LoginSession.expires_at > datetime.now(UTC),
+            User.deactivated_at.is_(None),
         )
     )

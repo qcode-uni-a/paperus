@@ -573,3 +573,97 @@ def test_groups_keep_an_admin(w: World) -> None:
     url = f"/api/groups/{w.chair['id']}/members/{w.admin.id}"
     assert w.admin.delete(url).status_code == 409
     assert w.admin.put(url, json={"role": "member"}).status_code == 409
+
+
+def test_groups_leave(w: World) -> None:
+    # Direct members leave; who is in through a group above leaves there.
+    project = w.admin.post(
+        "/api/groups", json={"name": "Project", "parent_id": w.chair["id"]}
+    ).json()
+    w.admin.put(
+        f"/api/groups/{project['id']}/members/{w.outsider.id}", json={"role": "reader"}
+    )
+    assert w.outsider.post(f"/api/groups/{project['id']}/leave").status_code == 204
+    assert w.outsider.get("/api/groups").json() == []
+    inherited = w.reader.post(f"/api/groups/{project['id']}/leave")
+    assert inherited.status_code == 409
+    assert "Chair" in inherited.json()["detail"]
+    assert w.reader.post(f"/api/groups/{w.chair['id']}/leave").status_code == 204
+    assert w.reader.titles() == []
+    # The last admin of a top-level group stays.
+    assert w.admin.post(f"/api/groups/{w.chair['id']}/leave").status_code == 409
+
+
+def test_groups_move(w: World) -> None:
+    project = w.admin.post(
+        "/api/groups", json={"name": "Project", "parent_id": w.chair["id"]}
+    ).json()
+    url = f"/api/groups/{project['id']}"
+    # Into another group: admins of both (the admin is also the Lab's admin).
+    for person in (w.outsider, w.reader, w.member):
+        assert person.patch(url, json={"parent_id": w.lab["id"]}).status_code in (
+            403,
+            404,
+        )
+    moved = w.admin.patch(url, json={"parent_id": w.lab["id"]})
+    assert moved.json()["parent_id"] == w.lab["id"]
+    # Never into itself or a group inside it.
+    inner = w.admin.post(
+        "/api/groups", json={"name": "Inner", "parent_id": project["id"]}
+    )
+    assert w.admin.patch(url, json={"parent_id": inner.json()["id"]}).status_code == 409
+    # To the top: site administrators only.
+    assert w.admin.patch(url, json={"parent_id": None}).status_code == 403
+    assert w.root.patch(url, json={"parent_id": None}).json()["parent_id"] is None
+
+
+# Users (site administrators)
+
+
+def test_users_list_and_create(w: World) -> None:
+    for person in (w.outsider, w.member, w.admin):
+        assert person.get("/api/admin/users").status_code == 403
+        new = {"username": "new", "password": "long enough"}
+        assert person.post("/api/admin/users", json=new).status_code == 403
+    listed = {u["username"]: u for u in w.root.get("/api/admin/users").json()}
+    assert listed["member"]["groups"] == 2
+    created = w.root.post(
+        "/api/admin/users", json={"username": "new", "password": "long enough"}
+    )
+    assert created.status_code == 201
+    again = w.root.post(
+        "/api/admin/users", json={"username": "new", "password": "long enough"}
+    )
+    assert again.status_code == 409
+    login = w.root.client.post(
+        "/api/auth/login", json={"username": "new", "password": "long enough"}
+    )
+    assert login.status_code == 200
+
+
+def test_users_reset_password_admin_rights_deactivate(w: World) -> None:
+    url = f"/api/admin/users/{w.member.id}"
+    for person in (w.outsider, w.admin):
+        assert person.patch(url, json={"is_admin": True}).status_code == 403
+    # A new password logs the person out everywhere.
+    assert w.root.patch(url, json={"password": "a new one!"}).status_code == 200
+    assert w.member.get("/api/auth/me").status_code == 401
+    # Admin rights, but never losing the last administrator.
+    assert w.root.patch(url, json={"is_admin": True}).json()["is_admin"] is True
+    assert w.root.patch(url, json={"is_admin": False}).json()["is_admin"] is False
+    root_url = f"/api/admin/users/{w.root.id}"
+    assert w.root.patch(root_url, json={"is_admin": False}).status_code == 409
+    assert w.root.patch(root_url, json={"active": False}).status_code == 409
+    # Deactivated: no login, sessions end; papers and groups stay.
+    reader_url = f"/api/admin/users/{w.reader.id}"
+    deactivated = w.root.patch(reader_url, json={"active": False}).json()
+    assert deactivated["deactivated_at"] is not None
+    assert deactivated["groups"] == 1
+    assert w.reader.get("/api/auth/me").status_code == 401
+    login = w.root.client.post(
+        "/api/auth/login", json={"username": "reader", "password": "secret"}
+    )
+    assert login.status_code == 401
+    assert (
+        w.root.patch(reader_url, json={"active": True}).json()["deactivated_at"] is None
+    )
