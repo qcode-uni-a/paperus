@@ -832,7 +832,7 @@
           "search"
         ],
         "summary": "Search",
-        "description": "Passages matching the words in ``q`` (quotes for phrases, ``-`` to exclude).",
+        "description": "Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both. The ``X-Search-Mode`` header says what was used: without\nthe ML service, hybrid search falls back to keywords.",
         "operationId": "search",
         "parameters": [
           {
@@ -857,6 +857,21 @@
               "default": 20,
               "title": "Limit"
             }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "hybrid",
+                "keyword",
+                "meaning"
+              ],
+              "type": "string",
+              "default": "hybrid",
+              "title": "Mode"
+            }
           }
         ],
         "responses": {
@@ -870,6 +885,190 @@
                     "$ref": "#/components/schemas/Passage"
                   },
                   "title": "Response Search"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/config": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfig"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Config",
+        "description": "Save settings. A new embedding model must be one the ML service\noffers; the library is then re-embedded in the background, while keyword\nsearch keeps working and search by meaning covers more and more.",
+        "operationId": "set_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SystemConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/ml": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Ml Status",
+        "operationId": "ml_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MLStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/ml/models/{name}": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Ml Model",
+        "description": "Remove a downloaded model from the ML service (not the one in use).",
+        "operationId": "delete_ml_model",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Stats",
+        "operationId": "stats",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs/{job}": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Run Job",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing) or ``text``\n(read files still pending), instead of waiting for the next run.",
+        "operationId": "run_job",
+        "parameters": [
+          {
+            "name": "job",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Job"
                 }
               }
             }
@@ -1334,6 +1533,105 @@
         ],
         "title": "LoginResponse"
       },
+      "MLModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "dimensions": {
+            "type": "integer",
+            "title": "Dimensions"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "loaded": {
+            "type": "boolean",
+            "title": "Loaded"
+          },
+          "cached_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "task",
+          "dimensions",
+          "max_tokens",
+          "loaded",
+          "cached_bytes"
+        ],
+        "title": "MLModel"
+      },
+      "MLService": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "ok",
+          "error"
+        ],
+        "title": "MLService"
+      },
+      "MLStatus": {
+        "properties": {
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/MLService"
+            },
+            "type": "array",
+            "title": "Services"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/MLModel"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "services",
+          "models"
+        ],
+        "title": "MLStatus"
+      },
       "MetadataSource": {
         "type": "string",
         "enum": [
@@ -1410,6 +1708,17 @@
           "score": {
             "type": "number",
             "title": "Score"
+          },
+          "matched": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "keyword",
+                "meaning"
+              ]
+            },
+            "type": "array",
+            "title": "Matched"
           }
         },
         "type": "object",
@@ -1422,7 +1731,8 @@
           "position",
           "page",
           "snippet",
-          "score"
+          "score",
+          "matched"
         ],
         "title": "Passage"
       },
@@ -1436,6 +1746,68 @@
           "url"
         ],
         "title": "Scheme"
+      },
+      "Stats": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "files_pending": {
+            "type": "integer",
+            "title": "Files Pending"
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks"
+          },
+          "embedded": {
+            "type": "integer",
+            "title": "Embedded"
+          },
+          "embedding_model": {
+            "type": "string",
+            "title": "Embedding Model"
+          },
+          "jobs": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "files",
+          "files_pending",
+          "chunks",
+          "embedded",
+          "embedding_model",
+          "jobs"
+        ],
+        "title": "Stats"
+      },
+      "SystemConfig": {
+        "properties": {
+          "embedding_model": {
+            "type": "string",
+            "title": "Embedding Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "embedding_model"
+        ],
+        "title": "SystemConfig"
       },
       "TextStatus": {
         "type": "string",

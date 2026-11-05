@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddVersionData, AddVersionErrors, AddVersionResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, SearchData, SearchErrors, SearchResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddVersionData, AddVersionErrors, AddVersionResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ListItemsData, ListItemsErrors, ListItemsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MeData, MeResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -198,6 +198,54 @@ export const restoreFile = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * Search
  *
- * Passages matching the words in ``q`` (quotes for phrases, ``-`` to exclude).
+ * Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its
+ * meaning, or both. The ``X-Search-Mode`` header says what was used: without
+ * the ML service, hybrid search falls back to keywords.
  */
 export const search = <ThrowOnError extends boolean = false>(options: Options<SearchData, ThrowOnError>): RequestResult<SearchResponses, SearchErrors, ThrowOnError> => (options.client ?? client).get<SearchResponses, SearchErrors, ThrowOnError>({ url: '/api/search', ...options });
+
+/**
+ * Get Config
+ */
+export const getConfig = <ThrowOnError extends boolean = false>(options?: Options<GetConfigData, ThrowOnError>): RequestResult<GetConfigResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetConfigResponses, unknown, ThrowOnError>({ url: '/api/admin/config', ...options });
+
+/**
+ * Set Config
+ *
+ * Save settings. A new embedding model must be one the ML service
+ * offers; the library is then re-embedded in the background, while keyword
+ * search keeps working and search by meaning covers more and more.
+ */
+export const setConfig = <ThrowOnError extends boolean = false>(options: Options<SetConfigData, ThrowOnError>): RequestResult<SetConfigResponses, SetConfigErrors, ThrowOnError> => (options.client ?? client).put<SetConfigResponses, SetConfigErrors, ThrowOnError>({
+    url: '/api/admin/config',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Ml Status
+ */
+export const mlStatus = <ThrowOnError extends boolean = false>(options?: Options<MlStatusData, ThrowOnError>): RequestResult<MlStatusResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MlStatusResponses, unknown, ThrowOnError>({ url: '/api/admin/ml', ...options });
+
+/**
+ * Delete Ml Model
+ *
+ * Remove a downloaded model from the ML service (not the one in use).
+ */
+export const deleteMlModel = <ThrowOnError extends boolean = false>(options: Options<DeleteMlModelData, ThrowOnError>): RequestResult<DeleteMlModelResponses, DeleteMlModelErrors, ThrowOnError> => (options.client ?? client).delete<DeleteMlModelResponses, DeleteMlModelErrors, ThrowOnError>({ url: '/api/admin/ml/models/{name}', ...options });
+
+/**
+ * Stats
+ */
+export const stats = <ThrowOnError extends boolean = false>(options?: Options<StatsData, ThrowOnError>): RequestResult<StatsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<StatsResponses, unknown, ThrowOnError>({ url: '/api/admin/stats', ...options });
+
+/**
+ * Run Job
+ *
+ * Start a sweep now: ``embeddings`` (embed what is missing) or ``text``
+ * (read files still pending), instead of waiting for the next run.
+ */
+export const runJob = <ThrowOnError extends boolean = false>(options: Options<RunJobData, ThrowOnError>): RequestResult<RunJobResponses, RunJobErrors, ThrowOnError> => (options.client ?? client).post<RunJobResponses, RunJobErrors, ThrowOnError>({ url: '/api/admin/jobs/{job}', ...options });

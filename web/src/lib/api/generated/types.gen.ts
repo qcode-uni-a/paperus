@@ -267,6 +267,68 @@ export type LoginResponse = {
 };
 
 /**
+ * MLModel
+ */
+export type MlModel = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Task
+     */
+    task: string;
+    /**
+     * Dimensions
+     */
+    dimensions: number;
+    /**
+     * Max Tokens
+     */
+    max_tokens: number;
+    /**
+     * Loaded
+     */
+    loaded: boolean;
+    /**
+     * Cached Bytes
+     */
+    cached_bytes: number | null;
+};
+
+/**
+ * MLService
+ */
+export type MlService = {
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Ok
+     */
+    ok: boolean;
+    /**
+     * Error
+     */
+    error: string | null;
+};
+
+/**
+ * MLStatus
+ */
+export type MlStatus = {
+    /**
+     * Services
+     */
+    services: Array<MlService>;
+    /**
+     * Models
+     */
+    models: Array<MlModel>;
+};
+
+/**
  * MetadataSource
  */
 export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
@@ -322,12 +384,64 @@ export type Passage = {
      * Score
      */
     score: number;
+    /**
+     * Matched
+     */
+    matched: Array<'keyword' | 'meaning'>;
 };
 
 /**
  * Scheme
  */
 export type Scheme = 'doi' | 'arxiv' | 'isbn' | 'pmid' | 'url';
+
+/**
+ * Stats
+ */
+export type Stats = {
+    /**
+     * Items
+     */
+    items: number;
+    /**
+     * Files
+     */
+    files: number;
+    /**
+     * Files Pending
+     */
+    files_pending: number;
+    /**
+     * Chunks
+     */
+    chunks: number;
+    /**
+     * Embedded
+     */
+    embedded: number;
+    /**
+     * Embedding Model
+     */
+    embedding_model: string;
+    /**
+     * Jobs
+     */
+    jobs: {
+        [key: string]: {
+            [key: string]: number;
+        };
+    };
+};
+
+/**
+ * SystemConfig
+ */
+export type SystemConfig = {
+    /**
+     * Embedding Model
+     */
+    embedding_model: string;
+};
 
 /**
  * TextStatus
@@ -996,6 +1110,10 @@ export type SearchData = {
          * Limit
          */
         limit?: number;
+        /**
+         * Mode
+         */
+        mode?: 'hybrid' | 'keyword' | 'meaning';
     };
     url: '/api/search';
 };
@@ -1019,3 +1137,140 @@ export type SearchResponses = {
 };
 
 export type SearchResponse = SearchResponses[keyof SearchResponses];
+
+export type GetConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/config';
+};
+
+export type GetConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: SystemConfig;
+};
+
+export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
+
+export type SetConfigData = {
+    body: SystemConfig;
+    path?: never;
+    query?: never;
+    url: '/api/admin/config';
+};
+
+export type SetConfigErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetConfigError = SetConfigErrors[keyof SetConfigErrors];
+
+export type SetConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: SystemConfig;
+};
+
+export type SetConfigResponse = SetConfigResponses[keyof SetConfigResponses];
+
+export type MlStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/ml';
+};
+
+export type MlStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: MlStatus;
+};
+
+export type MlStatusResponse = MlStatusResponses[keyof MlStatusResponses];
+
+export type DeleteMlModelData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/admin/ml/models/{name}';
+};
+
+export type DeleteMlModelErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteMlModelError = DeleteMlModelErrors[keyof DeleteMlModelErrors];
+
+export type DeleteMlModelResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteMlModelResponse = DeleteMlModelResponses[keyof DeleteMlModelResponses];
+
+export type StatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/stats';
+};
+
+export type StatsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Stats;
+};
+
+export type StatsResponse = StatsResponses[keyof StatsResponses];
+
+export type RunJobData = {
+    body?: never;
+    path: {
+        /**
+         * Job
+         */
+        job: string;
+    };
+    query?: never;
+    url: '/api/admin/jobs/{job}';
+};
+
+export type RunJobErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RunJobError = RunJobErrors[keyof RunJobErrors];
+
+export type RunJobResponses = {
+    /**
+     * Response Run Job
+     *
+     * Successful Response
+     */
+    202: {
+        [key: string]: unknown;
+    };
+};
+
+export type RunJobResponse = RunJobResponses[keyof RunJobResponses];

@@ -32,6 +32,7 @@
 			<a class="brand" href={resolve('/')}>paperus</a>
 			<a href={resolve('/')}>Library</a>
 			<a href={resolve('/trash')}>Trash</a>
+			{#if session.user?.is_admin}<a href={resolve('/admin')}>Admin</a>{/if}
 		</nav>
 		{#if session.user}
 			<div class="row">
