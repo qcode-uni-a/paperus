@@ -12,7 +12,7 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus server: API, website and worker" \
       org.opencontainers.image.licenses="Apache-2.0"

@@ -4,7 +4,7 @@
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
 FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus machine learning service (embeddings)" \
       org.opencontainers.image.licenses="Apache-2.0"
