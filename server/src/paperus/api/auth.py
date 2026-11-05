@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Path, Request, Response
 from pydantic import BaseModel, Field
 
 from paperus import auth
@@ -21,6 +21,8 @@ class UserOut(BaseModel):
     id: uuid.UUID
     username: str
     is_admin: bool
+    seen_hints: list[str]
+    """Tutorial hints already shown to the person."""
 
 
 class PasswordChange(BaseModel):
@@ -34,7 +36,12 @@ class LoginResponse(BaseModel):
 
 
 def user_out(user: auth.User) -> UserOut:
-    return UserOut(id=user.id, username=user.username, is_admin=user.is_admin)
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        is_admin=user.is_admin,
+        seen_hints=user.seen_hints,
+    )
 
 
 @router.post("/login")
@@ -81,3 +88,14 @@ def change_password(
         raise HTTPException(403, "the current password is wrong")
     auth.change_password(db, user, body.new, keep_token=request_token(request) or "")
     db.commit()
+
+
+Hint = Annotated[str, Path(pattern=r"^[a-z0-9-]{1,40}$")]
+
+
+@router.put("/hints/{hint}", status_code=204)
+def mark_hint_seen(hint: Hint, db: DB, user: CurrentUser) -> None:
+    """Remember that the person has seen a tutorial hint."""
+    if hint not in user.seen_hints:
+        user.seen_hints = [*user.seen_hints, hint]
+        db.commit()

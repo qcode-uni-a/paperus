@@ -1038,6 +1038,10 @@ export type UserOut = {
      * Is Admin
      */
     is_admin: boolean;
+    /**
+     * Seen Hints
+     */
+    seen_hints: Array<string>;
 };
 
 /**
@@ -1263,6 +1267,36 @@ export type ChangePasswordResponses = {
 };
 
 export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
+
+export type MarkHintSeenData = {
+    body?: never;
+    path: {
+        /**
+         * Hint
+         */
+        hint: string;
+    };
+    query?: never;
+    url: '/api/auth/hints/{hint}';
+};
+
+export type MarkHintSeenErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MarkHintSeenError = MarkHintSeenErrors[keyof MarkHintSeenErrors];
+
+export type MarkHintSeenResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type MarkHintSeenResponse = MarkHintSeenResponses[keyof MarkHintSeenResponses];
 
 export type ListItemsData = {
     body?: never;

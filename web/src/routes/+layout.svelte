@@ -3,6 +3,7 @@
 	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import DropZone from '#lib/DropZone.svelte';
+	import OwnerHint from '#lib/OwnerHint.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadUser, session } from '#lib/session.svelte.ts';
 	import Sidebar from '#lib/Sidebar.svelte';
@@ -61,6 +62,7 @@
 {#if session.user && !onLoginPage}
 	<DropZone />
 	<UploadTray />
+	<OwnerHint />
 {/if}
 
 <style>

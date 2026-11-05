@@ -51,6 +51,10 @@ class User(Record, Base):
         ForeignKey("libraries.id", ondelete="SET NULL", use_alter=True)
     )
     """Where new items go unless another library is chosen."""
+    seen_hints: Mapped[list[str]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """Tutorial hints the person has seen (so they show once, on any device)."""
 
 
 class Role(StrEnum):

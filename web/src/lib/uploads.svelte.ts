@@ -1,5 +1,6 @@
 import { addItems, errorMessage, findUpload } from '#lib/api/client.ts';
-import { libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
+import { addedPaper } from '#lib/hints.svelte.ts';
+import { defaultLibrary, libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
@@ -87,6 +88,9 @@ async function run(upload: Upload, file: File): Promise<void> {
 		}
 		upload.loaded = upload.size;
 		upload.status = 'done';
+		if (!upload.existing) {
+			addedPaper(result.item_id, upload.name, upload.library ?? defaultLibrary()?.id);
+		}
 		uploads.finished++;
 		setTimeout(() => remove(upload.id), SHOW_DONE_MS);
 	} catch (error) {

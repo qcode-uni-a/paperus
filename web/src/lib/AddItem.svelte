@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { addItem, addItems, errorMessage } from '#lib/api/client.ts';
+	import { addedPaper } from '#lib/hints.svelte.ts';
 	import {
 		defaultLibrary,
 		libraryForCollection,
@@ -57,7 +58,14 @@
 				}
 			: { doi };
 		const target = fixedLibrary ?? (library || undefined);
-		const { data, error: failure } = await addItem({ body: { ...body, library_id: target } });
+		const {
+			data,
+			error: failure,
+			response
+		} = await addItem({
+			body: { ...body, library_id: target }
+		});
+		if (data && response?.status === 201) addedPaper(data.id, data.title, data.library_id);
 		if (data && collection) {
 			const added = await addItems({
 				path: { collection_id: collection },

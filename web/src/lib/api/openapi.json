@@ -166,6 +166,43 @@
         }
       }
     },
+    "/api/auth/hints/{hint}": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Mark Hint Seen",
+        "description": "Remember that the person has seen a tutorial hint.",
+        "operationId": "mark_hint_seen",
+        "parameters": [
+          {
+            "name": "hint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,40}$",
+              "title": "Hint"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items": {
       "post": {
         "tags": [
@@ -4223,13 +4260,21 @@
           "is_admin": {
             "type": "boolean",
             "title": "Is Admin"
+          },
+          "seen_hints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Seen Hints"
           }
         },
         "type": "object",
         "required": [
           "id",
           "username",
-          "is_admin"
+          "is_admin",
+          "seen_hints"
         ],
         "title": "UserOut"
       },

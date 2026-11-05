@@ -115,3 +115,13 @@ def test_change_password(client: TestClient, db: Session) -> None:
     other = {"Authorization": f"Bearer {other_device}"}
     assert client.get("/api/auth/me", headers=other).status_code == 401
     assert login(client, password="a new password")
+
+
+def test_hints_are_remembered(client: TestClient, db: Session) -> None:
+    make_user(db)
+    login(client)
+    assert client.get("/api/auth/me").json()["seen_hints"] == []
+    assert client.put("/api/auth/hints/first-owner").status_code == 204
+    client.put("/api/auth/hints/first-owner")
+    assert client.get("/api/auth/me").json()["seen_hints"] == ["first-owner"]
+    assert client.put("/api/auth/hints/Not%20a%20hint").status_code == 422
