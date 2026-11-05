@@ -11,6 +11,7 @@
 	import ThemeToggle from '#lib/ThemeToggle.svelte';
 	import AddMenu from '#lib/AddMenu.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
+	import Toasts from '#lib/Toasts.svelte';
 	import UserMenu from '#lib/UserMenu.svelte';
 	import type { LayoutProps } from './$types';
 
@@ -67,6 +68,7 @@
 {#if session.user && !onLoginPage}
 	<DropZone />
 	<UploadTray />
+	<Toasts />
 	<OwnerHint />
 {/if}
 

@@ -40,3 +40,12 @@ def test_pinned_collections(client: TestClient, db: Session) -> None:
     assert bob.put(f"/api/collections/{thesis['id']}/pin").status_code == 404
     assert ada.delete(f"/api/collections/{thesis['id']}/pin").status_code == 204
     assert not any(c["pinned"] for c in ada.get("/api/collections").json())
+
+
+def test_list_by_ids(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    a, b = ada.add("A"), ada.add("B")
+    ada.add("C")
+    found = ada.get("/api/items", params={"id": [a["id"], b["id"]]}).json()
+    assert sorted(i["title"] for i in found) == ["A", "B"]
+    assert bob.get("/api/items", params={"id": [a["id"]]}).json() == []

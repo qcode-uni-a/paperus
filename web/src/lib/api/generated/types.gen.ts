@@ -2192,6 +2192,10 @@ export type ListItemsData = {
          * Favourite
          */
         favourite?: boolean;
+        /**
+         * Id
+         */
+        id?: Array<string> | null;
     };
     url: '/api/items';
 };

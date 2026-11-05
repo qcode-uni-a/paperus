@@ -1,6 +1,7 @@
 import { addItems, errorMessage, findUpload } from '#lib/api/client.ts';
 import { addedPaper } from '#lib/hints.svelte.ts';
 import { defaultLibrary, libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
+import { watchUploads } from '#lib/processing.svelte.ts';
 import type { NewItemUpload } from '#lib/api/generated/types.gen.ts';
 
 export type UploadStatus = 'waiting' | 'uploading' | 'done' | 'failed';
@@ -30,6 +31,8 @@ const SHOW_DONE_MS = 4000;
 const queue: { upload: Upload; file: File }[] = [];
 let running = 0;
 let nextId = 1;
+/** New papers of the uploads since the queue was last empty. */
+let batch: string[] = [];
 
 export function addFiles(files: Iterable<File>, collection?: string): void {
 	const library = libraryForCollection(collection);
@@ -65,6 +68,11 @@ function pump(): void {
 		run(next.upload, next.file).finally(() => {
 			running--;
 			pump();
+			if (running === 0 && queue.length === 0) {
+				// All sent: many new papers get a message when they are read.
+				watchUploads(batch);
+				batch = [];
+			}
 		});
 	}
 }
@@ -90,6 +98,7 @@ async function run(upload: Upload, file: File): Promise<void> {
 		upload.status = 'done';
 		if (!upload.existing) {
 			addedPaper(result.item_id, upload.name, upload.library ?? defaultLibrary()?.id);
+			batch.push(result.item_id);
 		}
 		uploads.finished++;
 		setTimeout(() => remove(upload.id), SHOW_DONE_MS);

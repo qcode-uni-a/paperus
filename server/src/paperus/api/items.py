@@ -504,6 +504,7 @@ def list_items(
     offset: Annotated[int, Query(ge=0)] = 0,
     unsorted: bool = False,
     favourite: bool = False,
+    id: Annotated[list[uuid.UUID] | None, Query(max_length=200)] = None,
 ) -> list[ItemOut]:
     """Items the person can read, newest first; ``before`` = last ``id`` for
     the next page. ``library`` shows one library only. ``sort=recent``:
@@ -548,6 +549,8 @@ def list_items(
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():
         conditions.append(Item.title.icontains(word, autoescape=True))
+    if id:
+        conditions.append(Item.id.in_(id))
     if favourite:
         conditions.append(
             Item.id.in_(

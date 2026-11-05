@@ -3,6 +3,8 @@
 	import { listImports } from '#lib/api/client.ts';
 	import type { ImportOut } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
+	import { watchImport } from '#lib/processing.svelte.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 	import {
 		defaultLibrary,
 		libraryName,
@@ -57,6 +59,10 @@
 		const { data } = await listImports();
 		if (!alive) return;
 		imports = data ?? [];
+		// A message when one still running is done, also after leaving.
+		for (const record of imports)
+			if (record.status === 'waiting' || record.status === 'running')
+				watchImport(record.id, record.filename);
 		clearTimeout(timer);
 		// Follow imports still running.
 		if (imports.some((i) => i.status === 'waiting' || i.status === 'running')) {
@@ -86,12 +92,20 @@
 		if (owner) body.append('library_id', owner);
 		const request = new XMLHttpRequest();
 		request.open('POST', '/api/imports');
+		request.responseType = 'json';
 		request.upload.onprogress = (progress) => {
 			if (progress.lengthComputable) sending = progress.loaded / progress.total;
 		};
 		request.onload = () => {
 			sending = null;
 			if (request.status === 201) {
+				const started = request.response as ImportOut;
+				watchImport(started.id, started.filename);
+				notify({
+					kind: 'info',
+					title: 'Import started',
+					text: 'It runs in the background: you can leave this page; you get a message when it is done.'
+				});
 				file = null;
 				load();
 			} else {

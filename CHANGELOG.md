@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Messages when background work is done**: after uploading more than
+  five papers, a note says they are being read, and a message follows when
+  all are ready (with how many need their details by hand, linking to
+  Unsorted). An import says when it is done, with its summary, also after
+  leaving the import page. As long as paperus is open in the browser.
 - **A new look, inspired by Immich**: the search moved into the top bar (on
   every page; "/" jumps to it), the menu got icons and a rounded highlight
   for the current page, buttons are rounded, and pages start right next to
