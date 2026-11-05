@@ -1,30 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.0.9 (2026-11-05)
 
-- Lists show a small icon when a paper has a file (PDF, text, image, …);
-  a click opens the file in a new tab.
-- **Tidying up**: the worker retries jobs whose worker stopped in the middle
-  (hourly), and deletes old finished jobs and expired login sessions
-  (nightly). See Job settings and docs/operations.md.
+Ready for the pilot's groups: sharing with a group in one step, finding the
+passage you searched for, and housekeeping that keeps a server tidy.
+
 - **Share with group…** in a paper's menu: the group gets the paper, and
-  the dialog says what changes for whom.
-- Group papers say who added them ("Added by ada, 3 days ago").
-- With the menu closed, pages take its room instead of leaving a gap on
-  the right.
-- Opening a search result marks the passage in the PDF and scrolls to it.
-- Search results show each paper's authors and year under its title (also
-  for AI assistants through MCP), the way people recognise papers.
-- Search options: "Note" among the types, so notes can be searched alone
-  or together with some types of paper.
-- The search field says what the search options are set to, e.g. "Search
-  preprints by meaning".
-- Fixed: the search options panel was squeezed to the width of its button.
+  the dialog says what changes for whom. Group papers say who added them
+  ("Added by ada, 3 days ago").
+- **Search**:
+  - Opening a result marks the passage in the PDF and scrolls to it.
+  - Results show each paper's authors and year under its title (also for
+    AI assistants through MCP).
+  - "Note" among the types in the search options, so notes can be
+    searched alone or with some types of paper.
+  - The search field says what the options are set to, e.g. "Search
+    preprints by meaning".
+- **Lists** show a small icon when a paper has a file (PDF, text, image,
+  …); a click opens the file in a new tab.
 - **Profile picture editor**: move and zoom the picture in a circle, with
   previews at the sizes others see. Only the 256-pixel result leaves the
   browser; the server refuses pictures larger than 512 pixels on a side.
-- The menu's Manage part sits at the bottom of the window; Administration
-  is only in the profile menu, whose entries now have icons.
+- **Menu**: Manage sits at the bottom of the window; Administration is only
+  in the profile menu, now with icons. With the menu closed, pages take
+  its room.
+- **Tidying up**: the worker retries jobs whose worker stopped in the
+  middle (hourly), and deletes old finished jobs and expired login
+  sessions (nightly). See Job settings and docs/operations.md.
+- Fixed: the search options panel was squeezed to the width of its button.
+- Behind the scenes: pre-commit checks in CI, Dependabot for all
+  dependencies, base images and actions; the website is built with
+  Node 26 (LTS); katex 0.18.10 (0.18.11 was withdrawn).
 
 ## 0.0.8 (2026-11-05)
 
