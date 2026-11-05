@@ -50,6 +50,10 @@ updates:
       # Node's major versions (only even ones become LTS) by hand.
       - dependency-name: node
         update-types: [version-update:semver-major]
+      # Python's versions (3.14 → 3.15) by hand too: new ones lack wheels
+      # for a while (onnxruntime had none for 3.15 a month after it).
+      - dependency-name: python
+        update-types: [version-update:semver-minor]
     groups:
       images:
         update-types: [minor, patch]
