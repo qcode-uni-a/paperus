@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { closeOnScroll } from '#lib/dismiss.ts';
 	import AddItem from '#lib/AddItem.svelte';
 	import { addFiles } from '#lib/uploads.svelte.ts';
 
 	let menu = $state<HTMLElement>();
+
+	$effect(() => closeOnScroll(() => menu?.hidePopover()));
 	let dialog = $state<HTMLDialogElement>();
 	let fileInput = $state<HTMLInputElement>();
 	let formOpen = $state(false);

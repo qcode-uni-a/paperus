@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { TYPE_NAMES } from '#lib/format.ts';
 
 	export interface Filters {
@@ -11,6 +12,10 @@
 
 	let open = $state(false);
 	let root = $state<HTMLElement>();
+
+	$effect(() => {
+		if (open) return closeOnScroll(() => (open = false));
+	});
 
 	const changed = $derived(!filters.words || !filters.meaning || filters.types.length > 0);
 

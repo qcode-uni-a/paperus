@@ -1,9 +1,12 @@
 <script lang="ts">
+	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { logout, session } from '#lib/session.svelte.ts';
 
 	let menu = $state<HTMLElement>();
+
+	$effect(() => closeOnScroll(() => menu?.hidePopover()));
 
 	const name = $derived(session.user?.username ?? '');
 	const initial = $derived(name.slice(0, 1).toUpperCase());
