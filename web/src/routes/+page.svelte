@@ -3,16 +3,8 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
-	import {
-		changeCollection,
-		createCollection,
-		deleteCollection,
-		listItems,
-		search,
-		type Item,
-		type Passage
-	} from '#lib/api/client.ts';
-	import { collectionPath, loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
+	import { organize } from '#lib/organize.svelte.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import SearchFilters, { type Filters } from '#lib/SearchFilters.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -70,40 +62,16 @@
 	// Filters from the address: ?collection=…, ?tag=… (several: all of them).
 	const collectionId = $derived(page.url.searchParams.get('collection'));
 	const tagIds = $derived(page.url.searchParams.getAll('tag'));
-	const collection = $derived(organize.collections.find((c) => c.id === collectionId));
 	const tagNames = $derived(
 		tagIds.map((id) => organize.tags.find((t) => t.id === id)?.name ?? '…')
 	);
 
-	async function newSubcollection() {
-		const name = prompt('Name of the new collection inside this one:')?.trim();
-		if (!name || !collectionId) return;
-		const { data } = await createCollection({ body: { name, parent_id: collectionId } });
-		await loadOrganize();
-		if (data) goto(`${resolve('/')}?collection=${data.id}`);
-	}
-
-	async function renameCollection() {
-		if (!collection) return;
-		const name = prompt('New name of the collection:', collection.name)?.trim();
-		if (!name || name === collection.name) return;
-		await changeCollection({ path: { collection_id: collection.id }, body: { name } });
-		await loadOrganize();
-	}
-
-	async function removeCollection() {
-		if (!collection) return;
-		const children = organize.collections.some((c) => c.parent_id === collection.id);
-		const ok = confirm(
-			`Delete the collection “${collection.name}”${children ? ' and the collections inside it' : ''}? ` +
-				'The items stay in the library.'
-		);
-		if (!ok) return;
-		const parent = collection.parent_id;
-		await deleteCollection({ path: { collection_id: collection.id } });
-		await loadOrganize();
-		goto(parent ? `${resolve('/')}?collection=${parent}` : resolve('/'));
-	}
+	// Collections have their own pages; older links still work.
+	$effect(() => {
+		if (collectionId) {
+			goto(resolve('/collections/[id]', { id: collectionId }), { replace: true });
+		}
+	});
 	let loading = false;
 
 	/** The first page, or with ``before`` the page after that item. */
@@ -274,13 +242,9 @@
 				{/each}
 			</ul>
 		{/if}
-	{:else if items.length === 0 && (collectionId || tagIds.length)}
+	{:else if items.length === 0 && tagIds.length}
 		{@render filterHead()}
-		<p class="muted">
-			{collectionId
-				? 'Nothing in this collection yet. Add items from their page, under Collections.'
-				: 'No items with these tags.'}
-		</p>
+		<p class="muted">No items with these tags.</p>
 	{:else if items.length === 0}
 		<div class="empty">
 			<h2>Nothing in the library yet</h2>
@@ -307,17 +271,7 @@
 </div>
 
 {#snippet filterHead()}
-	{#if collectionId}
-		<div class="filter-head">
-			<h1>{collection ? collectionPath(collection.id) : 'Collection'}</h1>
-			{#if collection?.description}<p class="muted">{collection.description}</p>{/if}
-			<div class="row">
-				<button class="quiet" onclick={newSubcollection}>New collection inside</button>
-				<button class="quiet" onclick={renameCollection}>Rename</button>
-				<button class="quiet danger" onclick={removeCollection}>Delete</button>
-			</div>
-		</div>
-	{:else if tagIds.length}
+	{#if tagIds.length}
 		<div class="filter-head">
 			<h1>Tagged {tagNames.join(' and ')}</h1>
 			<a href={resolve('/')}>Show all items</a>
@@ -410,25 +364,6 @@
 	.filter-head h1 {
 		margin: 0;
 		font-size: var(--step-2);
-	}
-	.filter-head p {
-		margin: 0;
-	}
-	.filter-head .row {
-		margin-left: -8px;
-	}
-	.quiet {
-		border-color: transparent;
-		background: none;
-		color: var(--royal);
-		padding: 4px 8px;
-	}
-	.quiet:hover:not(:disabled) {
-		background: var(--rail);
-		border-color: transparent;
-	}
-	.quiet.danger {
-		color: var(--danger);
 	}
 	.count {
 		font-size: var(--step-0);

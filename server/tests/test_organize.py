@@ -140,3 +140,16 @@ def test_tagging_changes_the_item_for_sync(logged_in: TestClient) -> None:
     tag(logged_in, a["id"], "new")
     changed = logged_in.get("/api/items", params={"since": since}).json()
     assert [i["id"] for i in changed] == [a["id"]]
+
+
+def test_collection_previews(logged_in: TestClient) -> None:
+    items = [add(logged_in, f"Paper {n}") for n in range(4)]
+    shelf = collection(logged_in, "Shelf")
+    for item in items:
+        logged_in.post(
+            f"/api/collections/{shelf}/items", json={"item_ids": [item["id"]]}
+        )
+    logged_in.delete(f"/api/items/{items[3]['id']}")
+    [listed] = logged_in.get("/api/collections").json()
+    assert [p["title"] for p in listed["recent"]] == ["Paper 2", "Paper 1", "Paper 0"]
+    assert listed["count"] == 3

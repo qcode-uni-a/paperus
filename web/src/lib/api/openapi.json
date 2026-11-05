@@ -1812,6 +1812,14 @@
           "count": {
             "type": "integer",
             "title": "Count"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/ItemPreview"
+            },
+            "type": "array",
+            "title": "Recent",
+            "default": []
           }
         },
         "type": "object",
@@ -2235,6 +2243,25 @@
           "collection_ids"
         ],
         "title": "ItemOut"
+      },
+      "ItemPreview": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ItemPreview"
       },
       "ItemTagOut": {
         "properties": {

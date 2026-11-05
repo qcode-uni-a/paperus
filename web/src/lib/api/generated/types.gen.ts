@@ -98,6 +98,10 @@ export type CollectionOut = {
      * Count
      */
     count: number;
+    /**
+     * Recent
+     */
+    recent?: Array<ItemPreview>;
 };
 
 /**
@@ -329,6 +333,20 @@ export type ItemOut = {
      * Collection Ids
      */
     collection_ids: Array<string>;
+};
+
+/**
+ * ItemPreview
+ */
+export type ItemPreview = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Title
+     */
+    title: string;
 };
 
 /**

@@ -67,7 +67,7 @@
 		<span class="label">Collections</span>
 		{#each item.collection_ids as id (id)}
 			<span class="chip">
-				<a href="{resolve('/')}?collection={id}">{collectionPath(id) || '…'}</a>
+				<a href={resolve('/collections/[id]', { id })}>{collectionPath(id) || '…'}</a>
 				<button
 					onclick={async () =>
 						done(await removeItem({ path: { collection_id: id, item_id: item.id } }))}

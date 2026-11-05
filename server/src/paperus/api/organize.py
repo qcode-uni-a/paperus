@@ -33,6 +33,11 @@ class TagIn(BaseModel):
     name: Name
 
 
+class ItemPreview(BaseModel):
+    id: uuid.UUID
+    title: str
+
+
 class CollectionOut(BaseModel):
     id: uuid.UUID
     name: str
@@ -40,6 +45,8 @@ class CollectionOut(BaseModel):
     parent_id: uuid.UUID | None
     count: int
     """Items directly in this collection (not in the trash)."""
+    recent: list[ItemPreview] = []
+    """The last items added (up to three), for previews."""
 
 
 class CollectionIn(BaseModel):
@@ -191,6 +198,7 @@ def list_collections(db: DB, user: CurrentUser) -> list[CollectionOut]:
         .outerjoin(counts, counts.c.collection_id == Collection.id)
         .order_by(func.lower(Collection.name))
     )
+    recent = _recent_items(db)
     return [
         CollectionOut(
             id=c.id,
@@ -198,9 +206,40 @@ def list_collections(db: DB, user: CurrentUser) -> list[CollectionOut]:
             description=c.description,
             parent_id=c.parent_id,
             count=count,
+            recent=recent.get(c.id, []),
         )
         for c, count in rows
     ]
+
+
+def _recent_items(
+    db: DB, per_collection: int = 3
+) -> dict[uuid.UUID, list[ItemPreview]]:
+    """The last items added to each collection, newest first."""
+    ranked = (
+        select(
+            CollectionItem.collection_id,
+            Item.id,
+            Item.title,
+            func.row_number()
+            .over(
+                partition_by=CollectionItem.collection_id,
+                order_by=CollectionItem.created_at.desc(),
+            )
+            .label("rank"),
+        )
+        .join(Item, Item.id == CollectionItem.item_id)
+        .where(Item.deleted_at.is_(None))
+        .subquery()
+    )
+    previews: dict[uuid.UUID, list[ItemPreview]] = {}
+    for collection_id, item_id, title, _ in db.execute(
+        select(ranked).where(ranked.c.rank <= per_collection).order_by(ranked.c.rank)
+    ):
+        previews.setdefault(collection_id, []).append(
+            ItemPreview(id=item_id, title=title)
+        )
+    return previews
 
 
 @router.post("/api/collections", status_code=201)
