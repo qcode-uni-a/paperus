@@ -1372,7 +1372,7 @@
           "organize"
         ],
         "summary": "Add Tag",
-        "description": "Tag an item; the tag is created if its library has none of that name\n(any case).",
+        "description": "Tag an item with its owner's, the person's or one of their groups' tag\n(see ``Access.may_tag``); the tag is created if that owner has none of\nthat name (any case), which for a group needs member rights there.",
         "operationId": "add_tag",
         "parameters": [
           {
@@ -1517,7 +1517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TagChanged"
+                  "$ref": "#/components/schemas/TagOut"
                 }
               }
             }
@@ -3929,94 +3929,6 @@
         "type": "object",
         "title": "TagChange",
         "description": "Only the fields given are changed; ``null`` clears colour or description."
-      },
-      "TagChanged": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "library_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Library Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TagColor"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          },
-          "sources": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "propertyNames": {
-              "$ref": "#/components/schemas/TagSource"
-            },
-            "type": "object",
-            "title": "Sources"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "last_used": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Used"
-          },
-          "left_out": {
-            "type": "integer",
-            "title": "Left Out",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "library_id",
-          "name",
-          "color",
-          "description",
-          "count",
-          "sources",
-          "created_at",
-          "last_used"
-        ],
-        "title": "TagChanged"
       },
       "TagColor": {
         "type": "string",

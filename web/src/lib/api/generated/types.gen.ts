@@ -902,51 +902,6 @@ export type TagChange = {
 };
 
 /**
- * TagChanged
- */
-export type TagChanged = {
-    /**
-     * Id
-     */
-    id: string;
-    /**
-     * Library Id
-     */
-    library_id: string;
-    /**
-     * Name
-     */
-    name: string;
-    color: TagColor | null;
-    /**
-     * Description
-     */
-    description: string | null;
-    /**
-     * Count
-     */
-    count: number;
-    /**
-     * Sources
-     */
-    sources: {
-        [key in TagSource]?: number;
-    };
-    /**
-     * Created At
-     */
-    created_at: string;
-    /**
-     * Last Used
-     */
-    last_used: string | null;
-    /**
-     * Left Out
-     */
-    left_out?: number;
-};
-
-/**
  * TagColor
  *
  * Colours a tag can have; the website gives each a light and dark shade.
@@ -2134,7 +2089,7 @@ export type ChangeTagResponses = {
     /**
      * Successful Response
      */
-    200: TagChanged;
+    200: TagOut;
 };
 
 export type ChangeTagResponse = ChangeTagResponses[keyof ChangeTagResponses];

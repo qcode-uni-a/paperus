@@ -312,8 +312,9 @@ export const createTag = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Add Tag
  *
- * Tag an item; the tag is created if its library has none of that name
- * (any case).
+ * Tag an item with its owner's, the person's or one of their groups' tag
+ * (see ``Access.may_tag``); the tag is created if that owner has none of
+ * that name (any case), which for a group needs member rights there.
  */
 export const addTag = <ThrowOnError extends boolean = false>(options: Options<AddTagData, ThrowOnError>): RequestResult<AddTagResponses, AddTagErrors, ThrowOnError> => (options.client ?? client).post<AddTagResponses, AddTagErrors, ThrowOnError>({
     url: '/api/items/{item_id}/tags',
