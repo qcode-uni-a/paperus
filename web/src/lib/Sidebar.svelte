@@ -81,6 +81,9 @@
 			<a href={resolve('/manage/tags')} class:current={active(resolve('/manage/tags'))}
 				><span>Tags</span></a
 			>
+			<a href={resolve('/manage/groups')} class:current={active(resolve('/manage/groups'))}
+				><span>Groups</span></a
+			>
 			<a href={resolve('/trash')} class:current={active(resolve('/trash'))}><span>Trash</span></a>
 			{#if session.user?.is_admin}
 				<a href={adminPath}><span>Administration</span></a>

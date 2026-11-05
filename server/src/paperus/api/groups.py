@@ -168,7 +168,7 @@ def list_libraries(db: DB, access: CurrentAccess) -> list[LibraryOut]:
     ]
     group_libraries = sorted(
         access.group_libraries.items(),
-        key=lambda pair: [*path(pair[0]), groups[pair[0]].name.lower()],
+        key=lambda pair: [n.lower() for n in [*path(pair[0]), groups[pair[0]].name]],
     )
     for group_id, library_id in group_libraries:
         libraries.append(

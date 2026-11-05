@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Groups and libraries**: everyone has a private library, every group one.
+  Groups nest (faculty, chair, project); members of a group are members of
+  the groups inside it. Roles: reader, member, admin. Site administrators
+  create top-level groups; group admins manage people and subgroups
+  (Manage → Groups), with a reminder that licences must allow sharing.
+  Lists, search and downloads show only what a person may read; items carry
+  their library, new items go to a default or chosen library. Private tags
+  and collections on group papers stay private. Everything from before goes
+  into a first group, "Shared library".
+- Tag colours (18), descriptions and usage; Manage pages for collections
+  (a tree with drag and drop) and tags.
+
 ## 0.0.1 (2026-11-05)
 
 First version, for trying paperus in a small group. Expect breaking changes.
