@@ -9,6 +9,34 @@ Smaller tasks noted along the way; larger plans live in the other documents.
   days, not hours as estimated in [search.md](search.md). Compare int8
   exports, batch sizes and thread settings, and a smaller model.
 
+## Sidebar and library
+
+Noted 2026-11-05.
+
+- **Favourites**: mark papers (and notes?) with a star; own sidebar entry.
+- **Recently read**: own sidebar entry for what one opened. The Recent page
+  already has "Opened by me"; perhaps split it into two entries.
+- **Quick links**: pin collections to the sidebar.
+- **Manage → Unsorted**: papers whose details could not be found
+  automatically (no DOI or arXiv ID found, title only from the file), to
+  fix by hand.
+- **Manage → Duplicates**: likely duplicates across the library (same
+  identifier or file, similar titles) with a recommendation, merged by hand
+  with the existing merge preview.
+
+## Groups and notes
+
+Noted 2026-11-05.
+
+- **Replies on notes**: a comment thread on a note, apart from its text,
+  so a group can discuss without editing it; together with PDF
+  annotations (highlights with comments), which work much the same.
+- **"Share with group…"** as the wording for giving a paper to a group
+  (the same handover, but it reads like sharing in Google Photos).
+- **"Added by"** on group papers, so people see who brought a paper in.
+- **Sharing with single people** via small ad-hoc groups ("Anna & Ben"),
+  so the owner model stays as it is.
+
 ## Ideas to decide later
 
 - **OAuth for MCP**, so claude.ai and ChatGPT can connect as custom
@@ -21,7 +49,7 @@ Collected 2026-11-05, roughly in priority order; each needs a design first.
 
 - **Feature parity with Zotero** as the general goal: citation styles and
   export, browser connector, notes and annotations, Word/LibreOffice
-  plugins, Zotero import, related items, duplicates merging.
+  plugins, related items.
 - **Start page.** A good default (e.g. recently added, recently opened,
   most used) with simple sorting and filtering; paperless-ngx's custom
   dashboards feel like overkill.
