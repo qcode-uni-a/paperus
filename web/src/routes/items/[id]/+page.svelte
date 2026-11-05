@@ -187,7 +187,7 @@
 		<div class="title">
 			<h1>
 				{item.title}{#if isShared(item.library_id)}<span class="shared-mark"
-						><SharedIcon size={18} /></span
+						><SharedIcon size={18} owner={item.library_id} /></span
 					>{/if}
 			</h1>
 			{#if !item.deleted_at && (writable || viewed)}

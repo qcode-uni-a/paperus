@@ -190,7 +190,7 @@
 						>
 							{tag.name}
 						</button>
-						{#if isShared(tag.library_id)}<SharedIcon size={15} />{/if}
+						{#if isShared(tag.library_id)}<SharedIcon size={15} owner={tag.library_id} />{/if}
 						{#if tag.description}<p>{tag.description}</p>{/if}
 					</td>
 					<td class="number">{tag.count}</td>

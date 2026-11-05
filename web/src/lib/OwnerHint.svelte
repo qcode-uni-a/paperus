@@ -34,8 +34,8 @@
 				<em>Settings → Owner of new things</em>.
 			</li>
 			<li>
-				<strong>To give one paper to someone else</strong>, open it and pick another
-				<em>Owner</em> below its title, for example a group to share it with.
+				<strong>To give one paper to someone else</strong>, open it and choose <em>Edit</em> in its ⋯
+				menu; there you can give it to a group to share it, for example.
 			</li>
 		</ol>
 		<div class="buttons">

@@ -12,7 +12,8 @@
 </script>
 
 <li>
-	{#if isShared(item.library_id)}<span class="corner"><SharedIcon /></span>{/if}
+	{#if isShared(item.library_id)}<span class="corner"><SharedIcon owner={item.library_id} /></span
+		>{/if}
 	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
 	<p class="reference">

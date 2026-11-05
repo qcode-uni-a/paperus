@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { libraryById, type Collection } from '#lib/organize.svelte.ts';
+	import SharedIcon from '#lib/SharedIcon.svelte';
 
 	let { collection }: { collection: Collection } = $props();
 
@@ -16,43 +17,36 @@
 	];
 </script>
 
-<a class="stack" href={resolve('/collections/[id]', { id: collection.id })}>
-	<div class="desk" aria-hidden="true">
-		{#if shared}
-			<span class="shared" title="Shared with a group">
-				<svg viewBox="0 0 24 24">
-					<circle cx="9" cy="8" r="3.2" />
-					<path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
-					<circle cx="16.5" cy="9" r="2.6" />
-					<path d="M15.5 14.2c2.6-.3 4.6 1.3 5.2 4.3" />
-				</svg>
-			</span>
-		{/if}
-		{#if sheets.length === 0}
-			<div class="sheet empty"></div>
-		{/if}
-		{#each sheets as sheet, index (sheet.id)}
-			{@const front = index === sheets.length - 1}
-			<div
-				class="sheet"
-				class:front
-				style:--angle="{fan[3 - sheets.length + index].angle}deg"
-				style:--shift="{fan[3 - sheets.length + index].shift}px"
-				style:--lift="{(sheets.length - 1 - index) * 4}px"
-			>
-				<span class="fold"></span>
-				<span class="title">{sheet.title}</span>
-				<span class="line"></span>
-				<span class="line short" class:marked={front}></span>
-				<span class="line"></span>
-			</div>
-		{/each}
-	</div>
-	<div class="label">
-		<strong>{collection.name}</strong>
-		<span>{collection.count} {collection.count === 1 ? 'item' : 'items'}</span>
-	</div>
-</a>
+<div class="wrap">
+	{#if shared}<span class="badge"><SharedIcon owner={collection.library_id} /></span>{/if}
+	<a class="stack" href={resolve('/collections/[id]', { id: collection.id })}>
+		<div class="desk" aria-hidden="true">
+			{#if sheets.length === 0}
+				<div class="sheet empty"></div>
+			{/if}
+			{#each sheets as sheet, index (sheet.id)}
+				{@const front = index === sheets.length - 1}
+				<div
+					class="sheet"
+					class:front
+					style:--angle="{fan[3 - sheets.length + index].angle}deg"
+					style:--shift="{fan[3 - sheets.length + index].shift}px"
+					style:--lift="{(sheets.length - 1 - index) * 4}px"
+				>
+					<span class="fold"></span>
+					<span class="title">{sheet.title}</span>
+					<span class="line"></span>
+					<span class="line short" class:marked={front}></span>
+					<span class="line"></span>
+				</div>
+			{/each}
+		</div>
+		<div class="label">
+			<strong>{collection.name}</strong>
+			<span>{collection.count} {collection.count === 1 ? 'item' : 'items'}</span>
+		</div>
+	</a>
+</div>
 
 <style>
 	.stack {
@@ -77,26 +71,20 @@
 		background: var(--desk);
 		overflow: hidden;
 	}
-	.shared {
+	.wrap {
+		position: relative;
+	}
+	/* Over the desk's top right corner, outside the link (it is a button). */
+	.badge {
 		position: absolute;
-		top: 8px;
-		right: 8px;
-		z-index: 1;
+		top: 14px;
+		right: 14px;
+		z-index: 2;
 		display: grid;
 		place-items: center;
-		width: 26px;
-		height: 26px;
 		border-radius: 50%;
 		background: var(--surface);
 		box-shadow: 0 1px 2px rgb(27 36 64 / 0.15);
-	}
-	.shared svg {
-		width: 16px;
-		height: 16px;
-		fill: none;
-		stroke: var(--muted);
-		stroke-width: 1.8;
-		stroke-linecap: round;
 	}
 	.sheet {
 		position: absolute;

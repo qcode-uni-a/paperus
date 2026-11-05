@@ -175,7 +175,7 @@
 			<div class="body" onclick={() => writable(collection) && edit(collection)}>
 				<strong
 					>{collection.name}{#if isShared(collection.library_id)}<span class="shared-mark"
-							><SharedIcon size={15} /></span
+							><SharedIcon size={15} owner={collection.library_id} /></span
 						>{/if}</strong
 				>
 				<span class="counts">{counts(collection)}</span>
