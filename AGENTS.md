@@ -3,6 +3,8 @@
 Design phase: start with `README.md` and `docs/`. `docs/decisions.md` lists
 what is decided and what is still open; don't re-open decided points without
 a reason.
+Planned work and ideas are GitHub issues (`gh issue list`), not a file;
+close them from commits with "Fixes #n".
 
 ## Conventions (planned)
 

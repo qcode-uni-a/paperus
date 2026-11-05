@@ -63,6 +63,9 @@ or pull `release` again, then `docker compose up -d`.
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |
 | [Pilot](docs/pilot.md) | Pilot plan and questions for testers |
 
+Planned work, ideas and bugs are in the [issues](https://github.com/qcode-uni-a/paperus/issues);
+labels show the area and whether a point still needs discussion.
+
 ## Development
 
 Needs Docker, [uv](https://docs.astral.sh/uv/) and Node.js.
