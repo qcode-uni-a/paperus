@@ -770,6 +770,7 @@ export type ItemDetail = {
      * Favourite
      */
     favourite?: boolean;
+    added_by?: Person | null;
     /**
      * Csl
      */
@@ -1645,6 +1646,24 @@ export type PasswordChange = {
      * New
      */
     new: string;
+};
+
+/**
+ * Person
+ */
+export type Person = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Username
+     */
+    username: string;
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
 };
 
 /**

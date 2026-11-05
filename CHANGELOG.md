@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Share with group…** in a paper's menu: the group gets the paper, and
+  the dialog says what changes for whom.
+- Group papers say who added them ("Added by ada, 3 days ago").
 - With the menu closed, pages take its room instead of leaving a gap on
   the right.
 - Opening a search result marks the passage in the PDF and scrolls to it.

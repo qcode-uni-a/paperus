@@ -28,11 +28,14 @@
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
 	import MergeDialog from '#lib/MergeDialog.svelte';
+	import ShareDialog from '#lib/ShareDialog.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
 	import { isShared, libraryById } from '#lib/organize.svelte.ts';
-	import { fullName } from '#lib/format.ts';
+	import { ago, fullName } from '#lib/format.ts';
+	import { session } from '#lib/session.svelte.ts';
+	import Avatar from '#lib/Avatar.svelte';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
 
 	const id = $derived(page.params.id ?? '');
@@ -67,6 +70,7 @@
 		}
 	}
 	let mergeDialog = $state<MergeDialog>();
+	let shareDialog = $state<ShareDialog>();
 
 	let addingVersion = $state(false);
 	let versionDoi = $state('');
@@ -231,6 +235,9 @@
 					>
 					{#if writable}
 						<hr />
+						<button role="menuitem" onclick={() => shareDialog?.open()}>
+							{isShared(item.library_id) ? 'Share with another group…' : 'Share with group…'}
+						</button>
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" onclick={() => mergeDialog?.open()}>Merge into…</button>
 						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
@@ -244,6 +251,19 @@
 				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
 				<em>{item.container_title}</em>{/if}
 		</p>
+		{#if item.added_by && isShared(item.library_id)}
+			<p class="added-by">
+				<Avatar
+					name={item.added_by.username}
+					url={item.added_by.avatar_url}
+					size={20}
+					tone="desk"
+				/>
+				Added by {item.added_by.id === session.user?.id ? 'you' : item.added_by.username}, {ago(
+					item.created_at
+				)}
+			</p>
+		{/if}
 
 		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
@@ -251,6 +271,7 @@
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
 			<MergeDialog bind:this={mergeDialog} {item} />
+			<ShareDialog bind:this={shareDialog} {item} onshared={load} />
 		{/if}
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
@@ -391,6 +412,14 @@
 {/if}
 
 <style>
+	.added-by {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: -4px 0 12px;
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
 	.copied {
 		margin: 0 0 8px;
 		color: var(--success);

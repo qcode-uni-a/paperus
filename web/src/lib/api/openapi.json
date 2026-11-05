@@ -6393,6 +6393,16 @@
             "title": "Favourite",
             "default": false
           },
+          "added_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Person"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "csl": {
             "additionalProperties": true,
             "type": "object",
@@ -7980,6 +7990,36 @@
           "new"
         ],
         "title": "PasswordChange"
+      },
+      "Person": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username"
+        ],
+        "title": "Person"
       },
       "Private": {
         "properties": {

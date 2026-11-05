@@ -10,13 +10,14 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from paperus import changes, library, merge, metadata
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
+from paperus.avatars import avatar_url
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
     Favourite,
@@ -26,6 +27,7 @@ from paperus.models import (
     ItemView,
     MetadataSource,
     TextStatus,
+    User,
     Version,
     VersionKind,
 )
@@ -112,7 +114,15 @@ class ItemOut(BaseModel):
     """The reader starred it."""
 
 
+class Person(BaseModel):
+    id: uuid.UUID
+    username: str
+    avatar_url: str | None = None
+
+
 class ItemDetail(ItemOut):
+    added_by: Person | None = None
+    """Who brought the paper in (None if unknown or the account is gone)."""
     csl: dict[str, Any]
     """Metadata for citing: the preferred version's plus manual edits."""
     overrides: dict[str, Any]
@@ -187,8 +197,17 @@ def item_detail(
     if response is not None:
         response.headers["ETag"] = f'"{item.change}"'
     preferred = library.preferred_version(item)
+    db = object_session(item)
+    adder = db.get(User, item.added_by) if db and item.added_by else None
     return ItemDetail(
         **item_out(item, access).model_dump(),
+        added_by=Person(
+            id=adder.id,
+            username=adder.username,
+            avatar_url=avatar_url(adder.id, adder.avatar_version),
+        )
+        if adder
+        else None,
         csl=library.citation_csl(item),
         overrides=item.overrides,
         preferred_version_id=preferred.id if preferred else None,

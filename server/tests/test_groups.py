@@ -375,3 +375,15 @@ def test_group_tags_on_own_papers(client: TestClient, db: Session) -> None:
         ).status_code
         == 403
     )
+
+
+def test_who_added_a_group_paper(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    ben = Person(client, db, "ben")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{ben.id}", {"role": "reader"})
+    paper = ada.add("Radar notes", library=chair["library_id"])
+    seen = ben.get(f"/api/items/{paper['id']}").json()
+    assert seen["added_by"]["username"] == "ada"
+    assert seen["added_by"]["avatar_url"] is None
