@@ -474,7 +474,12 @@ def import_library(job: JobContext, import_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
         record = db.get(Import, uuid.UUID(import_id))
-        if record is None or record.status != ImportStatus.WAITING:
+        # Running: the job is being retried after its worker stopped in the
+        # middle; importing again is safe (what is there is recognised).
+        if record is None or record.status not in (
+            ImportStatus.WAITING,
+            ImportStatus.RUNNING,
+        ):
             return
         if record.blob_sha256 is None:
             return

@@ -6,13 +6,16 @@ chunking (sections, captions) with GROBID or Docling comes later.
 """
 
 import re
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 import pypdfium2
+from bs4 import BeautifulSoup
 
 TARGET_WORDS = 200
 MAX_WORDS = 350
+LONGEST_WORD = 200
 
 _HYPHENATED = re.compile(r"(\w)-\n(?=[a-z])")
 _BLANK_LINES = re.compile(r"\n\s*\n")
@@ -42,8 +45,19 @@ class TextChunk:
     """Part of a reference list: kept for keyword search, not embedded."""
 
 
+# PDFium is not thread-safe, and the worker reads several files at once in
+# threads: one thread at a time inside PDFium (two at once once let a worker
+# grow to 15 GB until it was killed).
+PDFIUM = threading.Lock()
+
+
 def extract_pdf_pages(path: Path) -> list[str]:
     """The text of each page; empty strings for pages without text."""
+    with PDFIUM:
+        return _pdf_pages(path)
+
+
+def _pdf_pages(path: Path) -> list[str]:
     pdf = pypdfium2.PdfDocument(path)
     try:
         pages = []
@@ -58,10 +72,33 @@ def extract_pdf_pages(path: Path) -> list[str]:
         pdf.close()
 
 
+_BLOCKS = [
+    "address", "article", "aside", "blockquote", "br", "dd", "div", "dl", "dt",
+    "figcaption", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr",
+    "li", "main", "nav", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul",
+]  # fmt: skip
+
+
+def html_text(html: bytes) -> str:
+    """The readable text of a web page (e.g. a snapshot saved by Zotero):
+    without scripts, styles and markup; blocks become paragraphs."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "noscript", "svg", "template", "head"]):
+        tag.decompose()
+    for block in soup(_BLOCKS):
+        block.insert_after("\n\n")
+    return soup.get_text()
+
+
 def _paragraphs(text: str) -> list[str]:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = _HYPHENATED.sub(r"\1", text)
-    paragraphs = (" ".join(p.split()) for p in _BLANK_LINES.split(text))
+    # Words longer than any real word (embedded images, minified code) only
+    # bloat a passage (Postgres indexes at most 1 MB of text per passage).
+    paragraphs = (
+        " ".join(w for w in p.split() if len(w) <= LONGEST_WORD)
+        for p in _BLANK_LINES.split(text)
+    )
     return [p for p in paragraphs if p]
 
 

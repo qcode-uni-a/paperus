@@ -12,7 +12,13 @@ from sqlalchemy.orm import Session
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, TextStatus
 from paperus.storage import BlobStore
-from paperus.text import TextChunk, chunk_document, chunk_pages, extract_pdf_pages
+from paperus.text import (
+    TextChunk,
+    chunk_document,
+    chunk_pages,
+    extract_pdf_pages,
+    html_text,
+)
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +33,8 @@ def _chunks_for(file: File, blobs: BlobStore) -> list[TextChunk] | None:
             return chunk_pages(extract_pdf_pages(path))
     if file.media_type.startswith(TEXT_TYPES):
         data = b"".join(blobs.iter_bytes(file.blob_sha256))
+        if file.media_type in ("text/html", "application/xhtml+xml"):
+            return chunk_document(html_text(data))
         return chunk_document(data.decode(errors="replace"))
     return None
 
@@ -140,6 +148,19 @@ def pending_files(db: Session, limit: int = 500) -> list[uuid.UUID]:
             .limit(limit)
         )
     )
+
+
+def reread_failed(db: Session) -> int:
+    """Try the files whose reading failed once more (e.g. after a fix);
+    commits; how many. They are not retried by themselves: a broken file
+    would fail for ever."""
+    result = db.execute(
+        update(File)
+        .where(File.deleted_at.is_(None), File.text_status == TextStatus.FAILED)
+        .values(text_status=TextStatus.PENDING, text_error=None)
+    )
+    db.commit()
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def reread_all(db: Session) -> int:

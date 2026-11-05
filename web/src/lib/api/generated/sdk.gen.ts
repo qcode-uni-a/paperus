@@ -642,7 +642,8 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
  * Run Job
  *
  * Start a sweep now: ``embeddings`` (embed what is missing), ``text``
- * (read files still pending), ``text-all`` (read every file again),
+ * (read files still pending), ``text-failed`` (try failed files again),
+ * ``text-all`` (read every file again),
  * ``trash`` (delete what is older than the trash days), ``integrity``
  * (check stored contents), ``integrity-deep`` (also their SHA-256) or
  * ``integrity-clean`` (check and remove unused stored contents), ``copy``

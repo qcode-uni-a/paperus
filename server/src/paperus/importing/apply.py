@@ -82,10 +82,28 @@ class _ByName:
         if key in self.exact:
             return self.exact[key]
         candidates = self.by_name.get(self._basename(path).lower(), [])
-        for name in candidates:
-            if key.endswith("/" + self._key(name)):
-                return name
-        return candidates[0] if len(candidates) == 1 else None
+        if len(candidates) == 1:
+            return candidates[0]
+        # Several of that name (arXiv snapshots are often all "2310.html"):
+        # the one sharing the most folders from the end, e.g.
+        # "My Library/files/83/2310.html" (in a zip's top folder) for
+        # "files/83/2310.html", or for "C:/Users/…/files/83/2310.html".
+        wanted = key.split("/")
+        shared = {
+            name: _common_tail(wanted, self._key(name).split("/"))
+            for name in candidates
+        }
+        best = max(shared.values(), default=0)
+        winners = [name for name, n in shared.items() if n == best]
+        return winners[0] if best >= 2 and len(winners) == 1 else None
+
+
+def _common_tail(a: list[str], b: list[str]) -> int:
+    """How many path parts two paths share from their end."""
+    n = 0
+    while n < min(len(a), len(b)) and a[-1 - n] == b[-1 - n]:
+        n += 1
+    return n
 
 
 class ZipFiles:

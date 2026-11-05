@@ -3,11 +3,13 @@ import uuid
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from paperus.config import Settings
 from paperus.embedding import embed_file
 from paperus.jobs import send_ml_config
+from paperus.models import File, TextStatus
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from paperus.system import load_config
@@ -124,3 +126,19 @@ def test_run_jobs(admin: TestClient, job_app: App) -> None:
         "paperus:queue_missing_embeddings",
         "paperus:queue_pending_files",
     ]
+
+
+def test_read_failed_files_again(admin: TestClient, db: Session, job_app: App) -> None:
+    item = admin.post("/api/items", json={"metadata": {"title": "Broken"}}).json()
+    admin.post(
+        f"/api/items/{item['id']}/files",
+        files={"upload": ("b.pdf", b"%PDF-1.7 broken", "application/pdf")},
+    )
+    db.execute(update(File).values(text_status=TextStatus.FAILED, text_error="bad"))
+    db.commit()
+    assert admin.get("/api/admin/stats").json()["files_failed"] == 1
+    started = admin.post("/api/admin/jobs/text-failed").json()
+    assert started == {"queued": "text-failed", "files": 1}
+    db.expire_all()
+    assert db.scalar(select(File.text_status)) == TextStatus.PENDING
+    assert admin.get("/api/admin/stats").json()["files_failed"] == 0

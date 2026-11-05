@@ -21,7 +21,7 @@ from paperus.jobs import (
 )
 from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
 from paperus.models import LoginSession, User
-from paperus.processing import reread_all
+from paperus.processing import reread_all, reread_failed
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -91,6 +91,7 @@ class Stats(BaseModel):
     items: int
     files: int
     files_pending: int
+    files_failed: int
     """Files whose text (and, for uploads, metadata) is still being read."""
     chunks: int
     """Passages searchable by meaning (reference lists are left out)."""
@@ -205,6 +206,7 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
         items=figures.items,
         files=figures.files,
         files_pending=figures.files_pending,
+        files_failed=figures.files_failed,
         chunks=figures.chunks,
         embedded=figures.embedded,
         embedding_model=figures.embedding_model,
@@ -216,7 +218,8 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
 @router.post("/jobs/{job}", status_code=202)
 def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
-    (read files still pending), ``text-all`` (read every file again),
+    (read files still pending), ``text-failed`` (try failed files again),
+    ``text-all`` (read every file again),
     ``trash`` (delete what is older than the trash days), ``integrity``
     (check stored contents), ``integrity-deep`` (also their SHA-256) or
     ``integrity-clean`` (check and remove unused stored contents), ``copy``
@@ -234,6 +237,10 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
         "tidy": queue_tidy,
         "copy-remove": lambda app: queue_readable_copy(app, remove=True),
     }
+    if job == "text-failed":
+        count = reread_failed(db)
+        queue_text_sweep(request.app.state.jobs)
+        return {"queued": job, "files": count}
     if job == "text-all":
         count = reread_all(db)
         queue_text_sweep(request.app.state.jobs)

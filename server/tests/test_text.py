@@ -1,5 +1,10 @@
+import threading
+import time
 from pathlib import Path
 
+import pytest
+
+from paperus import text
 from paperus.text import (
     MAX_WORDS,
     TARGET_WORDS,
@@ -7,6 +12,7 @@ from paperus.text import (
     chunk_pages,
     chunk_text,
     extract_pdf_pages,
+    html_text,
 )
 from tests.pdfs import make_pdf
 
@@ -92,3 +98,49 @@ def test_reference_headings() -> None:
     # A sentence mentioning references is not a heading.
     [chunk] = chunk_document("The references below were checked.\nSmith (2020).")
     assert not chunk.references
+
+
+def test_one_thread_at_a_time_in_pdfium(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PDFium is not thread-safe: reading in parallel threads takes turns."""
+    inside = 0
+    most = 0
+    guard = threading.Lock()
+
+    def slow_read(path: Path) -> list[str]:
+        nonlocal inside, most
+        with guard:
+            inside += 1
+            most = max(most, inside)
+        time.sleep(0.05)
+        with guard:
+            inside -= 1
+        return []
+
+    monkeypatch.setattr(text, "_pdf_pages", slow_read)
+    threads = [
+        threading.Thread(target=text.extract_pdf_pages, args=(Path("x.pdf"),))
+        for _ in range(4)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert most == 1
+
+
+def test_web_pages_give_their_readable_text() -> None:
+    """Snapshots (e.g. from Zotero): no markup, scripts or embedded images."""
+    image = "data:image/png;base64," + "A" * 5000
+    page = f"""<html><head><title>Phys. Rev. B</title>
+    <style>p {{ color: red }}</style></head>
+    <body><script>var tracker = 1;</script>
+    <h1>Path-integral simulation of exchange</h1>
+    <p>We simulate the <b>exchange</b> interaction.</p><img src="{image}">
+    <p>{image} Holes in germanium.</p></body></html>""".encode()
+    readable = html_text(page)
+    assert "tracker" not in readable and "color" not in readable
+    [chunk] = chunk_document(readable)
+    assert chunk.text == (
+        "Path-integral simulation of exchange\n\n"
+        "We simulate the exchange interaction.\n\nHoles in germanium."
+    )

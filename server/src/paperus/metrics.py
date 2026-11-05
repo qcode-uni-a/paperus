@@ -71,6 +71,7 @@ class Figures:
     items_in_trash: int
     files: int
     files_pending: int
+    files_failed: int
     notes: int
     users: int
     groups: int
@@ -113,6 +114,11 @@ def library_figures(db: Session, settings: Settings) -> Figures:
             select(count)
             .select_from(File)
             .where(File.text_status == TextStatus.PENDING, File.deleted_at.is_(None))
+        ),
+        files_failed=number(
+            select(count)
+            .select_from(File)
+            .where(File.text_status == TextStatus.FAILED, File.deleted_at.is_(None))
         ),
         notes=number(select(count).select_from(Note).where(Note.deleted_at.is_(None))),
         users=number(
@@ -159,6 +165,7 @@ class LibraryCollector(Collector):
             "items_in_trash": "Papers in the trash",
             "files": "Files (not in the trash)",
             "files_pending": "Files whose text is still being read",
+            "files_failed": "Files whose text could not be read",
             "notes": "Notes (not in the trash)",
             "users": "Active people",
             "groups": "Groups",

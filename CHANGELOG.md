@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Fixed: reading PDFs in parallel.** PDFium is not thread-safe; two files
+  read at once could make the worker grow until it was killed (15 GB with a
+  Zotero import), or fail on valid PDFs. One file at a time inside PDFium.
+- **Fixed: files of the same name in a zip** (arXiv snapshots are often all
+  "2310.html") were left out when the zip had a top folder.
+- Saved web pages (e.g. Zotero snapshots) are read as text, without markup,
+  scripts or embedded images (one page made a passage too long to index).
+- **Read failed files again** on the Jobs page, which also shows live
+  numbers per queue, a chart of the last ten minutes and running imports.
+- An import whose worker stopped in the middle goes on when retried.
 - Zotero import: files on their own in Zotero (no paper around them, e.g.
   lecture notes, a thesis, scanned notes) come along as documents instead
   of being left out. Found with a real export of 381 papers.

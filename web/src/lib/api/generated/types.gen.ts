@@ -1969,6 +1969,10 @@ export type Stats = {
      */
     files_pending: number;
     /**
+     * Files Failed
+     */
+    files_failed: number;
+    /**
      * Chunks
      */
     chunks: number;

@@ -557,3 +557,25 @@ def test_reimport_skips_standalone_notes_and_drops_the_upload(
     # The uploaded zip is gone once imported.
     sha = hashlib.sha256(upload).digest()
     assert not blobs.exists(sha)
+
+
+def test_same_file_names_in_a_zip_folder() -> None:
+    """arXiv snapshots are often all called 2310.html: in a zip with a top
+    folder, each is still found by its whole path."""
+    files = zipped(
+        **{
+            "My Library/files/83/2310.html": b"first",
+            "My Library/files/373/2310.html": b"second",
+        }
+    )
+    for path, content in (
+        ("files/83/2310.html", b"first"),
+        ("files/373/2310.html", b"second"),
+    ):
+        opened = files.open(path)
+        assert opened is not None
+        assert opened.read() == content
+    # From the exporting computer, also with a different start.
+    absolute = files.open("C:/Users/ada/Zotero/files/373/2310.html")
+    assert absolute is not None and absolute.read() == b"second"
+    assert files.open("files/999/2310.html") is None

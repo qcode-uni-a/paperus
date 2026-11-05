@@ -3094,7 +3094,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -8482,6 +8482,10 @@
             "type": "integer",
             "title": "Files Pending"
           },
+          "files_failed": {
+            "type": "integer",
+            "title": "Files Failed"
+          },
           "chunks": {
             "type": "integer",
             "title": "Chunks"
@@ -8513,6 +8517,7 @@
           "items",
           "files",
           "files_pending",
+          "files_failed",
           "chunks",
           "embedded",
           "embedding_model",

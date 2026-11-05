@@ -25,6 +25,35 @@ export async function loadAdmin(): Promise<void> {
 	admin.config = config.data ?? null;
 	admin.ml = ml.data ?? null;
 	admin.stats = stats.data ?? null;
+	if (stats.data) record(stats.data);
+}
+
+/** The job counts over the last minutes, for the Jobs page's charts:
+ * sampled whenever the admin data is reloaded (every 3 seconds while an
+ * admin page is open), kept while one moves between admin pages. */
+export interface Sample {
+	at: number;
+	/** Per queue: waiting ("todo") and running ("doing"). */
+	waiting: Record<string, number>;
+	running: Record<string, number>;
+	/** All queues together, as counted so far (finished jobs are deleted
+	 * after a week, so only differences mean something). */
+	succeeded: number;
+	failed: number;
+}
+export const history = $state<{ samples: Sample[] }>({ samples: [] });
+const KEEP_MS = 30 * 60 * 1000;
+
+function record(stats: Stats): void {
+	const sample: Sample = { at: Date.now(), waiting: {}, running: {}, succeeded: 0, failed: 0 };
+	for (const [queue, counts] of Object.entries(stats.jobs)) {
+		sample.waiting[queue] = counts.todo ?? 0;
+		sample.running[queue] = counts.doing ?? 0;
+		sample.succeeded += counts.succeeded ?? 0;
+		sample.failed += counts.failed ?? 0;
+	}
+	const cutoff = sample.at - KEEP_MS;
+	history.samples = [...history.samples.filter((s) => s.at >= cutoff), sample];
 }
 
 export function formatSize(bytes: number | null | undefined): string {

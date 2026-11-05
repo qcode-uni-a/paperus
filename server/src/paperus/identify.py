@@ -41,6 +41,7 @@ from paperus.models import (
     Version,
 )
 from paperus.storage import BlobStore
+from paperus.text import PDFIUM
 
 log = logging.getLogger(__name__)
 
@@ -116,11 +117,12 @@ def plausible_title(title: str | None, filename: str) -> bool:
 
 
 def embedded_title(path: Path) -> str | None:
-    pdf = pypdfium2.PdfDocument(path)
-    try:
-        title = pdf.get_metadata_dict().get("Title")
-    finally:
-        pdf.close()
+    with PDFIUM:  # see paperus.text
+        pdf = pypdfium2.PdfDocument(path)
+        try:
+            title = pdf.get_metadata_dict().get("Title")
+        finally:
+            pdf.close()
     return " ".join(title.split()) if title else None
 
 
