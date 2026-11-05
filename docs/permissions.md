@@ -54,7 +54,9 @@ because of it; they need a membership like everyone else.
   (only if I may change it), its tags and its collections (where the rules
   below allow). What cannot move stays with the trashed paper. Likely
   duplicates (same identifier or file, among papers I can see) are
-  suggested; nothing is merged automatically.
+  suggested; nothing is merged automatically. "Not the same paper" hides a
+  pair for everyone who sees both, so it needs the right to change at
+  least one of them.
 
 ## Tags
 
@@ -129,17 +131,21 @@ optionally to some owners; it never gets more than the person has.
 | Scope | Allows |
 | --- | --- |
 | `search` | Searching by words and meaning |
-| `papers.read` | Papers, versions, tags, collections |
-| `files.read` | The files (PDFs, notes) |
-| `papers.write` | Adding, changing and trashing papers and their files |
+| `papers.read` | Papers, versions, tags, collections, notes |
+| `files.read` | The files (PDFs, …) and their full text (search alone gives snippets) |
+| `papers.write` | Adding, changing, merging and trashing papers and their files |
 | `tags.write` | Tagging, creating and changing tags |
 | `collections.write` | Creating and changing collections, filing papers |
 | `groups.read` | One's groups and their members |
+| `notes.write` | Writing, changing and trashing notes |
 
 Never with a token, whatever its scopes: passwords, users, groups (changes),
-tokens, settings and administration. Expired or revoked tokens, and those
-of deactivated people, stop working at once. Tested in
-`server/tests/test_tokens.py`.
+tokens, imports, settings and administration (a site administrator's token
+gets no administration either), nor the person's own view (stars, pinned
+collections, what they opened). A token limited to some owners reaches
+nothing else, also not by id. Expired or revoked tokens, and those of
+deactivated people, stop working at once. Tested in
+`server/tests/test_tokens.py`, which pins the answer for every route.
 
 ## Notes
 
@@ -151,5 +157,10 @@ of deactivated people, stop working at once. Tested in
 | Link to / unlink from papers | yes, any paper I can see | no | yes, any paper I can see |
 
 - A note's links to papers a reader cannot see are hidden from that reader
-  (like a group's tags on private papers).
+  (like a group's tags on private papers); the note's writers can remove
+  them.
+- Merging papers moves the notes about the merged one (everyone's) and
+  everyone's star to the paper that stays.
+- A group with notes (also in its trash) cannot be deleted, like one with
+  papers.
 - A private note on a group's paper is visible only to its owner.

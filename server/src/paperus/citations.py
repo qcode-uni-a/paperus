@@ -51,9 +51,9 @@ def citation_key_base(csl: dict[str, Any]) -> str:
     """The paper's own key (e.g. from Better BibTeX or Zotero), or one in
     Zotero's form ``author_titleword_year``: the first creator's family
     name, the title's first word that is not an article or preposition."""
-    own = csl.get("citation-key")
-    if isinstance(own, str) and own.strip():
-        return own.strip()
+    own = _own_key(csl)
+    if own:
+        return own
     names = csl.get("author") or csl.get("editor") or []
     first = names[0] if names else {}
     family = " ".join(
@@ -67,24 +67,59 @@ def citation_key_base(csl: dict[str, Any]) -> str:
 
 
 def keyed(items: list[Item]) -> list[tuple[str, dict[str, Any]]]:
-    """Each item's CSL-JSON with a citation key unique in this export (equal
-    generated keys get -1, -2, … in the items' order, as in Zotero)."""
-    pairs = [(item, library.citation_csl(item)) for item in items]
-    own = {
-        str(csl["citation-key"]).strip() for _, csl in pairs if csl.get("citation-key")
-    }
+    """Each item's CSL-JSON (tidied, see ``_tidy``) with a citation key
+    unique in this export: equal keys get -1, -2, … in the items' order, as
+    in Zotero; a paper's own key wins over a generated one of the same name
+    (e.g. the same .bib imported into a private and a group library)."""
+    pairs = [(item, tidy(library.citation_csl(item))) for item in items]
+    own = {key for _, csl in pairs if (key := _own_key(csl))}
     seen: set[str] = set()
     result: list[tuple[str, dict[str, Any]]] = []
     for _, csl in pairs:
         base = key = citation_key_base(csl)
-        if not csl.get("citation-key"):
-            suffix = 0
-            while key in seen or key in own:
-                suffix += 1
-                key = f"{base}-{suffix}"
+        suffix = 0
+        while key in seen or (key in own and _own_key(csl) != key):
+            suffix += 1
+            key = f"{base}-{suffix}"
         seen.add(key)
         result.append((key, csl))
     return result
+
+
+# Characters BibTeX and biber do not take in keys.
+_KEY_UNSAFE = re.compile(r"""[\s,{}()"#%'=\\~]""")
+
+
+def _own_key(csl: dict[str, Any]) -> str | None:
+    """The paper's own citation key, without characters a .bib cannot hold."""
+    own = csl.get("citation-key")
+    if not isinstance(own, str):
+        return None
+    return _KEY_UNSAFE.sub("", own) or None
+
+
+def tidy(csl: dict[str, Any]) -> dict[str, Any]:
+    """CSL-JSON as the export expects it: name lists of objects, dates as
+    objects. Imports and manual edits can hold other shapes (a year as text,
+    an author as one string); they become their nearest CSL form."""
+    csl = dict(csl)
+    for role in ("author", "editor", "translator"):
+        names = csl.get(role)
+        if names is None:
+            continue
+        if not isinstance(names, list):
+            names = [names]
+        csl[role] = [
+            name if isinstance(name, dict) else {"literal": str(name)}
+            for name in names
+            if isinstance(name, dict) or (isinstance(name, str | int) and str(name))
+        ]
+    for field in ("issued", "accessed"):
+        date = csl.get(field)
+        if date is None or isinstance(date, dict):
+            continue
+        csl[field] = {"raw": str(date)}
+    return csl
 
 
 def csl_json(items: list[Item]) -> list[dict[str, Any]]:
@@ -117,7 +152,13 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
     def add(name: str, value: object, *, raw: bool = False) -> None:
         if value is None or value == "" or value == []:
             return
-        text = str(value) if raw else _escape(str(value))
+        # URLs and DOIs stay as they are, but a stray brace would end the
+        # field early: those are percent-encoded.
+        text = (
+            str(value).replace("{", "%7B").replace("}", "%7D")
+            if raw
+            else _escape(str(value))
+        )
         if name in ("title", "type", "shorttitle", "booktitle", "series"):
             text = _protect(text)
         fields.append((name, "{" + text + "}"))
@@ -173,6 +214,9 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
 def _name(name: dict[str, Any]) -> str:
     if name.get("literal"):
         return "{" + _escape(str(name["literal"])) + "}"
+    if not name.get("family"):  # e.g. "Plato": one name, kept whole
+        whole = " ".join(str(v) for v in (name.get("given"), name.get("suffix")) if v)
+        return "{" + _escape(whole or "Anonymous") + "}"
     family = " ".join(
         filter(None, [name.get("non-dropping-particle"), name.get("family")])
     )
@@ -239,15 +283,23 @@ def _first(value: object) -> str | None:
 def _date_parts(date: object) -> list[Any]:
     if not isinstance(date, dict):
         return []
-    parts = date.get("date-parts") or [[]]
-    return list(parts[0]) if parts and parts[0] else []
+    parts = date.get("date-parts")
+    if not isinstance(parts, list) or not parts or not isinstance(parts[0], list):
+        return []
+    return list(parts[0])
+
+
+def year_of(csl: dict[str, Any]) -> int | str | None:
+    """The year of publication, from the date or a raw date text."""
+    return _year(csl)
 
 
 def _year(csl: dict[str, Any]) -> int | str | None:
     parts = _date_parts(csl.get("issued"))
     if parts and parts[0]:
         return parts[0]
-    raw = str((csl.get("issued") or {}).get("raw") or "")
+    issued = csl.get("issued")
+    raw = str(issued.get("raw") or "") if isinstance(issued, dict) else ""
     found = re.search(r"\d{4}", raw)
     return found.group() if found else None
 
@@ -255,16 +307,20 @@ def _year(csl: dict[str, Any]) -> int | str | None:
 def _month(csl: dict[str, Any]) -> str | None:
     parts = _date_parts(csl.get("issued"))
     try:
-        return _MONTHS[int(parts[1]) - 1] if len(parts) > 1 else None
-    except (ValueError, IndexError):
+        month = int(parts[1]) if len(parts) > 1 else 0
+    except (TypeError, ValueError):
         return None
+    return _MONTHS[month - 1] if 1 <= month <= 12 else None
 
 
 def _iso_date(date: object) -> str | None:
     parts = _date_parts(date)
-    if not parts:
+    try:
+        return "-".join(
+            f"{int(p):02d}" if i else str(int(p)) for i, p in enumerate(parts)
+        )
+    except (TypeError, ValueError):
         return None
-    return "-".join(f"{int(p):02d}" if i else str(p) for i, p in enumerate(parts))
 
 
 _ARXIV_DOI = re.compile(r"10\.48550/arxiv\.(.+)", re.IGNORECASE)

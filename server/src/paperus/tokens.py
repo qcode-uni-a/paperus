@@ -129,8 +129,17 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
 ]
 
 
+# A person's own view of the library (stars, pinned collections, what they
+# opened): not for assistants and scripts, even where a rule above matches.
+_CLOSED = re.compile(r"/api/(items/[^/]+/(favourite|viewed)|collections/[^/]+/pin)")
+
+
 def needed_scope(method: str, path: str) -> Scope | None:
-    """The scope a call needs, or None if tokens may not make it at all."""
+    """The scope a call needs, or None if tokens may not make it at all.
+    Every route's answer is pinned in tests/test_tokens.py, so a new route
+    needs a decision."""
+    if _CLOSED.fullmatch(path):
+        return None
     for methods, pattern, scope in _RULES:
         if method in methods and pattern.fullmatch(path):
             return scope

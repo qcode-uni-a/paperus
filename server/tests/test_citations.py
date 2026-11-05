@@ -122,3 +122,35 @@ def test_collections_and_access(client: TestClient, db: Session) -> None:
     assert bob.get("/api/citations").text == ""
     assert bob.get("/api/citations", params={"item": inside}).text == ""
     assert bob.get("/api/citations", params={"collection": shelf}).status_code == 404
+
+
+def test_odd_metadata_and_keys(client: TestClient, db: Session) -> None:
+    """Imports and manual edits can hold any JSON: the export copes, and
+    every key is one BibTeX takes, once."""
+    ada = Person(client, db, "ada")
+    odd = add(
+        ada,
+        {
+            "type": "article",
+            "title": "Odd",
+            "author": ["Smith, J", {"given": "Plato"}],
+            "issued": "2020",
+            "accessed": {"date-parts": [[2020, "May"]]},
+            "URL": "https://example.org/{x",
+            "citation-key": "Smith 2020, x",
+        },
+    )
+    zero = add(ada, {"title": "Zero month", "issued": {"date-parts": [[2021, 0]]}})
+    twice = [
+        add(ada, {"title": f"Same key {n}", "citation-key": "dup"}) for n in (1, 2)
+    ]
+    response = ada.get("/api/citations", params={"item": [odd, zero, *twice]})
+    assert response.status_code == 200, response.text
+    text = response.text
+    assert "@misc{Smith2020x,\n" in text
+    assert "\tauthor = {{Smith, J} and {Plato}},\n" in text
+    assert "\tyear = {2020},\n" in text
+    assert "url = {https://example.org/%7Bx}" in text
+    assert "month =" not in text  # month 0 is no month
+    assert "@misc{dup,\n" in text and "@misc{dup-1,\n" in text
+    assert ada.get("/api/citations", params={"format": "csl-json"}).status_code == 200

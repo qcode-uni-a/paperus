@@ -1,8 +1,10 @@
 """Personal access tokens: scopes, owner limits, expiry, revoking."""
 
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -194,3 +196,120 @@ def test_admin_tokens_get_no_administration(client: TestClient, db: Session) -> 
     client.cookies.clear()
     groups = client.get("/api/groups", headers=as_token(client, token["token"]))
     assert [g["name"] for g in groups.json()] == ["Lab"]
+
+
+# What an access token may call: every API route, with the scope it needs
+# (None: never with a token). A new route fails this test until its line is
+# added here, so opening one to tokens is always a decision.
+ROUTES = {
+    ("GET", "/api/admin/backups"): None,
+    ("POST", "/api/admin/backups"): None,
+    ("PUT", "/api/admin/backups/config"): None,
+    ("DELETE", "/api/admin/backups/{name}"): None,
+    ("GET", "/api/admin/config"): None,
+    ("PUT", "/api/admin/config"): None,
+    ("POST", "/api/admin/jobs/{job}"): None,
+    ("GET", "/api/admin/ml"): None,
+    ("DELETE", "/api/admin/ml/models/{name}"): None,
+    ("POST", "/api/admin/ml/models/{name}/speed"): None,
+    ("GET", "/api/admin/stats"): None,
+    ("GET", "/api/admin/users"): None,
+    ("POST", "/api/admin/users"): None,
+    ("PATCH", "/api/admin/users/{user_id}"): None,
+    ("PUT", "/api/auth/hints/{hint}"): None,
+    ("POST", "/api/auth/login"): None,
+    ("POST", "/api/auth/logout"): None,
+    ("GET", "/api/auth/me"): "papers.read",
+    ("POST", "/api/auth/password"): None,
+    ("GET", "/api/citations"): "papers.read",
+    ("GET", "/api/collections"): "papers.read",
+    ("POST", "/api/collections"): "collections.write",
+    ("DELETE", "/api/collections/{collection_id}"): "collections.write",
+    ("PATCH", "/api/collections/{collection_id}"): "collections.write",
+    ("POST", "/api/collections/{collection_id}/items"): "collections.write",
+    ("DELETE", "/api/collections/{collection_id}/items/{item_id}"): "collections.write",
+    ("GET", "/api/collections/{collection_id}/move-preview"): "papers.read",
+    ("POST", "/api/collections/{collection_id}/notes"): "collections.write",
+    ("DELETE", "/api/collections/{collection_id}/notes/{note_id}"): "collections.write",
+    ("DELETE", "/api/collections/{collection_id}/pin"): None,
+    ("PUT", "/api/collections/{collection_id}/pin"): None,
+    ("GET", "/api/duplicates"): "papers.read",
+    ("POST", "/api/duplicates/different"): None,
+    ("DELETE", "/api/files/{file_id}"): "papers.write",
+    ("GET", "/api/files/{file_id}/content"): "files.read",
+    ("POST", "/api/files/{file_id}/restore"): "papers.write",
+    ("GET", "/api/groups"): "groups.read",
+    ("POST", "/api/groups"): None,
+    ("DELETE", "/api/groups/{group_id}"): None,
+    ("PATCH", "/api/groups/{group_id}"): None,
+    ("POST", "/api/groups/{group_id}/leave"): None,
+    ("GET", "/api/groups/{group_id}/members"): "groups.read",
+    ("DELETE", "/api/groups/{group_id}/members/{user_id}"): None,
+    ("PUT", "/api/groups/{group_id}/members/{user_id}"): None,
+    ("GET", "/api/health"): None,
+    ("GET", "/api/health/db"): None,
+    ("GET", "/api/imports"): None,
+    ("POST", "/api/imports"): None,
+    ("GET", "/api/imports/{import_id}"): None,
+    ("GET", "/api/items"): "papers.read",
+    ("POST", "/api/items"): "papers.write",
+    ("DELETE", "/api/items/{item_id}"): "papers.write",
+    ("GET", "/api/items/{item_id}"): "papers.read",
+    ("GET", "/api/items/{item_id}/duplicates"): "papers.read",
+    ("DELETE", "/api/items/{item_id}/favourite"): None,
+    ("PUT", "/api/items/{item_id}/favourite"): None,
+    ("POST", "/api/items/{item_id}/files"): "papers.write",
+    ("POST", "/api/items/{item_id}/merge"): "papers.write",
+    ("GET", "/api/items/{item_id}/merge-preview"): "papers.read",
+    ("PUT", "/api/items/{item_id}/overrides"): "papers.write",
+    ("PUT", "/api/items/{item_id}/owner"): "papers.write",
+    ("POST", "/api/items/{item_id}/restore"): "papers.write",
+    ("POST", "/api/items/{item_id}/tags"): "tags.write",
+    ("DELETE", "/api/items/{item_id}/tags/{tag_id}"): "tags.write",
+    ("POST", "/api/items/{item_id}/versions"): "papers.write",
+    ("POST", "/api/items/{item_id}/viewed"): None,
+    ("GET", "/api/libraries"): "groups.read",
+    ("PUT", "/api/me/default-library"): None,
+    ("GET", "/api/me/tokens"): None,
+    ("POST", "/api/me/tokens"): None,
+    ("DELETE", "/api/me/tokens/{token_id}"): None,
+    ("GET", "/api/notes"): "papers.read",
+    ("POST", "/api/notes"): "notes.write",
+    ("DELETE", "/api/notes/{note_id}"): "notes.write",
+    ("GET", "/api/notes/{note_id}"): "papers.read",
+    ("PATCH", "/api/notes/{note_id}"): "notes.write",
+    ("GET", "/api/notes/{note_id}/history"): "papers.read",
+    ("DELETE", "/api/notes/{note_id}/items/{item_id}"): "notes.write",
+    ("PUT", "/api/notes/{note_id}/items/{item_id}"): "notes.write",
+    ("GET", "/api/notes/{note_id}/markdown"): "papers.read",
+    ("PUT", "/api/notes/{note_id}/owner"): "notes.write",
+    ("POST", "/api/notes/{note_id}/restore"): "notes.write",
+    ("GET", "/api/search"): "search",
+    ("GET", "/api/setup"): None,
+    ("POST", "/api/setup/admin"): None,
+    ("POST", "/api/setup/restore"): None,
+    ("GET", "/api/setup/restore-check"): None,
+    ("GET", "/api/tags"): "papers.read",
+    ("POST", "/api/tags"): "tags.write",
+    ("DELETE", "/api/tags/{tag_id}"): "tags.write",
+    ("PATCH", "/api/tags/{tag_id}"): "tags.write",
+    ("POST", "/api/uploads"): "papers.write",
+    ("GET", "/api/uploads/{sha256}"): "papers.read",
+    ("GET", "/api/users"): None,
+    ("POST", "/api/versions/{version_id}/files"): "papers.write",
+    ("POST", "/api/versions/{version_id}/pin"): "papers.write",
+}
+
+
+def test_every_route_has_a_decision(client: TestClient) -> None:
+    app = client.app
+    assert isinstance(app, FastAPI)
+    found = {}
+    for path, operations in app.openapi()["paths"].items():
+        if not path.startswith("/api"):
+            continue
+        concrete = re.sub(r"\{[^}]+\}", "x", path)
+        for method in operations:
+            scope = needed_scope(method.upper(), concrete)
+            found[(method.upper(), path)] = scope.value if scope else None
+    assert found == ROUTES
