@@ -242,9 +242,6 @@ def set_owner(db: Session, item: Item, library_id: uuid.UUID) -> None:
         )
     )
     gone = groups - {library_id}
-    item.tag_links = [
-        link for link in item.tag_links if link.tag.library_id not in gone
-    ]
     item.collection_links = [
         link for link in item.collection_links if link.collection.library_id not in gone
     ]

@@ -4,6 +4,12 @@ Who may do what with papers, tags, collections and groups. The server
 enforces all of this (`server/src/paperus/access.py`); the website only
 hides what one may not do.
 
+Every row below has a test in `server/tests/test_permissions.py`, named
+after its table and row (e.g. `test_tags_create`), which checks each
+column; keep the two in step. Inherited roles in nested groups are tested
+in `test_groups.py`. Not tested on the server: the licence reminder (a
+website text) and the planned collection link.
+
 ## Owners and roles
 
 Every paper, tag and collection has one **owner**: a person (private) or a
