@@ -128,6 +128,11 @@
 				if (event.key === 'Escape') clearSearch();
 			}}
 		/>
+		{#if query}
+			<button class="clear" onclick={clearSearch} aria-label="Clear search" title="Clear search">
+				<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg>
+			</button>
+		{/if}
 	</div>
 
 	{#if searched}
@@ -137,7 +142,6 @@
 					? 'Searching…'
 					: `${groups.length} ${groups.length === 1 ? 'item' : 'items'} for “${searched}”`}
 			</h1>
-			<button class="quiet" onclick={clearSearch}>Clear search</button>
 		</div>
 	{/if}
 
@@ -211,6 +215,38 @@
 		border-color: var(--rule);
 		background: var(--surface);
 	}
+	.search input {
+		padding-right: 48px;
+	}
+	.search input::-webkit-search-cancel-button {
+		display: none;
+	}
+	.clear {
+		position: absolute;
+		right: 8px;
+		top: 50%;
+		transform: translateY(-50%);
+		display: grid;
+		place-items: center;
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		border-color: transparent;
+		border-radius: 50%;
+		background: none;
+	}
+	.clear:hover:not(:disabled) {
+		background: var(--rail);
+		border-color: transparent;
+	}
+	.clear svg {
+		width: 18px;
+		height: 18px;
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 2.2;
+		stroke-linecap: round;
+	}
 	.search-icon {
 		position: absolute;
 		left: 15px;
@@ -230,16 +266,6 @@
 	}
 	.results-head .count {
 		margin: 0;
-	}
-	.quiet {
-		border-color: transparent;
-		background: none;
-		color: var(--royal);
-		padding: 4px 8px;
-	}
-	.quiet:hover:not(:disabled) {
-		background: var(--rail);
-		border-color: transparent;
 	}
 	.count {
 		font-size: var(--step-0);
