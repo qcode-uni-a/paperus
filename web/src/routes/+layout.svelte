@@ -161,10 +161,11 @@
 		padding: 20px 16px;
 		align-items: flex-start;
 	}
+	/* The page takes all the room next to the menu (also when the menu is
+	   closed); text inside keeps its own line length. */
 	main {
 		flex: 1;
 		min-width: 0;
-		max-width: 1040px;
 	}
 	main.login {
 		padding: 16px;
