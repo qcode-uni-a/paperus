@@ -25,8 +25,6 @@ WORKDIR /app
 COPY server/pyproject.toml server/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY server/src ./src
-COPY server/alembic.ini ./
-COPY server/migrations ./migrations
 RUN uv sync --frozen --no-dev
 COPY --from=web /web/build ./web
 COPY docker/start.sh /usr/local/bin/paperus-start

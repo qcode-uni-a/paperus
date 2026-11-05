@@ -1,5 +1,5 @@
 # Copied from Procrastinate as is.
-exclude: ^server/migrations/procrastinate_.*\.sql$
+exclude: ^server/src/paperus/migrations/procrastinate_.*\.sql$
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: ty
         name: ty
-        entry: uv run --directory server ty check src tests migrations
+        entry: uv run --directory server ty check src tests
         language: system
         files: ^server/.*\.py$
         pass_filenames: false
