@@ -2,15 +2,21 @@
 
 ## Unreleased
 
-- **Groups and libraries**: everyone has a private library, every group one.
-  Groups nest (faculty, chair, project); members of a group are members of
-  the groups inside it. Roles: reader, member, admin. Site administrators
-  create top-level groups; group admins manage people and subgroups
-  (Manage → Groups), with a reminder that licences must allow sharing.
-  Lists, search and downloads show only what a person may read; items carry
-  their library, new items go to a default or chosen library. Private tags
-  and collections on group papers stay private. Everything from before goes
-  into a first group, "Shared library".
+- **Groups and owners**: every paper, tag and collection belongs to a person
+  or a group. Groups nest (faculty, chair, project); members of a group are
+  members of the groups inside it. Roles: reader, member, admin. Site
+  administrators create top-level groups; group admins manage people and
+  subgroups (Manage → Groups), with a reminder that licences must allow
+  sharing. Lists, search and downloads show only what a person may see,
+  mixed in one list; a small shared icon (click: which group) marks group
+  papers, tags and collections. Papers, tags and collections can be given
+  to a group or taken back (Edit). Private tags and collections on group
+  papers stay private; a group's tags can also go on one's own papers.
+  Everything from before belongs to a first group, "Shared library". Who
+  may do what: [docs/permissions.md](docs/permissions.md).
+- **Settings**: owner of new papers, tags and collections, theme, password.
+- **Recent**: papers by latest activity (opened by me, or added or changed).
+- A one-time hint after the first added paper explains owners.
 - Tag colours (18), descriptions and usage; Manage pages for collections
   (a tree with drag and drop) and tags.
 
