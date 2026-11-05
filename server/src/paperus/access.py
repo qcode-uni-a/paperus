@@ -41,9 +41,15 @@ class Access:
     """Effective role per group (direct or inherited)."""
     group_libraries: dict[uuid.UUID, uuid.UUID] = field(default_factory=dict)
     """Library of each group the person belongs to."""
+    own_allowed: bool = True
+    """False for an access token limited to some groups' libraries."""
 
     @classmethod
-    def of(cls, db: Session, user: User) -> "Access":
+    def of(
+        cls, db: Session, user: User, only: list[uuid.UUID] | None = None
+    ) -> "Access":
+        """What ``user`` may do; with ``only`` (an access token's owner limit),
+        nothing outside these libraries."""
         own = db.scalar(select(Library.id).where(Library.user_id == user.id))
         if own is None:  # users from before libraries existed get one now
             library = Library(user_id=user.id)
@@ -81,12 +87,18 @@ class Access:
             )
             if group_id is not None
         }
-        return cls(user, own, roles, libraries)
+        if only is None:
+            return cls(user, own, roles, libraries)
+        allowed = set(only)
+        libraries = {g: lib for g, lib in libraries.items() if lib in allowed}
+        roles = {g: r for g, r in roles.items() if g in libraries}
+        return cls(user, own, roles, libraries, own_allowed=own in allowed)
 
     @property
     def readable(self) -> list[uuid.UUID]:
         """Libraries this person may read: their own and their groups'."""
-        return [self.own_library, *self.group_libraries.values()]
+        own = [self.own_library] if self.own_allowed else []
+        return [*own, *self.group_libraries.values()]
 
     def role_in_library(self, library_id: uuid.UUID) -> Role | None:
         for group_id, group_library in self.group_libraries.items():
@@ -103,7 +115,7 @@ class Access:
     def can_write(self, library_id: uuid.UUID) -> bool:
         """Add, change and delete items, tags and collections."""
         if library_id == self.own_library:
-            return True
+            return self.own_allowed
         role = self.role_in_library(library_id)
         return role is not None and ROLE_RANK[role] >= ROLE_RANK[Role.MEMBER]
 
@@ -142,7 +154,7 @@ class Access:
         tags (they read) on any item they may change, e.g. their own papers
         with the group's vocabulary."""
         if library_id == self.own_library:
-            return self.can_read_item(item)
+            return self.own_allowed and self.can_read_item(item)
         return self.can_read(library_id) and self.can_write_item(item)
 
     def may_hold(self, library_id: uuid.UUID, item: Item) -> bool:
@@ -150,7 +162,7 @@ class Access:
         only the group's items, a person's private ones any item the person
         can read."""
         if library_id == self.own_library:
-            return self.can_read_item(item)
+            return self.own_allowed and self.can_read_item(item)
         return library_id == item.library_id
 
     def target_library(self, requested: uuid.UUID | None) -> uuid.UUID:
@@ -164,4 +176,9 @@ class Access:
         default = self.user.default_library_id
         if default is not None and self.can_write(default):
             return default
-        return self.own_library
+        if self.own_allowed:
+            return self.own_library
+        writable = self.writable
+        if not writable:
+            raise Forbidden("this token may not add anything")
+        return writable[0]

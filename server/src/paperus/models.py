@@ -139,6 +139,26 @@ class LoginSession(Record, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class AccessToken(Record, Base):
+    """A personal token for scripts and AI assistants (see
+    ``paperus.tokens``); only its SHA-256 is stored."""
+
+    __tablename__ = "access_tokens"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    token_hash: Mapped[bytes] = mapped_column(LargeBinary(32), unique=True)
+    hint: Mapped[str] = mapped_column(String(32))
+    """The token's start, to recognise it (``paperus_ab12…``)."""
+    scopes: Mapped[list[str]] = mapped_column(JSONB)
+    library_ids: Mapped[list[str] | None] = mapped_column(JSONB)
+    """Only these owners' things (libraries); all the user's if None."""
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ChangeCounter(Base):
     """The library's change number; see ``paperus.changes``."""
 

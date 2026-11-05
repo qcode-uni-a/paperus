@@ -119,3 +119,24 @@ because of it; they need a membership like everyone else.
 | Reset a password (logs the person out everywhere) | no (own password: Settings) | yes |
 | Grant or take administrator rights | no | yes, but one active administrator always stays |
 | Deactivate (no login; papers and groups stay), reactivate | no | yes, not oneself |
+
+## Access tokens
+
+Personal access tokens (Settings → Access tokens) are for scripts and AI
+assistants. A token acts as its person, narrowed by its scopes and
+optionally to some owners; it never gets more than the person has.
+
+| Scope | Allows |
+| --- | --- |
+| `search` | Searching by words and meaning |
+| `papers.read` | Papers, versions, tags, collections |
+| `files.read` | The files (PDFs, notes) |
+| `papers.write` | Adding, changing and trashing papers and their files |
+| `tags.write` | Tagging, creating and changing tags |
+| `collections.write` | Creating and changing collections, filing papers |
+| `groups.read` | One's groups and their members |
+
+Never with a token, whatever its scopes: passwords, users, groups (changes),
+tokens, settings and administration. Expired or revoked tokens, and those
+of deactivated people, stop working at once. Tested in
+`server/tests/test_tokens.py`.

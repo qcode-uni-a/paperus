@@ -20,6 +20,7 @@ from paperus.api import (
     organize,
     search,
     setup,
+    tokens,
     users,
 )
 from paperus.config import Settings
@@ -77,6 +78,7 @@ def create_app(
     app.include_router(users.router)
     app.include_router(backups.router)
     app.include_router(setup.router)
+    app.include_router(tokens.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:
