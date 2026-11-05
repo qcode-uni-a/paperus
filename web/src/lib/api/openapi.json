@@ -2902,6 +2902,146 @@
           }
         }
       }
+    },
+    "/api/setup/restore-check": {
+      "get": {
+        "tags": [
+          "setup"
+        ],
+        "summary": "Check Restore",
+        "operationId": "check_restore",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreCheckOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup": {
+      "get": {
+        "tags": [
+          "setup"
+        ],
+        "summary": "Setup State",
+        "operationId": "setup_state",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupState"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/admin": {
+      "post": {
+        "tags": [
+          "setup"
+        ],
+        "summary": "Create First Admin",
+        "description": "The first administrator, logged in right away.",
+        "operationId": "create_first_admin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/restore": {
+      "post": {
+        "tags": [
+          "setup"
+        ],
+        "summary": "Restore On First Start",
+        "description": "Restore a backup from the backup folder into the empty database; then\npeople log in with their accounts from the backup.",
+        "operationId": "restore_on_first_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4687,6 +4827,78 @@
         ],
         "title": "PasswordChange"
       },
+      "RestoreCheckOut": {
+        "properties": {
+          "with_files": {
+            "type": "boolean",
+            "title": "With Files"
+          },
+          "needed": {
+            "type": "integer",
+            "title": "Needed"
+          },
+          "in_storage": {
+            "type": "integer",
+            "title": "In Storage"
+          },
+          "from_backup": {
+            "type": "integer",
+            "title": "From Backup"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing"
+          },
+          "affected": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Affected"
+          },
+          "affected_count": {
+            "type": "integer",
+            "title": "Affected Count"
+          },
+          "extra": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra"
+          }
+        },
+        "type": "object",
+        "required": [
+          "with_files",
+          "needed",
+          "in_storage",
+          "from_backup",
+          "missing",
+          "affected",
+          "affected_count",
+          "extra"
+        ],
+        "title": "RestoreCheckOut",
+        "description": "Where the backup's files would come from. Files are stored by their\nSHA-256, so one already in the storage is the very same file: nothing\nis overwritten, missing ones are copied back, extra ones stay."
+      },
+      "RestoreRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RestoreRequest"
+      },
       "Role": {
         "type": "string",
         "enum": [
@@ -4707,6 +4919,39 @@
           "url"
         ],
         "title": "Scheme"
+      },
+      "SetupState": {
+        "properties": {
+          "needed": {
+            "type": "boolean",
+            "title": "Needed"
+          },
+          "backup_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Path"
+          },
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupOut"
+            },
+            "type": "array",
+            "title": "Backups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "needed",
+          "backup_path",
+          "backups"
+        ],
+        "title": "SetupState"
       },
       "Stats": {
         "properties": {

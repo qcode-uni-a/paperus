@@ -1013,6 +1013,58 @@ export type PasswordChange = {
 };
 
 /**
+ * RestoreCheckOut
+ *
+ * Where the backup's files would come from. Files are stored by their
+ * SHA-256, so one already in the storage is the very same file: nothing
+ * is overwritten, missing ones are copied back, extra ones stay.
+ */
+export type RestoreCheckOut = {
+    /**
+     * With Files
+     */
+    with_files: boolean;
+    /**
+     * Needed
+     */
+    needed: number;
+    /**
+     * In Storage
+     */
+    in_storage: number;
+    /**
+     * From Backup
+     */
+    from_backup: number;
+    /**
+     * Missing
+     */
+    missing: number;
+    /**
+     * Affected
+     */
+    affected: Array<string>;
+    /**
+     * Affected Count
+     */
+    affected_count: number;
+    /**
+     * Extra
+     */
+    extra: number | null;
+};
+
+/**
+ * RestoreRequest
+ */
+export type RestoreRequest = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * Role
  *
  * What a member may do in a group (and every group inside it).
@@ -1023,6 +1075,24 @@ export type Role = 'reader' | 'member' | 'admin';
  * Scheme
  */
 export type Scheme = 'doi' | 'arxiv' | 'isbn' | 'pmid' | 'url';
+
+/**
+ * SetupState
+ */
+export type SetupState = {
+    /**
+     * Needed
+     */
+    needed: boolean;
+    /**
+     * Backup Path
+     */
+    backup_path: string | null;
+    /**
+     * Backups
+     */
+    backups: Array<BackupOut>;
+};
 
 /**
  * Stats
@@ -3218,3 +3288,99 @@ export type DeleteBackupResponses = {
 };
 
 export type DeleteBackupResponse = DeleteBackupResponses[keyof DeleteBackupResponses];
+
+export type CheckRestoreData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    url: '/api/setup/restore-check';
+};
+
+export type CheckRestoreErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckRestoreError = CheckRestoreErrors[keyof CheckRestoreErrors];
+
+export type CheckRestoreResponses = {
+    /**
+     * Successful Response
+     */
+    200: RestoreCheckOut;
+};
+
+export type CheckRestoreResponse = CheckRestoreResponses[keyof CheckRestoreResponses];
+
+export type SetupStateData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/setup';
+};
+
+export type SetupStateResponses = {
+    /**
+     * Successful Response
+     */
+    200: SetupState;
+};
+
+export type SetupStateResponse = SetupStateResponses[keyof SetupStateResponses];
+
+export type CreateFirstAdminData = {
+    body: NewUser;
+    path?: never;
+    query?: never;
+    url: '/api/setup/admin';
+};
+
+export type CreateFirstAdminErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateFirstAdminError = CreateFirstAdminErrors[keyof CreateFirstAdminErrors];
+
+export type CreateFirstAdminResponses = {
+    /**
+     * Successful Response
+     */
+    201: LoginResponse;
+};
+
+export type CreateFirstAdminResponse = CreateFirstAdminResponses[keyof CreateFirstAdminResponses];
+
+export type RestoreOnFirstStartData = {
+    body: RestoreRequest;
+    path?: never;
+    query?: never;
+    url: '/api/setup/restore';
+};
+
+export type RestoreOnFirstStartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RestoreOnFirstStartError = RestoreOnFirstStartErrors[keyof RestoreOnFirstStartErrors];
+
+export type RestoreOnFirstStartResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type RestoreOnFirstStartResponse = RestoreOnFirstStartResponses[keyof RestoreOnFirstStartResponses];

@@ -2,13 +2,21 @@
 	import { goto } from '$app/navigation';
 	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { login as apiLogin } from '#lib/api/client.ts';
+	import { login as apiLogin, setupState } from '#lib/api/client.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	let username = $state('');
 	let password = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	const restored = $derived(page.url.searchParams.has('restored'));
+
+	// A server without users yet starts with the setup.
+	$effect(() => {
+		setupState().then(({ data }) => {
+			if (data?.needed) goto(resolve('/setup'));
+		});
+	});
 
 	async function login(event: SubmitEvent) {
 		event.preventDefault();
@@ -32,6 +40,9 @@
 	<img class="mark" src={asset('favicon.svg')} alt="" width="72" height="72" />
 	<h1>paperus</h1>
 	<p class="tagline">Papers, for us: the group's library, searchable by meaning.</p>
+	{#if restored}
+		<p class="restored">Backup restored. Log in with your account from the backup.</p>
+	{/if}
 	<form onsubmit={login}>
 		<label>Username <input bind:value={username} autocomplete="username" required /></label>
 		<label>
@@ -80,5 +91,11 @@
 	}
 	.error {
 		margin: 0;
+	}
+	.restored {
+		margin: -16px 0 20px;
+		padding: 8px 12px;
+		border-left: 3px solid var(--success);
+		background: var(--rail);
 	}
 </style>

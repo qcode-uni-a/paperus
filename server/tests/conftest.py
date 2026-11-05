@@ -184,7 +184,11 @@ def doi_registry() -> FakeDOIRegistry:
 
 @pytest.fixture
 def settings(database_url: str, tmp_path: Path) -> Settings:
-    return Settings(database_url=database_url, storage_path=tmp_path / "files")
+    return Settings(
+        database_url=database_url,
+        storage_path=tmp_path / "files",
+        backup_path=tmp_path / "backups",
+    )
 
 
 @pytest.fixture

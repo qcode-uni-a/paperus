@@ -21,6 +21,7 @@ import gzip
 import hashlib
 import json
 import logging
+import re
 import shutil
 from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
@@ -38,7 +39,7 @@ from paperus import __version__
 from paperus.config import Settings
 from paperus.migrate import alembic_config, migrate
 from paperus.models import Base
-from paperus.storage import BlobStore, blob_name
+from paperus.storage import BlobStore, FilesystemStore, blob_name
 
 log = logging.getLogger(__name__)
 
@@ -265,6 +266,119 @@ def due(last: datetime | None, schedule: str, hour: int, now: datetime) -> bool:
 def last_backup_time(root: Path) -> datetime | None:
     backups = list_backups(root)
     return datetime.fromisoformat(backups[0].created_at) if backups else None
+
+
+# Checking before a restore
+
+
+@dataclass
+class RestoreCheck:
+    """Where the backup's files would come from, before restoring it."""
+
+    name: str
+    with_files: bool
+    """Whether the backup has its own copy of the files."""
+    needed: int
+    """Files the backup's papers use (not in the trash)."""
+    in_storage: int
+    """Of those, already in the file storage (identical: same SHA-256)."""
+    from_backup: int
+    """Of those, not in the storage but in the backup: copied back."""
+    missing: int
+    """Neither in the storage nor in the backup."""
+    affected: list[str]
+    """Titles of papers that would lack a file (at most 20)."""
+    affected_count: int
+    extra: int | None
+    """Files in the storage the backup does not know (probably added after
+    it; they stay); None when the storage cannot be listed (S3)."""
+
+
+def _rows(folder: Path, table: str) -> Iterator[list[str | None]]:
+    """The rows of a dumped table, as COPY text fields (None for NULL)."""
+    path = folder / "tables" / f"{table}.tsv.gz"
+    with gzip.open(path, "rt", encoding="utf-8") as lines:
+        for line in lines:
+            yield [_unescape(field) for field in line.rstrip("\n").split("\t")]
+
+
+_ESCAPE = re.compile(r"\\(.)")
+_ESCAPES = {"t": "\t", "n": "\n", "r": "\r", "b": "\b", "f": "\f", "v": "\v"}
+
+
+def _unescape(field: str) -> str | None:
+    """A field of Postgres COPY text format (backslash escapes, NULL as \\N)."""
+    if field == "\\N":
+        return None
+    if "\\" not in field:
+        return field
+    return _ESCAPE.sub(lambda m: _ESCAPES.get(m[1], m[1]), field)
+
+
+def _column(table: str, name: str) -> int:
+    columns = _columns(Base.metadata.tables[table])
+    return columns.index(name)
+
+
+def check_restore(blobs: BlobStore, root: Path, name: str) -> RestoreCheck:
+    folder = root / name
+    if not (folder / "manifest.json").is_file():
+        raise BackupError(f"no backup {name!r} in {root}")
+    manifest = Manifest.read(folder)
+    pool = root / "files"
+
+    # Which items use which files (live ones only).
+    version_item = {
+        row[_column("versions", "id")]: row[_column("versions", "item_id")]
+        for row in _rows(folder, "versions")
+    }
+    titles: dict[str | None, str | None] = {}
+    trashed: set[str | None] = set()
+    for row in _rows(folder, "items"):
+        titles[row[_column("items", "id")]] = row[_column("items", "title")]
+        if row[_column("items", "deleted_at")] is not None:
+            trashed.add(row[_column("items", "id")])
+    users: dict[bytes, set[str | None]] = {}
+    for row in _rows(folder, "files"):
+        if row[_column("files", "deleted_at")] is not None:
+            continue
+        item = version_item.get(row[_column("files", "version_id")])
+        if item in trashed:
+            continue
+        sha = bytes.fromhex((row[_column("files", "blob_sha256")] or "")[2:])
+        users.setdefault(sha, set()).add(item)
+
+    in_storage = from_backup = missing = 0
+    affected: set[str | None] = set()
+    for sha, items in users.items():
+        if blobs.exists(sha):
+            in_storage += 1
+        elif manifest.with_files and (pool / blob_name(sha)).is_file():
+            from_backup += 1
+        else:
+            missing += 1
+            affected |= items
+    extra = None
+    if isinstance(blobs, FilesystemStore):
+        stored = blobs.root / "blobs"
+        known = {sha.hex() for sha in users}
+        extra = (
+            sum(1 for p in stored.rglob("*") if p.is_file() and p.name not in known)
+            if stored.is_dir()
+            else 0
+        )
+    names = sorted(titles.get(item) or "Untitled" for item in affected)
+    return RestoreCheck(
+        name=name,
+        with_files=manifest.with_files,
+        needed=len(users),
+        in_storage=in_storage,
+        from_backup=from_backup,
+        missing=missing,
+        affected=names[:20],
+        affected_count=len(names),
+        extra=extra,
+    )
 
 
 # Restoring

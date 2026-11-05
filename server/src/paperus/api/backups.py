@@ -35,7 +35,7 @@ class BackupRequest(BaseModel):
     with_files: bool = True
 
 
-def _out(manifest: backup.Manifest) -> BackupOut:
+def backup_out(manifest: backup.Manifest) -> BackupOut:
     items = manifest.tables.get("items")
     return BackupOut(
         name=manifest.name,
@@ -60,7 +60,7 @@ def list_backups(request: Request, db: DB, admin: Admin) -> Backups:
     return Backups(
         path=str(root.resolve()),
         files_size=files_size,
-        backups=[_out(m) for m in backup.list_backups(root)],
+        backups=[backup_out(m) for m in backup.list_backups(root)],
         config=system.load_backup_config(db),
     )
 

@@ -12,6 +12,7 @@ from sqlalchemy import Engine, make_url, text
 
 from paperus.backup import (
     BackupError,
+    check_restore,
     create_backup,
     delete_backup,
     due,
@@ -206,3 +207,37 @@ def test_backup_api(admin: TestClient, settings: Settings) -> None:
 def test_backup_api_is_for_admins(logged_in: TestClient) -> None:
     assert logged_in.get("/api/admin/backups").status_code == 403
     assert logged_in.post("/api/admin/backups", json={}).status_code == 403
+
+
+def test_check_before_restoring(
+    logged_in: TestClient, engine: Engine, blobs: BlobStore, tmp_path: Path
+) -> None:
+    fill(logged_in)
+    root = tmp_path / "backups"
+    full = create_backup(engine, blobs, root, with_files=True)
+    (root / full.name).rename(root / "2000-01-01T00-00-00Z")
+    only_db = create_backup(engine, blobs, root, with_files=False)
+
+    # The storage survived: every file is already there.
+    check = check_restore(blobs, root, only_db.name)
+    assert (check.needed, check.in_storage, check.missing, check.extra) == (1, 1, 0, 0)
+
+    # A new, empty storage: the full backup brings the file back ...
+    empty = FilesystemStore(tmp_path / "new-storage")
+    check = check_restore(empty, root, "2000-01-01T00-00-00Z")
+    assert (check.from_backup, check.missing) == (1, 0)
+    # ... the database-only one cannot: the paper would lack its PDF.
+    check = check_restore(empty, root, only_db.name)
+    assert (check.missing, check.affected, check.affected_count) == (
+        1,
+        ["Kept safe"],
+        1,
+    )
+
+    # Files added after the backup are counted (and kept).
+    extra = logged_in.post("/api/items", json={"metadata": {"title": "Later"}}).json()
+    logged_in.post(
+        f"/api/items/{extra['id']}/files",
+        files={"upload": ("later.pdf", PDF + b"later", "application/pdf")},
+    )
+    assert check_restore(blobs, root, only_db.name).extra == 1

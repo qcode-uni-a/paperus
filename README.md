@@ -36,14 +36,14 @@ by meaning takes 2–3 GB).
    [`deploy/example.env`](deploy/example.env) into a new folder; rename
    `example.env` to `.env`.
 2. In `.env`, set `DB_PASSWORD` and `ML_TOKEN` (e.g. `openssl rand -hex 32`),
-   and the folders for files, database and models.
-3. Start: `docker compose up -d`. The first start downloads the model (about
-   2.3 GB).
-4. Create the first administrator:
-   `docker compose exec server paperus user create admin --admin`
-5. Put a reverse proxy with HTTPS in front of port 8000, on a (sub)domain of its
+   and the folders for files, database, backups and models.
+3. Put a reverse proxy with HTTPS in front of port 8000, on a (sub)domain of its
    own; examples for Caddy and nginx are in
    [operations](docs/operations.md#reverse-proxy).
+4. Start: `docker compose up -d`. The first start downloads the model (about
+   2.3 GB).
+5. Open paperus in the browser: create the administrator account, or restore
+   a backup found in the backup folder (for moving to a new server).
 
 Back up from Administration → Backups (now, or daily or weekly), into
 `BACKUP_LOCATION` on another disk; restoring is described in

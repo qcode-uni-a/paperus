@@ -15,7 +15,10 @@
 
 	let { children }: LayoutProps = $props();
 
-	const onLoginPage = $derived(page.url.pathname === resolve('/login'));
+	// The login and first-start pages stand alone, without menu or header.
+	const onLoginPage = $derived(
+		page.url.pathname === resolve('/login') || page.url.pathname === resolve('/setup')
+	);
 
 	$effect(() => {
 		if (!session.checked && !onLoginPage) loadUser();

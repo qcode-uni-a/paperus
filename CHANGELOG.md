@@ -7,6 +7,9 @@
   backup copies only new files). Restore with `paperus backup restore`;
   older backups are brought up to date while restoring. See
   [operations](docs/operations.md#backups).
+- **First start in the browser**: create the administrator, or restore a
+  backup found in the backup folder. Before restoring, a check shows where
+  each file comes from (storage, backup) and warns about missing ones.
 - **Merge duplicates**: "Merge into…" in a paper's ⋯ menu suggests papers
   with the same identifier or file and moves versions, files, tags and
   collections over (as far as one's rights allow); the merged paper goes to

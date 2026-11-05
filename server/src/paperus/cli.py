@@ -10,7 +10,13 @@ import uvicorn
 from sqlalchemy.exc import IntegrityError
 
 from paperus.auth import create_user
-from paperus.backup import BackupError, create_backup, list_backups, restore_backup
+from paperus.backup import (
+    BackupError,
+    check_restore,
+    create_backup,
+    list_backups,
+    restore_backup,
+)
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import run_worker
@@ -135,6 +141,25 @@ def backup_command(args: argparse.Namespace) -> int:
                     f"{items} items{files}"
                 )
         elif args.backup_command == "restore":
+            blobs = make_blob_store(settings)
+            check = check_restore(blobs, root, args.name)
+            print(
+                f"Files: {check.needed} needed, {check.in_storage} already in "
+                f"the storage, {check.from_backup} from the backup, "
+                f"{check.missing} missing."
+            )
+            if check.extra:
+                print(
+                    f"{check.extra} files in the storage are not in the backup; "
+                    "they stay."
+                )
+            if check.missing:
+                print(f"{check.affected_count} papers would lack a file, e.g.:")
+                for title in check.affected[:5]:
+                    print(f"  {title}")
+                if input("Restore anyway? Type yes: ").strip().lower() != "yes":
+                    print("Nothing changed.")
+                    return 1
             if args.replace:
                 answer = input(
                     "This drops everything in the database first. Type yes: "

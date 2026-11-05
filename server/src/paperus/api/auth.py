@@ -53,6 +53,11 @@ def login(
         raise HTTPException(401, "wrong username or password")
     token = auth.start_session(db, user)
     db.commit()
+    set_session_cookie(request, response, token)
+    return LoginResponse(token=token, user=user_out(user))
+
+
+def set_session_cookie(request: Request, response: Response, token: str) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         token,
@@ -61,7 +66,6 @@ def login(
         secure=request.app.state.settings.cookie_secure,
         samesite="lax",
     )
-    return LoginResponse(token=token, user=user_out(user))
 
 
 @router.post("/logout", status_code=204)

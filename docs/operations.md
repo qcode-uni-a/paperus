@@ -112,7 +112,21 @@ docker compose exec server paperus backup create --no-files
 docker compose exec server paperus backup list
 ```
 
-**Restoring** replaces the database, so stop paperus first:
+**On a new server** (or after losing the old one): copy the backup folder
+(the backup itself and the `files` folder next to it) into `BACKUP_LOCATION`,
+start paperus and choose "Restore from a backup" on the first page. That
+page only appears while paperus has no users, so it needs no downtime.
+
+**Files when restoring.** Files are stored by their SHA-256, so a file
+already in the storage is the very same file: nothing is ever overwritten.
+Before restoring, paperus checks where each file the backup's papers use
+comes from: already in the storage (e.g. only the server died), copied back
+from the backup, or missing from both. Missing files (a database-only
+backup with an empty storage, or an incomplete one) get a warning naming
+the papers that would open without their file. Files in the storage that
+the backup does not know (added after it) stay on disk.
+
+**Replacing** a running installation's database needs it stopped first:
 
 ```sh
 docker compose stop server worker
