@@ -120,6 +120,7 @@ class FakeML:
     def __init__(self) -> None:
         self.down = False
         self.requests: list[dict[str, Any]] = []
+        self.deleted: list[str] = []
 
     def vector(self, text: str) -> list[float]:
         vector = [0.0] * self.DIMENSIONS
@@ -131,9 +132,29 @@ class FakeML:
         norm = math.sqrt(sum(x * x for x in vector)) or 1.0
         return [x / norm for x in vector]
 
+    MODELS: ClassVar[list[str]] = ["bge-m3", "multilingual-e5-small"]
+
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         if self.down:
             raise httpx2.ConnectError("ML service down")
+        if request.url.path == "/ping":
+            return httpx2.Response(200, json="pong")
+        if request.url.path == "/models":
+            models = [
+                {
+                    "name": name,
+                    "task": "embedding",
+                    "dimensions": self.DIMENSIONS,
+                    "max_tokens": 512,
+                    "loaded": False,
+                    "cached_bytes": None,
+                }
+                for name in self.MODELS
+            ]
+            return httpx2.Response(200, json=models)
+        if request.method == "DELETE":
+            self.deleted.append(request.url.path.rsplit("/", 1)[1])
+            return httpx2.Response(204)
         body = json.loads(request.content)
         self.requests.append(body)
         vectors = [self.vector(t) for t in body["texts"]]
@@ -196,6 +217,17 @@ def client(
     # https, so the client sends the Secure session cookie back.
     with TestClient(app, base_url="https://testserver") as client:
         yield client
+
+
+@pytest.fixture
+def admin(client: TestClient, db: Session) -> TestClient:
+    create_user(db, "root", "secret", is_admin=True)
+    db.commit()
+    response = client.post(
+        "/api/auth/login", json={"username": "root", "password": "secret"}
+    )
+    assert response.status_code == 200
+    return client
 
 
 @pytest.fixture

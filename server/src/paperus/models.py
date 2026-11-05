@@ -287,3 +287,15 @@ class Embedding(Base):
     # No fixed dimension: models differ. Exact search is fast at group scale;
     # an index per model can cast to halfvec(n) later.
     embedding: Mapped[list[float]] = mapped_column(HALFVEC())
+
+
+class SystemSetting(Base):
+    """Settings changed in the admin page; environment variables give defaults."""
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

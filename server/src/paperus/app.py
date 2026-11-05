@@ -7,7 +7,7 @@ import httpx2
 from fastapi import FastAPI
 from procrastinate import App
 
-from paperus.api import auth, files, health, items, search
+from paperus.api import admin, auth, files, health, items, search
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import make_job_app
@@ -57,6 +57,7 @@ def create_app(
     app.include_router(items.router)
     app.include_router(files.router)
     app.include_router(search.router)
+    app.include_router(admin.router)
     if settings.web_path is not None and (settings.web_path / FALLBACK).is_file():
         mount_web(app, settings.web_path)
     return app

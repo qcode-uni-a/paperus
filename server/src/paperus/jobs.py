@@ -22,6 +22,7 @@ from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLUnavailable, make_ml_client
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
+from paperus.system import load_config
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class WorkerContext:
     blobs: BlobStore
     http: httpx2.Client
     ml: MLClient
-    embedding_model: str
+    settings: Settings
 
 
 _context: WorkerContext | None = None
@@ -66,7 +67,8 @@ def extract_text(job: JobContext, file_id: str) -> None:
 def embed(file_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
-        count = embed_file(db, context.ml, context.embedding_model, uuid.UUID(file_id))
+        model = load_config(db, context.settings).embedding_model
+        count = embed_file(db, context.ml, model, uuid.UUID(file_id))
     log.info("embedded %d chunks of file %s", count, file_id)
 
 
@@ -81,8 +83,25 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
     """Also re-embeds the library after the embedding model changed."""
     context = _worker_context()
     with context.sessions() as db:
-        for file_id in files_missing_embeddings(db, context.embedding_model):
+        model = load_config(db, context.settings).embedding_model
+        for file_id in files_missing_embeddings(db, model):
             queue_embedding(job.app, file_id)
+
+
+def queue_embedding_sweep(app: App) -> None:
+    """Look for missing embeddings now (e.g. after the model changed)."""
+    task = app.configure_task(
+        "paperus:queue_missing_embeddings", queueing_lock="embedding-sweep"
+    )
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
+
+
+def queue_text_sweep(app: App) -> None:
+    """Look for files whose text is still pending now."""
+    task = app.configure_task("paperus:queue_pending_files", queueing_lock="sweep")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
 
 
 def queue_embedding(app: App, file_id: uuid.UUID) -> None:
@@ -132,7 +151,7 @@ def run_worker(settings: Settings) -> None:
         blobs=make_blob_store(settings),
         http=make_http_client(settings),
         ml=make_ml_client(settings),
-        embedding_model=settings.embedding_model,
+        settings=settings,
     )
     app = make_job_app(settings)
     with app.open():

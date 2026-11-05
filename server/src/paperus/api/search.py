@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from paperus.api.deps import DB, CurrentUser
 from paperus.ml import MLClient, MLUnavailable
+from paperus.system import load_config
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["search"])
@@ -127,7 +128,7 @@ def search(
     """Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its
     meaning, or both. The ``X-Search-Mode`` header says what was used: without
     the ML service, hybrid search falls back to keywords."""
-    model = request.app.state.settings.embedding_model
+    model = load_config(db, request.app.state.settings).embedding_model
     vector = None
     if mode != "keyword":
         vector = _query_vector(request.app.state.ml, model, q)

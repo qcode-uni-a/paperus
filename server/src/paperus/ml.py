@@ -7,7 +7,7 @@ machine can be added in front of a local fallback.
 
 import logging
 import time
-from typing import Literal
+from typing import Any, Literal
 
 import httpx2
 
@@ -67,6 +67,37 @@ class MLClient:
             self._failed_at.pop(url, None)
             embeddings: list[list[float]] = response.json()["embeddings"]
             return embeddings
+        raise MLUnavailable("; ".join(errors) or "no ML service configured")
+
+    def status(self) -> list[tuple[str, str | None]]:
+        """Each address with None if it answers, else the error."""
+        result: list[tuple[str, str | None]] = []
+        for url in self.urls:
+            try:
+                self.http.get(f"{url}/ping", timeout=5).raise_for_status()
+                result.append((url, None))
+            except httpx2.HTTPError as error:
+                result.append((url, str(error) or type(error).__name__))
+        return result
+
+    def models(self) -> list[dict[str, Any]]:
+        """The models the service offers (``GET /models``)."""
+        return list(self._call("GET", "/models").json())
+
+    def delete_model(self, name: str) -> None:
+        """Remove a downloaded model from the service's cache."""
+        self._call("DELETE", f"/models/{name}")
+
+    def _call(self, method: str, path: str) -> httpx2.Response:
+        errors = []
+        for url in self._ordered_urls():
+            try:
+                response = self.http.request(method, f"{url}{path}", timeout=10)
+                response.raise_for_status()
+            except httpx2.HTTPError as error:
+                errors.append(f"{url}: {error}")
+                continue
+            return response
         raise MLUnavailable("; ".join(errors) or "no ML service configured")
 
     def close(self) -> None:

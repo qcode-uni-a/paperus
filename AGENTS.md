@@ -10,9 +10,9 @@ a reason.
 - Pre-commit hooks (`.pre-commit-config.yaml`): `uvx pre-commit install` once
   per clone; `uvx pre-commit run --all-files` to check everything.
 - Imports at the top of the file, except optional dependencies.
-- Database migrations: until the first deployment with data to keep, change
-  the single initial migration instead of adding new ones. After that, add a
-  migration per change and never edit one that has been applied.
+- Database migrations: add a migration per change and never edit one that
+  has been applied; the dev database holds test data, so never reset it
+  without asking.
 - Frontend and browser extension in TypeScript.
 
 ## Guidelines
