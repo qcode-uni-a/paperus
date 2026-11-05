@@ -1,13 +1,25 @@
 """Login, logout and the current user."""
 
+import json
 import uuid
+from datetime import timedelta
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Path, Request, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
-from paperus import auth
-from paperus.api.deps import DB, SESSION_COOKIE, CurrentUser, request_token
+from paperus import auth, oidc
+from paperus.api.deps import (
+    DB,
+    SESSION_COOKIE,
+    CurrentUser,
+    SessionUser,
+    request_token,
+)
+from paperus.system import SystemConfig, load_config, oidc_secret
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -23,6 +35,8 @@ class UserOut(BaseModel):
     is_admin: bool
     seen_hints: list[str]
     """Tutorial hints already shown to the person."""
+    university_login: bool = False
+    """The account is linked to the university login."""
 
 
 class PasswordChange(BaseModel):
@@ -41,6 +55,7 @@ def user_out(user: auth.User) -> UserOut:
         username=user.username,
         is_admin=user.is_admin,
         seen_hints=user.seen_hints,
+        university_login=user.oidc_subject is not None,
     )
 
 
@@ -51,21 +66,192 @@ def login(
     user = auth.authenticate(db, body.username, body.password)
     if user is None:
         raise HTTPException(401, "wrong username or password")
-    token = auth.start_session(db, user)
+    config = load_config(db, request.app.state.settings)
+    if not config.password_login and not user.is_admin:
+        db.rollback()
+        raise HTTPException(403, f"log in with {config.oidc_label}")
+    token = auth.start_session(db, user, timedelta(days=config.session_days))
     db.commit()
-    set_session_cookie(request, response, token)
+    set_session_cookie(request, response, token, config.session_days)
     return LoginResponse(token=token, user=user_out(user))
 
 
-def set_session_cookie(request: Request, response: Response, token: str) -> None:
+def set_session_cookie(
+    request: Request, response: Response, token: str, days: int
+) -> None:
     response.set_cookie(
         SESSION_COOKIE,
         token,
-        max_age=int(auth.SESSION_LIFETIME.total_seconds()),
+        max_age=days * 24 * 3600,
         httponly=True,
         secure=request.app.state.settings.cookie_secure,
         samesite="lax",
     )
+
+
+def check_password_length(db: Session, request: Request, password: str) -> None:
+    """At least as long as the administration asks (Authentication)."""
+    least = load_config(db, request.app.state.settings).password_min_length
+    if len(password) < least:
+        raise HTTPException(422, f"the password needs at least {least} characters")
+
+
+class LoginMethods(BaseModel):
+    password: bool
+    """Everyone may log in with a password (else only administrators)."""
+    oidc_label: str | None
+    """The university login's button, if it is on."""
+
+
+@router.get("/methods")
+def login_methods(request: Request, db: DB) -> LoginMethods:
+    """How one may log in (for the login page)."""
+    config = load_config(db, request.app.state.settings)
+    return LoginMethods(
+        password=config.password_login,
+        oidc_label=config.oidc_label if config.oidc_enabled else None,
+    )
+
+
+OIDC_COOKIE = "paperus_oidc"
+OIDC_CALLBACK = "/api/auth/oidc/callback"
+
+
+def public_base(request: Request, config: SystemConfig) -> str:
+    """The address people use: the one set in the administration, else the
+    one this request came to."""
+    if config.public_url:
+        return str(config.public_url).rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+def _session_user(request: Request, db: Session) -> auth.User | None:
+    """Who is logged in with the session cookie (not a token)."""
+    token = request.cookies.get(SESSION_COOKIE)
+    return auth.user_for_token(db, token) if token else None
+
+
+def _failed(
+    request: Request, config: SystemConfig, back: str, link: bool, error: str
+) -> RedirectResponse:
+    """To the login page, or (when linking) back where one came from."""
+    if not link:
+        return _login_page(request, config, error)
+    separator = "&" if "?" in back else "?"
+    response = RedirectResponse(
+        f"{public_base(request, config)}{back}{separator}link_error={quote(error)}",
+        status_code=303,
+    )
+    response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
+    return response
+
+
+def _login_page(request: Request, config: SystemConfig, error: str) -> RedirectResponse:
+    response = RedirectResponse(
+        f"{public_base(request, config)}/login?error={quote(error)}", status_code=303
+    )
+    response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
+    return response
+
+
+@router.get("/oidc/start")
+def oidc_start(
+    request: Request, db: DB, next: str = "/", link: bool = False
+) -> RedirectResponse:
+    """Off to the identity provider; it sends the browser back to
+    ``/api/auth/oidc/callback``. With ``link``, the university login is
+    linked to the account logged in now instead (whatever its name)."""
+    config = load_config(db, request.app.state.settings)
+    # Only paths of this site, so the login cannot send one elsewhere.
+    back = next if next.startswith("/") and not next.startswith("//") else "/"
+    if link and _session_user(request, db) is None:
+        return _login_page(request, config, "Log in first to link your account.")
+    if not config.oidc_enabled or not config.oidc_issuer or not config.oidc_client_id:
+        return _failed(request, config, back, link, "The university login is off.")
+    try:
+        provider = oidc.discover(request.app.state.http, config.oidc_issuer)
+    except oidc.LoginFailed as error:
+        return _failed(
+            request, config, back, link, f"University login failed: {error}."
+        )
+    redirect_uri = public_base(request, config) + OIDC_CALLBACK
+    started = oidc.start(provider, config.oidc_client_id, redirect_uri)
+    response = RedirectResponse(started.url, status_code=303)
+    response.set_cookie(
+        OIDC_COOKIE,
+        json.dumps([started.state, started.nonce, started.verifier, back, link]),
+        max_age=600,
+        path="/api/auth/oidc",
+        httponly=True,
+        secure=request.app.state.settings.cookie_secure,
+        samesite="lax",
+    )
+    return response
+
+
+@router.get("/oidc/callback")
+def oidc_callback(
+    request: Request,
+    db: DB,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+) -> RedirectResponse:
+    """Back from the identity provider: log the person in."""
+    settings = request.app.state.settings
+    config = load_config(db, settings)
+    try:
+        saved_state, nonce, verifier, back, link = json.loads(
+            request.cookies.get(OIDC_COOKIE, "")
+        )
+    except (ValueError, TypeError):
+        return _login_page(request, config, "The login took too long; try again.")
+    if error:
+        reason = f"University login failed: {error_description or error}."
+        return _failed(request, config, back, link, reason)
+    if not code or not state or state != saved_state:
+        reason = "The login was not started here; try again."
+        return _failed(request, config, back, link, reason)
+    if not config.oidc_enabled or not config.oidc_issuer or not config.oidc_client_id:
+        return _failed(request, config, back, link, "The university login is off.")
+    try:
+        provider = oidc.discover(request.app.state.http, config.oidc_issuer)
+        claims = oidc.finish(
+            request.app.state.http,
+            provider,
+            client_id=config.oidc_client_id,
+            client_secret=oidc_secret(db, settings),
+            redirect_uri=public_base(request, config) + OIDC_CALLBACK,
+            code=code,
+            verifier=verifier,
+            nonce=nonce,
+        )
+        if link:
+            current = _session_user(request, db)
+            if current is None:
+                raise oidc.LoginFailed("you were logged out meanwhile")
+            oidc.link(db, current, claims)
+        else:
+            user = oidc.user_for(db, claims, config)
+    except oidc.LoginFailed as failure:
+        db.rollback()
+        reason = f"University login failed: {failure}."
+        return _failed(request, config, back, link, reason)
+    response = RedirectResponse(public_base(request, config) + back, status_code=303)
+    response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
+    if not link:
+        token = auth.start_session(db, user, timedelta(days=config.session_days))
+        set_session_cookie(request, response, token, config.session_days)
+    db.commit()
+    return response
+
+
+@router.delete("/oidc/link", status_code=204)
+def unlink_university_login(db: DB, user: SessionUser) -> None:
+    """Unlink one's account from the university login (the password stays)."""
+    user.oidc_subject = None
+    db.commit()
 
 
 @router.post("/logout", status_code=204)
@@ -90,6 +276,7 @@ def change_password(
     logged out, this one stays logged in."""
     if not auth.verify_password(user.password_hash, body.current):
         raise HTTPException(403, "the current password is wrong")
+    check_password_length(db, request, body.new)
     auth.change_password(db, user, body.new, keep_token=request_token(request) or "")
     db.commit()
 

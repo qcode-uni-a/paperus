@@ -38,9 +38,18 @@ Ask the computing centre for:
   ChatGPT) need the server reachable from the internet over HTTPS: clarify
   early with IT security.
 - **DNS name and TLS certificate** (ACME from the university or Let's Encrypt).
-- **University login**: registration with the identity provider (SAML/
-  Shibboleth or OIDC); list the attributes requested (name, email,
-  affiliation). Group membership from the directory later.
+- **University login**: registration with the identity provider as an
+  OpenID Connect client (confidential, authorization code flow with PKCE;
+  scopes `openid profile email`). Give them the redirect address shown in
+  Administration → Settings → Authentication
+  (`https://<host>/api/auth/oidc/callback`); enter the issuer, client ID and
+  secret there (or the secret as `PAPERUS_OIDC_CLIENT_SECRET`). The client
+  authenticates with `client_secret_post`. SAML-only providers need a bridge
+  (Keycloak, SATOSA). Group membership from the directory later.
+- **Administrators keep a password**: with password login off, only
+  administrators may still use one, their way in if the identity provider
+  fails. Link their accounts to the university login (on first setup, or
+  "Link my account" under Authentication).
 
 Agree in writing who patches the OS and who updates the application. Automate
 updates (container images + script or Ansible), set up backups and test a

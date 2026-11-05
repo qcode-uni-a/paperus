@@ -5,6 +5,32 @@ export type ClientOptions = {
 };
 
 /**
+ * Authentication
+ */
+export type Authentication = {
+    /**
+     * Redirect Uri
+     */
+    redirect_uri: string;
+    /**
+     * Secret Set
+     */
+    secret_set: boolean;
+    /**
+     * Secret From Environment
+     */
+    secret_from_environment: boolean;
+    /**
+     * Linked
+     */
+    linked: number;
+    /**
+     * Sessions
+     */
+    sessions: number;
+};
+
+/**
  * BackupConfig
  *
  * When backups run on their own (checked every hour by the worker).
@@ -924,6 +950,20 @@ export type LinkIn = {
 };
 
 /**
+ * LoginMethods
+ */
+export type LoginMethods = {
+    /**
+     * Password
+     */
+    password: boolean;
+    /**
+     * Oidc Label
+     */
+    oidc_label: string | null;
+};
+
+/**
  * LoginRequest
  */
 export type LoginRequest = {
@@ -1534,6 +1574,34 @@ export type Problem = {
 };
 
 /**
+ * ProviderCheck
+ */
+export type ProviderCheck = {
+    /**
+     * Issuer
+     */
+    issuer: string;
+};
+
+/**
+ * ProviderFound
+ */
+export type ProviderFound = {
+    /**
+     * Ok
+     */
+    ok: boolean;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Authorization Endpoint
+     */
+    authorization_endpoint?: string | null;
+};
+
+/**
  * Report
  */
 export type Report = {
@@ -1667,6 +1735,16 @@ export type Scheme = 'doi' | 'arxiv' | 'isbn' | 'pmid' | 'url';
 export type Scope = 'search' | 'papers.read' | 'files.read' | 'papers.write' | 'tags.write' | 'collections.write' | 'notes.write' | 'groups.read';
 
 /**
+ * Secret
+ */
+export type Secret = {
+    /**
+     * Secret
+     */
+    secret?: string | null;
+};
+
+/**
  * SetupState
  */
 export type SetupState = {
@@ -1793,6 +1871,42 @@ export type SystemConfig = {
      * Integrity Schedule
      */
     integrity_schedule?: 'off' | 'daily' | 'weekly';
+    /**
+     * Session Days
+     */
+    session_days?: number;
+    /**
+     * Password Min Length
+     */
+    password_min_length?: number;
+    /**
+     * Password Login
+     */
+    password_login?: boolean;
+    /**
+     * Oidc Enabled
+     */
+    oidc_enabled?: boolean;
+    /**
+     * Oidc Issuer
+     */
+    oidc_issuer?: string | null;
+    /**
+     * Oidc Client Id
+     */
+    oidc_client_id?: string | null;
+    /**
+     * Oidc Label
+     */
+    oidc_label?: string;
+    /**
+     * Oidc Username Claim
+     */
+    oidc_username_claim?: string;
+    /**
+     * Oidc Create Accounts
+     */
+    oidc_create_accounts?: boolean;
 };
 
 /**
@@ -2017,6 +2131,10 @@ export type UserOut = {
      * Seen Hints
      */
     seen_hints: Array<string>;
+    /**
+     * University Login
+     */
+    university_login?: boolean;
 };
 
 /**
@@ -2223,6 +2341,110 @@ export type LoginResponses = {
 };
 
 export type LoginResponse2 = LoginResponses[keyof LoginResponses];
+
+export type LoginMethodsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/methods';
+};
+
+export type LoginMethodsResponses = {
+    /**
+     * Successful Response
+     */
+    200: LoginMethods;
+};
+
+export type LoginMethodsResponse = LoginMethodsResponses[keyof LoginMethodsResponses];
+
+export type OidcStartData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Next
+         */
+        next?: string;
+        /**
+         * Link
+         */
+        link?: boolean;
+    };
+    url: '/api/auth/oidc/start';
+};
+
+export type OidcStartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OidcStartError = OidcStartErrors[keyof OidcStartErrors];
+
+export type OidcStartResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type OidcCallbackData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Code
+         */
+        code?: string | null;
+        /**
+         * State
+         */
+        state?: string | null;
+        /**
+         * Error
+         */
+        error?: string | null;
+        /**
+         * Error Description
+         */
+        error_description?: string | null;
+    };
+    url: '/api/auth/oidc/callback';
+};
+
+export type OidcCallbackErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OidcCallbackError = OidcCallbackErrors[keyof OidcCallbackErrors];
+
+export type OidcCallbackResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
+export type UnlinkUniversityLoginData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/oidc/link';
+};
+
+export type UnlinkUniversityLoginResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnlinkUniversityLoginResponse = UnlinkUniversityLoginResponses[keyof UnlinkUniversityLoginResponses];
 
 export type LogoutData = {
     body?: never;
@@ -3888,6 +4110,92 @@ export type IntegrityReportResponses = {
 };
 
 export type IntegrityReportResponse = IntegrityReportResponses[keyof IntegrityReportResponses];
+
+export type AuthenticationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/authentication';
+};
+
+export type AuthenticationResponses = {
+    /**
+     * Successful Response
+     */
+    200: Authentication;
+};
+
+export type AuthenticationResponse = AuthenticationResponses[keyof AuthenticationResponses];
+
+export type SetOidcSecretData = {
+    body: Secret;
+    path?: never;
+    query?: never;
+    url: '/api/admin/authentication/secret';
+};
+
+export type SetOidcSecretErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetOidcSecretError = SetOidcSecretErrors[keyof SetOidcSecretErrors];
+
+export type SetOidcSecretResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetOidcSecretResponse = SetOidcSecretResponses[keyof SetOidcSecretResponses];
+
+export type CheckProviderData = {
+    body: ProviderCheck;
+    path?: never;
+    query?: never;
+    url: '/api/admin/authentication/check';
+};
+
+export type CheckProviderErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckProviderError = CheckProviderErrors[keyof CheckProviderErrors];
+
+export type CheckProviderResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProviderFound;
+};
+
+export type CheckProviderResponse = CheckProviderResponses[keyof CheckProviderResponses];
+
+export type EndAllSessionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/sessions';
+};
+
+export type EndAllSessionsResponses = {
+    /**
+     * Response End All Sessions
+     *
+     * Successful Response
+     */
+    200: {
+        [key: string]: number;
+    };
+};
+
+export type EndAllSessionsResponse = EndAllSessionsResponses[keyof EndAllSessionsResponses];
 
 export type ListTagsData = {
     body?: never;

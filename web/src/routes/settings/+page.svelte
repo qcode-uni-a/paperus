@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { changePassword, errorMessage, setDefaultLibrary } from '#lib/api/client.ts';
+	import {
+		changePassword,
+		errorMessage,
+		loginMethods,
+		setDefaultLibrary
+	} from '#lib/api/client.ts';
 	import {
 		defaultLibrary,
 		libraryName,
@@ -9,6 +14,12 @@
 	import AccessTokens from '#lib/AccessTokens.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
+	import UniversityLink from '#lib/UniversityLink.svelte';
+
+	let university = $state<string | null>(null);
+	$effect(() => {
+		loginMethods().then(({ data }) => (university = data?.oidc_label ?? null));
+	});
 
 	$effect(() => {
 		loadOrganize();
@@ -123,6 +134,11 @@
 			? ', site administrator'
 			: ''}.
 	</p>
+	{#if university}
+		<h3>{university}</h3>
+		<UniversityLink label={university} next="/settings" />
+		<h3>Password</h3>
+	{/if}
 	<form class="password" onsubmit={savePassword}>
 		<label
 			>Current password <input
@@ -172,6 +188,10 @@
 	h2 {
 		margin: 0 0 6px;
 		font-size: var(--step-1);
+	}
+	h3 {
+		margin: 18px 0 8px;
+		font-size: var(--step-0);
 	}
 	section > p {
 		margin: 0 0 14px;

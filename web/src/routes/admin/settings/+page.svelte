@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
+	import AuthSettings from '#lib/admin/AuthSettings.svelte';
 	import JobSettings from '#lib/admin/JobSettings.svelte';
 	import IntegritySettings from '#lib/admin/IntegritySettings.svelte';
 	import LoggingSettings from '#lib/admin/LoggingSettings.svelte';
@@ -76,6 +77,8 @@
 				<MlSettings />
 			{:else if slug === 'integrity'}
 				<IntegritySettings />
+			{:else if slug === 'authentication'}
+				<AuthSettings />
 			{:else if slug === 'jobs'}
 				<JobSettings />
 			{:else if slug === 'server'}

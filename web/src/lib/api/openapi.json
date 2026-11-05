@@ -96,6 +96,191 @@
         }
       }
     },
+    "/api/auth/methods": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login Methods",
+        "description": "How one may log in (for the login page).",
+        "operationId": "login_methods",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginMethods"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/oidc/start": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Oidc Start",
+        "description": "Off to the identity provider; it sends the browser back to\n``/api/auth/oidc/callback``. With ``link``, the university login is\nlinked to the account logged in now instead (whatever its name).",
+        "operationId": "oidc_start",
+        "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "/",
+              "title": "Next"
+            }
+          },
+          {
+            "name": "link",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Link"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/oidc/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Oidc Callback",
+        "description": "Back from the identity provider: log the person in.",
+        "operationId": "oidc_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error"
+            }
+          },
+          {
+            "name": "error_description",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Error Description"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/oidc/link": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Unlink University Login",
+        "description": "Unlink one's account from the university login (the password stays).",
+        "operationId": "unlink_university_login",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/api/auth/logout": {
       "post": {
         "tags": [
@@ -2824,6 +3009,131 @@
         }
       }
     },
+    "/api/admin/authentication": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Authentication",
+        "description": "What the Authentication settings show besides the settings.",
+        "operationId": "authentication",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Authentication"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/authentication/secret": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Oidc Secret",
+        "description": "The university login's client secret; never sent back.",
+        "operationId": "set_oidc_secret",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Secret"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/authentication/check": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Check Provider",
+        "description": "Whether the identity provider answers at this address.",
+        "operationId": "check_provider",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCheck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderFound"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sessions": {
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "End All Sessions",
+        "description": "Log everyone out on every device, except this one.",
+        "operationId": "end_all_sessions",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response End All Sessions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/tags": {
       "get": {
         "tags": [
@@ -4451,6 +4761,39 @@
   },
   "components": {
     "schemas": {
+      "Authentication": {
+        "properties": {
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri"
+          },
+          "secret_set": {
+            "type": "boolean",
+            "title": "Secret Set"
+          },
+          "secret_from_environment": {
+            "type": "boolean",
+            "title": "Secret From Environment"
+          },
+          "linked": {
+            "type": "integer",
+            "title": "Linked"
+          },
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "redirect_uri",
+          "secret_set",
+          "secret_from_environment",
+          "linked",
+          "sessions"
+        ],
+        "title": "Authentication"
+      },
       "BackupConfig": {
         "properties": {
           "schedule": {
@@ -6113,6 +6456,31 @@
         ],
         "title": "LinkIn"
       },
+      "LoginMethods": {
+        "properties": {
+          "password": {
+            "type": "boolean",
+            "title": "Password"
+          },
+          "oidc_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "password",
+          "oidc_label"
+        ],
+        "title": "LoginMethods"
+      },
       "LoginRequest": {
         "properties": {
           "username": {
@@ -7160,6 +7528,55 @@
         ],
         "title": "Problem"
       },
+      "ProviderCheck": {
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Issuer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issuer"
+        ],
+        "title": "ProviderCheck"
+      },
+      "ProviderFound": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "authorization_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorization Endpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "title": "ProviderFound"
+      },
       "Report": {
         "properties": {
           "checked_at": {
@@ -7360,6 +7777,24 @@
           "groups.read"
         ],
         "title": "Scope"
+      },
+      "Secret": {
+        "properties": {
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "title": "Secret"
       },
       "SetupState": {
         "properties": {
@@ -7604,6 +8039,73 @@
             ],
             "title": "Integrity Schedule",
             "default": "weekly"
+          },
+          "session_days": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Session Days",
+            "default": 30
+          },
+          "password_min_length": {
+            "type": "integer",
+            "maximum": 128.0,
+            "minimum": 8.0,
+            "title": "Password Min Length",
+            "default": 8
+          },
+          "password_login": {
+            "type": "boolean",
+            "title": "Password Login",
+            "default": true
+          },
+          "oidc_enabled": {
+            "type": "boolean",
+            "title": "Oidc Enabled",
+            "default": false
+          },
+          "oidc_issuer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://\\S+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Issuer"
+          },
+          "oidc_client_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Client Id"
+          },
+          "oidc_label": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Oidc Label",
+            "default": "University login"
+          },
+          "oidc_username_claim": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_:.-]{1,60}$",
+            "title": "Oidc Username Claim",
+            "default": "preferred_username"
+          },
+          "oidc_create_accounts": {
+            "type": "boolean",
+            "title": "Oidc Create Accounts",
+            "default": true
           }
         },
         "type": "object",
@@ -8080,6 +8582,11 @@
             },
             "type": "array",
             "title": "Seen Hints"
+          },
+          "university_login": {
+            "type": "boolean",
+            "title": "University Login",
+            "default": false
           }
         },
         "type": "object",

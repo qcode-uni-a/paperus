@@ -2,7 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { login as apiLogin, setupState } from '#lib/api/client.ts';
+	import { login as apiLogin, errorMessage, loginMethods, setupState } from '#lib/api/client.ts';
+	import type { LoginMethods } from '#lib/api/generated/types.gen.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	let username = $state('');
@@ -10,6 +11,23 @@
 	let error = $state('');
 	let busy = $state(false);
 	const restored = $derived(page.url.searchParams.has('restored'));
+	/** From a failed university login. */
+	const failed = $derived(page.url.searchParams.get('error'));
+	let methods = $state<LoginMethods | null>(null);
+	/** With password login off: the administrators' way in. */
+	let showPassword = $state(false);
+
+	$effect(() => {
+		loginMethods().then(({ data }) => (methods = data ?? null));
+	});
+
+	const next = $derived.by(() => {
+		const wanted = page.url.searchParams.get('next');
+		// Only paths on this site, never another origin.
+		return wanted?.startsWith('/') && !wanted.startsWith('//') ? wanted : '/';
+	});
+	const universityHref = $derived(`/api/auth/oidc/start?next=${encodeURIComponent(next)}`);
+	const passwordForm = $derived(!methods || methods.password || showPassword);
 
 	// A server without users yet starts with the setup.
 	$effect(() => {
@@ -22,17 +40,15 @@
 		event.preventDefault();
 		busy = true;
 		error = '';
-		const { data } = await apiLogin({ body: { username, password } });
+		const { data, error: failure, response } = await apiLogin({ body: { username, password } });
 		busy = false;
 		if (!data) {
-			error = 'Wrong username or password.';
+			error = response?.status === 403 ? errorMessage(failure) : 'Wrong username or password.';
 			return;
 		}
 		session.user = data.user;
 		session.checked = true;
-		const next = page.url.searchParams.get('next');
-		// Only paths on this site, never another origin.
-		await goto(next?.startsWith('/') && !next.startsWith('//') ? next : resolve('/'));
+		await goto(next === '/' ? resolve('/') : next);
 	}
 </script>
 
@@ -43,15 +59,29 @@
 	{#if restored}
 		<p class="restored">Backup restored. Log in with your account from the backup.</p>
 	{/if}
-	<form onsubmit={login}>
-		<label>Username <input bind:value={username} autocomplete="username" required /></label>
-		<label>
-			Password
-			<input type="password" bind:value={password} autocomplete="current-password" required />
-		</label>
-		{#if error}<p class="error" role="alert">{error}</p>{/if}
-		<button class="primary" disabled={busy}>{busy ? 'Logging in…' : 'Log in'}</button>
-	</form>
+	{#if failed}<p class="error" role="alert">{failed}</p>{/if}
+	{#if methods?.oidc_label}
+		<!-- A full page load: the server sends the browser on to the identity provider. -->
+		<a class="university" href={universityHref} data-sveltekit-reload>{methods.oidc_label}</a>
+		{#if passwordForm}<p class="or"><span>or with a password</span></p>{/if}
+	{/if}
+	{#if passwordForm}
+		<form onsubmit={login}>
+			<label>Username <input bind:value={username} autocomplete="username" required /></label>
+			<label>
+				Password
+				<input type="password" bind:value={password} autocomplete="current-password" required />
+			</label>
+			{#if error}<p class="error" role="alert">{error}</p>{/if}
+			<button class={methods?.oidc_label ? '' : 'primary'} disabled={busy}
+				>{busy ? 'Logging in…' : 'Log in'}</button
+			>
+		</form>
+	{:else}
+		<button class="admin-login" onclick={() => (showPassword = true)}>
+			Administrator login with a password
+		</button>
+	{/if}
 </div>
 
 <style>
@@ -90,7 +120,50 @@
 		margin-top: 4px;
 	}
 	.error {
+		margin: 0 0 16px;
+	}
+	form .error {
 		margin: 0;
+	}
+	.university {
+		display: block;
+		padding: 12px 16px;
+		border-radius: 999px;
+		background: var(--royal);
+		color: var(--on-royal, #fff);
+		font-weight: 650;
+		text-align: center;
+		text-decoration: none;
+	}
+	.university:hover {
+		filter: brightness(1.08);
+	}
+	.university:focus-visible {
+		outline: 2px solid var(--royal);
+		outline-offset: 3px;
+	}
+	.or {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		margin: 24px 0 16px;
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
+	.or::before,
+	.or::after {
+		content: '';
+		flex: 1;
+		border-top: 1px solid var(--rule);
+	}
+	.admin-login {
+		margin-top: 20px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--muted);
+		font-size: var(--step--1);
+		text-decoration: underline;
 	}
 	.restored {
 		margin: -16px 0 20px;

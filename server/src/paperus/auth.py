@@ -64,14 +64,16 @@ def _token_hash(token: str) -> bytes:
     return hashlib.sha256(token.encode()).digest()
 
 
-def start_session(db: Session, user: User) -> str:
+def start_session(
+    db: Session, user: User, lifetime: timedelta = SESSION_LIFETIME
+) -> str:
     """Create a login session and return its token."""
     token = secrets.token_urlsafe(32)
     db.add(
         LoginSession(
             token_hash=_token_hash(token),
             user_id=user.id,
-            expires_at=datetime.now(UTC) + SESSION_LIFETIME,
+            expires_at=datetime.now(UTC) + lifetime,
         )
     )
     return token
@@ -86,6 +88,14 @@ def end_session(db: Session, token: str) -> None:
 def end_sessions(db: Session, user: User) -> None:
     """Log the user out everywhere."""
     db.execute(delete(LoginSession).where(LoginSession.user_id == user.id))
+
+
+def end_all_sessions(db: Session, keep_token: str) -> int:
+    """Log everyone out, except the session ``keep_token``; how many ended."""
+    result = db.execute(
+        delete(LoginSession).where(LoginSession.token_hash != _token_hash(keep_token))
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def change_password(db: Session, user: User, password: str, keep_token: str) -> None:

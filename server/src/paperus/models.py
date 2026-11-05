@@ -58,6 +58,9 @@ class User(Record, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Deactivated people cannot log in; their papers and memberships stay."""
+    oidc_subject: Mapped[str | None] = mapped_column(String(500), unique=True)
+    """Who the person is at the identity provider (issuer and subject), once
+    they logged in with the university login."""
 
 
 class Role(StrEnum):

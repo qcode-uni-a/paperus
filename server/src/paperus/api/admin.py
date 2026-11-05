@@ -1,12 +1,15 @@
 """Admin page: settings, the ML service, progress and jobs."""
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 
-from paperus import integrity, metrics, system, usage
-from paperus.api.deps import DB, CurrentUser
+from paperus import auth, integrity, metrics, oidc, system, usage
+from paperus.api.auth import OIDC_CALLBACK, public_base
+from paperus.api.deps import DB, CurrentUser, request_token
 from paperus.jobs import (
     queue_embedding_sweep,
     queue_empty_trash,
@@ -15,7 +18,7 @@ from paperus.jobs import (
     queue_text_sweep,
 )
 from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
-from paperus.models import User
+from paperus.models import LoginSession, User
 from paperus.processing import reread_all
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -233,3 +236,76 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
 def integrity_report(db: DB, admin: Admin) -> integrity.Report | None:
     """The last integrity check's report (None before the first)."""
     return integrity.last_report(db)
+
+
+class Authentication(BaseModel):
+    redirect_uri: str
+    """To register at the identity provider."""
+    secret_set: bool
+    secret_from_environment: bool
+    """Set with ``PAPERUS_OIDC_CLIENT_SECRET`` (then not changeable here)."""
+    linked: int
+    """Accounts that have logged in with the university login."""
+    sessions: int
+    """Devices logged in now."""
+
+
+@router.get("/authentication")
+def authentication(request: Request, db: DB, admin: Admin) -> Authentication:
+    """What the Authentication settings show besides the settings."""
+    settings = request.app.state.settings
+    config = system.load_config(db, settings)
+    now = datetime.now(UTC)
+    return Authentication(
+        redirect_uri=public_base(request, config) + OIDC_CALLBACK,
+        secret_set=system.oidc_secret(db, settings) is not None,
+        secret_from_environment=bool(settings.oidc_client_secret),
+        linked=db.scalar(select(func.count()).where(User.oidc_subject.is_not(None)))
+        or 0,
+        sessions=db.scalar(select(func.count()).where(LoginSession.expires_at > now))
+        or 0,
+    )
+
+
+class Secret(BaseModel):
+    secret: str | None = Field(None, max_length=1000)
+    """None or empty: no secret (a public client)."""
+
+
+@router.put("/authentication/secret", status_code=204)
+def set_oidc_secret(body: Secret, db: DB, admin: Admin) -> None:
+    """The university login's client secret; never sent back."""
+    system.save_oidc_secret(db, body.secret or None)
+    db.commit()
+
+
+class ProviderCheck(BaseModel):
+    issuer: str = Field(max_length=500)
+
+
+class ProviderFound(BaseModel):
+    ok: bool
+    error: str | None = None
+    authorization_endpoint: str | None = None
+
+
+@router.post("/authentication/check")
+def check_provider(
+    body: ProviderCheck, request: Request, admin: Admin
+) -> ProviderFound:
+    """Whether the identity provider answers at this address."""
+    try:
+        provider = oidc.discover(request.app.state.http, body.issuer, fresh=True)
+    except oidc.LoginFailed as error:
+        return ProviderFound(ok=False, error=str(error))
+    return ProviderFound(
+        ok=True, authorization_endpoint=provider.authorization_endpoint
+    )
+
+
+@router.delete("/sessions")
+def end_all_sessions(request: Request, db: DB, admin: Admin) -> dict[str, int]:
+    """Log everyone out on every device, except this one."""
+    ended = auth.end_all_sessions(db, request_token(request) or "")
+    db.commit()
+    return {"ended": ended}

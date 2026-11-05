@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddNotesData, AddNotesErrors, AddNotesResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeNoteData, ChangeNoteErrors, ChangeNoteResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateNoteData, CreateNoteErrors, CreateNoteResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, EmptyTrashData, EmptyTrashResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetImportData, GetImportErrors, GetImportResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, IntegrityReportData, IntegrityReportResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, LinkItemData, LinkItemErrors, LinkItemResponses, ListBackupsData, ListBackupsResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesEverywhereData, ListDuplicatesEverywhereResponses, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListImportsData, ListImportsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListNotesData, ListNotesErrors, ListNotesResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkDifferentData, MarkDifferentErrors, MarkDifferentResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeasureMlSpeedData, MeasureMlSpeedErrors, MeasureMlSpeedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, NoteHistoryData, NoteHistoryErrors, NoteHistoryResponses, NoteMarkdownData, NoteMarkdownErrors, NoteMarkdownResponses, PinCollectionData, PinCollectionErrors, PinCollectionResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, ReadNoteData, ReadNoteErrors, ReadNoteResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveNoteData, RemoveNoteErrors, RemoveNoteResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreNoteData, RestoreNoteErrors, RestoreNoteResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetNoteOwnerData, SetNoteOwnerErrors, SetNoteOwnerResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StarItemData, StarItemErrors, StarItemResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StartImportData, StartImportErrors, StartImportResponses, StatsData, StatsResponses, StorageData, StorageResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, TrashNoteData, TrashNoteErrors, TrashNoteResponses, UnlinkItemData, UnlinkItemErrors, UnlinkItemResponses, UnpinCollectionData, UnpinCollectionErrors, UnpinCollectionResponses, UnstarItemData, UnstarItemErrors, UnstarItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddNotesData, AddNotesErrors, AddNotesResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, AuthenticationData, AuthenticationResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeNoteData, ChangeNoteErrors, ChangeNoteResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckProviderData, CheckProviderErrors, CheckProviderResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateNoteData, CreateNoteErrors, CreateNoteResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, EmptyTrashData, EmptyTrashResponses, EndAllSessionsData, EndAllSessionsResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetImportData, GetImportErrors, GetImportResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, IntegrityReportData, IntegrityReportResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, LinkItemData, LinkItemErrors, LinkItemResponses, ListBackupsData, ListBackupsResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesEverywhereData, ListDuplicatesEverywhereResponses, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListImportsData, ListImportsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListNotesData, ListNotesErrors, ListNotesResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginMethodsData, LoginMethodsResponses, LoginResponses, LogoutData, LogoutResponses, MarkDifferentData, MarkDifferentErrors, MarkDifferentResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeasureMlSpeedData, MeasureMlSpeedErrors, MeasureMlSpeedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, NoteHistoryData, NoteHistoryErrors, NoteHistoryResponses, NoteMarkdownData, NoteMarkdownErrors, NoteMarkdownResponses, OidcCallbackData, OidcCallbackErrors, OidcCallbackResponses, OidcStartData, OidcStartErrors, OidcStartResponses, PinCollectionData, PinCollectionErrors, PinCollectionResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, ReadNoteData, ReadNoteErrors, ReadNoteResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveNoteData, RemoveNoteErrors, RemoveNoteResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreNoteData, RestoreNoteErrors, RestoreNoteResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetNoteOwnerData, SetNoteOwnerErrors, SetNoteOwnerResponses, SetOidcSecretData, SetOidcSecretErrors, SetOidcSecretResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StarItemData, StarItemErrors, StarItemResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StartImportData, StartImportErrors, StartImportResponses, StatsData, StatsResponses, StorageData, StorageResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, TrashNoteData, TrashNoteErrors, TrashNoteResponses, UnlinkItemData, UnlinkItemErrors, UnlinkItemResponses, UnlinkUniversityLoginData, UnlinkUniversityLoginResponses, UnpinCollectionData, UnpinCollectionErrors, UnpinCollectionResponses, UnstarItemData, UnstarItemErrors, UnstarItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -39,6 +39,36 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
         ...options.headers
     }
 });
+
+/**
+ * Login Methods
+ *
+ * How one may log in (for the login page).
+ */
+export const loginMethods = <ThrowOnError extends boolean = false>(options?: Options<LoginMethodsData, ThrowOnError>): RequestResult<LoginMethodsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<LoginMethodsResponses, unknown, ThrowOnError>({ url: '/api/auth/methods', ...options });
+
+/**
+ * Oidc Start
+ *
+ * Off to the identity provider; it sends the browser back to
+ * ``/api/auth/oidc/callback``. With ``link``, the university login is
+ * linked to the account logged in now instead (whatever its name).
+ */
+export const oidcStart = <ThrowOnError extends boolean = false>(options?: Options<OidcStartData, ThrowOnError>): RequestResult<OidcStartResponses, OidcStartErrors, ThrowOnError> => (options?.client ?? client).get<OidcStartResponses, OidcStartErrors, ThrowOnError>({ url: '/api/auth/oidc/start', ...options });
+
+/**
+ * Oidc Callback
+ *
+ * Back from the identity provider: log the person in.
+ */
+export const oidcCallback = <ThrowOnError extends boolean = false>(options?: Options<OidcCallbackData, ThrowOnError>): RequestResult<OidcCallbackResponses, OidcCallbackErrors, ThrowOnError> => (options?.client ?? client).get<OidcCallbackResponses, OidcCallbackErrors, ThrowOnError>({ url: '/api/auth/oidc/callback', ...options });
+
+/**
+ * Unlink University Login
+ *
+ * Unlink one's account from the university login (the password stays).
+ */
+export const unlinkUniversityLogin = <ThrowOnError extends boolean = false>(options?: Options<UnlinkUniversityLoginData, ThrowOnError>): RequestResult<UnlinkUniversityLoginResponses, unknown, ThrowOnError> => (options?.client ?? client).delete<UnlinkUniversityLoginResponses, unknown, ThrowOnError>({ url: '/api/auth/oidc/link', ...options });
 
 /**
  * Logout
@@ -589,6 +619,48 @@ export const runJob = <ThrowOnError extends boolean = false>(options: Options<Ru
  * The last integrity check's report (None before the first).
  */
 export const integrityReport = <ThrowOnError extends boolean = false>(options?: Options<IntegrityReportData, ThrowOnError>): RequestResult<IntegrityReportResponses, unknown, ThrowOnError> => (options?.client ?? client).get<IntegrityReportResponses, unknown, ThrowOnError>({ url: '/api/admin/integrity', ...options });
+
+/**
+ * Authentication
+ *
+ * What the Authentication settings show besides the settings.
+ */
+export const authentication = <ThrowOnError extends boolean = false>(options?: Options<AuthenticationData, ThrowOnError>): RequestResult<AuthenticationResponses, unknown, ThrowOnError> => (options?.client ?? client).get<AuthenticationResponses, unknown, ThrowOnError>({ url: '/api/admin/authentication', ...options });
+
+/**
+ * Set Oidc Secret
+ *
+ * The university login's client secret; never sent back.
+ */
+export const setOidcSecret = <ThrowOnError extends boolean = false>(options: Options<SetOidcSecretData, ThrowOnError>): RequestResult<SetOidcSecretResponses, SetOidcSecretErrors, ThrowOnError> => (options.client ?? client).put<SetOidcSecretResponses, SetOidcSecretErrors, ThrowOnError>({
+    url: '/api/admin/authentication/secret',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Check Provider
+ *
+ * Whether the identity provider answers at this address.
+ */
+export const checkProvider = <ThrowOnError extends boolean = false>(options: Options<CheckProviderData, ThrowOnError>): RequestResult<CheckProviderResponses, CheckProviderErrors, ThrowOnError> => (options.client ?? client).post<CheckProviderResponses, CheckProviderErrors, ThrowOnError>({
+    url: '/api/admin/authentication/check',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * End All Sessions
+ *
+ * Log everyone out on every device, except this one.
+ */
+export const endAllSessions = <ThrowOnError extends boolean = false>(options?: Options<EndAllSessionsData, ThrowOnError>): RequestResult<EndAllSessionsResponses, unknown, ThrowOnError> => (options?.client ?? client).delete<EndAllSessionsResponses, unknown, ThrowOnError>({ url: '/api/admin/sessions', ...options });
 
 /**
  * List Tags

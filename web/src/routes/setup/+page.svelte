@@ -2,25 +2,30 @@
 	import { goto } from '$app/navigation';
 	import { asset, resolve } from '$app/paths';
 	import {
+		authentication,
+		checkProvider,
 		checkRestore,
 		createFirstAdmin,
 		errorMessage,
+		getConfig,
 		restoreOnFirstStart,
+		setConfig,
+		setOidcSecret,
 		setupState
 	} from '#lib/api/client.ts';
-	import type { RestoreCheckOut, SetupState } from '#lib/api/generated/types.gen.ts';
+	import type { ProviderFound, RestoreCheckOut, SetupState } from '#lib/api/generated/types.gen.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	/** First start: a new administrator, or a backup restored. */
 	let setup = $state<SetupState | null>(null);
-	let choice = $state<'new' | 'restore' | null>(null);
+	let choice = $state<'new' | 'restore' | 'university' | null>(null);
 	let error = $state('');
 
 	$effect(() => {
 		setupState().then(({ data }) => {
 			setup = data ?? null;
 			// Set up already (e.g. someone else was faster): to the login.
-			if (data && !data.needed) goto(resolve('/login'));
+			if (data && !data.needed && choice !== 'university') goto(resolve('/login'));
 		});
 	});
 
@@ -46,7 +51,53 @@
 		}
 		session.user = data.user;
 		session.checked = true;
-		await goto(resolve('/'));
+		// Next, optionally: the university login.
+		choice = 'university';
+		const info = await authentication();
+		redirectUri = info.data?.redirect_uri ?? '';
+	}
+
+	// The university login (optional), linked to the new administrator.
+	let redirectUri = $state('');
+	let issuer = $state('');
+	let clientId = $state('');
+	let secret = $state('');
+	let buttonText = $state('University login');
+	let found = $state<ProviderFound | null>(null);
+
+	async function checkIssuer() {
+		const { data, error: failure } = await checkProvider({ body: { issuer: issuer.trim() } });
+		found = data ?? { ok: false, error: errorMessage(failure) };
+	}
+
+	async function saveUniversity(event: SubmitEvent) {
+		event.preventDefault();
+		error = '';
+		busy = true;
+		const current = await getConfig();
+		if (!current.data) {
+			busy = false;
+			error = errorMessage(current.error);
+			return;
+		}
+		const saved = await setConfig({
+			body: {
+				...current.data,
+				oidc_enabled: true,
+				oidc_issuer: issuer.trim(),
+				oidc_client_id: clientId.trim(),
+				oidc_label: buttonText.trim() || 'University login'
+			}
+		});
+		if (!saved.error && secret) await setOidcSecret({ body: { secret } });
+		busy = false;
+		if (saved.error) {
+			error = errorMessage(saved.error);
+			return;
+		}
+		// One login there links it to this account; back to its settings.
+		const next = '/admin/settings?open=authentication';
+		window.location.href = `/api/auth/oidc/start?link=true&next=${encodeURIComponent(next)}`;
 	}
 
 	// Restore.
@@ -129,6 +180,45 @@
 			<div class="buttons">
 				<button type="button" onclick={() => (choice = null)}>Back</button>
 				<button class="primary" disabled={busy}>Create and start</button>
+			</div>
+		</form>
+	{:else if choice === 'university'}
+		<form onsubmit={saveUniversity}>
+			<h2>University login</h2>
+			<p class="muted">
+				Optional: people log in with their university account (OpenID Connect). Your account is
+				linked to it right away; your password stays, as a way in if the university login fails.
+				Also later, under Administration → Settings → Authentication.
+			</p>
+			<div class="redirect">
+				<span>Register this redirect address at the identity provider:</span>
+				<code>{redirectUri || '…'}</code>
+			</div>
+			<label
+				>Identity provider
+				<span class="with-button">
+					<input
+						type="url"
+						bind:value={issuer}
+						placeholder="https://login.uni-example.de/realms/staff"
+						oninput={() => (found = null)}
+						required
+					/>
+					<button type="button" onclick={checkIssuer} disabled={!issuer.trim()}>Check</button>
+				</span>
+			</label>
+			{#if found}
+				<p class="check" class:warn={!found.ok}>
+					{found.ok ? `Found: logins go to ${found.authorization_endpoint}` : found.error}
+				</p>
+			{/if}
+			<label>Client ID <input bind:value={clientId} placeholder="paperus" required /></label>
+			<label>Client secret <input type="password" bind:value={secret} autocomplete="off" /></label>
+			<label>Button text <input bind:value={buttonText} maxlength="60" /></label>
+			{#if error}<p class="error">{error}</p>{/if}
+			<div class="buttons">
+				<button type="button" onclick={() => goto(resolve('/'))}>Skip</button>
+				<button class="primary" disabled={busy}>Save and link my account</button>
 			</div>
 		</form>
 	{:else}
@@ -343,5 +433,22 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
+	}
+	.redirect {
+		display: grid;
+		gap: 4px;
+		padding: 10px 12px;
+		border-radius: 8px;
+		background: var(--rail);
+		font-size: var(--step--1);
+	}
+	.with-button {
+		display: flex;
+		gap: 8px;
+		font-weight: 400;
+	}
+	.with-button input {
+		flex: 1;
+		min-width: 0;
 	}
 </style>

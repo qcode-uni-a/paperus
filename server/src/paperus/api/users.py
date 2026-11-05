@@ -4,13 +4,14 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from paperus import auth
 from paperus.api.admin import Admin
+from paperus.api.auth import check_password_length
 from paperus.api.deps import DB
 from paperus.models import Item, Library, Membership, User
 
@@ -87,8 +88,9 @@ def list_users(db: DB, admin: Admin) -> list[UserRow]:
 
 
 @router.post("", status_code=201)
-def create_user(body: NewUser, db: DB, admin: Admin) -> UserRow:
+def create_user(body: NewUser, request: Request, db: DB, admin: Admin) -> UserRow:
     """A new account (with its private space); 409 if the name is taken."""
+    check_password_length(db, request, body.password)
     try:
         user = auth.create_user(
             db, body.username, body.password, is_admin=body.is_admin
@@ -110,7 +112,9 @@ def _active_admins(db: DB) -> int:
 
 
 @router.patch("/{user_id}")
-def change_user(user_id: uuid.UUID, body: UserChange, db: DB, admin: Admin) -> UserRow:
+def change_user(
+    user_id: uuid.UUID, body: UserChange, request: Request, db: DB, admin: Admin
+) -> UserRow:
     """Reset a password, grant or take admin rights, (de)activate. The last
     active administrator cannot lose those rights, and nobody deactivates
     themselves."""
@@ -127,6 +131,7 @@ def change_user(user_id: uuid.UUID, body: UserChange, db: DB, admin: Admin) -> U
     if body.active is False and user.id == admin.id:
         raise HTTPException(409, "you cannot deactivate yourself")
     if body.password is not None:
+        check_password_length(db, request, body.password)
         user.password_hash = auth.hash_password(body.password)
         auth.end_sessions(db, user)
     if body.is_admin is not None:

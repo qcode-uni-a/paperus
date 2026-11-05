@@ -92,7 +92,7 @@ def create_first_admin(
     user = auth.create_user(db, body.username, body.password, is_admin=True)
     token = auth.start_session(db, user)
     db.commit()
-    set_session_cookie(request, response, token)
+    set_session_cookie(request, response, token, auth.SESSION_LIFETIME.days)
     return LoginResponse(token=token, user=user_out(user))
 
 
