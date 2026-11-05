@@ -7,8 +7,11 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
+from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
+from paperus.config import Settings
 from paperus.ml import MLClient, MLUnavailable
 from paperus.system import load_config
 
@@ -129,29 +132,25 @@ def _query_vector(ml: MLClient, model: str, query: str) -> str | None:
     return "[" + ",".join(f"{x:.6g}" for x in vector) + "]"
 
 
-@router.get("/api/search")
-def search(
-    request: Request,
-    response: Response,
-    db: DB,
-    access: CurrentAccess,
-    q: Annotated[str, Query(min_length=1, max_length=500)],
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+def run_search(
+    db: Session,
+    access: Access,
+    ml: MLClient,
+    settings: Settings,
+    q: str,
+    *,
+    limit: int = 20,
     mode: Mode = "hybrid",
-    type: Annotated[list[str] | None, Query()] = None,
-    library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
-) -> list[Passage]:
-    """Passages for ``q`` in the libraries the person can read (or one
-    ``library``): its words (quotes for phrases, ``-`` to exclude), its
-    meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
-    ``X-Search-Mode`` header says what was used: without the ML service,
-    hybrid search falls back to keywords."""
-    model = load_config(db, request.app.state.settings).embedding_model
+    types: list[str] | None = None,
+    library_id: uuid.UUID | None = None,
+) -> tuple[Mode, list[Passage]]:
+    """Passages for ``q`` that the person may read, and the mode used
+    (hybrid falls back to keywords without the ML service)."""
+    model = load_config(db, settings).embedding_model
     vector = None
     if mode != "keyword":
-        vector = _query_vector(request.app.state.ml, model, q)
+        vector = _query_vector(ml, model, q)
     used: Mode = mode if vector is not None or mode == "keyword" else "keyword"
-    response.headers["X-Search-Mode"] = used
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []
@@ -164,11 +163,11 @@ def search(
             "model": model,
             "use_keyword": used != "meaning",
             "use_meaning": vector is not None,
-            "types": type or [],
+            "types": types or [],
             "libraries": libraries,
         },
     ).mappings()
-    return [
+    passages = [
         Passage(
             passage_id=f"{row['file_id']}#{row['position']}",
             item_id=row["item_id"],
@@ -191,3 +190,36 @@ def search(
         )
         for row in rows
     ]
+    return used, passages
+
+
+@router.get("/api/search")
+def search(
+    request: Request,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+    q: Annotated[str, Query(min_length=1, max_length=500)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    mode: Mode = "hybrid",
+    type: Annotated[list[str] | None, Query()] = None,
+    library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
+) -> list[Passage]:
+    """Passages for ``q`` in the libraries the person can read (or one
+    ``library``): its words (quotes for phrases, ``-`` to exclude), its
+    meaning, or both; ``type`` (repeatable, CSL types) limits the items. The
+    ``X-Search-Mode`` header says what was used: without the ML service,
+    hybrid search falls back to keywords."""
+    used, passages = run_search(
+        db,
+        access,
+        request.app.state.ml,
+        request.app.state.settings,
+        q,
+        limit=limit,
+        mode=mode,
+        types=type,
+        library_id=library_id,
+    )
+    response.headers["X-Search-Mode"] = used
+    return passages

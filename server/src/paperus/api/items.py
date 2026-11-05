@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from paperus import changes, library, merge, metadata
 from paperus.access import Access
@@ -270,12 +271,11 @@ def _identifier_conflict(error: library.IdentifierTaken) -> HTTPException:
     )
 
 
-@router.post("/api/items", status_code=201)
-def add_item(
-    body: ItemIn, request: Request, response: Response, db: DB, access: CurrentAccess
-) -> ItemDetail:
-    """A new item; if one of its identifiers is known among the items the
-    person can see, the existing item (200)."""
+def add_or_find(
+    db: Session, access: Access, http: httpx2.Client, body: ItemIn
+) -> tuple[Item, bool]:
+    """A new item, or the existing one if one of its identifiers is known
+    among the items the person can see; and whether it is new."""
     library_id = access.target_library(body.library_id)
     identifiers = _normalized_identifiers(body)
     known = library.find_identifier(db, access.readable, identifiers)
@@ -284,10 +284,9 @@ def add_item(
         if existing.deleted_at is not None and access.can_write_item(existing):
             library.restore(existing)
             db.commit()
-        response.status_code = 200
-        return item_detail(existing, access, response)
+        return existing, False
 
-    resolved = _resolve(body, identifiers, request.app.state.http)
+    resolved = _resolve(body, identifiers, http)
     try:
         item = library.create_item(
             db,
@@ -306,12 +305,23 @@ def add_item(
         known = library.find_identifier(db, access.readable, identifiers)
         if known is None:
             raise
-        response.status_code = 200
-        return item_detail(known.version.item, access, response)
+        return known.version.item, False
     except library.IdentifierTaken as error:
         # Added meanwhile; the lookup above missed it.
         raise _identifier_conflict(error) from error
     db.refresh(item)
+    return item, True
+
+
+@router.post("/api/items", status_code=201)
+def add_item(
+    body: ItemIn, request: Request, response: Response, db: DB, access: CurrentAccess
+) -> ItemDetail:
+    """A new item; if one of its identifiers is known among the items the
+    person can see, the existing item (200)."""
+    item, created = add_or_find(db, access, request.app.state.http, body)
+    if not created:
+        response.status_code = 200
     return item_detail(item, access, response)
 
 

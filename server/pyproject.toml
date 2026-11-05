@@ -20,6 +20,7 @@ dependencies = [
     "boto3>=1.43.124",
     "fastapi>=0.162.0",
     "httpx2>=2.16.0",
+    "mcp>=2.3.0,<3",
     "pgvector>=0.5.1",
     "procrastinate>=3.10,<3.11",  # schema frozen in src/paperus/migrations/
     "psycopg[binary]>=3.3.8",

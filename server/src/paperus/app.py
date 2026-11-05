@@ -2,12 +2,15 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import httpx2
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
 
+from paperus import tokens
 from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
@@ -20,12 +23,13 @@ from paperus.api import (
     organize,
     search,
     setup,
-    tokens,
     users,
 )
+from paperus.api import tokens as token_api
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.jobs import make_job_app
+from paperus.mcp_server import build_mcp
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, make_ml_client
 from paperus.storage import make_blob_store
@@ -48,7 +52,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         with jobs.open():
-            yield
+            async with app.state.mcp.session_manager.run():
+                yield
         http.close()
         ml.close()
         engine.dispose()
@@ -78,7 +83,7 @@ def create_app(
     app.include_router(users.router)
     app.include_router(backups.router)
     app.include_router(setup.router)
-    app.include_router(tokens.router)
+    app.include_router(token_api.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:
@@ -87,6 +92,34 @@ def create_app(
     @app.exception_handler(NotVisible)
     def not_visible(request: Request, error: NotVisible) -> JSONResponse:
         return JSONResponse({"detail": str(error)}, status_code=404)
+
+    # The MCP server for AI assistants, before the website's catch-all.
+    app.state.mcp = build_mcp(app.state)
+    mcp_app = app.state.mcp.streamable_http_app(
+        streamable_http_path="/mcp",
+        stateless_http=True,
+        json_response=True,
+        # Only bearer tokens get in (never cookies), so DNS rebinding cannot
+        # borrow a browser's login; behind any host name or proxy.
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        ),
+    )
+    app.router.routes.extend(mcp_app.routes)
+
+    @app.middleware("http")
+    async def mcp_needs_a_token(request: Request, call_next: Any) -> Response:  # noqa: ANN401
+        """Clients learn at once that a token is missing or wrong."""
+        if request.url.path == "/mcp":
+            scheme, _, raw = request.headers.get("authorization", "").partition(" ")
+            if scheme.lower() != "bearer" or not tokens.is_token(raw):
+                return JSONResponse(
+                    {"detail": "a paperus access token is needed"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        response: Response = await call_next(request)
+        return response
 
     if settings.web_path is not None and (settings.web_path / FALLBACK).is_file():
         mount_web(app, settings.web_path)
