@@ -745,3 +745,120 @@ def test_users_reset_password_admin_rights_deactivate(w: World) -> None:
     assert (
         w.root.patch(reader_url, json={"active": True}).json()["deactivated_at"] is None
     )
+
+
+# Notes
+
+
+def note_titles(person: Person, **params: str) -> list[str]:
+    return sorted(n["title"] for n in person.get("/api/notes", params=params).json())
+
+
+def save(person: Person, note: dict[str, Any], text: str) -> httpx2.Response:
+    current = person.get(f"/api/notes/{note['id']}")
+    return person.patch(
+        f"/api/notes/{note['id']}",
+        json={"text": text},
+        headers={"If-Match": current.headers.get("ETag", '"0"')},
+    )
+
+
+def test_notes_see_search(w: World) -> None:
+    mine = w.reader.note("Reader's note")
+    shared = w.admin.note("Group note", w.library)
+    assert note_titles(w.reader) == ["Group note", "Reader's note"]  # mine, group's
+    assert note_titles(w.member) == ["Group note"]
+    for person in (w.member, w.outsider, w.root):
+        assert person.get(f"/api/notes/{mine['id']}").status_code == 404
+    assert w.outsider.get(f"/api/notes/{shared['id']}").status_code == 404
+    assert note_titles(w.outsider) == note_titles(w.root) == []
+
+
+def test_notes_write_change_trash_restore(w: World) -> None:
+    mine = w.reader.note("Mine")
+    assert save(w.reader, mine, "Mine, changed").status_code == 200
+    assert w.reader.delete(f"/api/notes/{mine['id']}").status_code == 204
+    assert w.reader.post(f"/api/notes/{mine['id']}/restore").status_code == 200
+    # A group's: readers cannot write one or change it; members can.
+    response = w.reader.post("/api/notes", json={"text": "x", "library_id": w.library})
+    assert response.status_code == 403
+    shared = w.member.note("Group note", w.library)
+    assert save(w.reader, shared, "Changed").status_code == 403
+    assert w.reader.delete(f"/api/notes/{shared['id']}").status_code == 403
+    assert save(w.member, shared, "Changed").status_code == 200
+    assert w.admin.delete(f"/api/notes/{shared['id']}").status_code == 204
+    assert w.reader.post(f"/api/notes/{shared['id']}/restore").status_code == 403
+    assert w.member.post(f"/api/notes/{shared['id']}/restore").status_code == 200
+
+
+def test_notes_give_to_another_owner(w: World) -> None:
+    mine = w.member.note("Member's note")
+    url = f"/api/notes/{mine['id']}/owner"
+    lab = w.lab["library_id"]
+    assert w.member.put(url, json={"library_id": lab}).status_code == 200
+    assert w.member.put(url, json={"library_id": w.library}).status_code == 200
+    # Readers cannot give a group's note away; members can take it.
+    assert w.reader.put(url, json={"library_id": own(w.reader)}).status_code == 403
+    assert w.member.put(url, json={"library_id": own(w.member)}).status_code == 200
+    # Only to an owner one may add to.
+    assert w.member.put(url, json={"library_id": own(w.reader)}).status_code == 404
+
+
+def test_notes_link_to_papers(w: World) -> None:
+    private = w.member.add("Member's private")
+    paper = w.paper()
+    mine = w.reader.note("About papers", items=[paper["id"]])
+    assert [i["title"] for i in mine["items"]] == ["Group paper"]
+    url = f"/api/notes/{mine['id']}/items"
+    assert w.reader.delete(f"{url}/{paper['id']}").status_code == 200
+    assert w.reader.put(f"{url}/{paper['id']}", json={"page": 3}).json()["items"] == [
+        {"item_id": paper["id"], "title": "Group paper", "page": 3}
+    ]
+    # Only papers one can see.
+    assert w.reader.put(f"{url}/{private['id']}", json={}).status_code == 404
+    # A group's note: readers cannot link; members can, to any paper they see.
+    shared = w.member.note("Group note", w.library)
+    url = f"/api/notes/{shared['id']}/items"
+    assert w.reader.put(f"{url}/{paper['id']}", json={}).status_code == 403
+    response = w.member.put(f"{url}/{private['id']}", json={})
+    assert [i["title"] for i in response.json()["items"]] == ["Member's private"]
+    # Others in the group do not see the link to the member's private paper.
+    assert w.admin.get(f"/api/notes/{shared['id']}").json()["items"] == []
+    assert note_titles(w.member, item=private["id"]) == ["Group note"]
+
+
+def test_notes_private_note_on_group_paper_only_for_me(w: World) -> None:
+    paper = w.paper()
+    w.reader.note("My thoughts", items=[paper["id"]])
+    assert note_titles(w.reader, item=paper["id"]) == ["My thoughts"]
+    assert note_titles(w.member, item=paper["id"]) == []
+
+
+def test_collections_hold_notes(w: World) -> None:
+    group_note, private = w.member.note("Group note", w.library), w.member.note("Mine")
+    mine = make_collection(w.member, "Mine").json()
+    shared = make_collection(w.member, "Group's", w.library).json()
+    ids = {"note_ids": [group_note["id"], private["id"]]}
+    assert (
+        w.member.post(f"/api/collections/{mine['id']}/notes", json=ids).status_code
+        == 204
+    )
+    assert note_titles(w.member, collection=mine["id"]) == ["Group note", "Mine"]
+    # A group's collection holds only the group's notes; readers cannot add.
+    assert (
+        w.reader.post(f"/api/collections/{shared['id']}/notes", json=ids).status_code
+        == 403
+    )
+    w.member.post(f"/api/collections/{shared['id']}/notes", json=ids)
+    assert note_titles(w.member, collection=shared["id"]) == ["Group note"]
+    assert note_titles(w.reader, collection=shared["id"]) == ["Group note"]
+    url = f"/api/collections/{shared['id']}/notes/{group_note['id']}"
+    assert w.reader.delete(url).status_code == 403
+    assert w.member.delete(url).status_code == 204
+    # Taken for oneself: the group's collections let it go.
+    w.member.post(f"/api/collections/{shared['id']}/notes", json=ids)
+    w.member.put(
+        f"/api/notes/{group_note['id']}/owner", json={"library_id": own(w.member)}
+    )
+    assert note_titles(w.member, collection=shared["id"]) == []
+    assert note_titles(w.member, collection=mine["id"]) == ["Group note", "Mine"]

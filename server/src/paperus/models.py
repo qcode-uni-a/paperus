@@ -554,3 +554,117 @@ class CollectionItem(Base):
 
     item: Mapped[Item] = relationship(back_populates="collection_links")
     collection: Mapped[Collection] = relationship(lazy="joined", innerjoin=True)
+
+
+class Note(Record, Trashable, Base):
+    """A person's writing about sources, in Markdown (see docs/architecture.md).
+
+    Owned like items, linked to any number of items (none: a standalone
+    note), held by collections like items. No versions: each save keeps the
+    previous text in ``NoteRevision``.
+    """
+
+    __tablename__ = "notes"
+
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="RESTRICT"), index=True
+    )
+    """The owner: a person's or a group's library."""
+    text: Mapped[str] = mapped_column(server_default="")
+    title: Mapped[str] = mapped_column(String(300), server_default="")
+    """The first line without Markdown marks, cached for lists."""
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    change: Mapped[int] = mapped_column(BigInteger, index=True)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    text_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    """When the text last changed (for the edit history)."""
+
+    item_links: Mapped[list[NoteItem]] = relationship(
+        back_populates="note",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+        order_by="NoteItem.created_at",
+    )
+    collection_links: Mapped[list[CollectionNote]] = relationship(
+        back_populates="note", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class NoteItem(Base):
+    """A note is about an item, optionally at a page."""
+
+    __tablename__ = "note_items"
+
+    note_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    page: Mapped[int | None]
+    added_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    note: Mapped[Note] = relationship(back_populates="item_links")
+    item: Mapped[Item] = relationship(lazy="joined", innerjoin=True)
+
+
+class CollectionNote(Base):
+    __tablename__ = "collection_notes"
+
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id", ondelete="CASCADE"), primary_key=True
+    )
+    note_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    added_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    note: Mapped[Note] = relationship(back_populates="collection_links")
+    collection: Mapped[Collection] = relationship(lazy="joined", innerjoin=True)
+
+
+class NoteRevision(Record, Base):
+    """An earlier text of a note, kept when it was replaced."""
+
+    __tablename__ = "note_revisions"
+
+    note_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), index=True
+    )
+    text: Mapped[str]
+    written_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    written_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    """When this text was last saved, before it was replaced."""
+
+
+class NoteChunk(Base):
+    """A note's text as search passages, in order (like ``FileChunk``)."""
+
+    __tablename__ = "note_chunks"
+
+    note_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)

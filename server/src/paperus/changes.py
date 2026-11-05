@@ -18,10 +18,13 @@ from paperus.models import (
     ChangeCounter,
     Collection,
     CollectionItem,
+    CollectionNote,
     File,
     Identifier,
     Item,
     ItemTag,
+    Note,
+    NoteItem,
     Tag,
     Version,
 )
@@ -50,11 +53,13 @@ def _next_change(db: Session) -> int:
     )
 
 
-def _stamped(obj: object) -> Item | Tag | Collection | None:
+def _stamped(obj: object) -> Item | Tag | Collection | Note | None:
     """The object whose change number a change to ``obj`` moves."""
     match obj:
-        case Item() | Tag() | Collection():
+        case Item() | Tag() | Collection() | Note():
             return obj
+        case NoteItem() | CollectionNote():
+            return obj.note
         case Version() | ItemTag() | CollectionItem():
             return obj.item
         case Identifier() | File():
@@ -78,7 +83,7 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
         now = datetime.now(UTC)
         for target in stamped:
             target.change = db.info[_INFO_KEY]
-            if isinstance(target, Item):
+            if isinstance(target, Item | Note):
                 target.changed_at = now
 
 

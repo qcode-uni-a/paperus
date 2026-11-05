@@ -20,6 +20,7 @@ from paperus.models import (
     Item,
     Library,
     Membership,
+    Note,
     Role,
     User,
 )
@@ -157,12 +158,12 @@ class Access:
             return self.own_allowed and self.can_read_item(item)
         return self.can_read(library_id) and self.can_write_item(item)
 
-    def may_hold(self, library_id: uuid.UUID, item: Item) -> bool:
-        """Whether a collection of ``library_id`` may hold the item: a group's
-        only the group's items, a person's private ones any item the person
-        can read."""
+    def may_hold(self, library_id: uuid.UUID, item: Item | Note) -> bool:
+        """Whether a collection of ``library_id`` may hold the item (or note):
+        a group's only the group's own, a person's private ones anything the
+        person can read."""
         if library_id == self.own_library:
-            return self.own_allowed and self.can_read_item(item)
+            return self.own_allowed and self.can_read(item.library_id)
         return library_id == item.library_id
 
     def target_library(self, requested: uuid.UUID | None) -> uuid.UUID:

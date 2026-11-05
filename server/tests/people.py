@@ -1,6 +1,6 @@
 """Several logged-in people on one test client, for permission tests."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import httpx2
@@ -41,8 +41,12 @@ class Person:
     def put(self, url: str, json: object = None) -> httpx2.Response:
         return self.client.put(url, headers=self.headers, json=json)
 
-    def patch(self, url: str, json: object) -> httpx2.Response:
-        return self.client.patch(url, headers=self.headers, json=json)
+    def patch(
+        self, url: str, json: object, headers: dict[str, str] | None = None
+    ) -> httpx2.Response:
+        return self.client.patch(
+            url, headers={**self.headers, **(headers or {})}, json=json
+        )
 
     def delete(self, url: str) -> httpx2.Response:
         return self.client.delete(url, headers=self.headers)
@@ -53,6 +57,21 @@ class Person:
     def add(self, title: str, library: str | None = None) -> dict[str, Any]:
         response = self.post(
             "/api/items", json={"metadata": {"title": title}, "library_id": library}
+        )
+        assert response.status_code == 201, response.text
+        result: dict[str, Any] = response.json()
+        return result
+
+    def note(
+        self, text: str, library: str | None = None, items: Sequence[str] = ()
+    ) -> dict[str, Any]:
+        response = self.post(
+            "/api/notes",
+            json={
+                "text": text,
+                "library_id": library,
+                "items": [{"item_id": i} for i in items],
+            },
         )
         assert response.status_code == 201, response.text
         result: dict[str, Any] = response.json()

@@ -30,6 +30,8 @@ class Scope(StrEnum):
     """Add, change and trash papers and their files."""
     TAGS_WRITE = "tags.write"
     COLLECTIONS_WRITE = "collections.write"
+    NOTES_WRITE = "notes.write"
+    """Write, change and trash notes (reading them comes with papers.read)."""
     GROUPS_READ = "groups.read"
     """The groups and owners one belongs to (names, members)."""
 
@@ -102,6 +104,12 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
     (_READ, re.compile(r"/api/files/[^/]+/content"), Scope.FILES_READ),
     (_READ, re.compile(r"/api/(items|tags|collections)(/.*)?"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/citations"), Scope.PAPERS_READ),
+    (_READ, re.compile(r"/api/notes(/.*)?"), Scope.PAPERS_READ),
+    (
+        ("POST", "PUT", "PATCH", "DELETE"),
+        re.compile(r"/api/notes(/.*)?"),
+        Scope.NOTES_WRITE,
+    ),
     (_READ, re.compile(r"/api/uploads/[^/]+"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/(libraries|groups)(/.*)?"), Scope.GROUPS_READ),
     (_READ, re.compile(r"/api/auth/me"), Scope.PAPERS_READ),
