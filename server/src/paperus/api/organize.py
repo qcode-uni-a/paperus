@@ -4,11 +4,11 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from paperus import organize
+from paperus import library, organize
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.models import (
@@ -51,9 +51,9 @@ class ItemTagOut(BaseModel):
 class TagIn(BaseModel):
     name: Name
     library_id: uuid.UUID | None = None
-    """Whose tag: the item's library (for its members) or the person's own
-    (a private tag). Default: the item's library if the person may change
-    it, else their own."""
+    """Whose tag: one of the item's libraries the person may change, or the
+    person's own (a private tag). Default: their own if the item is in it,
+    else the first of the item's libraries they may change, else their own."""
 
 
 class TagChange(BaseModel):
@@ -93,11 +93,35 @@ class CollectionIn(BaseModel):
 
 
 class CollectionChange(BaseModel):
-    """Only the fields given are changed; ``parent_id: null`` moves to the top."""
+    """Only the fields given are changed; ``parent_id: null`` moves to the top.
+
+    ``library_id`` gives the collection, with the collections inside it, to
+    another library (at its top level unless ``parent_id`` names a collection
+    there). Papers a group's collection may not hold leave it.
+    """
 
     name: Name | None = None
     description: str | None = None
     parent_id: uuid.UUID | None = None
+    library_id: uuid.UUID | None = None
+    add_papers: bool = False
+    """On a move into a group: put the papers that are not in the group's
+    library yet into it (share them) instead of leaving them out."""
+
+
+class MovePreview(BaseModel):
+    """What moving a collection (with those inside) into a library does."""
+
+    papers: int
+    """Papers in the collections the person can read."""
+    not_in_library: int
+    """Of those, papers not in the target library yet: they join it (with
+    ``add_papers``) or leave the collections."""
+
+
+class CollectionChanged(CollectionOut):
+    left_out: int = 0
+    """Papers that left the collections on a move to another library."""
 
 
 class ItemIds(BaseModel):
@@ -106,7 +130,7 @@ class ItemIds(BaseModel):
 
 def _item(db: DB, access: Access, item_id: uuid.UUID) -> Item:
     item = db.get(Item, item_id)
-    if item is None or not access.can_read(item.library_id):
+    if item is None or not access.can_read_item(item):
         raise HTTPException(404, "item not found")
     return item
 
@@ -163,7 +187,7 @@ def list_tags(db: DB, access: CurrentAccess) -> list[TagOut]:
             ItemTag.tag_id, ItemTag.source, func.count(), func.max(ItemTag.created_at)
         )
         .join(Item, Item.id == ItemTag.item_id)
-        .where(Item.deleted_at.is_(None), Item.library_id.in_(access.readable))
+        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
         .group_by(ItemTag.tag_id, ItemTag.source)
     )
     sources: dict[uuid.UUID, dict[TagSource, int]] = {}
@@ -232,12 +256,15 @@ def add_tag(
     item = _item(db, access, item_id)
     library_id = body.library_id
     if library_id is None:
-        writable = access.can_write(item.library_id)
-        library_id = item.library_id if writable else access.own_library
+        writable = [lib for lib in item.library_ids if access.can_write(lib)]
+        if access.own_library in item.library_ids or not writable:
+            library_id = access.own_library
+        else:
+            library_id = writable[0]
     if not access.can_read(library_id):
         raise HTTPException(404, "library not found")
     access.require_write(library_id)
-    if not access.may_hold(library_id, item.library_id):
+    if not access.may_hold(library_id, item):
         raise HTTPException(409, "a group's tags go only on that group's items")
     try:
         organize.tag_item(
@@ -316,7 +343,7 @@ def _direct_counts(
     query = (
         select(CollectionItem.collection_id, func.count())
         .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None), Item.library_id.in_(access.readable))
+        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
         .group_by(CollectionItem.collection_id)
     )
     if only is not None:
@@ -374,7 +401,7 @@ def _contents(
         )
         .join(CollectionItem, CollectionItem.collection_id == tree.c.member)
         .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None), Item.library_id.in_(access.readable))
+        .where(Item.deleted_at.is_(None), Item.id.in_(access.readable_items()))
         .group_by(tree.c.root, CollectionItem.item_id)
         .subquery()
     )
@@ -431,16 +458,31 @@ def create_collection(
 @router.patch("/api/collections/{collection_id}")
 def change_collection(
     collection_id: uuid.UUID, body: CollectionChange, db: DB, access: CurrentAccess
-) -> CollectionOut:
-    """Rename, describe or move a collection (within its library, not into
-    itself)."""
+) -> CollectionChanged:
+    """Rename, describe or move a collection (not into itself), also into
+    another library the person may change."""
     collection = _collection(db, access, collection_id, write=True)
     given = body.model_fields_set
+    left_out = 0
     try:
         if "name" in given and body.name is not None:
             collection.name = organize.clean_name(body.name)
         if "description" in given:
             collection.description = body.description
+        target = body.library_id
+        if target is not None and target != collection.library_id:
+            access.target_library(target)  # readable and writable
+            if body.add_papers:
+                for item in _papers_in(db, access, collection):
+                    library.add_to_library(item, target, access.user.id)
+                db.flush()
+            left_out = organize.move_to_library(
+                db,
+                collection,
+                target,
+                may_hold=lambda item: access.may_hold(target, item),
+            )
+            db.flush()
         if "parent_id" in given:
             organize.move_collection(db, collection, body.parent_id)
     except organize.NotFound as error:
@@ -450,7 +492,42 @@ def change_collection(
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
     db.commit()
-    return _collection_out(db, access, collection)
+    return CollectionChanged(
+        **_collection_out(db, access, collection).model_dump(), left_out=left_out
+    )
+
+
+def _papers_in(db: DB, access: Access, collection: Collection) -> list[Item]:
+    """Readable items in the collection and the collections inside it."""
+    ids = organize.descendants(db, collection.id)
+    return list(
+        db.scalars(
+            select(Item)
+            .join(CollectionItem)
+            .where(
+                CollectionItem.collection_id.in_(ids),
+                Item.id.in_(access.readable_items()),
+            )
+        ).unique()
+    )
+
+
+@router.get("/api/collections/{collection_id}/move-preview")
+def preview_move(
+    collection_id: uuid.UUID,
+    library_id: Annotated[uuid.UUID, Query(alias="library")],
+    db: DB,
+    access: CurrentAccess,
+) -> MovePreview:
+    """Before moving a collection into another library: how many of its
+    papers are not in that library yet."""
+    collection = _collection(db, access, collection_id, write=True)
+    access.target_library(library_id)
+    papers = _papers_in(db, access, collection)
+    return MovePreview(
+        papers=len(papers),
+        not_in_library=sum(not access.may_hold(library_id, item) for item in papers),
+    )
 
 
 @router.delete("/api/collections/{collection_id}", status_code=204)
@@ -486,7 +563,7 @@ def add_items(
         collection,
         body.item_ids,
         access.user.id,
-        may_hold=lambda item: access.may_hold(collection.library_id, item.library_id),
+        may_hold=lambda item: access.may_hold(collection.library_id, item),
     )
     db.commit()
     return _collection_out(db, access, collection)

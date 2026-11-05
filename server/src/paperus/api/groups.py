@@ -16,7 +16,16 @@ from sqlalchemy import func, select
 from paperus import organize
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
-from paperus.models import ROLE_RANK, Group, Item, Library, Membership, Role, User
+from paperus.models import (
+    ROLE_RANK,
+    Group,
+    Item,
+    ItemLibrary,
+    Library,
+    Membership,
+    Role,
+    User,
+)
 
 router = APIRouter(tags=["groups"])
 
@@ -207,9 +216,10 @@ def _group_out(db: DB, access: Access, group: Group) -> GroupOut:
     items = None
     if role is not None:
         items = db.scalar(
-            select(func.count()).where(
-                Item.library_id == library_id, Item.deleted_at.is_(None)
-            )
+            select(func.count())
+            .select_from(ItemLibrary)
+            .join(Item, Item.id == ItemLibrary.item_id)
+            .where(ItemLibrary.library_id == library_id, Item.deleted_at.is_(None))
         )
     return GroupOut(
         id=group.id,
@@ -299,7 +309,7 @@ def delete_group(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response
     if db.scalar(select(func.count()).where(Group.parent_id == group.id)):
         raise HTTPException(409, "delete or move the groups inside first")
     library_id = _library_of(db, group.id)
-    if db.scalar(select(func.count()).where(Item.library_id == library_id)):
+    if db.scalar(select(func.count()).where(ItemLibrary.library_id == library_id)):
         raise HTTPException(409, "the group's library still has items")
     db.delete(group)
     db.commit()

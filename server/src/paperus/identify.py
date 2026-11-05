@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from paperus import library, metadata
+from paperus.access import Access
 from paperus.identifiers import (
     InvalidIdentifier,
     Scheme,
@@ -35,6 +36,7 @@ from paperus.models import (
     ItemTag,
     MetadataSource,
     TextStatus,
+    User,
     Version,
 )
 from paperus.storage import BlobStore
@@ -168,6 +170,7 @@ def identify(
                     csl=csl,
                     source=MetadataSource.LOOKUP,
                     identifiers=identifiers,
+                    known_in=_known_to_uploader(db, file),
                 )
         except library.IdentifierTaken as taken:
             log.info("file %s is %s, already item %s", file_id, doi, taken.item_id)
@@ -181,10 +184,20 @@ def identify(
         library.refresh_item(version.item)
 
 
+def _known_to_uploader(db: Session, file: File) -> list[uuid.UUID]:
+    """Where to look for the paper: every library the uploader can read (a
+    paper exists once), else just the upload's own."""
+    uploader = db.get(User, file.uploaded_by) if file.uploaded_by else None
+    if uploader is None:
+        return file.version.item.library_ids
+    return [*Access.of(db, uploader).readable, *file.version.item.library_ids]
+
+
 def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
-    """An upload turned out to be a paper already in the library: its files
-    join the known version, its collections and tags the known item, and the
-    upload's own item goes (it only ever held the placeholder)."""
+    """An upload turned out to be a paper already known: its files join the
+    known version, the known item joins the upload's libraries, collections
+    and tags, and the upload's own item goes (it only ever held the
+    placeholder)."""
     known = db.get(Version, known_id)
     item = upload.item
     if known is None or known.item.deleted_at is not None or len(item.versions) > 1:
@@ -197,6 +210,8 @@ def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:
         has_main = any(f.role == FileRole.MAIN for f in live)
         file.version = known
         file.role = FileRole.OTHER if has_main else FileRole.MAIN
+    for link in item.library_links:
+        library.add_to_library(target, link.library_id, link.added_by)
     in_collections = {link.collection_id for link in target.collection_links}
     for link in item.collection_links:
         if link.collection_id not in in_collections:

@@ -13,6 +13,7 @@ from paperus.metadata import csl_title, csl_type
 from paperus.models import (
     Identifier,
     Item,
+    ItemLibrary,
     MetadataSource,
     Trashable,
     Version,
@@ -75,19 +76,25 @@ def refresh_item(item: Item) -> None:
 
 
 def find_identifier(
-    db: Session, library_id: uuid.UUID, identifiers: list[IdentifierValue]
+    db: Session, libraries: list[uuid.UUID], identifiers: list[IdentifierValue]
 ) -> Identifier | None:
-    """An identifier among these that a version in the library already has."""
+    """An identifier among these that a version of an item in one of the
+    libraries already has (those the person can read: a paper in someone
+    else's private library stays unknown to them)."""
     for scheme, value in identifiers:
         found = db.scalar(
             select(Identifier)
             .join(Version)
-            .join(Item)
             .where(
                 Identifier.scheme == scheme,
                 Identifier.value == value,
-                Item.library_id == library_id,
+                Version.item_id.in_(
+                    select(ItemLibrary.item_id).where(
+                        ItemLibrary.library_id.in_(libraries)
+                    )
+                ),
             )
+            .order_by(Identifier.id)
             .limit(1)
         )
         if found is not None:
@@ -106,7 +113,7 @@ def add_version(
     identifiers: list[IdentifierValue],
     created_by: uuid.UUID | None,
 ) -> Version:
-    taken = find_identifier(db, item.library_id, identifiers)
+    taken = find_identifier(db, item.library_ids, identifiers)
     if taken is not None:
         raise IdentifierTaken(
             taken.scheme, taken.value, taken.version.item_id, taken.version_id
@@ -141,7 +148,7 @@ def create_item(
 ) -> Item:
     """A new item in the library, with its first version."""
     item = Item(
-        library_id=library_id,
+        library_links=[ItemLibrary(library_id=library_id, added_by=added_by)],
         type="",
         title="",
         overrides={},
@@ -196,9 +203,15 @@ def replace_metadata(
     csl: dict[str, Any],
     source: MetadataSource,
     identifiers: list[IdentifierValue],
+    known_in: list[uuid.UUID] | None = None,
 ) -> None:
-    """Give a version new metadata and identifiers (e.g. found in its file)."""
-    taken = find_identifier(db, version.item.library_id, identifiers)
+    """Give a version new metadata and identifiers (e.g. found in its file).
+
+    ``IdentifierTaken`` if an item in the libraries ``known_in`` (default:
+    the item's own) already has one of them.
+    """
+    libraries = version.item.library_ids if known_in is None else known_in
+    taken = find_identifier(db, libraries, identifiers)
     if taken is not None and taken.version_id != version.id:
         raise IdentifierTaken(
             taken.scheme, taken.value, taken.version.item_id, taken.version_id
@@ -214,3 +227,38 @@ def replace_metadata(
     version.metadata_source = source
     db.flush()
     refresh_item(version.item)
+
+
+def add_to_library(
+    item: Item, library_id: uuid.UUID, user_id: uuid.UUID | None
+) -> bool:
+    """Put the item into another library too (sharing it); False if it was
+    there already."""
+    if library_id in item.library_ids:
+        return False
+    item.library_links.append(ItemLibrary(library_id=library_id, added_by=user_id))
+    return True
+
+
+def remove_from_library(
+    item: Item, library_id: uuid.UUID, user_id: uuid.UUID | None
+) -> None:
+    """Take the item out of one library; out of the last one, it goes to the
+    trash instead (and keeps that library, for restoring)."""
+    if library_id not in item.library_ids:
+        return
+    if len(item.library_links) == 1:
+        trash(item, user_id)
+        return
+    item.library_links = [
+        link for link in item.library_links if link.library_id != library_id
+    ]
+    # Its tags and collections of that library no longer apply.
+    item.tag_links = [
+        link for link in item.tag_links if link.tag.library_id != library_id
+    ]
+    item.collection_links = [
+        link
+        for link in item.collection_links
+        if link.collection.library_id != library_id
+    ]

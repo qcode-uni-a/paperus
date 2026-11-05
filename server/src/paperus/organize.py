@@ -99,6 +99,34 @@ def move_collection(
     collection.parent_id = parent_id
 
 
+def move_to_library(
+    db: Session,
+    collection: Collection,
+    library_id: uuid.UUID,
+    may_hold: Callable[[Item], bool],
+) -> int:
+    """Give a collection and everything inside it to another library, at its
+    top level. Items the new library's collections may not hold leave them
+    (the items themselves stay where they are); returns how many links
+    went."""
+    ids = descendants(db, collection.id)
+    for member in db.scalars(select(Collection).where(Collection.id.in_(ids))):
+        member.library_id = library_id
+    collection.parent_id = None
+    removed = 0
+    for item in db.scalars(
+        select(Item).join(CollectionItem).where(CollectionItem.collection_id.in_(ids))
+    ).unique():
+        if may_hold(item):
+            continue
+        before = len(item.collection_links)
+        item.collection_links = [
+            link for link in item.collection_links if link.collection_id not in ids
+        ]
+        removed += before - len(item.collection_links)
+    return removed
+
+
 def add_to_collection(
     db: Session,
     collection: Collection,

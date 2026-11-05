@@ -59,7 +59,8 @@ class VersionIn(BaseModel):
 
 class ItemIn(VersionIn):
     library_id: uuid.UUID | None = None
-    """Where the item goes; the person's default library if not given."""
+    """Where the item goes; the person's default library if not given. A
+    paper already in a library the person can read is added to this one."""
 
 
 class IdentifierOut(BaseModel):
@@ -81,7 +82,8 @@ class VersionOut(BaseModel):
 
 class ItemOut(BaseModel):
     id: uuid.UUID
-    library_id: uuid.UUID
+    library_ids: list[uuid.UUID]
+    """The libraries the item is in (those the reader can see)."""
     type: str
     title: str
     authors: list[str]
@@ -148,7 +150,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
     csl = library.citation_csl(item)
     return ItemOut(
         id=item.id,
-        library_id=item.library_id,
+        library_ids=access.item_libraries(item),
         type=item.type,
         title=item.title,
         authors=_authors(csl),
@@ -265,16 +267,17 @@ def _identifier_conflict(error: library.IdentifierTaken) -> HTTPException:
 def add_item(
     body: ItemIn, request: Request, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
-    """A new item; if one of its identifiers is known in the library, the
-    existing item."""
+    """A new item; if one of its identifiers is known in a library the person
+    can read, the existing item (put into this library too, 200)."""
     library_id = access.target_library(body.library_id)
     identifiers = _normalized_identifiers(body)
-    known = library.find_identifier(db, library_id, identifiers)
+    known = library.find_identifier(db, access.readable, identifiers)
     if known is not None:
         existing = known.version.item
         if existing.deleted_at is not None:
             library.restore(existing)
-            db.commit()
+        library.add_to_library(existing, library_id, access.user.id)
+        db.commit()
         response.status_code = 200
         return item_detail(existing, access, response)
 
@@ -294,7 +297,7 @@ def add_item(
     except IntegrityError:
         # Someone added the same identifier meanwhile.
         db.rollback()
-        known = library.find_identifier(db, library_id, identifiers)
+        known = library.find_identifier(db, access.readable, identifiers)
         if known is None:
             raise
         response.status_code = 200
@@ -317,10 +320,10 @@ def get_readable_item(
     """The item if the person may read it (404 otherwise, so items in other
     libraries stay unknown); with ``write``, 403 for readers."""
     item = db.get(Item, item_id)
-    if item is None or not access.can_read(item.library_id):
+    if item is None or not access.can_read_item(item):
         raise HTTPException(404, "item not found")
     if write:
-        access.require_write(item.library_id)
+        access.require_write_item(item)
     if not allow_trashed and item.deleted_at is not None:
         raise HTTPException(409, "item is in the trash")
     return item
@@ -338,7 +341,7 @@ def add_version(
     """Another version of an item, e.g. the published one of a preprint."""
     item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     identifiers = _normalized_identifiers(body)
-    known = library.find_identifier(db, item.library_id, identifiers)
+    known = library.find_identifier(db, item.library_ids, identifiers)
     if known is not None:
         if known.version.item_id != item.id:
             raise _identifier_conflict(
@@ -377,9 +380,9 @@ def pin_version(
 ) -> ItemDetail:
     """Cite this version, whatever its kind."""
     version = db.get(Version, version_id)
-    if version is None or not access.can_read(version.item.library_id):
+    if version is None or not access.can_read_item(version.item):
         raise HTTPException(404, "version not found")
-    access.require_write(version.item.library_id)
+    access.require_write_item(version.item)
     library.pin_version(db, version.item, version)
     db.commit()
     return item_detail(version.item, access, response)
@@ -412,9 +415,9 @@ def set_overrides(
     """
     expected = _parse_if_match(if_match)
     item = db.get(Item, item_id, with_for_update=True)
-    if item is None or not access.can_read(item.library_id):
+    if item is None or not access.can_read_item(item):
         raise HTTPException(404, "item not found")
-    access.require_write(item.library_id)
+    access.require_write_item(item)
     if item.change != expected:
         raise HTTPException(412, "item changed since it was read")
     library.set_overrides(item, overrides)
@@ -424,9 +427,51 @@ def set_overrides(
 
 @router.delete("/api/items/{item_id}", status_code=204)
 def trash_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> None:
-    """Move to the trash; restorable with ``POST …/restore``."""
-    library.trash(get_readable_item(db, access, item_id, write=True), access.user.id)
+    """Move to the trash, for everyone; restorable with ``POST …/restore``.
+    Only for people who may change every library the item is in; others
+    take it out of their library (``DELETE …/libraries/{id}``)."""
+    item = get_readable_item(db, access, item_id, write=True)
+    if not all(access.can_write(library_id) for library_id in item.library_ids):
+        raise HTTPException(
+            409, "the item is in other libraries too; remove it from yours instead"
+        )
+    library.trash(item, access.user.id)
     db.commit()
+
+
+@router.put("/api/items/{item_id}/libraries/{library_id}")
+def add_item_to_library(
+    item_id: uuid.UUID,
+    library_id: uuid.UUID,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> ItemDetail:
+    """Put the item into another library the person may change (share it)."""
+    item = get_readable_item(db, access, item_id, allow_trashed=False)
+    access.target_library(library_id)
+    library.add_to_library(item, library_id, access.user.id)
+    db.commit()
+    return item_detail(item, access, response)
+
+
+@router.delete("/api/items/{item_id}/libraries/{library_id}")
+def remove_item_from_library(
+    item_id: uuid.UUID,
+    library_id: uuid.UUID,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> ItemDetail:
+    """Take the item out of one library, with that library's tags and
+    collections on it; out of its last library, it goes to the trash."""
+    item = get_readable_item(db, access, item_id)
+    if library_id not in item.library_ids or not access.can_read(library_id):
+        raise HTTPException(404, "the item is not in this library")
+    access.require_write(library_id)
+    library.remove_from_library(item, library_id, access.user.id)
+    db.commit()
+    return item_detail(item, access, response)
 
 
 @router.post("/api/items/{item_id}/restore")
@@ -471,7 +516,7 @@ def list_items(
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []
-    in_libraries = Item.library_id.in_(libraries)
+    in_libraries = Item.id.in_(access.readable_items(libraries))
     if since is not None:
         query = (
             select(Item)

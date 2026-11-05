@@ -40,8 +40,11 @@ class Person:
     ) -> httpx2.Response:
         return self.client.post(url, headers=self.headers, json=json, files=files)
 
-    def put(self, url: str, json: object) -> httpx2.Response:
+    def put(self, url: str, json: object = None) -> httpx2.Response:
         return self.client.put(url, headers=self.headers, json=json)
+
+    def patch(self, url: str, json: object) -> httpx2.Response:
+        return self.client.patch(url, headers=self.headers, json=json)
 
     def delete(self, url: str) -> httpx2.Response:
         return self.client.delete(url, headers=self.headers)
@@ -247,15 +250,17 @@ def test_creating_groups_and_keeping_an_admin(client: TestClient, db: Session) -
     assert root.delete(f"/api/groups/{chair['id']}").status_code == 204
 
 
-def test_default_library_and_duplicates_per_library(
+def test_default_library_and_one_item_per_paper(
     client: TestClient, db: Session, doi_registry: FakeDOIRegistry
 ) -> None:
     doi_registry.records["10.1234/x"] = {"type": "journal-article", "title": "X"}
     root = Person(client, db, "root", admin=True)
-    ada = Person(client, db, "ada")
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
     chair = group(root, "Chair", ada)
+    own = ada.libraries()["My library"]["id"]
     assert ada.libraries()["My library"]["default"] is True
     mine = ada.post("/api/items", json={"doi": "10.1234/x"}).json()
+    assert mine["library_ids"] == [own]
     assert (
         ada.put(
             "/api/me/default-library", json={"library_id": chair["library_id"]}
@@ -263,18 +268,116 @@ def test_default_library_and_duplicates_per_library(
         == 204
     )
     assert ada.libraries()["Chair"]["default"] is True
-    # The same DOI in another library is another item there.
-    theirs = ada.post("/api/items", json={"doi": "10.1234/x"})
-    assert theirs.status_code == 201
-    assert theirs.json()["library_id"] == chair["library_id"]
-    assert theirs.json()["id"] != mine["id"]
-    # In the same library it is found again.
+    # The same DOI again: the same paper, now in the group's library too.
     again = ada.post("/api/items", json={"doi": "10.1234/x"})
     assert again.status_code == 200
-    assert again.json()["id"] == theirs.json()["id"]
+    assert again.json()["id"] == mine["id"]
+    assert set(again.json()["library_ids"]) == {own, chair["library_id"]}
+    # Someone who cannot read either library gets an item of their own.
+    theirs = bob.post("/api/items", json={"doi": "10.1234/x"})
+    assert theirs.status_code == 201
+    assert theirs.json()["id"] != mine["id"]
     # Libraries one cannot read are not targets.
     other = uuid.uuid4()
     assert (
         ada.put("/api/me/default-library", json={"library_id": str(other)}).status_code
         == 404
     )
+
+
+def test_sharing_and_removing_papers(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "member"})
+    own = ada.libraries()["My library"]["id"]
+    paper = ada.add("Ada's paper")
+    ada.post(f"/api/items/{paper['id']}/tags", json={"name": "private note"})
+    assert bob.titles() == []
+
+    shared = ada.put(f"/api/items/{paper['id']}/libraries/{chair['library_id']}").json()
+    assert set(shared["library_ids"]) == {own, chair["library_id"]}
+    # Bob sees the paper in the group, without Ada's library or private tag.
+    seen = bob.get(f"/api/items/{paper['id']}").json()
+    assert seen["library_ids"] == [chair["library_id"]]
+    assert seen["tags"] == []
+    # He cannot trash it for Ada, only take it out of the group.
+    assert bob.delete(f"/api/items/{paper['id']}").status_code == 409
+    assert (
+        bob.client.delete(
+            f"/api/items/{paper['id']}/libraries/{own}", headers=bob.headers
+        ).status_code
+        == 404
+    )
+    bob.client.delete(
+        f"/api/items/{paper['id']}/libraries/{chair['library_id']}",
+        headers=bob.headers,
+    )
+    assert bob.titles() == []
+    assert ada.titles() == ["Ada's paper"]
+    # Out of its last library, a paper goes to the trash.
+    left = ada.client.delete(
+        f"/api/items/{paper['id']}/libraries/{own}", headers=ada.headers
+    ).json()
+    assert left["deleted_at"] is not None
+    assert ada.titles(trashed="true") == ["Ada's paper"]
+
+
+def test_moving_a_collection_to_another_library(
+    client: TestClient, db: Session
+) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    shared = ada.add("Group paper", chair["library_id"])
+    private = ada.add("Private paper")
+    thesis = ada.post("/api/collections", json={"name": "Thesis"}).json()
+    chapter = ada.post(
+        "/api/collections", json={"name": "Chapter 1", "parent_id": thesis["id"]}
+    ).json()
+    ada.post(
+        f"/api/collections/{chapter['id']}/items",
+        json={"item_ids": [shared["id"], private["id"]]},
+    )
+    assert bob.get("/api/collections").json() == []
+
+    # A reader of the group cannot give it collections.
+    response = bob.post("/api/collections", json={"name": "Bob's"})
+    bob_collection = response.json()
+    assert (
+        bob.patch(
+            f"/api/collections/{bob_collection['id']}",
+            json={"library_id": chair["library_id"]},
+        ).status_code
+        == 403
+    )
+
+    preview = ada.get(
+        f"/api/collections/{thesis['id']}/move-preview",
+        params={"library": chair["library_id"]},
+    ).json()
+    assert preview == {"papers": 2, "not_in_library": 1}
+    moved = ada.patch(
+        f"/api/collections/{thesis['id']}", json={"library_id": chair["library_id"]}
+    ).json()
+    # The private paper leaves (a group's collection holds its papers only).
+    assert moved["left_out"] == 1
+    assert moved["library_id"] == chair["library_id"]
+    listed = {c["name"]: c for c in bob.get("/api/collections").json()}
+    assert listed["Chapter 1"]["library_id"] == chair["library_id"]
+    assert listed["Chapter 1"]["parent_id"] == thesis["id"]
+    assert bob.titles(collection=thesis["id"]) == ["Group paper"]
+    assert ada.titles() == ["Group paper", "Private paper"]
+
+    # And back: private collections hold any readable paper.
+    back = ada.patch(
+        f"/api/collections/{chapter['id']}",
+        json={"library_id": ada.libraries()["My library"]["id"]},
+    ).json()
+    assert back["left_out"] == 0
+    assert back["parent_id"] is None
+    assert [c["name"] for c in bob.get("/api/collections").json()] == [
+        "Bob's",
+        "Thesis",
+    ]

@@ -111,9 +111,9 @@ Item: the work; notes, tags, collections, citation metadata
   personal link, so the group's tree stays as it is), never the other way
   round (planned). Who may create, rename
   or delete a group's tags and collections follows the roles below.
-- **Library**: where items live. Every person has one (private), every
-  group has one. An item belongs to exactly one library; see "Groups and
-  libraries" below.
+- **Library**: where items are. Every person has one (private), every
+  group has one. An item can be in several libraries at once; see "Groups
+  and libraries" below.
 - **Group, membership, role**: see below.
 - **Provenance**: who or what created each object (user, AI via client X,
   import, sync), for labels, the AI inbox and the audit log.
@@ -124,12 +124,20 @@ inside the search query itself.
 ### Groups and libraries
 
 - **Libraries.** Each person has a private library; each group has one.
-  Every item, tag and collection belongs to exactly one library (like
-  Zotero). The same paper in two libraries is two items, each with its own
-  metadata edits, tags and notes; the bytes, text, chunks and embeddings
-  are stored once, since they are shared by content hash. Identifiers are
-  unique per library, so adding a known DOI finds the item in that library.
-  Moving or copying items between libraries comes later.
+  A paper exists once and can be in several libraries (mine and my
+  groups'); its metadata, versions and files are the same everywhere,
+  while tags, collections and notes belong to one library each (so private
+  ones stay private). Tags and collections belong to exactly one library.
+- **Sharing** adds a library to an item: from the item, by moving a
+  collection into a group (asking whether its papers not yet in the group
+  should join it), or by adding or uploading a paper that is already in
+  another library one can read. Adding a DOI or file finds the existing
+  item only among the libraries one can read: a paper in someone else's
+  private library stays invisible, so independent additions can still make
+  two items (merging duplicates comes later).
+- **Removing** takes one library off an item; when none is left, the item
+  goes to the trash. Changing an item's metadata, versions and files needs
+  the right to change at least one of its libraries.
 - **Nested groups.** A group can sit inside another (faculty → chair →
   project), like GitLab. Membership is inherited downwards: members of a
   group are members of every group inside it with the same role; a
