@@ -30,7 +30,12 @@ export const SETTINGS = [
 		'Search by meaning: the model, its speed, the CPU cores it uses',
 		false
 	],
-	['integrity', 'Integrity checks', 'Whether every file and its stored contents match', true],
+	[
+		'integrity',
+		'Integrity checks',
+		'Whether every file’s stored contents are there and unchanged',
+		false
+	],
 	['jobs', 'Job settings', 'How many background jobs run at once, and when checks run', true],
 	['logging', 'Logging', 'How much the server and the worker write to their logs', false],
 	['server', 'Server', 'Public address, contact email for metadata services, upload limits', false],

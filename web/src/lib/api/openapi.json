@@ -2733,7 +2733,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again) or\n``trash`` (delete what is older than the trash days).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -2765,6 +2765,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/integrity": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Integrity Report",
+        "description": "The last integrity check's report (None before the first).",
+        "operationId": "integrity_report",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Report"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Integrity Report"
                 }
               }
             }
@@ -7056,6 +7086,91 @@
           "new"
         ],
         "title": "PasswordChange"
+      },
+      "Problem": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "title": "File Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "filename",
+          "item_id",
+          "title"
+        ],
+        "title": "Problem"
+      },
+      "Report": {
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Checked At"
+          },
+          "deep": {
+            "type": "boolean",
+            "title": "Deep"
+          },
+          "contents": {
+            "type": "integer",
+            "title": "Contents"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing"
+          },
+          "damaged": {
+            "type": "integer",
+            "title": "Damaged"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "unused": {
+            "type": "integer",
+            "title": "Unused"
+          },
+          "unused_bytes": {
+            "type": "integer",
+            "title": "Unused Bytes"
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "checked_at",
+          "deep",
+          "contents",
+          "missing",
+          "damaged",
+          "problems",
+          "unused",
+          "unused_bytes"
+        ],
+        "title": "Report"
       },
       "RestoreCheckOut": {
         "properties": {

@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
+	import IntegritySettings from '#lib/admin/IntegritySettings.svelte';
 	import LoggingSettings from '#lib/admin/LoggingSettings.svelte';
 	import MlSettings from '#lib/admin/MlSettings.svelte';
 	import ServerSettings from '#lib/admin/ServerSettings.svelte';
@@ -76,6 +77,8 @@
 		>
 			{#if slug === 'ml'}
 				<MlSettings />
+			{:else if slug === 'integrity'}
+				<IntegritySettings />
 			{:else if slug === 'server'}
 				<ServerSettings />
 			{:else if slug === 'trash'}

@@ -1494,6 +1494,70 @@ export type PasswordChange = {
 };
 
 /**
+ * Problem
+ */
+export type Problem = {
+    /**
+     * File Id
+     */
+    file_id: string;
+    /**
+     * Filename
+     */
+    filename: string;
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+};
+
+/**
+ * Report
+ */
+export type Report = {
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Deep
+     */
+    deep: boolean;
+    /**
+     * Contents
+     */
+    contents: number;
+    /**
+     * Missing
+     */
+    missing: number;
+    /**
+     * Damaged
+     */
+    damaged: number;
+    /**
+     * Problems
+     */
+    problems: Array<Problem>;
+    /**
+     * Unused
+     */
+    unused: number;
+    /**
+     * Unused Bytes
+     */
+    unused_bytes: number;
+    /**
+     * Removed
+     */
+    removed?: number;
+};
+
+/**
  * RestoreCheckOut
  *
  * Where the backup's files would come from. Files are stored by their
@@ -3717,6 +3781,24 @@ export type RunJobResponses = {
 };
 
 export type RunJobResponse = RunJobResponses[keyof RunJobResponses];
+
+export type IntegrityReportData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/integrity';
+};
+
+export type IntegrityReportResponses = {
+    /**
+     * Response Integrity Report
+     *
+     * Successful Response
+     */
+    200: Report | null;
+};
+
+export type IntegrityReportResponse = IntegrityReportResponses[keyof IntegrityReportResponses];
 
 export type ListTagsData = {
     body?: never;

@@ -9,6 +9,9 @@
   - Trash: empty it automatically after some days (every night; off by
     default). Emptying also removes stored files nothing uses any more.
   - Logging: the log level of server and worker, without a restart.
+  - Integrity checks: whether every file's stored contents are there
+    (every Sunday night, or now), deeply also whether they are unchanged,
+    and removing stored contents nothing uses any more.
 - **Empty trash** on the trash page: deletes for good what one may change.
 - The search bar is hidden in the administration.
 
