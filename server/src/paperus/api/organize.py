@@ -1,6 +1,7 @@
 """Tags and collections."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Response
@@ -9,7 +10,15 @@ from sqlalchemy import func, select
 
 from paperus import organize
 from paperus.api.deps import DB, CurrentUser
-from paperus.models import Collection, CollectionItem, Item, ItemTag, Tag, TagSource
+from paperus.models import (
+    Collection,
+    CollectionItem,
+    Item,
+    ItemTag,
+    Tag,
+    TagColor,
+    TagSource,
+)
 
 router = APIRouter(tags=["organize"])
 
@@ -19,18 +28,34 @@ Name = Annotated[str, Field(min_length=1, max_length=200)]
 class TagOut(BaseModel):
     id: uuid.UUID
     name: str
+    color: TagColor | None
+    description: str | None
     count: int
     """Items with this tag (not in the trash)."""
+    sources: dict[TagSource, int]
+    """Of those, how many were tagged by hand, automatically or by AI."""
+    created_at: datetime
+    last_used: datetime | None
+    """When the tag was last put on an item."""
 
 
 class ItemTagOut(BaseModel):
     id: uuid.UUID
     name: str
+    color: TagColor | None
     source: TagSource
 
 
 class TagIn(BaseModel):
     name: Name
+
+
+class TagChange(BaseModel):
+    """Only the fields given are changed; ``null`` clears colour or description."""
+
+    name: Name | None = None
+    color: TagColor | None = None
+    description: Annotated[str | None, Field(max_length=2000)] = None
 
 
 class ItemPreview(BaseModel):
@@ -45,6 +70,8 @@ class CollectionOut(BaseModel):
     parent_id: uuid.UUID | None
     count: int
     """Items in this collection or the collections inside (not in the trash)."""
+    direct: int = 0
+    """Of those, the items directly in this collection."""
     recent: list[ItemPreview] = []
     """The last items added (up to three), for previews."""
 
@@ -85,7 +112,10 @@ def item_tags(item: Item) -> list[ItemTagOut]:
     return sorted(
         (
             ItemTagOut(
-                id=link.tag.id, name=link.tag.name, source=TagSource(link.source)
+                id=link.tag.id,
+                name=link.tag.name,
+                color=_color(link.tag),
+                source=TagSource(link.source),
             )
             for link in item.tag_links
         ),
@@ -96,21 +126,67 @@ def item_tags(item: Item) -> list[ItemTagOut]:
 # Tags
 
 
+def _color(tag: Tag) -> TagColor | None:
+    return TagColor(tag.color) if tag.color in set(TagColor) else None
+
+
 @router.get("/api/tags")
 def list_tags(db: DB, user: CurrentUser) -> list[TagOut]:
-    counts = (
-        select(ItemTag.tag_id, func.count().label("count"))
+    """All tags with how they are used (items in the trash do not count)."""
+    usage = db.execute(
+        select(
+            ItemTag.tag_id, ItemTag.source, func.count(), func.max(ItemTag.created_at)
+        )
         .join(Item, Item.id == ItemTag.item_id)
         .where(Item.deleted_at.is_(None))
-        .group_by(ItemTag.tag_id)
-        .subquery()
+        .group_by(ItemTag.tag_id, ItemTag.source)
     )
-    rows = db.execute(
-        select(Tag, func.coalesce(counts.c.count, 0))
-        .outerjoin(counts, counts.c.tag_id == Tag.id)
-        .order_by(func.lower(Tag.name))
+    sources: dict[uuid.UUID, dict[TagSource, int]] = {}
+    last_used: dict[uuid.UUID, datetime] = {}
+    for tag_id, source, count, last in usage:
+        sources.setdefault(tag_id, {})[TagSource(source)] = count
+        if tag_id not in last_used or last > last_used[tag_id]:
+            last_used[tag_id] = last
+    tags = db.scalars(select(Tag).order_by(func.lower(Tag.name)))
+    return [
+        TagOut(
+            id=tag.id,
+            name=tag.name,
+            color=_color(tag),
+            description=tag.description,
+            count=sum(sources.get(tag.id, {}).values()),
+            sources=sources.get(tag.id, {}),
+            created_at=tag.created_at,
+            last_used=last_used.get(tag.id),
+        )
+        for tag in tags
+    ]
+
+
+class TagNew(BaseModel):
+    name: Name
+    color: TagColor | None = None
+    description: Annotated[str | None, Field(max_length=2000)] = None
+
+
+@router.post("/api/tags", status_code=201)
+def create_tag(body: TagNew, db: DB, user: CurrentUser) -> TagOut:
+    """A tag not on any item yet (409 if one with that name exists)."""
+    if organize.find_tag(db, body.name) is not None:
+        raise HTTPException(409, f"a tag {body.name.strip()!r} exists already")
+    try:
+        name = organize.clean_name(body.name)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
+    tag = Tag(
+        name=name,
+        color=body.color,
+        description=(body.description or "").strip() or None,
+        change=0,
     )
-    return [TagOut(id=tag.id, name=tag.name, count=count) for tag, count in rows]
+    db.add(tag)
+    db.commit()
+    return next(t for t in list_tags(db, user) if t.id == tag.id)
 
 
 @router.post("/api/items/{item_id}/tags", status_code=201)
@@ -138,15 +214,23 @@ def remove_tag(
 
 
 @router.patch("/api/tags/{tag_id}")
-def rename_tag(tag_id: uuid.UUID, body: TagIn, db: DB, user: CurrentUser) -> TagOut:
-    """Rename a tag everywhere (409 if another tag has that name)."""
+def change_tag(tag_id: uuid.UUID, body: TagChange, db: DB, user: CurrentUser) -> TagOut:
+    """Rename a tag everywhere (409 if another tag has that name), or set its
+    colour or description."""
     tag = db.get(Tag, tag_id)
     if tag is None:
         raise HTTPException(404, "tag not found")
-    try:
-        organize.rename_tag(db, tag, body.name)
-    except organize.Conflict as error:
-        raise HTTPException(409, str(error)) from error
+    if body.name is not None:
+        try:
+            organize.rename_tag(db, tag, body.name)
+        except organize.Conflict as error:
+            raise HTTPException(409, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+    if "color" in body.model_fields_set:
+        tag.color = body.color
+    if "description" in body.model_fields_set:
+        tag.description = (body.description or "").strip() or None
     db.commit()
     return next(t for t in list_tags(db, user) if t.id == tag.id)
 
@@ -175,14 +259,28 @@ def _collection_out(db: DB, collection: Collection) -> CollectionOut:
         description=collection.description,
         parent_id=collection.parent_id,
         count=count,
+        direct=_direct_counts(db, collection.id).get(collection.id, 0),
         recent=recent,
     )
+
+
+def _direct_counts(db: DB, only: uuid.UUID | None = None) -> dict[uuid.UUID, int]:
+    query = (
+        select(CollectionItem.collection_id, func.count())
+        .join(Item, Item.id == CollectionItem.item_id)
+        .where(Item.deleted_at.is_(None))
+        .group_by(CollectionItem.collection_id)
+    )
+    if only is not None:
+        query = query.where(CollectionItem.collection_id == only)
+    return {collection_id: count for collection_id, count in db.execute(query)}
 
 
 @router.get("/api/collections")
 def list_collections(db: DB, user: CurrentUser) -> list[CollectionOut]:
     """All collections, flat; ``parent_id`` gives the tree."""
     contents = _contents(db)
+    direct = _direct_counts(db)
     collections = db.scalars(select(Collection).order_by(func.lower(Collection.name)))
     return [
         CollectionOut(
@@ -191,6 +289,7 @@ def list_collections(db: DB, user: CurrentUser) -> list[CollectionOut]:
             description=c.description,
             parent_id=c.parent_id,
             count=contents.get(c.id, (0, []))[0],
+            direct=direct.get(c.id, 0),
             recent=contents.get(c.id, (0, []))[1],
         )
         for c in collections

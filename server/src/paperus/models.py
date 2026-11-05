@@ -125,6 +125,20 @@ class FileSource(StrEnum):
     BROWSER = "browser"
 
 
+class TagColor(StrEnum):
+    """Colours a tag can have; the website gives each a light and dark shade."""
+
+    GRAY = "gray"
+    RED = "red"
+    ORANGE = "orange"
+    YELLOW = "yellow"
+    GREEN = "green"
+    TEAL = "teal"
+    BLUE = "blue"
+    PURPLE = "purple"
+    PINK = "pink"
+
+
 class TagSource(StrEnum):
     """Who put a tag on an item (Zotero keeps manual and automatic apart)."""
 
@@ -326,6 +340,8 @@ class Tag(Record, Base):
     __table_args__ = (Index("ix_tags_name_lower", text("lower(name)"), unique=True),)
 
     name: Mapped[str] = mapped_column(String(100))
+    color: Mapped[str | None] = mapped_column(String(16))
+    description: Mapped[str | None]
     change: Mapped[int] = mapped_column(
         BigInteger, server_default=text("0"), index=True
     )

@@ -1218,6 +1218,7 @@
           "organize"
         ],
         "summary": "List Tags",
+        "description": "All tags with how they are used (items in the trash do not count).",
         "operationId": "list_tags",
         "responses": {
           "200": {
@@ -1230,6 +1231,46 @@
                   },
                   "type": "array",
                   "title": "Response List Tags"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Create Tag",
+        "description": "A tag not on any item yet (409 if one with that name exists).",
+        "operationId": "create_tag",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagNew"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1357,9 +1398,9 @@
         "tags": [
           "organize"
         ],
-        "summary": "Rename Tag",
-        "description": "Rename a tag everywhere (409 if another tag has that name).",
-        "operationId": "rename_tag",
+        "summary": "Change Tag",
+        "description": "Rename a tag everywhere (409 if another tag has that name), or set its\ncolour or description.",
+        "operationId": "change_tag",
         "parameters": [
           {
             "name": "tag_id",
@@ -1377,7 +1418,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TagIn"
+                "$ref": "#/components/schemas/TagChange"
               }
             }
           }
@@ -1873,6 +1914,11 @@
             "type": "integer",
             "title": "Count"
           },
+          "direct": {
+            "type": "integer",
+            "title": "Direct",
+            "default": 0
+          },
           "recent": {
             "items": {
               "$ref": "#/components/schemas/ItemPreview"
@@ -2334,6 +2380,16 @@
             "type": "string",
             "title": "Name"
           },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source": {
             "$ref": "#/components/schemas/TagSource"
           }
@@ -2342,6 +2398,7 @@
         "required": [
           "id",
           "name",
+          "color",
           "source"
         ],
         "title": "ItemTagOut"
@@ -2685,6 +2742,64 @@
         ],
         "title": "SystemConfig"
       },
+      "TagChange": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "title": "TagChange",
+        "description": "Only the fields given are changed; ``null`` clears colour or description."
+      },
+      "TagColor": {
+        "type": "string",
+        "enum": [
+          "gray",
+          "red",
+          "orange",
+          "yellow",
+          "green",
+          "teal",
+          "blue",
+          "purple",
+          "pink"
+        ],
+        "title": "TagColor",
+        "description": "Colours a tag can have; the website gives each a light and dark shade."
+      },
       "TagIn": {
         "properties": {
           "name": {
@@ -2700,6 +2815,43 @@
         ],
         "title": "TagIn"
       },
+      "TagNew": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TagNew"
+      },
       "TagOut": {
         "properties": {
           "id": {
@@ -2711,16 +2863,69 @@
             "type": "string",
             "title": "Name"
           },
+          "color": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TagColor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "count": {
             "type": "integer",
             "title": "Count"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/TagSource"
+            },
+            "type": "object",
+            "title": "Sources"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used"
           }
         },
         "type": "object",
         "required": [
           "id",
           "name",
-          "count"
+          "color",
+          "description",
+          "count",
+          "sources",
+          "created_at",
+          "last_used"
         ],
         "title": "TagOut"
       },

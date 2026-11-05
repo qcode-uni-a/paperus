@@ -99,6 +99,10 @@ export type CollectionOut = {
      */
     count: number;
     /**
+     * Direct
+     */
+    direct?: number;
+    /**
      * Recent
      */
     recent?: Array<ItemPreview>;
@@ -361,6 +365,7 @@ export type ItemTagOut = {
      * Name
      */
     name: string;
+    color: TagColor | null;
     source: TagSource;
 };
 
@@ -586,6 +591,30 @@ export type SystemConfig = {
 };
 
 /**
+ * TagChange
+ *
+ * Only the fields given are changed; ``null`` clears colour or description.
+ */
+export type TagChange = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    color?: TagColor | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+};
+
+/**
+ * TagColor
+ *
+ * Colours a tag can have; the website gives each a light and dark shade.
+ */
+export type TagColor = 'gray' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'purple' | 'pink';
+
+/**
  * TagIn
  */
 export type TagIn = {
@@ -593,6 +622,21 @@ export type TagIn = {
      * Name
      */
     name: string;
+};
+
+/**
+ * TagNew
+ */
+export type TagNew = {
+    /**
+     * Name
+     */
+    name: string;
+    color?: TagColor | null;
+    /**
+     * Description
+     */
+    description?: string | null;
 };
 
 /**
@@ -607,10 +651,29 @@ export type TagOut = {
      * Name
      */
     name: string;
+    color: TagColor | null;
+    /**
+     * Description
+     */
+    description: string | null;
     /**
      * Count
      */
     count: number;
+    /**
+     * Sources
+     */
+    sources: {
+        [key in TagSource]?: number;
+    };
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used
+     */
+    last_used: string | null;
 };
 
 /**
@@ -1520,6 +1583,31 @@ export type ListTagsResponses = {
 
 export type ListTagsResponse = ListTagsResponses[keyof ListTagsResponses];
 
+export type CreateTagData = {
+    body: TagNew;
+    path?: never;
+    query?: never;
+    url: '/api/tags';
+};
+
+export type CreateTagErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateTagError = CreateTagErrors[keyof CreateTagErrors];
+
+export type CreateTagResponses = {
+    /**
+     * Successful Response
+     */
+    201: TagOut;
+};
+
+export type CreateTagResponse = CreateTagResponses[keyof CreateTagResponses];
+
 export type AddTagData = {
     body: TagIn;
     path: {
@@ -1618,8 +1706,8 @@ export type DeleteTagResponses = {
 
 export type DeleteTagResponse = DeleteTagResponses[keyof DeleteTagResponses];
 
-export type RenameTagData = {
-    body: TagIn;
+export type ChangeTagData = {
+    body: TagChange;
     path: {
         /**
          * Tag Id
@@ -1630,23 +1718,23 @@ export type RenameTagData = {
     url: '/api/tags/{tag_id}';
 };
 
-export type RenameTagErrors = {
+export type ChangeTagErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type RenameTagError = RenameTagErrors[keyof RenameTagErrors];
+export type ChangeTagError = ChangeTagErrors[keyof ChangeTagErrors];
 
-export type RenameTagResponses = {
+export type ChangeTagResponses = {
     /**
      * Successful Response
      */
     200: TagOut;
 };
 
-export type RenameTagResponse = RenameTagResponses[keyof RenameTagResponses];
+export type ChangeTagResponse = ChangeTagResponses[keyof ChangeTagResponses];
 
 export type ListCollectionsData = {
     body?: never;

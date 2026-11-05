@@ -35,7 +35,9 @@ def test_tags(logged_in: TestClient) -> None:
     assert [t["name"] for t in tag(logged_in, a["id"], "  To   read ")] == ["To read"]
     # Same tag regardless of case; no duplicates on an item.
     tags = tag(logged_in, b["id"], "to READ")
-    assert tags == [{"id": tags[0]["id"], "name": "To read", "source": "manual"}]
+    assert tags == [
+        {"id": tags[0]["id"], "name": "To read", "color": None, "source": "manual"}
+    ]
     tag(logged_in, b["id"], "to read")
     tag(logged_in, b["id"], "Hydrology")
 
@@ -69,6 +71,42 @@ def test_rename_and_delete_tags(logged_in: TestClient) -> None:
     assert [t["name"] for t in item["tags"]] == ["data"]
 
 
+def test_tag_details_and_usage(logged_in: TestClient) -> None:
+    a, b = add(logged_in, "A"), add(logged_in, "B")
+    created = logged_in.post(
+        "/api/tags", json={"name": " Field work ", "color": "green"}
+    ).json()
+    assert created["name"] == "Field work"
+    assert created["count"] == 0
+    assert created["last_used"] is None
+    assert logged_in.post("/api/tags", json={"name": "FIELD WORK"}).status_code == 409
+    assert (
+        logged_in.post("/api/tags", json={"name": "x", "color": "plaid"}).status_code
+        == 422
+    )
+
+    tag(logged_in, a["id"], "field work")
+    tag(logged_in, b["id"], "field work")
+    logged_in.delete(f"/api/items/{b['id']}")  # the trash does not count
+    [listed] = logged_in.get("/api/tags").json()
+    assert listed["count"] == 1
+    assert listed["sources"] == {"manual": 1}
+    assert listed["last_used"] is not None
+
+    changed = logged_in.patch(
+        f"/api/tags/{created['id']}",
+        json={"color": "purple", "description": "  Trips to the sites. "},
+    ).json()
+    assert (changed["name"], changed["color"]) == ("Field work", "purple")
+    assert changed["description"] == "Trips to the sites."
+    item = logged_in.get(f"/api/items/{a['id']}").json()
+    assert item["tags"][0]["color"] == "purple"
+    cleared = logged_in.patch(
+        f"/api/tags/{created['id']}", json={"color": None, "description": ""}
+    ).json()
+    assert (cleared["color"], cleared["description"]) == (None, None)
+
+
 def test_nested_collections(logged_in: TestClient) -> None:
     a, b, c = add(logged_in, "A"), add(logged_in, "B"), add(logged_in, "C")
     thesis = collection(logged_in, "Thesis")
@@ -97,6 +135,7 @@ def test_nested_collections(logged_in: TestClient) -> None:
     assert listed["Chapter 2"]["parent_id"] == thesis
     # Items of the collections inside count too, each once.
     assert listed["Thesis"]["count"] == 3
+    assert listed["Thesis"]["direct"] == 1
     assert listed["Chapter 2"]["count"] == 2
     logged_in.post(f"/api/collections/{thesis}/items", json={"item_ids": [b["id"]]})
     listed = {c["name"]: c for c in logged_in.get("/api/collections").json()}
