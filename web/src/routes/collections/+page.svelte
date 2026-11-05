@@ -3,13 +3,7 @@
 	import { resolve } from '$app/paths';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import CollectionStack from '#lib/CollectionStack.svelte';
-	import {
-		flatTree,
-		libraryName,
-		loadOrganize,
-		organize,
-		severalLibraries
-	} from '#lib/organize.svelte.ts';
+	import { flatTree, loadOrganize, organize } from '#lib/organize.svelte.ts';
 
 	let dialog = $state<CollectionDialog>();
 	let loaded = $state(false);
@@ -20,15 +14,6 @@
 
 	// All collections; nesting only organizes them, so each is shown alike.
 	const all = $derived(flatTree().map((row) => row.collection));
-	// Per library: those with collections, and those one may add to.
-	const sections = $derived(
-		organize.libraries
-			.map((library) => ({
-				library,
-				collections: flatTree(library.id).map((row) => row.collection)
-			}))
-			.filter(({ library, collections }) => collections.length || library.writable)
-	);
 </script>
 
 <svelte:head><title>Collections · paperus</title></svelte:head>
@@ -59,25 +44,18 @@
 		</div>
 	</div>
 {:else}
-	{#each sections as { library, collections } (library.id)}
-		<section>
-			{#if severalLibraries()}<h2 class="library">{libraryName(library.id)}</h2>{/if}
-			<div class="grid">
-				{#each collections as collection (collection.id)}
-					<CollectionStack {collection} />
-				{/each}
-				{#if library.writable}
-					<!-- A ghost collection: the place for the next one. -->
-					<button class="ghost" onclick={() => dialog?.open(library.id)}>
-						<span class="desk" aria-hidden="true">
-							<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
-						</span>
-						<span class="label">New collection</span>
-					</button>
-				{/if}
-			</div>
-		</section>
-	{/each}
+	<div class="grid">
+		{#each all as collection (collection.id)}
+			<CollectionStack {collection} />
+		{/each}
+		<!-- A ghost collection: the place for the next one. -->
+		<button class="ghost" onclick={() => dialog?.open()}>
+			<span class="desk" aria-hidden="true">
+				<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>
+			</span>
+			<span class="label">New collection</span>
+		</button>
+	</div>
 {/if}
 
 <CollectionDialog bind:this={dialog} onsaved={(id) => goto(resolve('/collections/[id]', { id }))} />
@@ -93,13 +71,6 @@
 	}
 	h1 {
 		margin: 0 0 4px;
-	}
-	section {
-		margin-bottom: 32px;
-	}
-	h2.library {
-		margin: 0 0 12px;
-		font-size: var(--step-1);
 	}
 	.head p {
 		margin: 0;

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { type Collection } from '#lib/organize.svelte.ts';
+	import { libraryById, type Collection } from '#lib/organize.svelte.ts';
 
 	let { collection }: { collection: Collection } = $props();
+
+	const shared = $derived(libraryById(collection.library_id)?.kind === 'group');
 
 	// Back to front: the newest item lies on top.
 	const sheets = $derived([...(collection.recent ?? [])].reverse());
@@ -16,6 +18,16 @@
 
 <a class="stack" href={resolve('/collections/[id]', { id: collection.id })}>
 	<div class="desk" aria-hidden="true">
+		{#if shared}
+			<span class="shared" title="Shared with a group">
+				<svg viewBox="0 0 24 24">
+					<circle cx="9" cy="8" r="3.2" />
+					<path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+					<circle cx="16.5" cy="9" r="2.6" />
+					<path d="M15.5 14.2c2.6-.3 4.6 1.3 5.2 4.3" />
+				</svg>
+			</span>
+		{/if}
 		{#if sheets.length === 0}
 			<div class="sheet empty"></div>
 		{/if}
@@ -64,6 +76,27 @@
 		border-radius: 10px;
 		background: var(--desk);
 		overflow: hidden;
+	}
+	.shared {
+		position: absolute;
+		top: 8px;
+		right: 8px;
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: var(--surface);
+		box-shadow: 0 1px 2px rgb(27 36 64 / 0.15);
+	}
+	.shared svg {
+		width: 16px;
+		height: 16px;
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 1.8;
+		stroke-linecap: round;
 	}
 	.sheet {
 		position: absolute;
