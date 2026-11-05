@@ -30,6 +30,7 @@
 	import TextViewer from '#lib/TextViewer.svelte';
 	import { isShared, libraryById } from '#lib/organize.svelte.ts';
 	import { fullName } from '#lib/format.ts';
+	import { copyCitations, downloadCitations } from '#lib/citations.ts';
 
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
@@ -41,6 +42,14 @@
 	let error = $state('');
 
 	let editDialog = $state<ItemEditDialog>();
+
+	let copied = $state(false);
+	async function copyBibtex() {
+		if (await copyCitations({ items: [id] })) {
+			copied = true;
+			setTimeout(() => (copied = false), 2000);
+		}
+	}
 	let mergeDialog = $state<MergeDialog>();
 
 	let addingVersion = $state(false);
@@ -192,14 +201,19 @@
 						><SharedIcon size={18} owner={item.library_id} /></span
 					>{/if}
 			</h1>
-			{#if !item.deleted_at && (writable || viewed)}
+			{#if !item.deleted_at}
 				<MenuButton label="Item actions">
 					{#if viewed}
 						<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
 							{showDetails ? 'Hide details' : 'Details and files'}
 						</button>
 					{/if}
+					<button role="menuitem" onclick={copyBibtex}>Copy BibTeX</button>
+					<button role="menuitem" onclick={() => downloadCitations({ items: [id] }, 'bibtex')}
+						>Download BibTeX</button
+					>
 					{#if writable}
+						<hr />
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" onclick={() => mergeDialog?.open()}>Merge into…</button>
 						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
@@ -214,6 +228,7 @@
 				<em>{item.container_title}</em>{/if}
 		</p>
 
+		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
@@ -354,6 +369,11 @@
 {/if}
 
 <style>
+	.copied {
+		margin: 0 0 8px;
+		color: var(--success);
+		font-size: var(--step--1);
+	}
 	header {
 		margin-bottom: 16px;
 	}

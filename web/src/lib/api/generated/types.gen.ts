@@ -2407,6 +2407,50 @@ export type SearchResponses = {
 
 export type SearchResponse = SearchResponses[keyof SearchResponses];
 
+export type ExportCitationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Format
+         */
+        format?: 'bibtex' | 'csl-json';
+        /**
+         * Item
+         */
+        item?: Array<string> | null;
+        /**
+         * Collection
+         */
+        collection?: string | null;
+        /**
+         * Nested
+         */
+        nested?: boolean;
+        /**
+         * Download
+         */
+        download?: boolean;
+    };
+    url: '/api/citations';
+};
+
+export type ExportCitationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ExportCitationsError = ExportCitationsErrors[keyof ExportCitationsErrors];
+
+export type ExportCitationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type GetConfigData = {
     body?: never;
     path?: never;

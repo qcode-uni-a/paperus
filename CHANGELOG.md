@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Citation export**: BibTeX and CSL-JSON for a paper (⋯ → Copy or
+  Download BibTeX), a collection (⋯ → Export, with or without the
+  collections inside) or everything, also for AI assistants
+  (`export_citations`). BibTeX as Zotero writes it (keys like
+  `gan_prizes_2026`, same field order and title protection), arXiv papers
+  with `eprint` as arXiv does; citation keys from Better BibTeX are kept.
+
 ## 0.0.4 (2026-11-05)
 
 AI assistants: paperus speaks MCP, with access tokens.

@@ -22,7 +22,8 @@ abstracts), `get_abstracts`, `get_passage`, `get_document` (details with file do
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 `list_collections`, `list_documents`, `list_tags`, `my_access` (who the
 token acts for, its rights and the tools they allow, groups with
-`groups.read`); with write scopes `add_tags` and `add_document`. The
+`groups.read`), `export_citations` (BibTeX or CSL-JSON); with write
+scopes `add_tags` and `add_document`. The
 server's instructions describe the search workflow: search, pick 2–5
 papers, compare their abstracts, read the best one's passage, repeat. Not yet: OAuth (needed for claude.ai and ChatGPT
 connectors), notes and annotations, the AI inbox, citation export.

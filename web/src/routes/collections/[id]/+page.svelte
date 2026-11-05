@@ -5,6 +5,7 @@
 	import { deleteCollection } from '#lib/api/client.ts';
 	import CollectionAdd from '#lib/CollectionAdd.svelte';
 	import MenuButton from '#lib/MenuButton.svelte';
+	import { downloadCitations } from '#lib/citations.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
 	import { childrenOf, libraryById, loadOrganize, organize } from '#lib/organize.svelte.ts';
@@ -64,7 +65,7 @@
 			{#if writable}
 				<CollectionAdd collection={collection.id} onadded={() => list?.refresh()} />
 			{/if}
-			{#if writable || inside.length}
+			{#if collection}
 				<MenuButton label="Collection actions">
 					{#if inside.length}
 						<button
@@ -77,9 +78,20 @@
 							</svg>
 							Include items of the collections inside
 						</button>
-						{#if writable}<hr />{/if}
+						<hr />
 					{/if}
+					<button
+						role="menuitem"
+						onclick={() => downloadCitations({ collection: id, nested: includeInside }, 'bibtex')}
+						>Export BibTeX</button
+					>
+					<button
+						role="menuitem"
+						onclick={() => downloadCitations({ collection: id, nested: includeInside }, 'csl-json')}
+						>Export CSL-JSON</button
+					>
 					{#if writable}
+						<hr />
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" class="danger" onclick={remove}>Delete</button>
 					{/if}
