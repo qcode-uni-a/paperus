@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- PDFs are read in helper processes: in parallel on several cores, each
+  with a memory and time limit, so a broken PDF can no longer take the
+  worker down (453 files re-read in 95 seconds, 1.5 GB at most).
+- Zotero import: saved web pages (snapshots) are left out next to a PDF;
+  alone, they stay.
 - **Duplicates**: "Review one by one" shows each pair side by side (first
   page, details with differences marked) and what merging does, with
   keyboard shortcuts; clearer cards in the list ("Keep this one" ← "Merged

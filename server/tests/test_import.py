@@ -17,7 +17,15 @@ from sqlalchemy.orm import Session
 from paperus.access import Access
 from paperus.cli import main
 from paperus.identifiers import Scheme
-from paperus.importing import Export, ExportedPaper, bibtex, csljson, ris, zotero
+from paperus.importing import (
+    Export,
+    ExportedFile,
+    ExportedPaper,
+    bibtex,
+    csljson,
+    ris,
+    zotero,
+)
 from paperus.importing import apply as apply_module
 from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
 from paperus.importing.run import run_import
@@ -606,3 +614,12 @@ def test_importing_again_repeats_nothing(
     again = run()
     assert (again.added, again.found) == (0, 2)
     assert len(ada.get("/api/items").json()) == 2
+
+
+def test_snapshots_next_to_a_pdf_are_left_out() -> None:
+    pdf = ExportedFile(path="files/1/paper.pdf", media_type="application/pdf")
+    page = ExportedFile(path="files/2/2310.html", media_type="text/html")
+    slides = ExportedFile(path="files/3/talk.pptx", media_type=None)
+    assert zotero._without_snapshots([page, pdf, slides]) == [pdf, slides]
+    # Alone, the snapshot is the paper's only text: it stays.
+    assert zotero._without_snapshots([page]) == [page]

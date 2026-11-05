@@ -317,11 +317,13 @@ class _Reader:
                 for note in sorted(g.objects(subject, DCTERMS.isReferencedBy), key=str)
                 if (text := self.note_text(note))
             ],
-            files=[
-                file
-                for attachment in sorted(g.objects(subject, LINK.link), key=str)
-                if (file := self._file(attachment)) is not None
-            ],
+            files=_without_snapshots(
+                [
+                    file
+                    for attachment in sorted(g.objects(subject, LINK.link), key=str)
+                    if (file := self._file(attachment)) is not None
+                ]
+            ),
             source_key=key or csl["title"],
         )
 
@@ -458,6 +460,18 @@ class _Reader:
             media_type=self.text(attachment, LINK.type),
             description=self.text(attachment, DC.title),
         )
+
+
+def _without_snapshots(files: list[ExportedFile]) -> list[ExportedFile]:
+    """Zotero's saved web pages ("Snapshot") left out next to a PDF: they
+    mostly repeat the abstract. Alone, a snapshot is the paper's only text."""
+    if any(f.media_type == "application/pdf" for f in files):
+        return [
+            f
+            for f in files
+            if f.media_type not in ("text/html", "application/xhtml+xml")
+        ]
+    return files
 
 
 def _extra_field(extra: str, name: str) -> str | None:

@@ -1,10 +1,8 @@
-import threading
-import time
 from pathlib import Path
 
 import pytest
 
-from paperus import text
+from paperus import pdf
 from paperus.text import (
     MAX_WORDS,
     TARGET_WORDS,
@@ -100,32 +98,17 @@ def test_reference_headings() -> None:
     assert not chunk.references
 
 
-def test_one_thread_at_a_time_in_pdfium(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PDFium is not thread-safe: reading in parallel threads takes turns."""
-    inside = 0
-    most = 0
-    guard = threading.Lock()
-
-    def slow_read(path: Path) -> list[str]:
-        nonlocal inside, most
-        with guard:
-            inside += 1
-            most = max(most, inside)
-        time.sleep(0.05)
-        with guard:
-            inside -= 1
-        return []
-
-    monkeypatch.setattr(text, "_pdf_pages", slow_read)
-    threads = [
-        threading.Thread(target=text.extract_pdf_pages, args=(Path("x.pdf"),))
-        for _ in range(4)
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-    assert most == 1
+def test_pdfs_are_read_in_helper_processes(tmp_path: Path) -> None:
+    """PDFium runs in helper processes; a damaged PDF gives a message."""
+    path = tmp_path / "paper.pdf"
+    path.write_bytes(make_pdf([["Radar gaps"], ["Second page"]]))
+    assert [p.strip() for p in pdf.pages(path)] == ["Radar gaps", "Second page"]
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"%PDF-1.7 this is no PDF")
+    with pytest.raises(pdf.PdfError, match="Data format error"):
+        pdf.pages(broken)
+    # The helpers still work after that.
+    assert pdf.pages(path)[0].strip() == "Radar gaps"
 
 
 def test_web_pages_give_their_readable_text() -> None:

@@ -14,11 +14,10 @@ import uuid
 from pathlib import Path
 
 import httpx2
-import pypdfium2
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import library, metadata
+from paperus import library, metadata, pdf
 from paperus.access import Access
 from paperus.identifiers import (
     InvalidIdentifier,
@@ -41,7 +40,6 @@ from paperus.models import (
     Version,
 )
 from paperus.storage import BlobStore
-from paperus.text import PDFIUM
 
 log = logging.getLogger(__name__)
 
@@ -117,12 +115,7 @@ def plausible_title(title: str | None, filename: str) -> bool:
 
 
 def embedded_title(path: Path) -> str | None:
-    with PDFIUM:  # see paperus.text
-        pdf = pypdfium2.PdfDocument(path)
-        try:
-            title = pdf.get_metadata_dict().get("Title")
-        finally:
-            pdf.close()
+    title = pdf.title(path)
     return " ".join(title.split()) if title else None
 
 

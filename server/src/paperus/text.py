@@ -6,12 +6,12 @@ chunking (sections, captions) with GROBID or Docling comes later.
 """
 
 import re
-import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-import pypdfium2
 from bs4 import BeautifulSoup
+
+from paperus import pdf
 
 TARGET_WORDS = 200
 MAX_WORDS = 350
@@ -45,31 +45,10 @@ class TextChunk:
     """Part of a reference list: kept for keyword search, not embedded."""
 
 
-# PDFium is not thread-safe, and the worker reads several files at once in
-# threads: one thread at a time inside PDFium (two at once once let a worker
-# grow to 15 GB until it was killed).
-PDFIUM = threading.Lock()
-
-
 def extract_pdf_pages(path: Path) -> list[str]:
-    """The text of each page; empty strings for pages without text."""
-    with PDFIUM:
-        return _pdf_pages(path)
-
-
-def _pdf_pages(path: Path) -> list[str]:
-    pdf = pypdfium2.PdfDocument(path)
-    try:
-        pages = []
-        for index in range(len(pdf)):
-            page = pdf[index]
-            text_page = page.get_textpage()
-            pages.append(text_page.get_text_bounded())
-            text_page.close()
-            page.close()
-        return pages
-    finally:
-        pdf.close()
+    """The text of each page; empty strings for pages without text (read
+    in a helper process, see ``paperus.pdf``)."""
+    return pdf.pages(path)
 
 
 _BLOCKS = [
