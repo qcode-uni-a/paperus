@@ -80,10 +80,10 @@ because of it; they need a membership like everyone else.
 | See | yes | yes | yes |
 | Create, rename, describe, nest, delete | yes | no | yes |
 | Give to another owner | yes, to a group I may add to | no | yes, to me or a group I may add to |
-| Add / remove papers | yes | no | yes |
+| Add / remove papers and notes | yes | no | yes |
 
-- **What a collection may hold:** my collections, any paper I can see; a
-  group's collections, only papers the group owns.
+- **What a collection may hold:** my collections, any paper or note I can
+  see; a group's collections, only papers and notes the group owns.
 - Collections nest only within one owner.
 - Giving a collection to a group: the dialog says how many of its papers
   the group does not own yet; they are given to the group too (if I may
@@ -140,3 +140,16 @@ Never with a token, whatever its scopes: passwords, users, groups (changes),
 tokens, settings and administration. Expired or revoked tokens, and those
 of deactivated people, stop working at once. Tested in
 `server/tests/test_tokens.py`.
+
+## Notes
+
+| Action | My notes | A group's notes, as reader | A group's notes, as member or admin |
+| --- | --- | --- | --- |
+| See, search | yes | yes | yes |
+| Write, change, move to the trash, restore | yes | no | yes |
+| Give to another owner | yes, to a group I may add to | no | yes, to me or a group I may add to |
+| Link to / unlink from papers | yes, any paper I can see | no | yes, any paper I can see |
+
+- A note's links to papers a reader cannot see are hidden from that reader
+  (like a group's tags on private papers).
+- A private note on a group's paper is visible only to its owner.

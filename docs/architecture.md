@@ -88,7 +88,9 @@ Item: the work; notes, tags, collections, citation metadata
   position anchors, section path and type (body, caption, abstract, note,
   annotation).
 - **Embedding**: per (chunk hash, model ID).
-- **Note**: Markdown, linked to items and passages; owner + visibility.
+- **Note**: the person's own writing about sources, in Markdown, kept in
+  the database (no versions like an item; no citation metadata; never in a
+  BibTeX export). See [Notes](#notes).
 - **Annotation**: W3C Web Annotation model, anchored by text quote selector
   plus page coordinates.
 - **Person** (later): an author or editor, so people can click a name and
@@ -195,3 +197,32 @@ The full list of who may do what is in [permissions](permissions.md).
   (pgvector 0.8+), possibly partial indexes per group.
 - Beyond tens of millions of vectors: pgvectorscale (DiskANN) or binary
   quantization with re-scoring.
+
+## Notes
+
+Decided 2026-11-05 (built in steps; see the changelog for what exists).
+
+- **What a note is**: Markdown text with an owner (a person or a group, like
+  papers, tags and collections; new notes go to the default owner). Its
+  title is its first line. It lives in the database; pasted images are
+  stored as files and referenced from the text.
+- **Links**: a note can be about any number of papers (none: a standalone
+  note), each link optionally at a page. It shows on every linked paper the
+  reader can see; links to papers the reader cannot see are hidden.
+- **Collections** hold notes as well as papers (e.g. reading-group notes
+  next to the papers they discuss), by the same rules as papers.
+- **History** instead of versions: each save keeps the previous text,
+  saves by the same person within 10 minutes count as one change. Saving
+  over someone else's newer change is refused (as for items, by ETag), so
+  two people editing a group note do not overwrite each other. A history
+  view with restore can come later; the record exists from the start.
+- **Search**: notes are split into passages from the database and indexed
+  like file text; results say whether a passage is from a paper or a note.
+- **AI assistants** read notes (with a paper's details and in search) and,
+  with the `notes.write` scope, write them; the instructions ask them to
+  ask first.
+- **Export**: a note as a Markdown file; later all notes of a collection as
+  a zip (and perhaps a synced Markdown folder, see decisions).
+- **Not now**: PDF annotations (highlights with comments) are their own
+  step. Until then, imported Zotero annotations become notes with the quoted
+  text and page. Markdown files uploaded as items stay items.
