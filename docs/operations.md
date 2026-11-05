@@ -221,8 +221,12 @@ Variables):
   (owner `qcode-uni-a`, repository `paperus`, workflow `release.yml`,
   environment `pypi` for `paperus` and `pypi-ml` for `paperus-ml`), then
   `PUBLISH_PYPI` = `true`.
-- npm (`paperus`): a secret `NPM_TOKEN` for the first release (trusted
-  publishing on npmjs.com afterwards), then `PUBLISH_NPM` = `true`.
+- npm (`paperus`): a secret `NPM_TOKEN` for the first release (a granular
+  token that may publish, valid for a few days), then `PUBLISH_NPM` =
+  `true`. After the first release, set up trusted publishing in the
+  package's settings on npmjs.com (GitHub Actions, owner `qcode-uni-a`,
+  repository `paperus`, workflow `release.yml`, environment `npm`), then
+  delete the token and the secret.
 
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
