@@ -14,6 +14,7 @@ from paperus.models import (
     Item,
     MetadataSource,
     NotDuplicate,
+    Note,
     NoteItem,
     VersionKind,
 )
@@ -89,7 +90,12 @@ def find(db: Session, access: Access, limit: int = 200) -> list[Pair]:
     notes = dict(
         db.execute(
             select(NoteItem.item_id, func.count())
-            .where(NoteItem.item_id.in_(ids))
+            .join(Note, Note.id == NoteItem.note_id)
+            .where(
+                NoteItem.item_id.in_(ids),
+                Note.deleted_at.is_(None),
+                Note.library_id.in_(access.readable),
+            )
             .group_by(NoteItem.item_id)
         ).all()
     )
@@ -99,8 +105,11 @@ def find(db: Session, access: Access, limit: int = 200) -> list[Pair]:
     ]
 
 
-def _merits(item: Item, notes: dict[uuid.UUID, int]) -> list[tuple[int, str]]:
-    """What speaks for keeping the paper: (weight, reason)."""
+def _merits(
+    access: Access, item: Item, notes: dict[uuid.UUID, int]
+) -> list[tuple[int, str]]:
+    """What speaks for keeping the paper: (weight, reason); only what the
+    person can see counts (others' private tags and collections do not)."""
     found: list[tuple[int, str]] = []
     versions = item.versions
     if any(v.kind == VersionKind.PUBLISHED and v.identifiers for v in versions):
@@ -115,10 +124,14 @@ def _merits(item: Item, notes: dict[uuid.UUID, int]) -> list[tuple[int, str]]:
         for f in v.files
     ):
         found.append((3, "has the PDF"))
-    if item.tag_links:
-        found.append((min(len(item.tag_links), 3), "has more tags"))
-    if item.collection_links:
-        found.append((min(len(item.collection_links), 3), "is in more collections"))
+    tags = [t for t in item.tag_links if access.can_read(t.tag.library_id)]
+    if tags:
+        found.append((min(len(tags), 3), "has more tags"))
+    held = [
+        c for c in item.collection_links if access.can_read(c.collection.library_id)
+    ]
+    if held:
+        found.append((min(len(held), 3), "is in more collections"))
     if notes.get(item.id):
         found.append((2, "has notes"))
     return found
@@ -131,7 +144,7 @@ def _recommend(
     reasons: list[Reason],
     notes: dict[uuid.UUID, int],
 ) -> Pair:
-    merits_a, merits_b = _merits(a, notes), _merits(b, notes)
+    merits_a, merits_b = _merits(access, a, notes), _merits(access, b, notes)
     score_a, score_b = sum(w for w, _ in merits_a), sum(w for w, _ in merits_b)
     # Ties: keep the older one (added first, the one people know).
     keep, merge = (

@@ -719,7 +719,7 @@ def preview_merge(
     source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     target = get_readable_item(db, access, into, allow_trashed=False)
     try:
-        return MergePreview(steps=_steps(merge.plan_merge(access, source, target)))
+        return MergePreview(steps=_steps(merge.plan_merge(access, source, target, db)))
     except merge.CannotMerge as error:
         raise HTTPException(409, str(error)) from error
 

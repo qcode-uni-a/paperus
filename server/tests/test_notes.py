@@ -93,3 +93,34 @@ def test_trash_and_lists(client: TestClient, db: Session) -> None:
     # A trashed paper's link is hidden, the note stays.
     ada.delete(f"/api/items/{paper['id']}")
     assert ada.get(f"/api/notes/{note['id']}").json()["items"] == []
+
+
+def test_filing_and_linking_do_not_conflict_with_editing(
+    client: TestClient, db: Session
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Radar")
+    note = ada.note("Draft")
+    url = f"/api/notes/{note['id']}"
+    etag = ada.get(url).headers["ETag"]
+    changed_at = ada.get(url).json()["changed_at"]
+    # Filed and linked meanwhile (by the same person, in another tab).
+    shelf = ada.post("/api/collections", json={"name": "Shelf"}).json()
+    ada.post(f"/api/collections/{shelf['id']}/notes", json={"note_ids": [note["id"]]})
+    ada.put(f"{url}/items/{paper['id']}", json={})
+    assert ada.get(url).json()["changed_at"] == changed_at  # lists keep their order
+    # The text is still the version the editor has: saving works.
+    assert save(ada, note["id"], "Draft, longer", etag)[0] == 200
+
+
+def test_links_to_trashed_papers_can_be_removed(
+    client: TestClient, db: Session
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Radar")
+    note = ada.note("About radar", items=[paper["id"]])
+    ada.delete(f"/api/items/{paper['id']}")
+    response = ada.delete(f"/api/notes/{note['id']}/items/{paper['id']}")
+    assert response.status_code == 200
+    ada.post(f"/api/items/{paper['id']}/restore")
+    assert ada.get(f"/api/notes/{note['id']}").json()["items"] == []

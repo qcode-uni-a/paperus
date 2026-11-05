@@ -10,13 +10,14 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from paperus.access import Access
 from paperus.importing import Export, bibtex, csljson, ris, zotero
 from paperus.importing.apply import Files as FileSource
 from paperus.importing.apply import FolderFiles, NoFiles, ZipFiles, apply
-from paperus.models import Import, ImportStatus, User
+from paperus.models import Blob, File, Import, ImportStatus, User
 from paperus.storage import BlobStore
 
 log = logging.getLogger(__name__)
@@ -41,13 +42,27 @@ class NotAnExport(ValueError):
     pass
 
 
+# The export itself (not its files): far more than any real library needs,
+# far less than a zip bomb would unpack to.
+MAX_EXPORT_BYTES = 200 * 1024 * 1024
+
+
 def _decode(data: bytes) -> str:
+    """Text in UTF-8, else Windows-1252; NUL characters (Postgres refuses
+    them in text) dropped."""
     for encoding in ("utf-8-sig", "cp1252"):
         try:
-            return data.decode(encoding)
+            return data.decode(encoding).replace("\x00", "")
         except UnicodeDecodeError:
             continue
-    return data.decode("latin-1")
+    return data.decode("latin-1").replace("\x00", "")
+
+
+def _too_large(size: int) -> NotAnExport:
+    return NotAnExport(
+        f"The export file is {size // 2**20} MB; at most "
+        f"{MAX_EXPORT_BYTES // 2**20} MB can be read (files beside it may be larger)."
+    )
 
 
 def _guess(name: str, text: str) -> str:
@@ -80,6 +95,8 @@ def open_export(path: Path, name: str) -> Generator[tuple[str, str, FileSource]]
         )
         if not candidates:
             raise NotAnExport("No .rdf, .bib, .ris or .json file in the folder.")
+        if candidates[0].stat().st_size > MAX_EXPORT_BYTES:
+            raise _too_large(candidates[0].stat().st_size)
         text = _decode(candidates[0].read_bytes())
         yield _guess(candidates[0].name, text), text, FolderFiles(path)
         return
@@ -96,9 +113,19 @@ def open_export(path: Path, name: str) -> Generator[tuple[str, str, FileSource]]
                 raise NotAnExport("No .rdf, .bib, .ris or .json file in the zip.")
             # The shallowest one: the export itself, not a file attached to a paper.
             chosen = min(exports, key=lambda n: n.count("/"))
-            text = _decode(archive.read(chosen))
+            # The size the zip says, checked before unpacking (and while).
+            size = archive.getinfo(chosen).file_size
+            if size > MAX_EXPORT_BYTES:
+                raise _too_large(size)
+            with archive.open(chosen) as stream:
+                data = stream.read(MAX_EXPORT_BYTES + 1)
+            if len(data) > MAX_EXPORT_BYTES:
+                raise _too_large(len(data))
+            text = _decode(data)
             yield _guess(chosen, text), text, ZipFiles(archive)
         return
+    if path.stat().st_size > MAX_EXPORT_BYTES:
+        raise _too_large(path.stat().st_size)
     text = _decode(path.read_bytes())
     yield _guess(name, text), text, NoFiles()
 
@@ -160,5 +187,19 @@ def run_import(
             else (f"The import stopped: {error}")
         )
     record.finished_at = datetime.now(UTC)
-    record.blob_sha256 = None
+    upload, record.blob_sha256 = record.blob_sha256, None
     db.commit()
+    if upload is not None:
+        _forget_upload(db, blobs, upload)
+
+
+def _forget_upload(db: Session, blobs: BlobStore, sha256: bytes) -> None:
+    """Delete the uploaded export, unless something else stores the same
+    bytes (e.g. the same zip imported as a paper's file, or imported again)."""
+    used = db.scalar(select(File.id).where(File.blob_sha256 == sha256).limit(1))
+    waiting = db.scalar(select(Import.id).where(Import.blob_sha256 == sha256).limit(1))
+    if used is not None or waiting is not None:
+        return
+    db.execute(delete(Blob).where(Blob.sha256 == sha256))
+    db.commit()
+    blobs.delete(sha256)

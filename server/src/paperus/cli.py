@@ -224,8 +224,13 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
             access = Access.of(db, user)
             owner = access.target_library(None)
             if group is not None:
-                found = db.scalar(select(Group).where(Group.name == group))
-                if found is None or found.id not in access.group_libraries:
+                # Group names repeat in different places: look among theirs.
+                found = db.scalars(
+                    select(Group).where(
+                        Group.name == group, Group.id.in_(access.group_libraries)
+                    )
+                ).first()
+                if found is None:
                     print(f"{username} is in no group {group!r}.", file=sys.stderr)
                     return 1
                 owner = access.group_libraries[found.id]

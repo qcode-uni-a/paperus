@@ -88,6 +88,13 @@ _ROLES = {
 
 def read(text: str) -> Export:
     export = Export(format="zotero-rdf")
+    # Zotero never declares entities; nested ones make the parser take
+    # hours on a tiny file ("billion laughs"), so they are refused.
+    if re.search(r"<!(DOCTYPE|ENTITY)", text[: text.find("<rdf:RDF") + 1 or None]):
+        export.problems.append(
+            "The file declares XML entities, which Zotero never does; not read."
+        )
+        return export
     graph = Graph()
     # Zotero has written file paths as <rdf:resource rdf:resource="files/…"/>,
     # which RDF/XML does not allow as a property; it means z:path.

@@ -22,6 +22,7 @@ from paperus.models import (
     Item,
     Library,
     Membership,
+    Note,
     Role,
     User,
 )
@@ -328,14 +329,16 @@ def _move(db: DB, access: Access, group: Group, parent_id: uuid.UUID | None) -> 
 
 @router.delete("/api/groups/{group_id}", status_code=204)
 def delete_group(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
-    """Delete an empty group: no groups inside and no items (not even in its
-    trash). Its tags, collections and memberships go with it."""
+    """Delete an empty group: no groups inside and no items or notes (not
+    even in its trash). Its tags, collections and memberships go with it."""
     group = _managed_group(db, access, group_id)
     if db.scalar(select(func.count()).where(Group.parent_id == group.id)):
         raise HTTPException(409, "delete or move the groups inside first")
     library_id = _library_of(db, group.id)
     if db.scalar(select(func.count()).where(Item.library_id == library_id)):
         raise HTTPException(409, "the group's library still has items")
+    if db.scalar(select(func.count()).where(Note.library_id == library_id)):
+        raise HTTPException(409, "the group's library still has notes")
     db.delete(group)
     db.commit()
     return Response(status_code=204)

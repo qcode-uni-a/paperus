@@ -246,8 +246,12 @@ def import_library(job: JobContext, import_id: str) -> None:
             )
 
 
-def queue_import(app: App, import_id: uuid.UUID) -> None:
-    app.configure_task("paperus:import_library").defer(import_id=str(import_id))
+def queue_import(app: App, import_id: uuid.UUID, owner: uuid.UUID) -> None:
+    """Imports into one owner run one after another (they would find each
+    other's new papers and collections only half)."""
+    app.configure_task("paperus:import_library", lock=f"import-{owner}").defer(
+        import_id=str(import_id)
+    )
 
 
 @tasks.task(name="backup", queue="backup", queueing_lock="backup")

@@ -307,13 +307,11 @@ def test_notes(client: TestClient, ada: Person) -> None:
     assert hit["note"] == "Summary by Claude" and "beam" in hit["passages"][0]["text"]
     # Updating needs the current change number.
     with pytest.raises(ToolFailed, match="changed in the meantime"):
-        assistant.call(
-            "update_note", note_id=hit["note_id"], text="x", change=note["change"] - 1
-        )
+        assistant.call("update_note", note_id=hit["note_id"], text="x", change="1")
     updated = assistant.call(
         "update_note", note_id=hit["note_id"], text="# Better", change=note["change"]
     )
-    assert updated["change"] > note["change"]
+    assert updated["change"] != note["change"]
     assert ada.get(f"/api/notes/{hit['note_id']}").json()["title"] == "Better"
     # Without notes.write: reading only.
     reader = Assistant(client, token(ada, "papers.read"))

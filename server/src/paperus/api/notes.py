@@ -129,7 +129,7 @@ def note_out(db: DB, note: Note, access: Access) -> NoteOut:
 
 
 def note_detail(db: DB, note: Note, access: Access, response: Response) -> NoteDetail:
-    response.headers["ETag"] = f'"{note.change}"'
+    response.headers["ETag"] = f'"{notes.etag(note)}"'
     return NoteDetail(**note_out(db, note, access).model_dump(), text=note.text)
 
 
@@ -151,13 +151,10 @@ def _readable_item(db: DB, access: Access, item_id: uuid.UUID) -> Item:
     return item
 
 
-def _parse_if_match(value: str | None) -> int:
+def _parse_if_match(value: str | None) -> str:
     if value is None:
         raise HTTPException(428, "If-Match header with the note's ETag required")
-    try:
-        return int(value.removeprefix("W/").strip().strip('"'))
-    except ValueError as error:
-        raise HTTPException(412, "If-Match does not match") from error
+    return value.removeprefix("W/").strip().strip('"')
 
 
 @router.get("/api/notes")
@@ -264,9 +261,12 @@ def change_note(
     note = get_note(db, access, note_id, write=True)
     if note.deleted_at is not None:
         raise HTTPException(409, "the note is in the trash")
-    if _parse_if_match(if_match) != note.change:
-        raise HTTPException(412, "the note changed in the meantime")
-    notes.set_text(db, note, body.text, access.user.id)
+    try:
+        note = notes.save(
+            db, note.id, body.text, _parse_if_match(if_match), access.user.id
+        )
+    except notes.Conflict as error:
+        raise HTTPException(412, "the note changed in the meantime") from error
     db.commit()
     queue_note_embedding(request.app.state.jobs, note.id)
     return note_detail(db, note, access, response)
@@ -305,8 +305,9 @@ def unlink_item(
     db: DB,
     access: CurrentAccess,
 ) -> NoteDetail:
+    # Also links to papers the person cannot see (any more) or that are in
+    # the trash: the note's writers may tidy them up.
     note = get_note(db, access, note_id, write=True)
-    _readable_item(db, access, item_id)
     note.item_links = [link for link in note.item_links if link.item_id != item_id]
     db.commit()
     return note_detail(db, note, access, response)

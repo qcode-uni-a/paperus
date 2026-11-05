@@ -595,7 +595,7 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                     ],
                     "shared_with": _group_name(db, access, note.library_id),
                     "changed_at": note.changed_at.isoformat(),
-                    "change": note.change,
+                    "change": notes.etag(note),
                     "link": f"{base}/notes/{note.id}",
                 }
             )
@@ -633,7 +633,7 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
 
     @mcp.tool(annotations=WRITE)
     def update_note(
-        note_id: str, text: str, change: int, ctx: Context
+        note_id: str, text: str, change: str, ctx: Context
     ) -> CallToolResult:
         """Replace a note's text (the whole Markdown). `change` is the number
         from get_note: if the note changed since, nothing is saved; read it
@@ -645,15 +645,18 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
             note = _note(db, access, note_id)
             if not access.can_write(note.library_id):
                 raise ToolError("The person may not change this note (reader).")
-            if note.change != change:
-                raise ToolError("The note changed in the meantime; read it again.")
-            notes.set_text(db, note, text, access.user.id)
+            try:
+                note = notes.save(db, note.id, text, str(change), access.user.id)
+            except notes.Conflict as error:
+                raise ToolError(
+                    "The note changed in the meantime; read it again."
+                ) from error
             db.commit()
             queue_note_embedding(state.jobs, note.id)
             return _json(
                 {
                     "note_id": str(note.id),
-                    "change": note.change,
+                    "change": notes.etag(note),
                     "link": f"{base}/notes/{note.id}",
                 }
             )

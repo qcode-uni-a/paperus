@@ -25,7 +25,10 @@ def read(text: str) -> Export:
         if not isinstance(entry, dict) or not entry.get("title"):
             export.problems.append(f"Entry {number} has no title and was skipped.")
             continue
-        export.papers.append(_paper(number, entry))
+        try:
+            export.papers.append(_paper(number, entry))
+        except Exception as error:
+            export.problems.append(f"Entry {number} could not be read: {error}")
     return export
 
 
@@ -36,9 +39,9 @@ def _paper(number: int, entry: dict[str, Any]) -> ExportedPaper:
     if isinstance(key, str) and key and not key.startswith("http"):
         csl["citation-key"] = key
     identifiers = identifiers_of(
-        doi=entry.get("DOI"),
+        doi=_first(entry.get("DOI")),
         isbn=_first(entry.get("ISBN")),
-        pmid=entry.get("PMID"),
+        pmid=_first(entry.get("PMID")),
         book=csl["type"] == "book",
     )
     return ExportedPaper(

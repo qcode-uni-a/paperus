@@ -32,6 +32,31 @@ def title_of(text: str) -> str:
     return ""
 
 
+class Conflict(Exception):
+    """Someone saved the text since the editor read it."""
+
+
+def etag(note: Note) -> str:
+    """The text's version, for ``If-Match`` (and MCP's ``change``): it moves
+    only when the text changes, not when the note is filed or linked."""
+    return str(int(note.text_changed_at.timestamp() * 1_000_000))
+
+
+def save(
+    db: Session, note_id: uuid.UUID, text: str, expected: str, user_id: uuid.UUID | None
+) -> Note:
+    """Replace the text if it is still the version ``expected`` (from
+    ``etag``); locks the note, so two saves from the same version cannot both
+    pass. Raises ``Conflict`` otherwise. Callers check rights first."""
+    note = db.get(Note, note_id, with_for_update=True, populate_existing=True)
+    if note is None:
+        raise LookupError(note_id)
+    if etag(note) != expected:
+        raise Conflict
+    set_text(db, note, text, user_id)
+    return note
+
+
 def create(
     db: Session, library_id: uuid.UUID, text: str, user_id: uuid.UUID | None
 ) -> Note:

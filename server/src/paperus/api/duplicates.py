@@ -6,6 +6,7 @@ from fastapi import APIRouter, Response
 from pydantic import BaseModel
 
 from paperus import duplicates
+from paperus.access import Forbidden
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.items import ItemOut, get_readable_item, item_out
 
@@ -50,9 +51,11 @@ def list_duplicates_everywhere(db: DB, access: CurrentAccess) -> list[DuplicateO
 @router.post("/api/duplicates/different", status_code=204)
 def mark_different(body: Pair, db: DB, access: CurrentAccess) -> Response:
     """The two are different papers: do not suggest them again (for everyone
-    who sees both)."""
-    get_readable_item(db, access, body.a)
-    get_readable_item(db, access, body.b)
+    who sees both). Needs the right to change at least one of them."""
+    a = get_readable_item(db, access, body.a)
+    b = get_readable_item(db, access, body.b)
+    if not (access.can_write_item(a) or access.can_write_item(b)):
+        raise Forbidden("readers cannot decide this for the group")
     duplicates.dismiss(db, body.a, body.b, access.user.id)
     db.commit()
     return Response(status_code=204)

@@ -1,5 +1,6 @@
 """Importing from other reference managers: reading formats, adding them."""
 
+import hashlib
 import io
 import json
 import uuid
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from paperus.access import Access
 from paperus.cli import main
 from paperus.identifiers import Scheme
+from paperus.importing import apply as apply_module
 from paperus.importing import bibtex, csljson, ris, zotero
 from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
 from paperus.importing.run import run_import
@@ -469,3 +471,82 @@ def test_zotero_zip(
     )
     [note] = ada.get(f"/api/notes?collection={thesis['id']}&nested=false").json()
     assert note["title"] == "Ideas for the thesis."
+
+
+def test_one_failing_paper_does_not_break_the_rest(
+    client: TestClient, db: Session, blobs: BlobStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ada = Person(client, db, "ada")
+    text = """
+@article{a, title={First}, groups={Reading}}
+@article{b, title={Second}, groups={Reading}}
+@article{c, title={Third}, groups={Reading}}
+"""
+    real = apply_module._paper
+
+    def flaky(run: Any, paper: Any) -> None:  # noqa: ANN401
+        real(run, paper)
+        if paper.source_key == "a":
+            raise ValueError("broken entry\nwith SQL below")
+
+    monkeypatch.setattr(apply_module, "_paper", flaky)
+    report = apply(
+        db,
+        blobs,
+        access_of(db, ada),
+        bibtex.read(text),
+        NoFiles(),
+        owner=uuid.UUID(ada.libraries()["Me"]["id"]),
+        max_file_bytes=10_000_000,
+    )
+    # The first was undone, also in the counts; the others went in, into the
+    # collection the first had made (and that was undone with it).
+    assert (report.added, report.collections) == (2, 1)
+    assert report.problems == ["a: broken entry"]
+    assert sorted(i["title"] for i in ada.get("/api/items").json()) == [
+        "Second",
+        "Third",
+    ]
+
+
+def test_hostile_and_odd_exports() -> None:
+    bomb = (
+        '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaaaaaaaa">'
+        '<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+        '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">&b;</rdf:RDF>'
+    )
+    assert "entities" in zotero.read(bomb).problems[0]
+    odd = csljson.read(
+        json.dumps(
+            [
+                {"type": "article", "title": "A", "PMID": 12345, "DOI": ["10.1234/a"]},
+                {"type": "article", "title": "B", "author": "not a list"},
+            ]
+        )
+    )
+    assert odd.papers[0].identifiers == [
+        (Scheme.DOI, "10.1234/a"),
+        (Scheme.PMID, "12345"),
+    ]
+
+
+def test_reimport_skips_standalone_notes_and_drops_the_upload(
+    client: TestClient, db: Session, blobs: BlobStore, job_app: App
+) -> None:
+    ada = Person(client, db, "ada")
+    upload = zip_bytes(**{"Exported Items.rdf": ZOTERO.encode()})
+    for _ in range(2):
+        response = client.post(
+            "/api/imports",
+            headers=ada.headers,
+            files={"upload": ("Exported Items.zip", upload)},
+        )
+        assert response.status_code == 201
+        run_queued(db, blobs, job_app)
+        assert isinstance(job_app.connector, InMemoryConnector)
+        job_app.connector.jobs.clear()
+    reports = [i["report"] for i in ada.get("/api/imports").json()]
+    assert [r["notes"] for r in reports] == [0, 2]  # newest first
+    # The uploaded zip is gone once imported.
+    sha = hashlib.sha256(upload).digest()
+    assert not blobs.exists(sha)

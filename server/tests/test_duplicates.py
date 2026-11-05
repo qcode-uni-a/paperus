@@ -1,12 +1,13 @@
 """Likely duplicates across the library, and papers without details."""
 
+import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from paperus.models import File, MetadataSource, TextStatus, Version
+from paperus.models import File, Item, MetadataSource, TextStatus, Version
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 3000 + b"\n%%EOF\n"
@@ -135,3 +136,41 @@ def test_unsorted(client: TestClient, db: Session) -> None:
     db.commit()
     unsorted = ada.get("/api/items", params={"unsorted": True}).json()
     assert [i["title"] for i in unsorted] == ["scan_2024_03.pdf"]
+
+
+def test_merging_keeps_notes_and_stars(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    keep = paper(ada, "Clouds over Augsburg")
+    away = paper(ada, "Clouds over Augsburg!")
+    note = ada.note("Reading notes", items=[away])
+    both = ada.note("Comparison", items=[away, keep])
+    ada.put(f"/api/items/{away}/favourite")
+    preview = ada.get(f"/api/items/{away}/merge-preview", params={"into": keep}).json()
+    notes = {s["name"]: s["action"] for s in preview["steps"] if s["kind"] == "note"}
+    assert notes == {"Comparison": "already", "Reading notes": "move"}
+    assert ada.post(f"/api/items/{away}/merge", json={"into": keep}).status_code == 200
+    assert {n["id"] for n in ada.get(f"/api/notes?item={keep}").json()} == {
+        note["id"],
+        both["id"],
+    }
+    assert ada.get(f"/api/items/{keep}").json()["favourite"] is True
+    assert bob.get("/api/notes").json() == []
+
+
+def test_readers_cannot_dismiss_for_the_group(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    a = paper(ada, "Weather radar gaps", chair["library_id"])
+    b = paper(ada, "Weather radar gaps.", chair["library_id"])
+    response = bob.post("/api/duplicates/different", json={"a": a, "b": b})
+    assert response.status_code == 403
+    assert len(pairs(ada)) == 1
+    # A group that still has notes is not deleted (like one with papers).
+    for item in (a, b):
+        ada.delete(f"/api/items/{item}")
+    db.execute(update(Item).values(library_id=uuid.UUID(ada.libraries()["Me"]["id"])))
+    db.commit()
+    ada.note("Group note", chair["library_id"])
+    assert root.delete(f"/api/groups/{chair['id']}").status_code == 409

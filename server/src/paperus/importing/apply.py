@@ -5,6 +5,7 @@ again: what the export brings (tags, collections, notes, files) goes to the
 existing paper, as far as the person may change it. See docs/ingestion.md.
 """
 
+import dataclasses
 import logging
 import mimetypes
 import uuid
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 from paperus import library, notes, organize
 from paperus.access import Access
 from paperus.identifiers import Scheme
-from paperus.importing import Export, ExportedFile, ExportedPaper
+from paperus.importing import Export, ExportedFile, ExportedNote, ExportedPaper
 from paperus.metadata import version_kind
 from paperus.models import (
     Blob,
@@ -58,14 +59,15 @@ class NoFiles:
 
 class _ByName:
     """Finds a file by its path in the export, else by its name alone (paths
-    from the exporting computer, e.g. ``C:/Users/…/paper.pdf``)."""
+    from the exporting computer, e.g. ``C:/Users/…/paper.pdf``): among the
+    files of that name, the one whose path ends like the wanted one, or the
+    only one."""
 
     def __init__(self, names: list[str]) -> None:
         self.exact = {self._key(name): name for name in names}
-        by_name: dict[str, list[str]] = {}
+        self.by_name: dict[str, list[str]] = {}
         for name in names:
-            by_name.setdefault(self._basename(name).lower(), []).append(name)
-        self.unique = {k: v[0] for k, v in by_name.items() if len(v) == 1}
+            self.by_name.setdefault(self._basename(name).lower(), []).append(name)
 
     @staticmethod
     def _key(path: str) -> str:
@@ -73,16 +75,17 @@ class _ByName:
 
     @staticmethod
     def _basename(path: str) -> str:
-        return PureWindowsPath(path).name if "\\" in path else PurePosixPath(path).name
+        return path.replace("\\", "/").rsplit("/", 1)[-1]
 
     def find(self, path: str) -> str | None:
         key = self._key(path)
         if key in self.exact:
             return self.exact[key]
-        for name_key, name in self.exact.items():
-            if key.endswith("/" + name_key):
+        candidates = self.by_name.get(self._basename(path).lower(), [])
+        for name in candidates:
+            if key.endswith("/" + self._key(name)):
                 return name
-        return self.unique.get(self._basename(path.replace("\\", "/")).lower())
+        return candidates[0] if len(candidates) == 1 else None
 
 
 class ZipFiles:
@@ -156,31 +159,67 @@ def apply(
     db.commit()
     total = len(export.papers) + len(export.notes)
     for done, paper in enumerate(export.papers, 1):
-        try:
-            _paper(run, paper)
-            db.commit()
-        except Exception as error:
-            db.rollback()
-            log.warning("import of %s failed", paper.source_key, exc_info=True)
-            report.problems.append(
-                f"{paper.source_key or paper.csl.get('title')}: {error}"
-            )
+        name = paper.source_key or str(paper.csl.get("title"))
+        _guarded(run, name, lambda paper=paper: _paper(run, paper))
         for file_id in run.new_files:
             file_added(file_id)
         run.new_files.clear()
         progress(done, total)
     for done, standalone in enumerate(export.notes, len(export.papers) + 1):
-        note = notes.create(db, owner, standalone.text, access.user.id)
-        report.notes += 1
-        for path in standalone.collections:
-            collection = _collection(run, path)
-            if access.may_hold(collection.library_id, note):
-                note.collection_links.append(
-                    CollectionNote(collection_id=collection.id, added_by=access.user.id)
-                )
-        db.commit()
+        name = notes.title_of(standalone.text) or "a note"
+        _guarded(run, name, lambda standalone=standalone: _note(run, standalone))
         progress(done, total)
     return report
+
+
+def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
+    """One paper or note in its own transaction: if it fails, what it did is
+    undone (also in the counts and caches) and the import goes on."""
+    counts = dataclasses.replace(run.report, missing_files=[], problems=[])
+    seen = dict(run.seen)
+    missing = len(run.report.missing_files)
+    try:
+        step()
+        run.db.commit()
+    except Exception as error:
+        run.db.rollback()
+        log.warning("import of %s failed", name, exc_info=True)
+        for counter in ("added", "found", "files", "notes", "collections"):
+            setattr(run.report, counter, getattr(counts, counter))
+        del run.report.missing_files[missing:]
+        run.seen = seen
+        run.collections.clear()  # some may have been made in this transaction
+        run.new_files.clear()
+        run.report.problems.append(f"{name}: {_reason(error)}")
+
+
+def _reason(error: Exception) -> str:
+    """A short message: the database's own words, without the SQL."""
+    cause = getattr(error, "orig", None) or error
+    first = str(cause).strip().splitlines()[0] if str(cause).strip() else ""
+    return (first or type(error).__name__)[:200]
+
+
+def _note(run: _Run, standalone: ExportedNote) -> None:
+    """A note on no paper, unless the owner has the same text already
+    (imported before)."""
+    existing = run.db.scalar(
+        select(Note.id).where(
+            Note.library_id == run.owner,
+            Note.text == standalone.text,
+            Note.deleted_at.is_(None),
+        )
+    )
+    if existing is not None:
+        return
+    note = notes.create(run.db, run.owner, standalone.text, run.access.user.id)
+    run.report.notes += 1
+    for path in standalone.collections:
+        collection = _collection(run, path)
+        if run.access.may_hold(collection.library_id, note):
+            note.collection_links.append(
+                CollectionNote(collection_id=collection.id, added_by=run.access.user.id)
+            )
 
 
 def _collection(run: _Run, path: tuple[str, ...]) -> Collection:

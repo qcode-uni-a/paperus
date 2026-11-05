@@ -96,7 +96,7 @@ def start_import(
     )
     db.add(record)
     db.commit()
-    queue_import(request.app.state.jobs, record.id)
+    queue_import(request.app.state.jobs, record.id, owner)
     return import_out(record)
 
 

@@ -15,22 +15,26 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import delete, literal, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from paperus import library
 from paperus.access import Access
 from paperus.models import (
     CollectionItem,
+    Favourite,
     File,
     FileRole,
     Identifier,
     Item,
     ItemTag,
+    Note,
+    NoteItem,
     Version,
 )
 
-Kind = Literal["version", "file", "tag", "collection"]
+Kind = Literal["version", "file", "tag", "collection", "note"]
 Action = Literal["move", "already", "stays"]
 
 
@@ -104,8 +108,11 @@ def _move_version(version: Version, target: Item) -> None:
     version.item = target
 
 
-def plan_merge(access: Access, source: Item, target: Item) -> list[Step]:
-    """What merging ``source`` into ``target`` does, step by step."""
+def plan_merge(
+    access: Access, source: Item, target: Item, db: Session | None = None
+) -> list[Step]:
+    """What merging ``source`` into ``target`` does, step by step (with
+    ``db``, also the notes the person can see)."""
     if source.id == target.id:
         raise CannotMerge("a paper cannot be merged into itself")
     if target.deleted_at is not None:
@@ -222,16 +229,66 @@ def plan_merge(access: Access, source: Item, target: Item) -> list[Step]:
                     ),
                 )
             )
+    if db is not None:
+        on_target = set(
+            db.scalars(select(NoteItem.note_id).where(NoteItem.item_id == target.id))
+        )
+        for note in db.scalars(
+            select(Note)
+            .join(NoteItem, NoteItem.note_id == Note.id)
+            .where(
+                NoteItem.item_id == source.id,
+                Note.deleted_at.is_(None),
+                Note.library_id.in_(access.readable),
+            )
+            .order_by(Note.title)
+        ):
+            name = note.title or "Untitled note"
+            steps.append(
+                Step("note", name, "already" if note.id in on_target else "move")
+            )
     return steps
+
+
+def _move_notes_and_stars(db: Session, source: Item, target: Item) -> None:
+    """Notes about the paper are about the one that stays (everyone's,
+    whoever can see them), and everyone's star moves along."""
+    db.flush()
+    db.execute(
+        update(NoteItem)
+        .where(
+            NoteItem.item_id == source.id,
+            NoteItem.note_id.not_in(
+                select(NoteItem.note_id).where(NoteItem.item_id == target.id)
+            ),
+        )
+        .values(item_id=target.id)
+        .execution_options(synchronize_session=False)
+    )
+    db.execute(delete(NoteItem).where(NoteItem.item_id == source.id))
+    db.execute(
+        insert(Favourite)
+        .from_select(
+            ["user_id", "item_id", "created_at"],
+            select(Favourite.user_id, literal(target.id), Favourite.created_at).where(
+                Favourite.item_id == source.id
+            ),
+        )
+        .on_conflict_do_nothing()
+    )
+    db.execute(delete(Favourite).where(Favourite.item_id == source.id))
+    db.expire(source, ["favourites"])
+    db.expire(target, ["favourites"])
 
 
 def merge_items(db: Session, access: Access, source: Item, target: Item) -> list[Step]:
     """Merge ``source`` into ``target`` as planned and put ``source`` in the
     trash; returns the plan carried out."""
-    steps = plan_merge(access, source, target)
+    steps = plan_merge(access, source, target, db)
     for step in steps:
         if step.apply is not None:
             step.apply()
+    _move_notes_and_stars(db, source, target)
     db.flush()
     library.refresh_item(target)
     library.trash(source, access.user.id)

@@ -77,13 +77,24 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
     stamped = {target for obj in changed if (target := _stamped(obj)) is not None}
     if not stamped:
         return
+    # A note filed in a collection or linked to a paper is not "changed" for
+    # lists (it would move up for everyone, e.g. when a reader files a group
+    # note privately); only its own fields count.
+    # Checked before the change number is set (that would count too).
+    own_change = {
+        id(target)
+        for target in stamped
+        if target in db.new or db.is_modified(target, include_collections=False)
+    }
     with db.no_autoflush:
         if _INFO_KEY not in db.info:
             db.info[_INFO_KEY] = _next_change(db)
         now = datetime.now(UTC)
         for target in stamped:
             target.change = db.info[_INFO_KEY]
-            if isinstance(target, Item | Note):
+            if isinstance(target, Item) or (
+                isinstance(target, Note) and id(target) in own_change
+            ):
                 target.changed_at = now
 
 
