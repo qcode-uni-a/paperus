@@ -41,8 +41,8 @@ papers to other groups or back to their people from there.
 
 ### Known limitations
 
-- Two people adding the same paper independently get two items (merge them
-  by hand since the next version).
+- Two people adding the same paper independently get two items; merging
+  duplicates comes later.
 - A group's collection cannot yet appear inside a private collection.
 - No MCP server for AI assistants, no BibTeX export, no backups command yet.
 - The Python packages and the TypeScript client are not published yet.
