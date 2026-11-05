@@ -2,6 +2,8 @@ name: Release
 
 # For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
 # packages (PyPI) and the TypeScript client (npm), then the GitHub release.
+# PyPI and npm only run once switched on with the repository variables
+# PUBLISH_PYPI and PUBLISH_NPM (see docs/operations.md, "Releases").
 on:
   push:
     tags: ["v*"]
@@ -74,6 +76,7 @@ jobs:
   pypi:
     name: PyPI (paperus, paperus-ml)
     needs: [ci, versions]
+    if: vars.PUBLISH_PYPI == 'true'
     runs-on: ubuntu-latest
     # Trusted publishing: pypi.org knows this repository, workflow and
     # environment; no password is stored here.
@@ -93,6 +96,7 @@ jobs:
   npm:
     name: npm (paperus)
     needs: [ci, versions]
+    if: vars.PUBLISH_NPM == 'true'
     runs-on: ubuntu-latest
     environment: npm
     permissions:

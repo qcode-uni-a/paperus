@@ -94,6 +94,27 @@ server {
 Tested with Caddy in front of the container images: HTTPS, login with the
 Secure session cookie, uploads, downloads with range requests.
 
+## Releases
+
+Pushing a tag `vX.Y.Z` (matching the versions in `server/pyproject.toml`,
+`ml/pyproject.toml`, `web/package.json` and `client/package.json`) runs
+`.github/workflows/release.yml`: the tests, then the container images on
+ghcr.io (tags `vX.Y.Z`, `X.Y.Z` and `release`), then a GitHub release with
+the notes from `CHANGELOG.md`.
+
+The packages are published only once their setup is done and switched on
+with repository variables (Settings → Secrets and variables → Actions →
+Variables):
+
+- PyPI (`paperus`, `paperus-ml`): a trusted publisher on pypi.org for each
+  (owner `qcode-uni-a`, repository `paperus`, workflow `release.yml`,
+  environment `pypi`), then `PUBLISH_PYPI` = `true`.
+- npm (`paperus`): a secret `NPM_TOKEN` for the first release (trusted
+  publishing on npmjs.com afterwards), then `PUBLISH_NPM` = `true`.
+
+After the first release, make the two packages on ghcr.io public (package
+settings), so `docker compose pull` works without logging in.
+
 ## Data protection and licences
 
 - Involve the data protection officer early: accounts, notes, usage logs are
