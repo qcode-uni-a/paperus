@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { changeCollection, deleteCollection, errorMessage } from '#lib/api/client.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
-	import MenuButton from '#lib/MenuButton.svelte';
+	import IconButton from '#lib/IconButton.svelte';
 	import { childrenOf, loadOrganize, organize, type Collection } from '#lib/organize.svelte.ts';
 
 	let createDialog = $state<CollectionDialog>();
@@ -159,13 +159,12 @@
 				<span class="counts">{counts(collection)}</span>
 				{#if collection.description}<span class="description">{collection.description}</span>{/if}
 			</div>
-			<MenuButton label="Actions for {collection.name}">
-				<button role="menuitem" onclick={() => edit(collection)}>Edit</button>
-				{#if collection.parent_id}
-					<button role="menuitem" onclick={() => move(collection.id, null)}>Move to the top</button>
-				{/if}
-				<button role="menuitem" class="danger" onclick={() => remove(collection)}>Delete</button>
-			</MenuButton>
+			<IconButton icon="edit" label="Edit {collection.name}" onclick={() => edit(collection)} />
+			<IconButton
+				icon="delete"
+				label="Delete {collection.name}"
+				onclick={() => remove(collection)}
+			/>
 		</div>
 		{#if children.length}
 			<ul>
@@ -192,6 +191,9 @@
 	}
 	h1 {
 		margin: 0 0 4px;
+	}
+	.head button {
+		white-space: nowrap;
 	}
 	.head p {
 		margin: 0;
@@ -260,7 +262,7 @@
 	.card {
 		display: flex;
 		align-items: flex-start;
-		gap: 6px;
+		gap: 2px;
 		max-width: 560px;
 		padding: 8px 8px 8px 4px;
 		border: 1px solid var(--rule);

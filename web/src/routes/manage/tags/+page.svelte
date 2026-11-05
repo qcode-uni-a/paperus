@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { deleteTag, errorMessage } from '#lib/api/client.ts';
-	import MenuButton from '#lib/MenuButton.svelte';
+	import IconButton from '#lib/IconButton.svelte';
 	import { loadOrganize, organize, type Tag } from '#lib/organize.svelte.ts';
 	import TagDialog from '#lib/TagDialog.svelte';
 	import { ago } from '#lib/format.ts';
@@ -181,10 +181,10 @@
 						>
 					</td>
 					<td class="actions">
-						<MenuButton label="Actions for {tag.name}">
-							<button role="menuitem" onclick={() => dialog?.open(tag)}>Edit</button>
-							<button role="menuitem" class="danger" onclick={() => remove([tag])}>Delete</button>
-						</MenuButton>
+						<div class="row-actions">
+							<IconButton icon="edit" label="Edit {tag.name}" onclick={() => dialog?.open(tag)} />
+							<IconButton icon="delete" label="Delete {tag.name}" onclick={() => remove([tag])} />
+						</div>
 					</td>
 				</tr>
 			{:else}
@@ -219,6 +219,9 @@
 	}
 	h1 {
 		margin: 0 0 4px;
+	}
+	.head button {
+		white-space: nowrap;
 	}
 	.head p {
 		margin: 0;
@@ -279,9 +282,12 @@
 		margin-left: auto;
 	}
 	.actions {
-		width: 44px;
+		width: 76px;
 		padding: 2px 0;
-		text-align: right;
+	}
+	.row-actions {
+		display: flex;
+		justify-content: flex-end;
 	}
 	.sort {
 		display: inline-flex;
