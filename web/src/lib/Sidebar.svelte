@@ -16,7 +16,6 @@
 		mdiHistory,
 		mdiNoteTextOutline,
 		mdiServer,
-		mdiShieldAccountOutline,
 		mdiStarOutline,
 		mdiTagMultipleOutline,
 		mdiTrashCanOutline
@@ -120,9 +119,6 @@
 			{#each MANAGE as [path, label, icon] (path)}
 				<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
 			{/each}
-			{#if session.user?.is_admin}
-				<a href={adminPath}><Icon path={mdiShieldAccountOutline} /><span>Administration</span></a>
-			{/if}
 			{#if session.user}<StorageMeter />{/if}
 		</div>
 	{/if}

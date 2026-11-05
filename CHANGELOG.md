@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- The menu's Manage part sits at the bottom of the window.
+- The menu's Manage part sits at the bottom of the window; Administration
+  is only in the profile menu, whose entries now have icons.
 
 ## 0.0.8 (2026-11-05)
 

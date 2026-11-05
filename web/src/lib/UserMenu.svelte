@@ -2,7 +2,9 @@
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { mdiCogOutline, mdiLogout, mdiShieldAccountOutline } from '@mdi/js';
 	import Avatar from '#lib/Avatar.svelte';
+	import Icon from '#lib/Icon.svelte';
 	import { logout, session } from '#lib/session.svelte.ts';
 
 	let menu = $state<HTMLElement>();
@@ -31,13 +33,15 @@
 			<span>{session.user?.is_admin ? 'Administrator' : 'Member'}</span>
 		</div>
 	</div>
-	<a role="menuitem" href={resolve('/settings')} onclick={() => menu?.hidePopover()}>Settings</a>
+	<a role="menuitem" href={resolve('/settings')} onclick={() => menu?.hidePopover()}
+		><Icon path={mdiCogOutline} size={20} />Settings</a
+	>
 	{#if session.user?.is_admin}
-		<a role="menuitem" href={resolve('/admin')} onclick={() => menu?.hidePopover()}>
-			Administration
-		</a>
+		<a role="menuitem" href={resolve('/admin')} onclick={() => menu?.hidePopover()}
+			><Icon path={mdiShieldAccountOutline} size={20} />Administration</a
+		>
 	{/if}
-	<button role="menuitem" onclick={signOut}>Log out</button>
+	<button role="menuitem" onclick={signOut}><Icon path={mdiLogout} size={20} />Log out</button>
 </div>
 
 <style>
@@ -89,8 +93,11 @@
 	}
 	.menu a,
 	.menu button {
-		display: block;
+		display: flex;
+		align-items: center;
+		gap: 12px;
 		width: 100%;
+		font: inherit;
 		text-align: left;
 		padding: 9px 12px;
 		border: none;
@@ -102,6 +109,10 @@
 	.menu a:hover,
 	.menu button:hover:not(:disabled) {
 		background: var(--rail);
+	}
+	.menu a :global(svg),
+	.menu button :global(svg) {
+		color: var(--muted);
 	}
 	@media (max-width: 720px) {
 		.user {
