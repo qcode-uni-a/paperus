@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
-	import { organize } from '#lib/organize.svelte.ts';
+	import { libraryName, organize } from '#lib/organize.svelte.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import SearchFilters, { type Filters } from '#lib/SearchFilters.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -20,10 +20,12 @@
 		(page.url.searchParams.get('mode') ?? 'hybrid') as 'hybrid' | 'keyword' | 'meaning'
 	);
 	const types = $derived(page.url.searchParams.getAll('type'));
+	const libraryFilter = $derived(page.url.searchParams.get('library'));
 	const filters = $derived<Filters>({
 		words: mode !== 'meaning',
 		meaning: mode !== 'keyword',
-		types
+		types,
+		library: libraryFilter
 	});
 
 	/** The library address for a search with filters. */
@@ -33,6 +35,7 @@
 		if (!next.meaning) params.set('mode', 'keyword');
 		else if (!next.words) params.set('mode', 'meaning');
 		for (const type of next.types) params.append('type', type);
+		if (next.library) params.set('library', next.library);
 		const search = params.toString();
 		return search ? `${resolve('/')}?${search}` : resolve('/');
 	}
@@ -88,7 +91,8 @@
 				limit: PAGE,
 				before,
 				collection: collectionId ?? undefined,
-				tag: tagIds.length ? tagIds : undefined
+				tag: tagIds.length ? tagIds : undefined,
+				library: libraryFilter ?? undefined
 			}
 		});
 		if (request !== latest) return;
@@ -115,6 +119,7 @@
 	$effect(() => {
 		void collectionId;
 		void tagIds.join();
+		void libraryFilter;
 		untrack(() => loadItems());
 	});
 
@@ -145,7 +150,11 @@
 	// Results for the searched words.
 	$effect(() => {
 		const q = searched;
-		const options = { mode, type: types.length ? types : undefined };
+		const options = {
+			mode,
+			type: types.length ? types : undefined,
+			library: libraryFilter ?? undefined
+		};
 		if (!q) {
 			passages = null;
 			return;
@@ -257,7 +266,8 @@
 		{@render filterHead()}
 		<h1 class="count">
 			{(total ?? items.length).toLocaleString()}
-			{(total ?? items.length) === 1 ? 'item' : 'items'}
+			{(total ?? items.length) === 1 ? 'item' : 'items'}{#if libraryFilter}
+				in {libraryName(libraryFilter)}{/if}
 		</h1>
 		<ul class="items">
 			{#each items as item (item.id)}<ItemRow {item} />{/each}

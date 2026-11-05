@@ -2,7 +2,19 @@
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { setDefaultLibrary } from '#lib/api/client.ts';
+	import {
+		defaultLibrary,
+		libraryName,
+		loadOrganize,
+		writableLibraries
+	} from '#lib/organize.svelte.ts';
 	import { logout, session } from '#lib/session.svelte.ts';
+
+	async function chooseDefault(id: string) {
+		await setDefaultLibrary({ body: { library_id: id } });
+		await loadOrganize();
+	}
 
 	let menu = $state<HTMLElement>();
 
@@ -31,6 +43,19 @@
 			<span>{session.user?.is_admin ? 'Administrator' : 'Member'}</span>
 		</div>
 	</div>
+	{#if writableLibraries().length > 1}
+		<label class="default">
+			New items go to
+			<select
+				value={defaultLibrary()?.id}
+				onchange={(event) => chooseDefault(event.currentTarget.value)}
+			>
+				{#each writableLibraries() as library (library.id)}
+					<option value={library.id}>{libraryName(library.id)}</option>
+				{/each}
+			</select>
+		</label>
+	{/if}
 	{#if session.user?.is_admin}
 		<a role="menuitem" href={resolve('/admin')} onclick={() => menu?.hidePopover()}>
 			Administration
@@ -95,6 +120,18 @@
 		padding: 10px 12px 12px;
 		margin-bottom: 4px;
 		border-bottom: 1px solid var(--rule);
+	}
+	.default {
+		display: grid;
+		gap: 4px;
+		padding: 6px 12px 10px;
+		margin-bottom: 4px;
+		border-bottom: 1px solid var(--rule);
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
+	.default select {
+		font-size: var(--step-0);
 	}
 	.who div {
 		display: grid;

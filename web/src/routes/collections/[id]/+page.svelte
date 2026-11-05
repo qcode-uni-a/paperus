@@ -7,7 +7,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
-	import { childrenOf, loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import { childrenOf, libraryById, loadOrganize, organize } from '#lib/organize.svelte.ts';
 
 	const id = $derived(page.params.id ?? '');
 	let loaded = $state(false);
@@ -21,6 +21,7 @@
 
 	const collection = $derived(organize.collections.find((c) => c.id === id));
 	const inside = $derived(childrenOf(id));
+	const writable = $derived(libraryById(collection?.library_id)?.writable ?? false);
 	/** From the top level down to this collection. */
 	const trail = $derived.by(() => {
 		const path = [];
@@ -60,24 +61,30 @@
 			{/each}
 		</nav>
 		<div class="tools">
-			<CollectionAdd collection={collection.id} onadded={() => list?.refresh()} />
-			<MenuButton label="Collection actions">
-				{#if inside.length}
-					<button
-						role="menuitemcheckbox"
-						aria-checked={includeInside}
-						onclick={() => (includeInside = !includeInside)}
-					>
-						<svg viewBox="0 0 24 24" aria-hidden="true">
-							{#if includeInside}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
-						</svg>
-						Include items of the collections inside
-					</button>
-					<hr />
-				{/if}
-				<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
-				<button role="menuitem" class="danger" onclick={remove}>Delete</button>
-			</MenuButton>
+			{#if writable}
+				<CollectionAdd collection={collection.id} onadded={() => list?.refresh()} />
+			{/if}
+			{#if writable || inside.length}
+				<MenuButton label="Collection actions">
+					{#if inside.length}
+						<button
+							role="menuitemcheckbox"
+							aria-checked={includeInside}
+							onclick={() => (includeInside = !includeInside)}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								{#if includeInside}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
+							</svg>
+							Include items of the collections inside
+						</button>
+						{#if writable}<hr />{/if}
+					{/if}
+					{#if writable}
+						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+						<button role="menuitem" class="danger" onclick={remove}>Delete</button>
+					{/if}
+				</MenuButton>
+			{/if}
 		</div>
 	</div>
 

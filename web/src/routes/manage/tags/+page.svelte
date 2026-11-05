@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { deleteTag, errorMessage } from '#lib/api/client.ts';
 	import IconButton from '#lib/IconButton.svelte';
-	import { loadOrganize, organize, type Tag } from '#lib/organize.svelte.ts';
+	import {
+		libraryById,
+		libraryName,
+		loadOrganize,
+		organize,
+		severalLibraries,
+		type Tag
+	} from '#lib/organize.svelte.ts';
 	import TagDialog from '#lib/TagDialog.svelte';
 	import { ago } from '#lib/format.ts';
 
@@ -19,13 +26,17 @@
 		loadOrganize().then(() => (loaded = true));
 	});
 
+	let libraryFilter = $state('');
+	const writable = (tag: Tag) => libraryById(tag.library_id)?.writable ?? false;
+
 	const shown = $derived.by(() => {
 		const words = filter.trim().toLowerCase();
 		const matching = organize.tags.filter(
 			(tag) =>
-				!words ||
-				tag.name.toLowerCase().includes(words) ||
-				(tag.description ?? '').toLowerCase().includes(words)
+				(!libraryFilter || tag.library_id === libraryFilter) &&
+				(!words ||
+					tag.name.toLowerCase().includes(words) ||
+					(tag.description ?? '').toLowerCase().includes(words))
 		);
 		const key = (tag: Tag): string | number =>
 			sort === 'name' ? tag.name.toLowerCase() : sort === 'count' ? tag.count : (tag[sort] ?? '');
@@ -39,7 +50,7 @@
 	const used = $derived(organize.tags.reduce((sum, tag) => sum + tag.count, 0));
 	const unused = $derived(organize.tags.filter((tag) => tag.count === 0).length);
 	const allShownSelected = $derived(
-		shown.length > 0 && shown.every((tag) => selected.includes(tag.id))
+		shown.some(writable) && shown.filter(writable).every((tag) => selected.includes(tag.id))
 	);
 
 	function sortBy(column: Sort) {
@@ -56,7 +67,7 @@
 	}
 
 	function toggleAll() {
-		const ids = shown.map((tag) => tag.id);
+		const ids = shown.filter(writable).map((tag) => tag.id);
 		selected = allShownSelected
 			? selected.filter((id) => !ids.includes(id))
 			: [...new Set([...selected, ...ids])];
@@ -116,6 +127,14 @@
 			placeholder="Filter by name or description"
 			aria-label="Filter tags"
 		/>
+		{#if severalLibraries()}
+			<select bind:value={libraryFilter} aria-label="Library">
+				<option value="">All libraries</option>
+				{#each organize.libraries as library (library.id)}
+					<option value={library.id}>{libraryName(library.id)}</option>
+				{/each}
+			</select>
+		{/if}
 		{#if selected.length}
 			<div class="bulk">
 				<span>{selected.length} selected</span>
@@ -157,14 +176,21 @@
 							type="checkbox"
 							checked={selected.includes(tag.id)}
 							onchange={() => toggle(tag.id)}
+							disabled={!writable(tag)}
 							aria-label="Select {tag.name}"
 						/>
 					</td>
 					<td class="name">
-						<button class="chip" data-tag-color={tag.color} onclick={() => dialog?.open(tag)}>
+						<button
+							class="chip"
+							data-tag-color={tag.color}
+							disabled={!writable(tag)}
+							onclick={() => dialog?.open(tag)}
+						>
 							{tag.name}
 						</button>
 						{#if tag.description}<p>{tag.description}</p>{/if}
+						{#if severalLibraries()}<p class="library">{libraryName(tag.library_id)}</p>{/if}
 					</td>
 					<td class="number">{tag.count}</td>
 					<td class="wide muted">{sources(tag)}</td>
@@ -181,10 +207,12 @@
 						>
 					</td>
 					<td class="actions">
-						<div class="row-actions">
-							<IconButton icon="edit" label="Edit {tag.name}" onclick={() => dialog?.open(tag)} />
-							<IconButton icon="delete" label="Delete {tag.name}" onclick={() => remove([tag])} />
-						</div>
+						{#if writable(tag)}
+							<div class="row-actions">
+								<IconButton icon="edit" label="Edit {tag.name}" onclick={() => dialog?.open(tag)} />
+								<IconButton icon="delete" label="Delete {tag.name}" onclick={() => remove([tag])} />
+							</div>
+						{/if}
 					</td>
 				</tr>
 			{:else}
@@ -320,6 +348,13 @@
 		color: var(--tag-ink, var(--ink));
 		font-size: 0.95em;
 		text-align: left;
+	}
+	.chip:disabled {
+		cursor: default;
+		opacity: 1;
+	}
+	.name p.library {
+		color: var(--faint);
 	}
 	.chip:hover:not(:disabled) {
 		background: var(--tag-bg, var(--rail));

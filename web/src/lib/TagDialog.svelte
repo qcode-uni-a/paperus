@@ -2,6 +2,7 @@
 	import { changeTag, createTag, errorMessage } from '#lib/api/client.ts';
 	import type { TagColor, TagOut } from '#lib/api/generated/types.gen.ts';
 	import { TAG_COLORS } from '#lib/tags.ts';
+	import { defaultLibrary, libraryName, writableLibraries } from '#lib/organize.svelte.ts';
 
 	/** Create a tag, or edit one: name, colour and description. */
 	let { onsaved }: { onsaved?: () => void } = $props();
@@ -11,6 +12,7 @@
 	let name = $state('');
 	let color = $state<TagColor | null>(null);
 	let description = $state('');
+	let library = $state('');
 	let error = $state('');
 	let saving = $state(false);
 
@@ -19,6 +21,7 @@
 		name = editing?.name ?? '';
 		color = editing?.color ?? null;
 		description = editing?.description ?? '';
+		library = defaultLibrary()?.id ?? '';
 		error = '';
 		dialog?.showModal();
 	}
@@ -29,7 +32,7 @@
 		const body = { name, color, description: description.trim() || null };
 		const result = tag
 			? await changeTag({ path: { tag_id: tag.id }, body })
-			: await createTag({ body });
+			: await createTag({ body: { ...body, library_id: library || undefined } });
 		saving = false;
 		if (!result.data) {
 			error = errorMessage(result.error);
@@ -44,6 +47,16 @@
 	<form onsubmit={save}>
 		<h2 id="tag-dialog-title">{tag ? 'Edit tag' : 'New tag'}</h2>
 		<label>Name <input bind:value={name} required maxlength="100" /></label>
+		{#if !tag && writableLibraries().length > 1}
+			<label
+				>Library
+				<select bind:value={library}>
+					{#each writableLibraries() as option (option.id)}
+						<option value={option.id}>{libraryName(option.id)}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 		<fieldset>
 			<legend>Colour</legend>
 			<div class="swatches">
@@ -103,6 +116,7 @@
 		font-weight: 600;
 	}
 	form > label :global(input),
+	form > label :global(select),
 	form > label :global(textarea) {
 		font-weight: 400;
 	}

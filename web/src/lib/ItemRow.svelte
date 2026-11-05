@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
 	import { shortAuthors, typeName } from '#lib/format.ts';
+	import { libraryName, severalLibraries } from '#lib/organize.svelte.ts';
 
 	let { item }: { item: Item } = $props();
 
@@ -19,6 +20,9 @@
 				>{/if}</span
 		>
 		<span class="badge">{typeName(item.type)}</span>
+		{#if severalLibraries()}<span class="library" title="Library"
+				>{libraryName(item.library_id)}</span
+			>{/if}
 		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
@@ -32,6 +36,21 @@
 		border-bottom: 1px solid var(--rule);
 		display: grid;
 		gap: 4px;
+	}
+	.library {
+		font-size: var(--step--1);
+		color: var(--muted);
+	}
+	.library::before {
+		content: '';
+		display: inline-block;
+		width: 0.7em;
+		height: 0.55em;
+		margin-right: 5px;
+		border: 1.5px solid currentColor;
+		border-top-width: 3px;
+		border-radius: 2px;
+		vertical-align: 0.02em;
 	}
 	.title {
 		font-family: var(--serif);

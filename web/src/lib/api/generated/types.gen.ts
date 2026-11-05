@@ -12,6 +12,10 @@ export type BodyUploadNewItem = {
      * Upload
      */
     upload: Blob | File;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
 };
 
 /**
@@ -72,6 +76,10 @@ export type CollectionIn = {
      * Parent Id
      */
     parent_id?: string | null;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
 };
 
 /**
@@ -82,6 +90,10 @@ export type CollectionOut = {
      * Id
      */
     id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
     /**
      * Name
      */
@@ -106,6 +118,16 @@ export type CollectionOut = {
      * Recent
      */
     recent?: Array<ItemPreview>;
+};
+
+/**
+ * DefaultLibrary
+ */
+export type DefaultLibrary = {
+    /**
+     * Library Id
+     */
+    library_id: string;
 };
 
 /**
@@ -162,6 +184,85 @@ export type FileRole = 'main' | 'supplementary' | 'slides' | 'transcript' | 'rec
 export type FileSource = 'upload' | 'open_access' | 'browser';
 
 /**
+ * GroupChange
+ */
+export type GroupChange = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
+};
+
+/**
+ * GroupIn
+ */
+export type GroupIn = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id?: string | null;
+    /**
+     * Admin Id
+     */
+    admin_id?: string | null;
+};
+
+/**
+ * GroupOut
+ */
+export type GroupOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description: string | null;
+    /**
+     * Parent Id
+     */
+    parent_id: string | null;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    role: Role | null;
+    /**
+     * Can Manage
+     */
+    can_manage: boolean;
+    /**
+     * Members
+     */
+    members: number;
+    /**
+     * Items
+     */
+    items: number | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -201,6 +302,10 @@ export type ItemDetail = {
      * Id
      */
     id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
     /**
      * Type
      */
@@ -282,6 +387,35 @@ export type ItemIds = {
 };
 
 /**
+ * ItemIn
+ */
+export type ItemIn = {
+    /**
+     * Doi
+     */
+    doi?: string | null;
+    /**
+     * Metadata
+     */
+    metadata?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Identifiers
+     */
+    identifiers?: Array<IdentifierIn>;
+    kind?: VersionKind | null;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
  * ItemOut
  */
 export type ItemOut = {
@@ -289,6 +423,10 @@ export type ItemOut = {
      * Id
      */
     id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
     /**
      * Type
      */
@@ -381,6 +519,41 @@ export type KnownFile = {
 };
 
 /**
+ * LibraryOut
+ */
+export type LibraryOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind: 'personal' | 'group';
+    /**
+     * Group Id
+     */
+    group_id: string | null;
+    /**
+     * Path
+     */
+    path: Array<string>;
+    role: Role | null;
+    /**
+     * Writable
+     */
+    writable: boolean;
+    /**
+     * Default
+     */
+    default: boolean;
+};
+
+/**
  * LoginRequest
  */
 export type LoginRequest = {
@@ -468,6 +641,33 @@ export type MlStatus = {
 };
 
 /**
+ * MemberIn
+ */
+export type MemberIn = {
+    role: Role;
+};
+
+/**
+ * MemberOut
+ */
+export type MemberOut = {
+    /**
+     * User Id
+     */
+    user_id: string;
+    /**
+     * Username
+     */
+    username: string;
+    role: Role;
+    direct_role: Role | null;
+    /**
+     * Inherited From
+     */
+    inherited_from: string | null;
+};
+
+/**
  * MetadataSource
  */
 export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
@@ -536,6 +736,13 @@ export type Passage = {
      */
     in_references: boolean;
 };
+
+/**
+ * Role
+ *
+ * What a member may do in a group (and every group inside it).
+ */
+export type Role = 'reader' | 'member' | 'admin';
 
 /**
  * Scheme
@@ -622,6 +829,10 @@ export type TagIn = {
      * Name
      */
     name: string;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
 };
 
 /**
@@ -637,6 +848,10 @@ export type TagNew = {
      * Description
      */
     description?: string | null;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
 };
 
 /**
@@ -647,6 +862,10 @@ export type TagOut = {
      * Id
      */
     id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
     /**
      * Name
      */
@@ -687,6 +906,20 @@ export type TagSource = 'manual' | 'automatic' | 'ai';
  * TextStatus
  */
 export type TextStatus = 'pending' | 'done' | 'no_text' | 'unsupported' | 'failed';
+
+/**
+ * UserBrief
+ */
+export type UserBrief = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Username
+     */
+    username: string;
+};
 
 /**
  * UserOut
@@ -941,6 +1174,10 @@ export type ListItemsData = {
          * Title
          */
         title?: string | null;
+        /**
+         * Library
+         */
+        library?: string | null;
     };
     url: '/api/items';
 };
@@ -966,7 +1203,7 @@ export type ListItemsResponses = {
 export type ListItemsResponse = ListItemsResponses[keyof ListItemsResponses];
 
 export type AddItemData = {
-    body: VersionIn;
+    body: ItemIn;
     path?: never;
     query?: never;
     url: '/api/items';
@@ -1189,7 +1426,12 @@ export type FindUploadData = {
          */
         sha256: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Library
+         */
+        library?: string | null;
+    };
     url: '/api/uploads/{sha256}';
 };
 
@@ -1404,6 +1646,10 @@ export type SearchData = {
          * Type
          */
         type?: Array<string> | null;
+        /**
+         * Library
+         */
+        library?: string | null;
     };
     url: '/api/search';
 };
@@ -1902,3 +2148,285 @@ export type RemoveItemResponses = {
 };
 
 export type RemoveItemResponse = RemoveItemResponses[keyof RemoveItemResponses];
+
+export type ListLibrariesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/libraries';
+};
+
+export type ListLibrariesResponses = {
+    /**
+     * Response List Libraries
+     *
+     * Successful Response
+     */
+    200: Array<LibraryOut>;
+};
+
+export type ListLibrariesResponse = ListLibrariesResponses[keyof ListLibrariesResponses];
+
+export type SetDefaultLibraryData = {
+    body: DefaultLibrary;
+    path?: never;
+    query?: never;
+    url: '/api/me/default-library';
+};
+
+export type SetDefaultLibraryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetDefaultLibraryError = SetDefaultLibraryErrors[keyof SetDefaultLibraryErrors];
+
+export type SetDefaultLibraryResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetDefaultLibraryResponse = SetDefaultLibraryResponses[keyof SetDefaultLibraryResponses];
+
+export type ListGroupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/groups';
+};
+
+export type ListGroupsResponses = {
+    /**
+     * Response List Groups
+     *
+     * Successful Response
+     */
+    200: Array<GroupOut>;
+};
+
+export type ListGroupsResponse = ListGroupsResponses[keyof ListGroupsResponses];
+
+export type CreateGroupData = {
+    body: GroupIn;
+    path?: never;
+    query?: never;
+    url: '/api/groups';
+};
+
+export type CreateGroupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CreateGroupError = CreateGroupErrors[keyof CreateGroupErrors];
+
+export type CreateGroupResponses = {
+    /**
+     * Successful Response
+     */
+    201: GroupOut;
+};
+
+export type CreateGroupResponse = CreateGroupResponses[keyof CreateGroupResponses];
+
+export type DeleteGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}';
+};
+
+export type DeleteGroupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteGroupError = DeleteGroupErrors[keyof DeleteGroupErrors];
+
+export type DeleteGroupResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteGroupResponse = DeleteGroupResponses[keyof DeleteGroupResponses];
+
+export type ChangeGroupData = {
+    body: GroupChange;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}';
+};
+
+export type ChangeGroupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangeGroupError = ChangeGroupErrors[keyof ChangeGroupErrors];
+
+export type ChangeGroupResponses = {
+    /**
+     * Successful Response
+     */
+    200: GroupOut;
+};
+
+export type ChangeGroupResponse = ChangeGroupResponses[keyof ChangeGroupResponses];
+
+export type ListMembersData = {
+    body?: never;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}/members';
+};
+
+export type ListMembersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListMembersError = ListMembersErrors[keyof ListMembersErrors];
+
+export type ListMembersResponses = {
+    /**
+     * Response List Members
+     *
+     * Successful Response
+     */
+    200: Array<MemberOut>;
+};
+
+export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
+
+export type RemoveMemberData = {
+    body?: never;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}/members/{user_id}';
+};
+
+export type RemoveMemberErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveMemberError = RemoveMemberErrors[keyof RemoveMemberErrors];
+
+export type RemoveMemberResponses = {
+    /**
+     * Response Remove Member
+     *
+     * Successful Response
+     */
+    200: Array<MemberOut>;
+};
+
+export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
+
+export type SetMemberData = {
+    body: MemberIn;
+    path: {
+        /**
+         * Group Id
+         */
+        group_id: string;
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/groups/{group_id}/members/{user_id}';
+};
+
+export type SetMemberErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetMemberError = SetMemberErrors[keyof SetMemberErrors];
+
+export type SetMemberResponses = {
+    /**
+     * Response Set Member
+     *
+     * Successful Response
+     */
+    200: Array<MemberOut>;
+};
+
+export type SetMemberResponse = SetMemberResponses[keyof SetMemberResponses];
+
+export type FindUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Q
+         */
+        q?: string;
+    };
+    url: '/api/users';
+};
+
+export type FindUsersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FindUsersError = FindUsersErrors[keyof FindUsersErrors];
+
+export type FindUsersResponses = {
+    /**
+     * Response Find Users
+     *
+     * Successful Response
+     */
+    200: Array<UserBrief>;
+};
+
+export type FindUsersResponse = FindUsersResponses[keyof FindUsersResponses];

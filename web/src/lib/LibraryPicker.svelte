@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { addItems, errorMessage, listItems, type Item } from '#lib/api/client.ts';
 	import { shortAuthors } from '#lib/format.ts';
-	import { loadOrganize } from '#lib/organize.svelte.ts';
+	import { libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
 
 	/** Choose papers from the library to put into ``collection``. */
 	let { collection, onadded }: { collection: string; onadded?: () => void } = $props();
@@ -27,7 +27,12 @@
 	async function search() {
 		const request = ++latest;
 		const { data, response } = await listItems({
-			query: { limit: LIMIT, title: words.trim() || undefined }
+			// A group's collection takes only that group's items.
+			query: {
+				limit: LIMIT,
+				title: words.trim() || undefined,
+				library: libraryForCollection(collection)
+			}
 		});
 		if (request !== latest || !data) return;
 		items = data;

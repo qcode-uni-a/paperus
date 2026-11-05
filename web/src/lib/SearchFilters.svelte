@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { TYPE_NAMES } from '#lib/format.ts';
+	import { libraryName, organize, severalLibraries } from '#lib/organize.svelte.ts';
 
 	export interface Filters {
 		words: boolean;
 		meaning: boolean;
 		types: string[];
+		/** One library only; all readable ones if null. */
+		library: string | null;
 	}
 
 	let { filters, onchange }: { filters: Filters; onchange: (next: Filters) => void } = $props();
@@ -17,7 +20,9 @@
 		if (open) return closeOnScroll(() => (open = false));
 	});
 
-	const changed = $derived(!filters.words || !filters.meaning || filters.types.length > 0);
+	const changed = $derived(
+		!filters.words || !filters.meaning || filters.types.length > 0 || filters.library !== null
+	);
 
 	/** At least one way of searching stays on. */
 	function toggleMethod(method: 'words' | 'meaning') {
@@ -34,7 +39,7 @@
 	}
 
 	function reset() {
-		onchange({ words: true, meaning: true, types: [] });
+		onchange({ words: true, meaning: true, types: [], library: null });
 	}
 </script>
 
@@ -92,6 +97,27 @@
 					</button>
 				</div>
 			</fieldset>
+
+			{#if severalLibraries()}
+				<fieldset>
+					<legend>Library</legend>
+					<div class="chips">
+						<button
+							class="chip small"
+							aria-pressed={filters.library === null}
+							onclick={() => onchange({ ...filters, library: null })}>All</button
+						>
+						{#each organize.libraries as library (library.id)}
+							<button
+								class="chip small"
+								aria-pressed={filters.library === library.id}
+								onclick={() => onchange({ ...filters, library: library.id })}
+								>{libraryName(library.id)}</button
+							>
+						{/each}
+					</div>
+				</fieldset>
+			{/if}
 
 			<fieldset>
 				<legend>Type</legend>

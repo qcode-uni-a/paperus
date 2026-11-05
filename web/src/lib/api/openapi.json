@@ -137,14 +137,14 @@
           "items"
         ],
         "summary": "Add Item",
-        "description": "A new item; if one of its identifiers is known, the existing item.",
+        "description": "A new item; if one of its identifiers is known in the library, the\nexisting item.",
         "operationId": "add_item",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/VersionIn"
+                "$ref": "#/components/schemas/ItemIn"
               }
             }
           }
@@ -177,7 +177,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items, newest first; ``before`` = last ``id`` for the next page.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only.\n\n``trashed=true`` lists the trash instead. ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -298,6 +298,23 @@
                 }
               ],
               "title": "Title"
+            }
+          },
+          {
+            "name": "library",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library"
             }
           }
         ],
@@ -626,7 +643,7 @@
           "files"
         ],
         "summary": "Find Upload",
-        "description": "The item that already has a file with this SHA-256 (hex), so a client\ncan skip uploading it again; 404 if there is none.",
+        "description": "The item in the library (the person's default if not given) that\nalready has a file with this SHA-256 (hex), so a client can skip\nuploading it again; 404 if there is none.",
         "operationId": "find_upload",
         "parameters": [
           {
@@ -636,6 +653,23 @@
             "schema": {
               "type": "string",
               "title": "Sha256"
+            }
+          },
+          {
+            "name": "library",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library"
             }
           }
         ],
@@ -669,7 +703,7 @@
           "files"
         ],
         "summary": "Upload New Item",
-        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in the library makes no new item: the answer (200, ``existing``)\nnames the item that has it.",
+        "description": "A new item from a file, titled after the file until its text tells more.\n\nThe background job looks for a DOI or arXiv ID in the file and replaces\nthe placeholder metadata (see ``paperus.identify``). A file that is\nalready in the library makes no new item: the answer (200, ``existing``)\nnames the item that has it. ``library_id``: the person's default library\nif not given.",
         "operationId": "upload_new_item",
         "requestBody": {
           "content": {
@@ -939,7 +973,7 @@
           "search"
         ],
         "summary": "Search",
-        "description": "Passages for ``q``: its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items. The\n``X-Search-Mode`` header says what was used: without the ML service,\nhybrid search falls back to keywords.",
+        "description": "Passages for ``q`` in the libraries the person can read (or one\n``library``): its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items. The\n``X-Search-Mode`` header says what was used: without the ML service,\nhybrid search falls back to keywords.",
         "operationId": "search",
         "parameters": [
           {
@@ -997,6 +1031,23 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "name": "library",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library"
             }
           }
         ],
@@ -1218,7 +1269,7 @@
           "organize"
         ],
         "summary": "List Tags",
-        "description": "All tags with how they are used (items in the trash do not count).",
+        "description": "The tags of the libraries the person can read, with how they are used\n(items in the trash do not count).",
         "operationId": "list_tags",
         "responses": {
           "200": {
@@ -1242,7 +1293,7 @@
           "organize"
         ],
         "summary": "Create Tag",
-        "description": "A tag not on any item yet (409 if one with that name exists).",
+        "description": "A tag not on any item yet (409 if the library has one of that name).",
         "operationId": "create_tag",
         "requestBody": {
           "content": {
@@ -1284,7 +1335,7 @@
           "organize"
         ],
         "summary": "Add Tag",
-        "description": "Tag an item; the tag is created if it does not exist (any case).",
+        "description": "Tag an item; the tag is created if its library has none of that name\n(any case).",
         "operationId": "add_tag",
         "parameters": [
           {
@@ -1399,7 +1450,7 @@
           "organize"
         ],
         "summary": "Change Tag",
-        "description": "Rename a tag everywhere (409 if another tag has that name), or set its\ncolour or description.",
+        "description": "Rename a tag everywhere (409 if another tag of its library has that\nname), or set its colour or description.",
         "operationId": "change_tag",
         "parameters": [
           {
@@ -1488,7 +1539,7 @@
           "organize"
         ],
         "summary": "List Collections",
-        "description": "All collections, flat; ``parent_id`` gives the tree.",
+        "description": "The collections of the libraries the person can read, flat;\n``parent_id`` gives the tree.",
         "operationId": "list_collections",
         "responses": {
           "200": {
@@ -1553,7 +1604,7 @@
           "organize"
         ],
         "summary": "Change Collection",
-        "description": "Rename, describe or move a collection (not into itself).",
+        "description": "Rename, describe or move a collection (within its library, not into\nitself).",
         "operationId": "change_collection",
         "parameters": [
           {
@@ -1642,6 +1693,7 @@
           "organize"
         ],
         "summary": "Add Items",
+        "description": "Add items; those the collection may not hold (a group's collection\nholds only that group's items) or the person cannot read are skipped.",
         "operationId": "add_items",
         "parameters": [
           {
@@ -1741,6 +1793,442 @@
           }
         }
       }
+    },
+    "/api/libraries": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Libraries",
+        "description": "The libraries the person can read: their own first, then their groups'.",
+        "operationId": "list_libraries",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LibraryOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Libraries"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/default-library": {
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Set Default Library",
+        "description": "Where new items go unless another library is chosen.",
+        "operationId": "set_default_library",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultLibrary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Groups",
+        "description": "The groups the person belongs to (directly or through a group above);\nsite administrators see every group. Flat; ``parent_id`` gives the tree.",
+        "operationId": "list_groups",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Groups"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Create Group",
+        "description": "A group with its library. Top-level groups: site administrators only,\nwith a first admin. Subgroups: the parent's admins (who are then admins\nof the subgroup too).",
+        "operationId": "create_group",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{group_id}": {
+      "patch": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Change Group",
+        "operationId": "change_group",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Delete Group",
+        "description": "Delete an empty group: no groups inside and no items (not even in its\ntrash). Its tags, collections and memberships go with it.",
+        "operationId": "delete_group",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{group_id}/members": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "List Members",
+        "description": "Everyone in the group: given a role here or in a group above.",
+        "operationId": "list_members",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberOut"
+                  },
+                  "title": "Response List Members"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groups/{group_id}/members/{user_id}": {
+      "put": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Set Member",
+        "description": "Add someone to the group, or change their role here. A role lower than\none inherited from a group above has no effect (inherited roles win).",
+        "operationId": "set_member",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberOut"
+                  },
+                  "title": "Response Set Member"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Remove Member",
+        "description": "Remove someone's membership here (inherited ones stay).",
+        "operationId": "remove_member",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Group Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberOut"
+                  },
+                  "title": "Response Remove Member"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Find Users",
+        "description": "People to add to a group, by username; for site administrators and\ngroup admins.",
+        "operationId": "find_users",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserBrief"
+                  },
+                  "title": "Response Find Users"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1751,6 +2239,18 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "Upload"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
           }
         },
         "type": "object",
@@ -1868,6 +2368,18 @@
               }
             ],
             "title": "Parent Id"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
           }
         },
         "type": "object",
@@ -1882,6 +2394,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "name": {
             "type": "string",
@@ -1931,12 +2448,27 @@
         "type": "object",
         "required": [
           "id",
+          "library_id",
           "name",
           "description",
           "parent_id",
           "count"
         ],
         "title": "CollectionOut"
+      },
+      "DefaultLibrary": {
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id"
+        ],
+        "title": "DefaultLibrary"
       },
       "FileOut": {
         "properties": {
@@ -2031,6 +2563,175 @@
         "title": "FileSource",
         "description": "Where a file came from; matters for sharing rules."
       },
+      "GroupChange": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "title": "GroupChange"
+      },
+      "GroupIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "admin_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GroupIn"
+      },
+      "GroupOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_manage": {
+            "type": "boolean",
+            "title": "Can Manage"
+          },
+          "members": {
+            "type": "integer",
+            "title": "Members"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parent_id",
+          "library_id",
+          "role",
+          "can_manage",
+          "members",
+          "items",
+          "created_at"
+        ],
+        "title": "GroupOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2084,6 +2785,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "type": {
             "type": "string",
@@ -2202,6 +2908,7 @@
         "type": "object",
         "required": [
           "id",
+          "library_id",
           "type",
           "title",
           "authors",
@@ -2240,12 +2947,86 @@
         ],
         "title": "ItemIds"
       },
+      "ItemIn": {
+        "properties": {
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/IdentifierIn"
+            },
+            "type": "array",
+            "title": "Identifiers"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "title": "ItemIn"
+      },
       "ItemOut": {
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "type": {
             "type": "string",
@@ -2335,6 +3116,7 @@
         "type": "object",
         "required": [
           "id",
+          "library_id",
           "type",
           "title",
           "authors",
@@ -2420,6 +3202,76 @@
           "file"
         ],
         "title": "KnownFile"
+      },
+      "LibraryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "group"
+            ],
+            "title": "Kind"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Path"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "writable": {
+            "type": "boolean",
+            "title": "Writable"
+          },
+          "default": {
+            "type": "boolean",
+            "title": "Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "group_id",
+          "path",
+          "role",
+          "writable",
+          "default"
+        ],
+        "title": "LibraryOut"
       },
       "LoginRequest": {
         "properties": {
@@ -2555,6 +3407,64 @@
         ],
         "title": "MLStatus"
       },
+      "MemberIn": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "MemberIn"
+      },
+      "MemberOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "direct_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Role"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inherited_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inherited From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "role",
+          "direct_role",
+          "inherited_from"
+        ],
+        "title": "MemberOut"
+      },
       "MetadataSource": {
         "type": "string",
         "enum": [
@@ -2668,6 +3578,16 @@
           "in_references"
         ],
         "title": "Passage"
+      },
+      "Role": {
+        "type": "string",
+        "enum": [
+          "reader",
+          "member",
+          "admin"
+        ],
+        "title": "Role",
+        "description": "What a member may do in a group (and every group inside it)."
       },
       "Scheme": {
         "type": "string",
@@ -2816,6 +3736,18 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Name"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
           }
         },
         "type": "object",
@@ -2853,6 +3785,18 @@
               }
             ],
             "title": "Description"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
           }
         },
         "type": "object",
@@ -2867,6 +3811,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
           },
           "name": {
             "type": "string",
@@ -2928,6 +3877,7 @@
         "type": "object",
         "required": [
           "id",
+          "library_id",
           "name",
           "color",
           "description",
@@ -2958,6 +3908,25 @@
           "failed"
         ],
         "title": "TextStatus"
+      },
+      "UserBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username"
+        ],
+        "title": "UserBrief"
       },
       "UserOut": {
         "properties": {

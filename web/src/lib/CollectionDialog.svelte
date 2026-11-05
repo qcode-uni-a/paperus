@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { changeCollection, createCollection, errorMessage } from '#lib/api/client.ts';
-	import { flatTree, loadOrganize, organize, type Collection } from '#lib/organize.svelte.ts';
+	import {
+		defaultLibrary,
+		flatTree,
+		libraryName,
+		loadOrganize,
+		organize,
+		writableLibraries,
+		type Collection
+	} from '#lib/organize.svelte.ts';
 
 	/** Create a collection (optionally inside ``parentId``) or edit ``collection``. */
 	let {
@@ -17,12 +25,14 @@
 	let name = $state('');
 	let description = $state('');
 	let parent = $state('');
+	let library = $state('');
 	let error = $state('');
 	let saving = $state(false);
 
-	/** Not the collection itself or anything inside it. */
+	/** Collections of the same library, but not the collection itself or
+	 * anything inside it (collections nest only within one library). */
 	const parents = $derived.by(() => {
-		if (!collection) return flatTree();
+		if (!collection) return flatTree(library || undefined);
 		const excluded = new Set([collection.id]);
 		let grew = true;
 		while (grew) {
@@ -34,13 +44,16 @@
 				}
 			}
 		}
-		return flatTree().filter(({ collection: c }) => !excluded.has(c.id));
+		return flatTree(collection.library_id).filter(({ collection: c }) => !excluded.has(c.id));
 	});
 
-	export function open() {
+	/** ``inLibrary``: preselect this library for a new collection. */
+	export function open(inLibrary?: string) {
 		name = collection?.name ?? '';
 		description = collection?.description ?? '';
 		parent = collection ? (collection.parent_id ?? '') : (parentId ?? '');
+		const parentLibrary = organize.collections.find((c) => c.id === parentId)?.library_id;
+		library = collection?.library_id ?? parentLibrary ?? inLibrary ?? defaultLibrary()?.id ?? '';
 		error = '';
 		dialog?.showModal();
 	}
@@ -51,7 +64,7 @@
 		const body = { name, description: description.trim() || null, parent_id: parent || null };
 		const result = collection
 			? await changeCollection({ path: { collection_id: collection.id }, body })
-			: await createCollection({ body });
+			: await createCollection({ body: { ...body, library_id: library || null } });
 		saving = false;
 		if (!result.data) {
 			error = errorMessage(result.error);
@@ -71,6 +84,16 @@
 			Description <span class="optional">(optional)</span>
 			<textarea bind:value={description} rows="3"></textarea>
 		</label>
+		{#if !collection && writableLibraries().length > 1}
+			<label>
+				Library
+				<select bind:value={library} onchange={() => (parent = '')}>
+					{#each writableLibraries() as option (option.id)}
+						<option value={option.id}>{libraryName(option.id)}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 		<label>
 			Inside
 			<select bind:value={parent}>

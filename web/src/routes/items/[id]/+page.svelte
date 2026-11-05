@@ -24,6 +24,7 @@
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
+	import { libraryById, libraryName, severalLibraries } from '#lib/organize.svelte.ts';
 	import { fullName } from '#lib/format.ts';
 
 	const id = $derived(page.params.id ?? '');
@@ -71,6 +72,8 @@
 		return texts.find((f) => f.role === 'main') ?? texts[0] ?? null;
 	});
 	const viewed = $derived(pdfFile ?? textFile);
+	// Readers of a group's library see the item but change nothing of it.
+	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
 
 	function isText(mediaType: string, filename: string): boolean {
 		return (
@@ -201,21 +204,23 @@
 		{:else}
 			<div class="title">
 				<h1>{item.title}</h1>
-				{#if !item.deleted_at}
+				{#if !item.deleted_at && (writable || viewed)}
 					<MenuButton label="Item actions">
 						{#if viewed}
 							<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
 								{showDetails ? 'Hide details' : 'Details and files'}
 							</button>
 						{/if}
-						<button
-							role="menuitem"
-							onclick={() => {
-								titleDraft = item?.title ?? '';
-								editing = true;
-							}}>Edit title</button
-						>
-						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
+						{#if writable}
+							<button
+								role="menuitem"
+								onclick={() => {
+									titleDraft = item?.title ?? '';
+									editing = true;
+								}}>Edit title</button
+							>
+							<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
+						{/if}
 					</MenuButton>
 				{/if}
 			</div>
@@ -226,6 +231,9 @@
 				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
 				<em>{item.container_title}</em>{/if}
 		</p>
+		{#if severalLibraries()}
+			<p class="in-library">In {libraryName(item.library_id)}</p>
+		{/if}
 		<ItemOrganize {item} onchange={load} />
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
@@ -251,7 +259,7 @@
 			</div>
 			<div class="row heading">
 				<h2>Versions</h2>
-				{#if !item.deleted_at}
+				{#if !item.deleted_at && writable}
 					<button onclick={() => (addingVersion = !addingVersion)}>
 						{addingVersion ? 'Close' : 'Add version'}
 					</button>
@@ -289,7 +297,7 @@
 						{#if version.label}<span>{version.label}</span>{/if}
 						{#if version.id === item.preferred_version_id}
 							<span class="badge">cited{version.pinned ? ' (pinned)' : ''}</span>
-						{:else if !item.deleted_at}
+						{:else if !item.deleted_at && writable}
 							<button onclick={() => act(() => pinVersion({ path: { version_id: version.id } }))}>
 								Cite this version
 							</button>
@@ -316,7 +324,7 @@
 									<button onclick={() => act(() => restoreFile({ path: { file_id: file.id } }))}
 										>Restore</button
 									>
-								{:else if !item.deleted_at}
+								{:else if !item.deleted_at && writable}
 									<button
 										class="danger"
 										onclick={() => act(() => trashFile({ path: { file_id: file.id } }))}
@@ -330,7 +338,7 @@
 						{/each}
 					</ul>
 
-					{#if !item.deleted_at}
+					{#if !item.deleted_at && writable}
 						<div class="row">
 							<select bind:value={uploadRole} aria-label="Role of the uploaded file">
 								{#each FILE_ROLES as role (role)}<option value={role}>{role}</option>{/each}
@@ -387,6 +395,11 @@
 	}
 	header p {
 		margin: 0;
+	}
+	.in-library {
+		margin-top: 2px;
+		color: var(--muted);
+		font-size: var(--step--1);
 	}
 	header form input {
 		flex: 1;

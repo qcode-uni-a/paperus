@@ -2,7 +2,13 @@
 	import { resolve } from '$app/paths';
 	import { addItems, addTag, errorMessage, removeItem, removeTag } from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
-	import { collectionPath, flatTree, loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import {
+		collectionPath,
+		flatTree,
+		libraryById,
+		loadOrganize,
+		organize
+	} from '#lib/organize.svelte.ts';
 
 	let { item, onchange }: { item: ItemDetail; onchange: () => void } = $props();
 
@@ -11,12 +17,36 @@
 	let adding = $state(false);
 	let error = $state('');
 
+	const own = $derived(organize.libraries.find((library) => library.kind === 'personal'));
+	const itemWritable = $derived(libraryById(item.library_id)?.writable ?? false);
+	// New tags go into the item's library for its members, else they are
+	// private (the server decides the same way).
+	const tagLibrary = $derived(itemWritable ? item.library_id : own?.id);
+
 	const suggestions = $derived(
-		organize.tags.filter((t) => !item.tags.some((own) => own.id === t.id)).map((t) => t.name)
+		organize.tags
+			.filter((t) => t.library_id === tagLibrary && !item.tags.some((on) => on.id === t.id))
+			.map((t) => t.name)
 	);
+	// A group's collections hold only its items; private ones any item.
 	const choices = $derived(
-		flatTree().filter(({ collection }) => !item.collection_ids.includes(collection.id))
+		[...(itemWritable ? flatTree(item.library_id) : []), ...flatTree(own?.id)].filter(
+			({ collection }, index, all) =>
+				!item.collection_ids.includes(collection.id) &&
+				all.findIndex((row) => row.collection.id === collection.id) === index
+		)
 	);
+
+	function writableLibrary(id: string | undefined): boolean {
+		return libraryById(id)?.writable ?? false;
+	}
+	function tagLibraryOf(tagId: string): string | undefined {
+		return organize.tags.find((t) => t.id === tagId)?.library_id;
+	}
+	/** A private tag or collection on an item of a group. */
+	function isPrivate(libraryId: string | undefined): boolean {
+		return libraryId === own?.id && item.library_id !== own?.id;
+	}
 
 	async function done(result: { error?: unknown }) {
 		error = result.error ? errorMessage(result.error) : '';
@@ -53,13 +83,17 @@
 	<div class="line">
 		<span class="label">Tags</span>
 		{#each item.tags as tag (tag.id)}
+			{@const library = tagLibraryOf(tag.id)}
 			<span class="chip" data-tag-color={tag.color}>
+				{#if isPrivate(library)}{@render lock()}{/if}
 				<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
-				<button
-					onclick={async () =>
-						done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}
-					aria-label="Remove tag {tag.name}">×</button
-				>
+				{#if writableLibrary(library)}
+					<button
+						onclick={async () =>
+							done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}
+						aria-label="Remove tag {tag.name}">×</button
+					>
+				{/if}
 			</span>
 		{/each}
 		{#if tagging}
@@ -90,13 +124,17 @@
 	<div class="line">
 		<span class="label">Collections</span>
 		{#each item.collection_ids as id (id)}
+			{@const library = organize.collections.find((c) => c.id === id)?.library_id}
 			<span class="chip">
+				{#if isPrivate(library)}{@render lock()}{/if}
 				<a href={resolve('/collections/[id]', { id })}>{collectionPath(id) || '…'}</a>
-				<button
-					onclick={async () =>
-						done(await removeItem({ path: { collection_id: id, item_id: item.id } }))}
-					aria-label="Remove from {collectionPath(id)}">×</button
-				>
+				{#if writableLibrary(library)}
+					<button
+						onclick={async () =>
+							done(await removeItem({ path: { collection_id: id, item_id: item.id } }))}
+						aria-label="Remove from {collectionPath(id)}">×</button
+					>
+				{/if}
 			</span>
 		{/each}
 		{#if adding}
@@ -119,6 +157,14 @@
 	</div>
 	{#if error}<p class="error">{error}</p>{/if}
 </div>
+
+{#snippet lock()}
+	<svg class="lock" viewBox="0 0 24 24" role="img" aria-label="Private: only you see this">
+		<title>Private: only you see this</title>
+		<rect x="5" y="11" width="14" height="10" rx="2" />
+		<path d="M8 11V8a4 4 0 0 1 8 0v3" />
+	</svg>
+{/snippet}
 
 {#snippet plus(label: string, onclick: () => void)}
 	<button class="plus" {onclick} aria-label={label} title={label}>
@@ -148,9 +194,22 @@
 		align-items: center;
 		gap: 2px;
 		padding: 1px 4px 1px 10px;
+		min-height: 24px;
 		border-radius: 999px;
 		background: var(--tag-bg, var(--rail));
 		font-size: 0.92em;
+	}
+	.chip:not(:has(button)) {
+		padding-right: 10px;
+	}
+	.lock {
+		width: 13px;
+		height: 13px;
+		margin-right: 4px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2.2;
+		opacity: 0.75;
 	}
 	.chip a {
 		color: var(--tag-ink, var(--ink));

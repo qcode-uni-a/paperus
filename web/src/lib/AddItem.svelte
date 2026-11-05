@@ -2,7 +2,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { addItem, addItems, errorMessage } from '#lib/api/client.ts';
-	import { loadOrganize } from '#lib/organize.svelte.ts';
+	import {
+		defaultLibrary,
+		libraryForCollection,
+		libraryName,
+		loadOrganize,
+		writableLibraries
+	} from '#lib/organize.svelte.ts';
 
 	/** Called once the item exists. Without ``collection`` the item opens
 	 * then; with it, the item is put into that collection and stays closed. */
@@ -16,6 +22,10 @@
 	let date = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	// A group's collection takes items of its library only; otherwise the
+	// default library, unless another is picked.
+	const fixedLibrary = $derived(libraryForCollection(collection));
+	let library = $state(defaultLibrary()?.id ?? '');
 
 	// CSL types people add by hand most often.
 	const TYPES = [
@@ -46,7 +56,8 @@
 					}
 				}
 			: { doi };
-		const { data, error: failure } = await addItem({ body });
+		const target = fixedLibrary ?? (library || undefined);
+		const { data, error: failure } = await addItem({ body: { ...body, library_id: target } });
 		if (data && collection) {
 			const added = await addItems({
 				path: { collection_id: collection },
@@ -92,6 +103,16 @@
 				required
 			/></label
 		>
+	{/if}
+	{#if !fixedLibrary && writableLibraries().length > 1}
+		<label
+			>Library
+			<select bind:value={library}>
+				{#each writableLibraries() as option (option.id)}
+					<option value={option.id}>{libraryName(option.id)}</option>
+				{/each}
+			</select>
+		</label>
 	{/if}
 	{#if error}<p class="error">{error}</p>{/if}
 	<div class="row">
