@@ -3,6 +3,9 @@
 	import { resolve } from '$app/paths';
 	import { addItem, errorMessage } from '#lib/api/client.ts';
 
+	/** Called once the item exists, before opening it. */
+	let { ondone }: { ondone?: () => void } = $props();
+
 	let doi = $state('');
 	let manual = $state(false);
 	let title = $state('');
@@ -47,11 +50,12 @@
 			error = errorMessage(failure);
 			return;
 		}
+		ondone?.();
 		await goto(resolve('/items/[id]', { id: data.id }));
 	}
 </script>
 
-<form class="card" onsubmit={submit}>
+<form onsubmit={submit}>
 	{#if manual}
 		<div class="grid">
 			<label class="wide">Title <input bind:value={title} required /></label>

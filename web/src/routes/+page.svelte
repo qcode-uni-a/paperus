@@ -4,7 +4,6 @@
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
-	import AddItem from '#lib/AddItem.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
 
@@ -31,7 +30,6 @@
 		}
 		return [...byItem.values()];
 	});
-	let adding = $state(false);
 
 	async function loadItems(before?: string) {
 		const { data } = await listItems({ query: { limit: PAGE, before } });
@@ -112,14 +110,6 @@
 		/>
 	</div>
 
-	<div class="actions row">
-		<button class="quiet" onclick={() => (adding = !adding)} aria-expanded={adding}>
-			{adding ? 'Close' : 'Add by DOI or details'}
-		</button>
-	</div>
-
-	{#if adding}<AddItem />{/if}
-
 	{#if searched}
 		<div class="results-head row">
 			<h1 class="count">
@@ -166,8 +156,8 @@
 		<div class="empty">
 			<h2>Nothing in the library yet</h2>
 			<p class="muted">
-				Drop PDFs anywhere in this window. paperus reads them, finds their title and authors, and
-				makes the full text searchable.
+				Drop PDFs anywhere in this window, or use Add at the top. paperus reads them, finds their
+				title and authors, and makes the full text searchable.
 			</p>
 		</div>
 	{:else}
@@ -208,9 +198,6 @@
 		stroke-width: 2;
 		stroke-linecap: round;
 		pointer-events: none;
-	}
-	.actions {
-		margin: -12px 0 0 -8px;
 	}
 	.results-head {
 		justify-content: space-between;
