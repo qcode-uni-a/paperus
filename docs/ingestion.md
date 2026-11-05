@@ -139,10 +139,38 @@ a retention setting.
 - Search covers the latest version by default; unreferenced old chunks are
   garbage-collected.
 
-## Migration from Zotero
+## Import from other reference managers
 
-Import via the Zotero Web API or the local `zotero.sqlite` + storage folder.
-Keep items, collections, tags, notes, PDF annotations and Better BibTeX
-citation keys (existing LaTeX documents depend on them). Option: index an
-existing PDF or Zotero storage folder read-only, like Immich's external
-libraries.
+Decided 2026-11-05; built in steps (see the changelog).
+
+| Format | Exported by | Brings along |
+| --- | --- | --- |
+| Zotero RDF (zip with "Export Files" and "Export Notes") | Zotero | Papers, files, collections, tags, child and standalone notes, related papers |
+| BibTeX / BibLaTeX (`.bib`, or a zip with the files) | JabRef, Zotero, Mendeley, most others | Papers, citation keys, `file` links, keywords as tags, JabRef groups as collections, `annote`/`comment` as notes |
+| RIS (`.ris`) | Mendeley, EndNote, Citavi, publishers | Papers, keywords as tags, notes, file links |
+| CSL-JSON | Zotero, Pandoc | Papers (metadata only) |
+
+Mendeley's exports do not include its collections.
+
+- **How**: upload the file (or a zip with it and the files) in the browser
+  and choose the owner (oneself or a group); the import runs as a job with
+  a progress page. For very large libraries an administrator can run
+  `paperus import <file> --user <name>` on the server.
+- **Each format is read into one common form** (CSL-JSON metadata,
+  identifiers, tags, collection paths, notes as Markdown, files), so the
+  rest of the import is the same for every format.
+- **Duplicates**: a paper the person can already see (same DOI, arXiv ID
+  or file) is not added again; its new tags, collections, notes and files
+  are added to the existing one. Within one import, the same paper twice
+  becomes one paper.
+- **Kept as they were**: collection structure, tags (Zotero's automatic
+  tags too), citation keys (Better BibTeX, JabRef), notes (HTML converted to
+  Markdown), the metadata as exported (no lookups that could overwrite it;
+  missing identifiers can be looked up later as for uploads).
+- **Files** are stored like uploads (deduplicated by content) and read for
+  search; a missing file is listed in the report, not an error.
+- **Report** at the end: how many papers were added, found already, and
+  which files or entries could not be read.
+- **Not now**: Zotero PDF annotations (not in Zotero's exports; later via
+  the Zotero Web API or the local database), sync instead of a one-off
+  import, reading `zotero.sqlite` directly.
