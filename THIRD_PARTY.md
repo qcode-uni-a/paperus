@@ -8,6 +8,8 @@ come from others and keep their own licences.
 | Component | Where | Licence |
 | --- | --- | --- |
 | [PDF.js](https://mozilla.github.io/pdf.js/) (pdfjs-dist) | Website: the PDF reader | Apache-2.0, [text](licenses/PDF.js-Apache-2.0.txt) |
+| [marked](https://marked.js.org/) | Website: showing Markdown notes | MIT, [text](licenses/marked-MIT.txt) |
+| [DOMPurify](https://github.com/cure53/DOMPurify) | Website: cleaning the HTML of shown notes | Apache-2.0 (or MPL-2.0), [text](licenses/DOMPurify-Apache-2.0.txt) |
 | [Literata](https://github.com/googlefonts/literata) | Website and logo: titles, headings, wordmark | SIL Open Font License 1.1, [text](licenses/Literata-OFL-1.1.txt) |
 | [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) | Website: interface text | SIL Open Font License 1.1, [text](licenses/Atkinson-Hyperlegible-Next-OFL-1.1.txt) |
 | [Procrastinate](https://github.com/procrastinate-org/procrastinate) database schema, copied into `server/src/paperus/migrations/procrastinate_3.10.0.sql` | Server: job queue tables | MIT |
