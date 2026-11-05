@@ -13,13 +13,20 @@ BATCH = 32
 
 
 def missing_chunks(db: Session, file_id: uuid.UUID, model: str) -> list[Chunk]:
-    """The file's chunks without a vector from ``model`` (shared chunks count)."""
+    """The file's chunks without a vector from ``model`` (shared chunks count).
+
+    Reference lists are left out: they match many queries by meaning (titles
+    of other papers) and would push the paper's own text down."""
     has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
     return list(
         db.scalars(
             select(Chunk)
             .join(FileChunk, FileChunk.chunk_sha256 == Chunk.sha256)
-            .where(FileChunk.file_id == file_id, Chunk.sha256.not_in(has_vector))
+            .where(
+                FileChunk.file_id == file_id,
+                FileChunk.in_references.is_(False),
+                Chunk.sha256.not_in(has_vector),
+            )
             .distinct()
         )
     )
@@ -57,6 +64,7 @@ def files_missing_embeddings(
             .where(
                 File.text_status == TextStatus.DONE,
                 File.deleted_at.is_(None),
+                FileChunk.in_references.is_(False),
                 FileChunk.chunk_sha256.not_in(has_vector),
             )
             .group_by(File.id)

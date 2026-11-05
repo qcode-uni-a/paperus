@@ -3,6 +3,7 @@ from pathlib import Path
 from paperus.text import (
     MAX_WORDS,
     TARGET_WORDS,
+    chunk_document,
     chunk_pages,
     chunk_text,
     extract_pdf_pages,
@@ -58,3 +59,36 @@ def test_extract_pdf_pages(tmp_path: Path) -> None:
     assert len(pages) == 2
     assert "Hello (world)" in pages[0] and "next line" in pages[0]
     assert pages[1] == ""
+
+
+def test_reference_list_is_marked() -> None:
+    pages = [
+        "Introduction\n\nDroughts are measured with indices.",
+        "Results follow.\n7 References\n"
+        "[1] A. Huber, Drought indices, 2024.\n[2] B. Ko, Rivers.",
+        "[3] C. Li, Lakes, 2020.\nAppendix A. Extra results\n\nMore body text.",
+    ]
+    chunks = chunk_pages(pages)
+    marked = [(c.page, c.references, c.text.split()[0]) for c in chunks]
+    assert marked == [
+        (1, False, "Introduction"),
+        (2, False, "Results"),
+        (2, True, "7"),
+        (3, True, "[3]"),
+        (3, False, "Appendix"),
+    ]
+
+
+def test_reference_headings() -> None:
+    for heading in [
+        "REFERENCES",
+        "Bibliography",
+        "Literaturverzeichnis",
+        "IV. References",
+        "## References",
+    ]:
+        [body, refs] = chunk_document(f"Body text.\n{heading}\nSmith (2020).")
+        assert (body.references, refs.references) == (False, True), heading
+    # A sentence mentioning references is not a heading.
+    [chunk] = chunk_document("The references below were checked.\nSmith (2020).")
+    assert not chunk.references

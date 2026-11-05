@@ -197,7 +197,9 @@
 									>
 										{passage.page ? `Page ${passage.page}` : 'Open'}
 									</a>
-									{#if !passage.matched.includes('keyword')}
+									{#if passage.in_references}
+										<span class="badge">In the references</span>
+									{:else if !passage.matched.includes('keyword')}
 										<span class="badge">Similar meaning</span>
 									{/if}
 									<!-- Snippets are HTML-escaped on the server; only <mark> is added. -->

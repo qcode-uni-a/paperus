@@ -273,6 +273,8 @@ class FileChunk(Base):
     position: Mapped[int] = mapped_column(Integer, primary_key=True)
     chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
     page: Mapped[int | None]
+    in_references: Mapped[bool] = mapped_column(server_default=text("false"))
+    """In the file's reference list: found by keywords, not by meaning."""
 
 
 class Embedding(Base):

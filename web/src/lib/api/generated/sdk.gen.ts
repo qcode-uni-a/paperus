@@ -248,7 +248,7 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
 /**
  * Run Job
  *
- * Start a sweep now: ``embeddings`` (embed what is missing) or ``text``
- * (read files still pending), instead of waiting for the next run.
+ * Start a sweep now: ``embeddings`` (embed what is missing), ``text``
+ * (read files still pending), or ``text-all`` (read every file again).
  */
 export const runJob = <ThrowOnError extends boolean = false>(options: Options<RunJobData, ThrowOnError>): RequestResult<RunJobResponses, RunJobErrors, ThrowOnError> => (options.client ?? client).post<RunJobResponses, RunJobErrors, ThrowOnError>({ url: '/api/admin/jobs/{job}', ...options });

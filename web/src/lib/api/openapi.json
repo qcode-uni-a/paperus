@@ -1066,7 +1066,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing) or ``text``\n(read files still pending), instead of waiting for the next run.",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), or ``text-all`` (read every file again).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -1738,6 +1738,10 @@
             },
             "type": "array",
             "title": "Matched"
+          },
+          "in_references": {
+            "type": "boolean",
+            "title": "In References"
           }
         },
         "type": "object",
@@ -1751,7 +1755,8 @@
           "page",
           "snippet",
           "score",
-          "matched"
+          "matched",
+          "in_references"
         ],
         "title": "Passage"
       },

@@ -5,14 +5,14 @@ import logging
 import uuid
 
 import httpx2
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, TextStatus
 from paperus.storage import BlobStore
-from paperus.text import TextChunk, chunk_pages, chunk_text, extract_pdf_pages
+from paperus.text import TextChunk, chunk_document, chunk_pages, extract_pdf_pages
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def _chunks_for(file: File, blobs: BlobStore) -> list[TextChunk] | None:
             return chunk_pages(extract_pdf_pages(path))
     if file.media_type.startswith(TEXT_TYPES):
         data = b"".join(blobs.iter_bytes(file.blob_sha256))
-        return chunk_text(data.decode(errors="replace"))
+        return chunk_document(data.decode(errors="replace"))
     return None
 
 
@@ -42,7 +42,11 @@ def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
         )
         rows.append(
             FileChunk(
-                file_id=file.id, position=position, chunk_sha256=sha256, page=chunk.page
+                file_id=file.id,
+                position=position,
+                chunk_sha256=sha256,
+                page=chunk.page,
+                in_references=chunk.references,
             )
         )
     db.add_all(rows)
@@ -68,6 +72,7 @@ def _copy_manifest(db: Session, file: File) -> bool:
                 position=row.position,
                 chunk_sha256=row.chunk_sha256,
                 page=row.page,
+                in_references=row.in_references,
             )
         )
     return True
@@ -135,3 +140,22 @@ def pending_files(db: Session, limit: int = 500) -> list[uuid.UUID]:
             .limit(limit)
         )
     )
+
+
+def reread_all(db: Session) -> int:
+    """Read every file again (e.g. after chunking changed); commits.
+
+    Manifests are rebuilt; chunks and their vectors are kept, so unchanged
+    passages are not embedded again. Metadata is only replaced for items that
+    still have placeholder metadata from their file.
+    """
+    db.execute(delete(FileChunk))
+    active = File.deleted_at.is_(None)
+    count = db.scalar(select(func.count()).select_from(File).where(active)) or 0
+    db.execute(
+        update(File)
+        .where(active)
+        .values(text_status=TextStatus.PENDING, text_error=None)
+    )
+    db.commit()
+    return count

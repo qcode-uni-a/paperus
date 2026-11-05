@@ -12,7 +12,8 @@
 			description: 'Text extraction and, for uploads, metadata from the file.',
 			schedule: 'Pending files are picked up every 5 minutes.',
 			job: 'text' as const,
-			action: 'Read pending files now'
+			action: 'Read pending files now',
+			again: 'Read all files again'
 		},
 		{
 			queue: 'ml',
@@ -24,7 +25,15 @@
 		}
 	];
 
-	async function run(job: 'text' | 'embeddings') {
+	async function run(job: 'text' | 'embeddings' | 'text-all') {
+		if (
+			job === 'text-all' &&
+			!confirm(
+				'Read every file again? Needed after improvements to text extraction. Items, files ' +
+					'and your edits stay; unchanged passages keep their search vectors.'
+			)
+		)
+			return;
 		await runJob({ path: { job } });
 		message = 'Started.';
 		await loadAdmin();
@@ -46,7 +55,10 @@
 				<span class="muted">No jobs yet.</span>
 			{/each}
 		</div>
-		<div><button onclick={() => run(q.job)}>{q.action}</button></div>
+		<div class="row">
+			<button onclick={() => run(q.job)}>{q.action}</button>
+			{#if 'again' in q}<button onclick={() => run('text-all')}>{q.again}</button>{/if}
+		</div>
 	</section>
 {/each}
 

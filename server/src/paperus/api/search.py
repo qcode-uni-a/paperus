@@ -38,6 +38,8 @@ class Passage(BaseModel):
     score: float
     matched: list[Match]
     """How the passage was found: by its words, its meaning, or both."""
+    in_references: bool
+    """From the item's reference list (found by words only)."""
 
 
 # Keyword and meaning candidates are ranked separately, then fused by
@@ -47,7 +49,8 @@ _SEARCH = text(
     f"""
     WITH q AS (SELECT websearch_to_tsquery('simple', :query) AS tsq),
     visible AS NOT MATERIALIZED (
-        SELECT fc.file_id, fc.position, fc.page, fc.chunk_sha256, f.version_id,
+        SELECT fc.file_id, fc.position, fc.page, fc.chunk_sha256, fc.in_references,
+               f.version_id,
                i.id AS item_id, i.title AS item_title
         FROM file_chunks fc
              JOIN files f ON f.id = fc.file_id
@@ -73,7 +76,7 @@ _SEARCH = text(
         FROM visible vis
              JOIN embeddings e
                ON e.chunk_sha256 = vis.chunk_sha256 AND e.model = :model
-        WHERE :use_meaning
+        WHERE :use_meaning AND NOT vis.in_references
         ORDER BY rank LIMIT {CANDIDATES}
     ),
     fused AS (
@@ -87,7 +90,8 @@ _SEARCH = text(
         ) AS candidates
         GROUP BY file_id, position
     )
-    SELECT vis.file_id, vis.position, vis.page, vis.version_id, vis.item_id,
+    SELECT vis.file_id, vis.position, vis.page, vis.in_references, vis.version_id,
+           vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
            CASE WHEN fused.by_keyword THEN ts_headline(
                'simple',
@@ -167,6 +171,7 @@ def search(
             page=row["page"],
             snippet=row["snippet"],
             score=float(row["score"]),
+            in_references=row["in_references"],
             matched=[
                 m
                 for m, hit in (

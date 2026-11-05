@@ -11,6 +11,7 @@ from paperus.api.deps import DB, CurrentUser
 from paperus.jobs import queue_embedding_sweep, queue_text_sweep
 from paperus.ml import MLClient, MLUnavailable
 from paperus.models import Chunk, Embedding, File, FileChunk, Item, TextStatus, User
+from paperus.processing import reread_all
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -51,6 +52,7 @@ class Stats(BaseModel):
     files_pending: int
     """Files whose text (and, for uploads, metadata) is still being read."""
     chunks: int
+    """Passages searchable by meaning (reference lists are left out)."""
     embedded: int
     """Chunks with a vector from the current embedding model."""
     embedding_model: str
@@ -124,10 +126,11 @@ def delete_ml_model(name: str, request: Request, db: DB, admin: Admin) -> None:
 @router.get("/stats")
 def stats(request: Request, db: DB, admin: Admin) -> Stats:
     model = system.load_config(db, request.app.state.settings).embedding_model
+    # Passages to embed: in files not in the trash, outside reference lists.
     visible_chunks = (
         select(FileChunk.chunk_sha256)
         .join(File, File.id == FileChunk.file_id)
-        .where(File.deleted_at.is_(None))
+        .where(File.deleted_at.is_(None), FileChunk.in_references.is_(False))
     )
     jobs: dict[str, dict[str, int]] = {}
     for queue, status, count in db.execute(
@@ -171,10 +174,14 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
 
 
 @router.post("/jobs/{job}", status_code=202)
-def run_job(job: str, request: Request, admin: Admin) -> dict[str, Any]:
-    """Start a sweep now: ``embeddings`` (embed what is missing) or ``text``
-    (read files still pending), instead of waiting for the next run."""
+def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
+    """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
+    (read files still pending), or ``text-all`` (read every file again)."""
     sweeps = {"embeddings": queue_embedding_sweep, "text": queue_text_sweep}
+    if job == "text-all":
+        count = reread_all(db)
+        queue_text_sweep(request.app.state.jobs)
+        return {"queued": job, "files": count}
     if job not in sweeps:
         raise HTTPException(404, f"unknown job {job!r}")
     sweeps[job](request.app.state.jobs)

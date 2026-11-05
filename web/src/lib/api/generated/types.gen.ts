@@ -388,6 +388,10 @@ export type Passage = {
      * Matched
      */
     matched: Array<'keyword' | 'meaning'>;
+    /**
+     * In References
+     */
+    in_references: boolean;
 };
 
 /**

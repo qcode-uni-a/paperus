@@ -188,3 +188,38 @@ def test_filter_by_type(
         params=[("q", "interpolation"), ("type", "book"), ("type", "document")],
     )
     assert len(response.json()) == 1
+
+
+def test_references_found_by_words_not_by_meaning(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    content = (
+        b"Rain gauges were checked weekly.\n\nReferences\n\n"
+        b"[1] Huber, Missing data in rain records, 2024."
+    )
+    file_id = uuid.UUID(add_file(logged_in, "Notes", content)["id"])
+    process_file(db, blobs, file_id)
+    # Only the body is embedded.
+    assert embed_file(db, fake_ml.client(), MODEL, file_id) == 1
+    assert files_missing_embeddings(db, MODEL) == []
+
+    [hit] = search(logged_in, "Huber", mode="keyword")[0]
+    assert hit["in_references"] is True
+    hits, _ = search(logged_in, "missing", mode="meaning")
+    assert all(not h["in_references"] for h in hits)
+
+
+def test_reread_all_marks_existing_files(
+    admin: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML, job_app: App
+) -> None:
+    content = b"Body.\n\nReferences\n\n[1] Huber, 2024."
+    file_id = uuid.UUID(add_file(admin, "Notes", content)["id"])
+    process_file(db, blobs, file_id)
+    response = admin.post("/api/admin/jobs/text-all")
+    assert response.json() == {"queued": "text-all", "files": 1}
+    assert admin.get(f"/api/items/{admin.get('/api/items').json()[0]['id']}").json()[
+        "processing"
+    ]
+    process_file(db, blobs, file_id)
+    hits, _ = search(admin, "Huber", mode="keyword")
+    assert hits[0]["in_references"] is True
