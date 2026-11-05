@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
 
-from paperus import tokens
+from paperus import system, tokens
 from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
@@ -28,6 +28,7 @@ from paperus.api import (
     organize,
     search,
     setup,
+    trash,
     users,
 )
 from paperus.api import tokens as token_api
@@ -56,6 +57,14 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        # Log level and contact email as set in the administration.
+        try:
+            with app.state.sessionmaker() as db:
+                system.apply(system.load_config(db, settings), http)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "could not apply the saved settings", exc_info=True
+            )
         with jobs.open():
             # The ML service starts from its own defaults; send ours.
             try:
@@ -93,6 +102,7 @@ def create_app(
     app.include_router(notes.router)
     app.include_router(imports.router)
     app.include_router(duplicates.router)
+    app.include_router(trash.router)
     app.include_router(admin.router)
     app.include_router(organize.router)
     app.include_router(groups.router)

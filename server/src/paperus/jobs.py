@@ -8,7 +8,7 @@ import contextlib
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
@@ -16,6 +16,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
+from paperus import trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -31,7 +32,13 @@ from paperus.ml import MLClient, MLUnavailable, make_ml_client
 from paperus.models import Import, ImportStatus
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
-from paperus.system import load_backup_config, load_config
+from paperus.system import (
+    SystemConfig,
+    apply,
+    load_backup_config,
+    load_config,
+    max_upload_bytes,
+)
 
 log = logging.getLogger(__name__)
 
@@ -196,6 +203,12 @@ def run_worker(settings: Settings) -> None:
         app.run_worker(queues=["text", "ml", "backup", "import"], concurrency=3)
 
 
+def _apply_here(config: SystemConfig) -> None:
+    """The worker's own share of the settings (log level, contact email)."""
+    if _context is not None:
+        apply(config, _context.http)
+
+
 # First in the queue: a restarted ML service should not wait behind hundreds
 # of embedding jobs for its settings.
 @tasks.periodic(cron="* * * * *")
@@ -212,6 +225,7 @@ def configure_ml(timestamp: int) -> None:
 def send_ml_config(db: Session, settings: Settings, ml: MLClient) -> None:
     """The ML settings of the administration, to every ML service."""
     config = load_config(db, settings)
+    _apply_here(config)
     for error in ml.configure(threads=config.ml_threads, keep=[config.embedding_model]):
         log.info("ML service not configured: %s", error)
 
@@ -221,6 +235,28 @@ def queue_ml_configuration(app: App) -> None:
     task = app.configure_task(
         "paperus:configure_ml", queueing_lock="configure-ml", priority=100
     )
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
+
+
+@tasks.periodic(cron="30 2 * * *")
+@tasks.task(name="empty_trash", queue="backup", queueing_lock="empty-trash")
+def empty_old_trash(timestamp: int) -> None:
+    """Delete for good what has been in the trash longer than the days set
+    (Administration → Settings → Trash); nothing if none are set."""
+    context = _worker_context()
+    with context.sessions() as db:
+        days = load_config(db, context.settings).trash_days
+        if days is None:
+            return
+        done = trash.empty(
+            db, context.blobs, before=datetime.now(UTC) - timedelta(days=days)
+        )
+    log.info("emptied the trash: %s", done)
+
+
+def queue_empty_trash(app: App) -> None:
+    task = app.configure_task("paperus:empty_trash", queueing_lock="empty-trash")
     with contextlib.suppress(AlreadyEnqueued):
         task.defer(timestamp=0)
 
@@ -241,7 +277,7 @@ def import_library(job: JobContext, import_id: str) -> None:
                 context.blobs,
                 record,
                 path=path,
-                max_file_bytes=context.settings.max_upload_bytes,
+                max_file_bytes=max_upload_bytes(db, context.settings),
                 file_added=lambda file_id: queue_text_extraction(job.app, file_id),
             )
 

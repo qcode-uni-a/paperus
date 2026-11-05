@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from paperus import library
+from paperus import library, system
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import queue_text_extraction
@@ -106,7 +106,8 @@ def _put_upload(upload: UploadFile, request: Request, db: DB) -> _Stored:
     blobs: BlobStore = request.app.state.blobs
     try:
         stored = blobs.put(
-            _chunks(upload.file), max_size=request.app.state.settings.max_upload_bytes
+            _chunks(upload.file),
+            max_size=system.max_upload_bytes(db, request.app.state.settings),
         )
     except TooLarge as error:
         raise HTTPException(413, "file too large") from error

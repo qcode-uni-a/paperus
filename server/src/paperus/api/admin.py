@@ -10,6 +10,7 @@ from paperus import system
 from paperus.api.deps import DB, CurrentUser
 from paperus.jobs import (
     queue_embedding_sweep,
+    queue_empty_trash,
     queue_ml_configuration,
     queue_text_sweep,
 )
@@ -131,6 +132,7 @@ def set_config(
             )
     system.save_config(db, body)
     db.commit()
+    system.apply(body, request.app.state.http)
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
     if model_changed or body.ml_threads != current.ml_threads:
@@ -237,8 +239,13 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
 @router.post("/jobs/{job}", status_code=202)
 def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
-    (read files still pending), or ``text-all`` (read every file again)."""
-    sweeps = {"embeddings": queue_embedding_sweep, "text": queue_text_sweep}
+    (read files still pending), ``text-all`` (read every file again) or
+    ``trash`` (delete what is older than the trash days)."""
+    sweeps = {
+        "embeddings": queue_embedding_sweep,
+        "text": queue_text_sweep,
+        "trash": queue_empty_trash,
+    }
     if job == "text-all":
         count = reread_all(db)
         queue_text_sweep(request.app.state.jobs)

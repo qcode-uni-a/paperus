@@ -27,13 +27,11 @@ def test_admins_only(logged_in: TestClient) -> None:
 def test_change_embedding_model(
     admin: TestClient, db: Session, settings: Settings, job_app: App, fake_ml: FakeML
 ) -> None:
-    assert admin.get("/api/admin/config").json() == {
-        "embedding_model": "bge-m3",
-        "ml_threads": None,  # the ML service's own setting
-    }
+    config = admin.get("/api/admin/config").json()
+    assert (config["embedding_model"], config["ml_threads"]) == ("bge-m3", None)
     response = admin.put(
         "/api/admin/config",
-        json={"embedding_model": "multilingual-e5-small", "ml_threads": 6},
+        json={**config, "embedding_model": "multilingual-e5-small", "ml_threads": 6},
     )
     assert response.status_code == 200
     assert load_config(db, settings).embedding_model == "multilingual-e5-small"

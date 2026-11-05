@@ -18,12 +18,17 @@ class MetadataUnavailable(RuntimeError):
     """The registry could not be reached or returned something unusable."""
 
 
+def user_agent(contact_email: str | None) -> str:
+    """Crossref and others ask clients to name themselves and a contact."""
+    agent = f"paperus/{__version__}"
+    return f"{agent} (mailto:{contact_email})" if contact_email else agent
+
+
 def make_http_client(settings: Settings) -> httpx2.Client:
-    user_agent = f"paperus/{__version__}"
-    if settings.contact_email:
-        user_agent += f" (mailto:{settings.contact_email})"
     return httpx2.Client(
-        headers={"User-Agent": user_agent}, timeout=20, follow_redirects=True
+        headers={"User-Agent": user_agent(settings.contact_email)},
+        timeout=20,
+        follow_redirects=True,
     )
 
 

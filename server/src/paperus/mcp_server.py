@@ -50,6 +50,7 @@ from paperus.models import (
     Tag,
     User,
 )
+from paperus.system import load_config
 from paperus.tokens import Scope
 
 INSTRUCTIONS = """\
@@ -116,7 +117,9 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
         """The database, the person's access (narrowed by the token) and the
         website's address for links; a ToolError if the token may not."""
         with authorized(ctx, scope) as (db, token, user):
-            yield db, _access(db, token, user), _base_url(ctx)
+            public = load_config(db, state.settings).public_url
+            base = str(public).rstrip("/") if public else _base_url(ctx)
+            yield db, _access(db, token, user), base
 
     @mcp.tool(annotations=READ)
     def my_access(ctx: Context) -> CallToolResult:

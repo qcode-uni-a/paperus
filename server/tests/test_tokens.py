@@ -293,6 +293,7 @@ ROUTES = {
     ("POST", "/api/tags"): "tags.write",
     ("DELETE", "/api/tags/{tag_id}"): "tags.write",
     ("PATCH", "/api/tags/{tag_id}"): "tags.write",
+    ("DELETE", "/api/trash"): None,
     ("POST", "/api/uploads"): "papers.write",
     ("GET", "/api/uploads/{sha256}"): "papers.read",
     ("GET", "/api/users"): None,

@@ -27,6 +27,7 @@ from paperus.jobs import make_job_app, queue_text_extraction, run_worker
 from paperus.migrate import migrate
 from paperus.models import Group, Import, ImportStatus, User
 from paperus.storage import make_blob_store
+from paperus.system import max_upload_bytes
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -248,7 +249,7 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 make_blob_store(settings),
                 record,
                 path=path,
-                max_file_bytes=settings.max_upload_bytes,
+                max_file_bytes=max_upload_bytes(db, settings),
                 file_added=lambda file_id: queue_text_extraction(jobs, file_id),
             )
             done = db.get(Import, record_id)
