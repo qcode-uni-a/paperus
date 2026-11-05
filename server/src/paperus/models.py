@@ -61,6 +61,11 @@ class User(Record, Base):
     oidc_subject: Mapped[str | None] = mapped_column(String(500), unique=True)
     """Who the person is at the identity provider (issuer and subject), once
     they logged in with the OIDC login."""
+    avatar: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    """The profile picture: a small PNG, JPEG or WebP (see ``paperus.avatars``)."""
+    avatar_type: Mapped[str | None] = mapped_column(String(32))
+    avatar_version: Mapped[str | None] = mapped_column(String(16))
+    """Changes with the picture, so its address can be cached for good."""
 
 
 class Role(StrEnum):

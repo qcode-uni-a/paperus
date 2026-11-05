@@ -15,6 +15,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
 	import OidcLink from '#lib/OidcLink.svelte';
+	import ProfilePicture from '#lib/ProfilePicture.svelte';
 
 	let oidcLabel = $state<string | null>(null);
 	$effect(() => {
@@ -67,6 +68,11 @@
 <svelte:head><title>Settings · paperus</title></svelte:head>
 
 <h1>Settings</h1>
+
+<section>
+	<h2>Profile picture</h2>
+	<ProfilePicture />
+</section>
 
 <section>
 	<h2>Owner of new things</h2>

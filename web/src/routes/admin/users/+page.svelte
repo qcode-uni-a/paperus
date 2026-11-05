@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import Avatar from '#lib/Avatar.svelte';
 	import { changeUser, createUser, errorMessage, listUsers } from '#lib/api/client.ts';
 	import type { UserRow } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
@@ -106,7 +107,8 @@
 		{#each users as user (user.id)}
 			{@const me = user.id === session.user?.id}
 			<tr class:inactive={user.deactivated_at}>
-				<td>
+				<td class="person">
+					<Avatar name={user.username} url={user.avatar_url} size={28} tone="desk" />
 					<strong>{user.username}</strong>
 					{#if user.is_admin}<span class="badge">Administrator</span>{/if}
 					{#if user.deactivated_at}<span class="badge off">Deactivated</span>{/if}
@@ -179,6 +181,10 @@
 </dialog>
 
 <style>
+	.person :global(.avatar) {
+		margin-right: 8px;
+		vertical-align: middle;
+	}
 	.head {
 		display: flex;
 		justify-content: space-between;

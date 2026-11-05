@@ -388,6 +388,107 @@
         }
       }
     },
+    "/api/me/avatar": {
+      "put": {
+        "tags": [
+          "avatars"
+        ],
+        "summary": "Set Avatar",
+        "description": "One's profile picture: PNG, JPEG or WebP, up to 256 KB (the website\nsends it square, 256 pixels wide).",
+        "operationId": "set_avatar",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_set_avatar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "avatars"
+        ],
+        "summary": "Remove Avatar",
+        "operationId": "remove_avatar",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{user_id}/avatar": {
+      "get": {
+        "tags": [
+          "avatars"
+        ],
+        "summary": "Get Avatar",
+        "description": "A person's profile picture (404 without one). Its address carries\nthe picture's version, so it may be kept for long.",
+        "operationId": "get_avatar",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/*": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items": {
       "post": {
         "tags": [
@@ -5073,6 +5174,20 @@
         ],
         "title": "Backups"
       },
+      "Body_set_avatar": {
+        "properties": {
+          "upload": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Upload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload"
+        ],
+        "title": "Body_set_avatar"
+      },
       "Body_start_import": {
         "properties": {
           "upload": {
@@ -7051,6 +7166,17 @@
               }
             ],
             "title": "Inherited From"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
           }
         },
         "type": "object",
@@ -8989,6 +9115,17 @@
             "type": "boolean",
             "title": "Oidc Linked",
             "default": false
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
           }
         },
         "type": "object",
@@ -9051,6 +9188,17 @@
           "papers": {
             "type": "integer",
             "title": "Papers"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
           }
         },
         "type": "object",

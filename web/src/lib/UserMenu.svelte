@@ -2,6 +2,7 @@
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Avatar from '#lib/Avatar.svelte';
 	import { logout, session } from '#lib/session.svelte.ts';
 
 	let menu = $state<HTMLElement>();
@@ -9,7 +10,6 @@
 	$effect(() => closeOnScroll(() => menu?.hidePopover()));
 
 	const name = $derived(session.user?.username ?? '');
-	const initial = $derived(name.slice(0, 1).toUpperCase());
 
 	async function signOut() {
 		menu?.hidePopover();
@@ -19,13 +19,13 @@
 </script>
 
 <button class="user" popovertarget="user-menu" aria-haspopup="menu" title="Account">
-	<span class="avatar" aria-hidden="true">{initial}</span>
+	<Avatar {name} url={session.user?.avatar_url} />
 	<span class="name">{name}</span>
 </button>
 
 <div id="user-menu" popover bind:this={menu} role="menu" class="menu">
 	<div class="who">
-		<span class="avatar large" aria-hidden="true">{initial}</span>
+		<Avatar {name} url={session.user?.avatar_url} size={40} />
 		<div>
 			<strong>{name}</strong>
 			<span>{session.user?.is_admin ? 'Administrator' : 'Member'}</span>
@@ -56,23 +56,6 @@
 		background: var(--rail);
 		border-color: transparent;
 	}
-	.avatar {
-		display: grid;
-		place-items: center;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		background: var(--royal);
-		color: var(--on-royal);
-		font-weight: 700;
-		font-size: var(--step--1);
-	}
-	.avatar.large {
-		width: 40px;
-		height: 40px;
-		font-size: var(--step-1);
-		font-family: var(--serif);
-	}
 	.name {
 		color: var(--ink);
 	}
@@ -100,7 +83,7 @@
 	.who div {
 		display: grid;
 	}
-	.who span:not(.avatar) {
+	.who div span {
 		color: var(--muted);
 		font-size: var(--step--1);
 	}

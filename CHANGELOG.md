@@ -19,6 +19,9 @@
   added beforehand), linked by username, or linked by hand with "Link my
   account" (also in one's own settings). Password login can be limited to
   administrators.
+- **Profile pictures**: chosen in one's own settings (cut to a square and
+  scaled down in the browser), shown in the menu, with group members and
+  in Administration → Users.
 - **Storage template**: a readable copy of the library on disk, each
   paper's files in folders and under names from a template (e.g.
   `{owner}/{first_author}_{journal}_{year}` gives

@@ -17,6 +17,7 @@ from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
     auth,
+    avatars,
     backups,
     citations,
     duplicates,
@@ -98,6 +99,7 @@ def create_app(
     app.state.ml = ml
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(avatars.router)
     app.include_router(items.router)
     app.include_router(files.router)
     app.include_router(search.router)

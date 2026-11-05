@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Avatar from '#lib/Avatar.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -183,9 +184,7 @@
 			<ul class="members">
 				{#each members as member (member.user_id)}
 					<li>
-						<span class="avatar" aria-hidden="true"
-							>{member.username.slice(0, 1).toUpperCase()}</span
-						>
+						<Avatar name={member.username} url={member.avatar_url} size={30} tone="desk" />
 						<span class="who">
 							<strong>{member.username}</strong>
 							{#if member.inherited_from}
@@ -402,18 +401,6 @@
 		gap: 10px;
 		padding: 8px 0;
 		border-bottom: 1px solid var(--rule);
-	}
-	.avatar {
-		flex: none;
-		display: grid;
-		place-items: center;
-		width: 30px;
-		height: 30px;
-		border-radius: 50%;
-		background: var(--desk);
-		color: var(--ink);
-		font-weight: 700;
-		font-size: var(--step--1);
 	}
 	.who {
 		flex: 1;

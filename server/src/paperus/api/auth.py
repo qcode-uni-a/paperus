@@ -19,6 +19,7 @@ from paperus.api.deps import (
     SessionUser,
     request_token,
 )
+from paperus.avatars import avatar_url
 from paperus.system import SystemConfig, load_config, oidc_secret
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -37,6 +38,8 @@ class UserOut(BaseModel):
     """Tutorial hints already shown to the person."""
     oidc_linked: bool = False
     """The account is linked to the OIDC login."""
+    avatar_url: str | None = None
+    """The profile picture, if one is set."""
 
 
 class PasswordChange(BaseModel):
@@ -56,6 +59,7 @@ def user_out(user: auth.User) -> UserOut:
         is_admin=user.is_admin,
         seen_hints=user.seen_hints,
         oidc_linked=user.oidc_subject is not None,
+        avatar_url=avatar_url(user.id, user.avatar_version),
     )
 
 

@@ -118,6 +118,16 @@ export type Backups = {
 };
 
 /**
+ * Body_set_avatar
+ */
+export type BodySetAvatar = {
+    /**
+     * Upload
+     */
+    upload: Blob | File;
+};
+
+/**
  * Body_start_import
  */
 export type BodyStartImport = {
@@ -1220,6 +1230,10 @@ export type MemberOut = {
      * Inherited From
      */
     inherited_from: string | null;
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
 };
 
 /**
@@ -2284,6 +2298,10 @@ export type UserOut = {
      * Oidc Linked
      */
     oidc_linked?: boolean;
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
 };
 
 /**
@@ -2322,6 +2340,10 @@ export type UserRow = {
      * Papers
      */
     papers: number;
+    /**
+     * Avatar Url
+     */
+    avatar_url?: string | null;
 };
 
 /**
@@ -2681,6 +2703,75 @@ export type MarkHintSeenResponses = {
 };
 
 export type MarkHintSeenResponse = MarkHintSeenResponses[keyof MarkHintSeenResponses];
+
+export type RemoveAvatarData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/avatar';
+};
+
+export type RemoveAvatarResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserOut;
+};
+
+export type RemoveAvatarResponse = RemoveAvatarResponses[keyof RemoveAvatarResponses];
+
+export type SetAvatarData = {
+    body: BodySetAvatar;
+    path?: never;
+    query?: never;
+    url: '/api/me/avatar';
+};
+
+export type SetAvatarErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAvatarError = SetAvatarErrors[keyof SetAvatarErrors];
+
+export type SetAvatarResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserOut;
+};
+
+export type SetAvatarResponse = SetAvatarResponses[keyof SetAvatarResponses];
+
+export type GetAvatarData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/users/{user_id}/avatar';
+};
+
+export type GetAvatarErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetAvatarError = GetAvatarErrors[keyof GetAvatarErrors];
+
+export type GetAvatarResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ListItemsData = {
     body?: never;

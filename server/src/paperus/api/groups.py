@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from paperus import organize
 from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
+from paperus.avatars import avatar_url
 from paperus.models import (
     ROLE_RANK,
     Group,
@@ -95,6 +96,7 @@ class MemberOut(BaseModel):
     """Given in this group; ``None`` if only inherited."""
     inherited_from: str | None
     """The group above that gives the (higher) inherited role, if any."""
+    avatar_url: str | None = None
 
 
 class MemberIn(BaseModel):
@@ -354,12 +356,12 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
     chain = [group, *_ancestors(db, group)]
     names = {g.id: g.name for g in chain}
     rows = db.execute(
-        select(Membership, User.username)
+        select(Membership, User.username, User.avatar_version)
         .join(User, User.id == Membership.user_id)
         .where(Membership.group_id.in_(names))
     )
     members: dict[uuid.UUID, MemberOut] = {}
-    for membership, username in rows:
+    for membership, username, avatar_version in rows:
         role = Role(membership.role)
         here = membership.group_id == group.id
         current = members.get(membership.user_id) or MemberOut(
@@ -368,6 +370,7 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
             role=role,
             direct_role=None,
             inherited_from=None,
+            avatar_url=avatar_url(membership.user_id, avatar_version),
         )
         if here:
             current.direct_role = role

@@ -13,6 +13,7 @@ from paperus import auth, handover
 from paperus.api.admin import Admin
 from paperus.api.auth import check_password_length
 from paperus.api.deps import DB
+from paperus.avatars import avatar_url
 from paperus.models import Group, Item, Library, Membership, User
 from paperus.system import load_config
 
@@ -33,6 +34,7 @@ class UserRow(BaseModel):
     """Groups the person is directly in."""
     papers: int
     """Papers the person owns privately (not in the trash)."""
+    avatar_url: str | None = None
 
 
 class NewUser(BaseModel):
@@ -78,6 +80,7 @@ def _rows(db: DB, only: uuid.UUID | None = None) -> list[UserRow]:
             deactivated_at=user.deactivated_at,
             groups=groups.get(user.id, 0),
             papers=papers.get(user.id, 0),
+            avatar_url=avatar_url(user.id, user.avatar_version),
         )
         for user in db.scalars(query)
     ]
