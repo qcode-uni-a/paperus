@@ -44,7 +44,7 @@ class CollectionOut(BaseModel):
     description: str | None
     parent_id: uuid.UUID | None
     count: int
-    """Items directly in this collection (not in the trash)."""
+    """Items in this collection or the collections inside (not in the trash)."""
     recent: list[ItemPreview] = []
     """The last items added (up to three), for previews."""
 
@@ -168,78 +168,80 @@ def delete_tag(tag_id: uuid.UUID, db: DB, user: CurrentUser) -> Response:
 
 
 def _collection_out(db: DB, collection: Collection) -> CollectionOut:
-    count = db.scalar(
-        select(func.count())
-        .select_from(CollectionItem)
-        .join(Item, Item.id == CollectionItem.item_id)
-        .where(CollectionItem.collection_id == collection.id, Item.deleted_at.is_(None))
-    )
+    count, recent = _contents(db, collection.id).get(collection.id, (0, []))
     return CollectionOut(
         id=collection.id,
         name=collection.name,
         description=collection.description,
         parent_id=collection.parent_id,
-        count=count or 0,
+        count=count,
+        recent=recent,
     )
 
 
 @router.get("/api/collections")
 def list_collections(db: DB, user: CurrentUser) -> list[CollectionOut]:
     """All collections, flat; ``parent_id`` gives the tree."""
-    counts = (
-        select(CollectionItem.collection_id, func.count().label("count"))
-        .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None))
-        .group_by(CollectionItem.collection_id)
-        .subquery()
-    )
-    rows = db.execute(
-        select(Collection, func.coalesce(counts.c.count, 0))
-        .outerjoin(counts, counts.c.collection_id == Collection.id)
-        .order_by(func.lower(Collection.name))
-    )
-    recent = _recent_items(db)
+    contents = _contents(db)
+    collections = db.scalars(select(Collection).order_by(func.lower(Collection.name)))
     return [
         CollectionOut(
             id=c.id,
             name=c.name,
             description=c.description,
             parent_id=c.parent_id,
-            count=count,
-            recent=recent.get(c.id, []),
+            count=contents.get(c.id, (0, []))[0],
+            recent=contents.get(c.id, (0, []))[1],
         )
-        for c, count in rows
+        for c in collections
     ]
 
 
-def _recent_items(
-    db: DB, per_collection: int = 3
-) -> dict[uuid.UUID, list[ItemPreview]]:
-    """The last items added to each collection, newest first."""
+def _contents(
+    db: DB, root: uuid.UUID | None = None, per_collection: int = 3
+) -> dict[uuid.UUID, tuple[int, list[ItemPreview]]]:
+    """Per collection, its items including those of the collections inside:
+    how many, and the last added (newest first). Only ``root`` if given."""
+    start = select(Collection.id.label("root"), Collection.id.label("member"))
+    if root is not None:
+        start = start.where(Collection.id == root)
+    tree = start.cte("tree", recursive=True)
+    tree = tree.union_all(
+        select(tree.c.root, Collection.id).where(Collection.parent_id == tree.c.member)
+    )
+    # An item in several collections of one tree counts once, as last added.
+    items = (
+        select(
+            tree.c.root,
+            CollectionItem.item_id,
+            func.max(CollectionItem.created_at).label("added"),
+        )
+        .join(CollectionItem, CollectionItem.collection_id == tree.c.member)
+        .join(Item, Item.id == CollectionItem.item_id)
+        .where(Item.deleted_at.is_(None))
+        .group_by(tree.c.root, CollectionItem.item_id)
+        .subquery()
+    )
     ranked = (
         select(
-            CollectionItem.collection_id,
+            items.c.root,
             Item.id,
             Item.title,
             func.row_number()
-            .over(
-                partition_by=CollectionItem.collection_id,
-                order_by=CollectionItem.created_at.desc(),
-            )
+            .over(partition_by=items.c.root, order_by=items.c.added.desc())
             .label("rank"),
+            func.count().over(partition_by=items.c.root).label("count"),
         )
-        .join(Item, Item.id == CollectionItem.item_id)
-        .where(Item.deleted_at.is_(None))
+        .join(Item, Item.id == items.c.item_id)
         .subquery()
     )
-    previews: dict[uuid.UUID, list[ItemPreview]] = {}
-    for collection_id, item_id, title, _ in db.execute(
+    contents: dict[uuid.UUID, tuple[int, list[ItemPreview]]] = {}
+    for collection_id, item_id, title, _, count in db.execute(
         select(ranked).where(ranked.c.rank <= per_collection).order_by(ranked.c.rank)
     ):
-        previews.setdefault(collection_id, []).append(
-            ItemPreview(id=item_id, title=title)
-        )
-    return previews
+        _, previews = contents.setdefault(collection_id, (count, []))
+        previews.append(ItemPreview(id=item_id, title=title))
+    return contents
 
 
 @router.post("/api/collections", status_code=201)

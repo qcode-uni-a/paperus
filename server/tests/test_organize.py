@@ -95,7 +95,12 @@ def test_nested_collections(logged_in: TestClient) -> None:
 
     listed = {c["name"]: c for c in logged_in.get("/api/collections").json()}
     assert listed["Chapter 2"]["parent_id"] == thesis
-    assert listed["Thesis"]["count"] == 1
+    # Items of the collections inside count too, each once.
+    assert listed["Thesis"]["count"] == 3
+    assert listed["Chapter 2"]["count"] == 2
+    logged_in.post(f"/api/collections/{thesis}/items", json={"item_ids": [b["id"]]})
+    listed = {c["name"]: c for c in logged_in.get("/api/collections").json()}
+    assert listed["Thesis"]["count"] == 3
 
     logged_in.delete(f"/api/collections/{chapter}/items/{c['id']}")
     assert titles(logged_in, collection=chapter) == ["B"]
