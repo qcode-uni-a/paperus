@@ -171,6 +171,9 @@ Mendeley's exports do not include its collections.
   search; a missing file is listed in the report, not an error.
 - **Report** at the end: how many papers were added, found already, and
   which files or entries could not be read.
+- **Zotero RDF** is read as an RDF graph (rdflib), so the XML layout does
+  not matter; checked against a hand-made sample in Zotero's layout, still
+  to be checked against a real export.
 - **Not now**: Zotero PDF annotations (not in Zotero's exports; later via
   the Zotero Web API or the local database), sync instead of a one-off
   import, reading `zotero.sqlite` directly.

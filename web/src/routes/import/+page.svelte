@@ -15,7 +15,7 @@
 		{
 			name: 'Zotero',
 			steps:
-				'Right-click “My Library” (or a collection) → Export… → format “BibTeX”, tick “Export Files” and “Export Notes”. Zip the folder Zotero writes and choose the zip here. Zotero’s collections come along once its own format (Zotero RDF) can be imported, soon.'
+				'Right-click “My Library” (or a collection) → Export… → format “Zotero RDF”, tick “Export Notes” and “Export Files”. Zip the folder Zotero writes and choose the zip here. Collections, tags, notes and PDFs come along.'
 		},
 		{
 			name: 'JabRef',
@@ -122,14 +122,14 @@
 		<label class="drop" class:chosen={file}>
 			<input
 				type="file"
-				accept=".bib,.bibtex,.ris,.json,.zip,application/zip"
+				accept=".rdf,.bib,.bibtex,.ris,.json,.zip,application/zip"
 				onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
 			/>
 			<strong>{file ? file.name : 'Choose the export'}</strong>
 			<span class="muted"
 				>{file
 					? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-					: 'BibTeX, RIS or CSL-JSON, alone or zipped with the files'}</span
+					: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files'}</span
 			>
 		</label>
 		{#if writableLibraries().length > 1}

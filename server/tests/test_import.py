@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from paperus.access import Access
 from paperus.cli import main
 from paperus.identifiers import Scheme
-from paperus.importing import bibtex, csljson, ris
+from paperus.importing import bibtex, csljson, ris, zotero
 from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
 from paperus.importing.run import run_import
 from paperus.models import Import, User
@@ -362,10 +362,9 @@ def test_upload_formats_and_failures(
     run_queued(db, blobs, job_app)
     result = {k: ada.get(f"/api/imports/{v['id']}").json() for k, v in imports.items()}
     assert (result["ris"]["status"], result["ris"]["format"]) == ("done", "ris")
-    assert result["rdf"]["status"] == "failed"
-    assert "Zotero RDF is not supported yet" in result["rdf"]["error"]
+    assert (result["rdf"]["status"], result["rdf"]["format"]) == ("done", "zotero-rdf")
     assert "not an export paperus can read" in result["nothing"]["error"]
-    assert "No .bib, .ris or .json file in the zip" in result["zip"]["error"]
+    assert "No .rdf, .bib, .ris or .json file in the zip" in result["zip"]["error"]
 
 
 def test_import_command(
@@ -393,3 +392,80 @@ def test_import_command(
     with pytest.raises(SystemExit) as exit:
         main(["import", str(folder), "--user", "ada", "--group", "Nowhere"])
     assert exit.value.code == 1
+
+
+ZOTERO = (Path(__file__).parent / "zotero_sample.rdf").read_text()
+
+
+def test_zotero_rdf() -> None:
+    export = zotero.read(ZOTERO)
+    assert export.problems == []
+    assert export.collections == [("Thesis",), ("Thesis", "Chapter 1")]
+    [standalone] = export.notes
+    assert (standalone.text, standalone.collections) == (
+        "Ideas for the thesis.",
+        [("Thesis",)],
+    )
+    papers = {p.csl["title"]: p for p in export.papers}
+    article = papers["Radar gaps over the Alps"]
+    assert article.csl["author"] == [
+        {"family": "van Gogh", "given": "Vincent"},
+        {"literal": "Radar Working Group"},
+    ]
+    assert article.csl["translator"] == [{"family": "Müller", "given": "Jörg"}]
+    assert article.csl["container-title"] == "Journal of Weather"
+    assert (article.csl["volume"], article.csl["issue"]) == ("12", "4")
+    assert article.csl["citation-key"] == "vanGogh2024"
+    assert article.csl["note"] == "Read twice."
+    assert article.csl["accessed"] == {"date-parts": [[2026, 1, 5]]}
+    assert article.identifiers == [(Scheme.DOI, "10.1234/radar")]
+    assert article.tags == ["Weather", "radar"]  # automatic tags too
+    assert article.collections == [("Thesis", "Chapter 1")]
+    assert article.notes == [
+        "# Reading notes\n\nThe **gaps** are below the beam.\n\n- one\n- two"
+    ]
+    # Only the stored file; the link to a web page has none.
+    assert [f.path for f in article.files] == [
+        "files/13/van Gogh - 2024 - Radar gaps.pdf"
+    ]
+    preprint = papers["The diffusion of rain"]
+    assert preprint.csl["type"] == "article"
+    assert preprint.identifiers == [(Scheme.ARXIV, "2611.00001")]
+    book = papers["Clouds"]
+    assert (book.csl["publisher"], book.csl["publisher-place"]) == (
+        "Cloud Press",
+        "Augsburg",
+    )
+    assert book.csl["collection-title"] == "Weather Studies"
+    assert book.identifiers == [(Scheme.ISBN, "9783161484100")]
+    assert zotero.read("<rdf:RDF").problems
+
+
+def test_zotero_zip(
+    client: TestClient, db: Session, blobs: BlobStore, job_app: App
+) -> None:
+    ada = Person(client, db, "ada")
+    upload = zip_bytes(
+        **{
+            "Exported Items/Exported Items.rdf": ZOTERO.encode(),
+            "Exported Items/files/13/van Gogh - 2024 - Radar gaps.pdf": make_pdf(
+                [["Radar"]]
+            ),
+        }
+    )
+    started = client.post(
+        "/api/imports",
+        headers=ada.headers,
+        files={"upload": ("Exported Items.zip", upload)},
+    ).json()
+    run_queued(db, blobs, job_app)
+    done = ada.get(f"/api/imports/{started['id']}").json()
+    assert (done["status"], done["format"]) == ("done", "zotero-rdf")
+    report = done["report"]
+    assert (report["added"], report["files"], report["notes"]) == (3, 1, 2)
+    assert report["missing_files"] == []
+    thesis = next(
+        c for c in ada.get("/api/collections").json() if c["name"] == "Thesis"
+    )
+    [note] = ada.get(f"/api/notes?collection={thesis['id']}&nested=false").json()
+    assert note["title"] == "Ideas for the thesis."

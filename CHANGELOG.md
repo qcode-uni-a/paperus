@@ -3,9 +3,10 @@
 ## Unreleased
 
 - **Import a library** (Add → Import a library): from Zotero, JabRef,
-  Mendeley, EndNote and others, as BibTeX, RIS or CSL-JSON, alone or
-  zipped with the PDFs. Papers already here are recognized and not added
-  twice (importing again is safe); JabRef groups become collections,
+  Mendeley, EndNote and others, as Zotero RDF, BibTeX, RIS or CSL-JSON,
+  alone or zipped with the PDFs. Papers already here are recognized and not
+  added twice (importing again is safe); Zotero's collections, child and
+  standalone notes come along, JabRef groups become collections,
   keywords tags, notes notes, and citation keys stay. Runs in the
   background with progress and a report of missing files. For very large
   libraries: `paperus import <zip|folder> --user <name>` on the server.

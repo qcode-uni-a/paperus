@@ -13,7 +13,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from paperus.access import Access
-from paperus.importing import Export, bibtex, csljson, ris
+from paperus.importing import Export, bibtex, csljson, ris, zotero
 from paperus.importing.apply import Files as FileSource
 from paperus.importing.apply import FolderFiles, NoFiles, ZipFiles, apply
 from paperus.models import Import, ImportStatus, User
@@ -25,9 +25,16 @@ READERS: dict[str, Callable[[str], Export]] = {
     "bibtex": bibtex.read,
     "ris": ris.read,
     "csl-json": csljson.read,
+    "zotero-rdf": zotero.read,
 }
 # File endings of the exports, in the order they are looked for in a zip.
-ENDINGS = {".bib": "bibtex", ".bibtex": "bibtex", ".ris": "ris", ".json": "csl-json"}
+ENDINGS = {
+    ".rdf": "zotero-rdf",
+    ".bib": "bibtex",
+    ".bibtex": "bibtex",
+    ".ris": "ris",
+    ".json": "csl-json",
+}
 
 
 class NotAnExport(ValueError):
@@ -48,11 +55,8 @@ def _guess(name: str, text: str) -> str:
     ending = Path(name).suffix.lower()
     if ending in ENDINGS:
         return ENDINGS[ending]
-    if ending == ".rdf" or "<rdf:RDF" in text[:2000]:
-        raise NotAnExport(
-            "Zotero RDF is not supported yet. In Zotero, export as BibTeX (with "
-            "“Export Files”) for now."
-        )
+    if "<rdf:RDF" in text[:5000]:
+        return "zotero-rdf"
     start = text.lstrip()[:200]
     if start.startswith("@") or "\n@" in text[:5000]:
         return "bibtex"
@@ -61,8 +65,8 @@ def _guess(name: str, text: str) -> str:
     if start.startswith(("[", "{")):
         return "csl-json"
     raise NotAnExport(
-        "This is not an export paperus can read: use BibTeX (.bib), RIS (.ris) "
-        "or CSL-JSON (.json), alone or in a zip with the files."
+        "This is not an export paperus can read: use Zotero RDF (.rdf), BibTeX "
+        "(.bib), RIS (.ris) or CSL-JSON (.json), alone or in a zip with the files."
     )
 
 
@@ -75,7 +79,7 @@ def open_export(path: Path, name: str) -> Generator[tuple[str, str, FileSource]]
             p for p in path.rglob("*") if p.suffix.lower() in ENDINGS and p.is_file()
         )
         if not candidates:
-            raise NotAnExport("No .bib, .ris or .json file in the folder.")
+            raise NotAnExport("No .rdf, .bib, .ris or .json file in the folder.")
         text = _decode(candidates[0].read_bytes())
         yield _guess(candidates[0].name, text), text, FolderFiles(path)
         return
@@ -89,7 +93,7 @@ def open_export(path: Path, name: str) -> Generator[tuple[str, str, FileSource]]
                 if n.lower().endswith(ending) and "/__macosx/" not in f"/{n.lower()}"
             ]
             if not exports:
-                raise NotAnExport("No .bib, .ris or .json file in the zip.")
+                raise NotAnExport("No .rdf, .bib, .ris or .json file in the zip.")
             # The shallowest one: the export itself, not a file attached to a paper.
             chosen = min(exports, key=lambda n: n.count("/"))
             text = _decode(archive.read(chosen))

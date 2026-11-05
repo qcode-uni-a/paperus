@@ -1,0 +1,150 @@
+<rdf:RDF
+ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns:z="http://www.zotero.org/namespaces/export#"
+ xmlns:dcterms="http://purl.org/dc/terms/"
+ xmlns:bib="http://purl.org/net/biblio#"
+ xmlns:foaf="http://xmlns.com/foaf/0.1/"
+ xmlns:link="http://purl.org/rss/1.0/modules/link/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:prism="http://prismstandard.org/namespaces/1.2/basic/"
+ xmlns:vcard="http://nwalsh.com/rdf/vCard#">
+    <bib:Article rdf:about="#item_12">
+        <z:itemType>journalArticle</z:itemType>
+        <dcterms:isPartOf>
+            <bib:Journal>
+                <prism:volume>12</prism:volume>
+                <dc:title>Journal of Weather</dc:title>
+                <dc:identifier>DOI 10.1234/RADAR</dc:identifier>
+                <prism:number>4</prism:number>
+                <dcterms:alternative>J. Weather</dcterms:alternative>
+                <dc:identifier>ISSN 1234-5678</dc:identifier>
+            </bib:Journal>
+        </dcterms:isPartOf>
+        <bib:authors>
+            <rdf:Seq>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>van Gogh</foaf:surname>
+                        <foaf:givenName>Vincent</foaf:givenName>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Radar Working Group</foaf:surname>
+                    </foaf:Person>
+                </rdf:li>
+            </rdf:Seq>
+        </bib:authors>
+        <z:translators>
+            <rdf:Seq>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Müller</foaf:surname>
+                        <foaf:givenName>Jörg</foaf:givenName>
+                    </foaf:Person>
+                </rdf:li>
+            </rdf:Seq>
+        </z:translators>
+        <dcterms:isReferencedBy rdf:resource="#item_14"/>
+        <link:link rdf:resource="#item_13"/>
+        <link:link rdf:resource="#item_15"/>
+        <dc:subject>radar</dc:subject>
+        <dc:subject>
+           <z:AutomaticTag>
+              <rdf:value>Weather</rdf:value>
+           </z:AutomaticTag>
+        </dc:subject>
+        <dc:title>Radar gaps over the Alps</dc:title>
+        <dcterms:abstract>Blind zones hide rainfall.</dcterms:abstract>
+        <dc:date>2024-03-02</dc:date>
+        <z:language>en</z:language>
+        <z:shortTitle>Radar gaps</z:shortTitle>
+        <dc:identifier>
+            <dcterms:URI>
+               <rdf:value>https://example.org/radar</rdf:value>
+            </dcterms:URI>
+        </dc:identifier>
+        <dcterms:dateSubmitted>2026-01-05 10:11:12</dcterms:dateSubmitted>
+        <bib:pages>101-120</bib:pages>
+        <dc:description>Citation Key: vanGogh2024
+Read twice.</dc:description>
+    </bib:Article>
+    <z:Attachment rdf:about="#item_13">
+        <z:itemType>attachment</z:itemType>
+        <rdf:resource rdf:resource="files/13/van%20Gogh%20-%202024%20-%20Radar%20gaps.pdf"/>
+        <dc:title>Full Text PDF</dc:title>
+        <link:type>application/pdf</link:type>
+    </z:Attachment>
+    <z:Attachment rdf:about="#item_15">
+        <z:itemType>attachment</z:itemType>
+        <dc:identifier>
+            <dcterms:URI>
+               <rdf:value>https://example.org/radar/snapshot</rdf:value>
+            </dcterms:URI>
+        </dc:identifier>
+        <dc:title>Snapshot link</dc:title>
+    </z:Attachment>
+    <bib:Memo rdf:about="#item_14">
+        <rdf:value>&lt;div data-schema-version="9"&gt;&lt;h1&gt;Reading notes&lt;/h1&gt;
+&lt;p&gt;The &lt;strong&gt;gaps&lt;/strong&gt; are below the beam.&lt;/p&gt;
+&lt;ul&gt;&lt;li&gt;one&lt;/li&gt;&lt;li&gt;two&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;</rdf:value>
+    </bib:Memo>
+    <rdf:Description rdf:about="http://arxiv.org/abs/2611.00001v2">
+        <z:itemType>preprint</z:itemType>
+        <dc:publisher>
+           <foaf:Organization>
+              <foaf:name>arXiv</foaf:name>
+           </foaf:Organization>
+        </dc:publisher>
+        <bib:authors>
+            <rdf:Seq>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Lovelace</foaf:surname>
+                        <foaf:givenName>Ada</foaf:givenName>
+                    </foaf:Person>
+                </rdf:li>
+            </rdf:Seq>
+        </bib:authors>
+        <dc:title>The diffusion of rain</dc:title>
+        <dc:date>2026-11-02</dc:date>
+        <dc:description>arXiv:2611.00001 [physics]</dc:description>
+    </rdf:Description>
+    <bib:Book rdf:about="urn:isbn:978-3-16-148410-0">
+        <z:itemType>book</z:itemType>
+        <dc:publisher>
+            <foaf:Organization>
+                <vcard:adr>
+                    <vcard:Address>
+                       <vcard:locality>Augsburg</vcard:locality>
+                    </vcard:Address>
+                </vcard:adr>
+                <foaf:name>Cloud Press</foaf:name>
+            </foaf:Organization>
+        </dc:publisher>
+        <dcterms:isPartOf>
+            <bib:Series>
+                <dc:title>Weather Studies</dc:title>
+                <dc:identifier>7</dc:identifier>
+            </bib:Series>
+        </dcterms:isPartOf>
+        <dc:identifier>ISBN 978-3-16-148410-0</dc:identifier>
+        <dc:title>Clouds</dc:title>
+        <dc:date>2020</dc:date>
+    </bib:Book>
+    <bib:Memo rdf:about="#item_20">
+        <z:itemType>note</z:itemType>
+        <rdf:value>&lt;p&gt;Ideas for the thesis.&lt;/p&gt;</rdf:value>
+    </bib:Memo>
+    <z:Collection rdf:about="#collection_3">
+        <dc:title>Thesis</dc:title>
+        <dcterms:hasPart rdf:resource="#collection_4"/>
+        <dcterms:hasPart rdf:resource="#item_20"/>
+        <dcterms:hasPart rdf:resource="urn:isbn:978-3-16-148410-0"/>
+    </z:Collection>
+    <z:Collection rdf:about="#collection_4">
+        <dc:title>Chapter 1</dc:title>
+        <dcterms:hasPart rdf:resource="#item_12"/>
+        <dcterms:hasPart rdf:resource="http://arxiv.org/abs/2611.00001v2"/>
+    </z:Collection>
+</rdf:RDF>
