@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetConfigData, GetConfigResponses, GetItemData, GetItemErrors, GetItemResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, ListBackupsData, ListBackupsResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListTagsData, ListTagsResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MlStatusData, MlStatusResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StatsData, StatsResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -629,3 +629,39 @@ export const changeUser = <ThrowOnError extends boolean = false>(options: Option
         ...options.headers
     }
 });
+
+/**
+ * List Backups
+ */
+export const listBackups = <ThrowOnError extends boolean = false>(options?: Options<ListBackupsData, ThrowOnError>): RequestResult<ListBackupsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListBackupsResponses, unknown, ThrowOnError>({ url: '/api/admin/backups', ...options });
+
+/**
+ * Start Backup
+ *
+ * Queue a backup now (the worker writes it); 409 if one is running.
+ */
+export const startBackup = <ThrowOnError extends boolean = false>(options: Options<StartBackupData, ThrowOnError>): RequestResult<StartBackupResponses, StartBackupErrors, ThrowOnError> => (options.client ?? client).post<StartBackupResponses, StartBackupErrors, ThrowOnError>({
+    url: '/api/admin/backups',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Set Backup Config
+ */
+export const setBackupConfig = <ThrowOnError extends boolean = false>(options: Options<SetBackupConfigData, ThrowOnError>): RequestResult<SetBackupConfigResponses, SetBackupConfigErrors, ThrowOnError> => (options.client ?? client).put<SetBackupConfigResponses, SetBackupConfigErrors, ThrowOnError>({
+    url: '/api/admin/backups/config',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Backup
+ */
+export const deleteBackup = <ThrowOnError extends boolean = false>(options: Options<DeleteBackupData, ThrowOnError>): RequestResult<DeleteBackupResponses, DeleteBackupErrors, ThrowOnError> => (options.client ?? client).delete<DeleteBackupResponses, DeleteBackupErrors, ThrowOnError>({ url: '/api/admin/backups/{name}', ...options });

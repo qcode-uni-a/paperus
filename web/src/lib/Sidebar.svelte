@@ -27,6 +27,7 @@
 		[resolve('/admin/users'), 'Users'],
 		[resolve('/admin/jobs'), 'Jobs'],
 		[settingsPath, 'Settings'],
+		[resolve('/admin/backups'), 'Backups'],
 		[resolve('/admin/server'), 'Server stats']
 	] as const;
 

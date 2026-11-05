@@ -13,10 +13,7 @@ Smaller tasks noted along the way; larger plans live in the other documents.
 
 Collected 2026-11-05, roughly in priority order; each needs a design first.
 
-- **Backups (high priority).** From the admin page and on a schedule: the
-  database alone or database plus files, with the paperus version and
-  migration stored alongside, so a backup can be restored into the same or
-  a newer version.
+
 - **Personal access tokens.** For scripts, the MCP server (an AI assistant
   acting for its user) and the browser extension, instead of the login
   session. In Settings: create a named token, shown once, with scoped

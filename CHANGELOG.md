@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Backups** (Administration → Backups): now or daily/weekly at a chosen
+  hour, keeping the newest N; the database and optionally the files (each
+  backup copies only new files). Restore with `paperus backup restore`;
+  older backups are brought up to date while restoring. See
+  [operations](docs/operations.md#backups).
 - **Merge duplicates**: "Merge into…" in a paper's ⋯ menu suggests papers
   with the same identifier or file and moves versions, files, tags and
   collections over (as far as one's rights allow); the merged paper goes to

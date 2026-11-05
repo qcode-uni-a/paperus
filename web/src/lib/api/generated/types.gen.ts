@@ -5,6 +5,93 @@ export type ClientOptions = {
 };
 
 /**
+ * BackupConfig
+ *
+ * When backups run on their own (checked every hour by the worker).
+ */
+export type BackupConfig = {
+    /**
+     * Schedule
+     */
+    schedule?: 'off' | 'daily' | 'weekly';
+    /**
+     * Hour
+     */
+    hour?: number;
+    /**
+     * With Files
+     */
+    with_files?: boolean;
+    /**
+     * Keep
+     */
+    keep?: number;
+};
+
+/**
+ * BackupOut
+ */
+export type BackupOut = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Paperus Version
+     */
+    paperus_version: string;
+    /**
+     * With Files
+     */
+    with_files: boolean;
+    /**
+     * Files
+     */
+    files: number;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Items
+     */
+    items: number;
+};
+
+/**
+ * BackupRequest
+ */
+export type BackupRequest = {
+    /**
+     * With Files
+     */
+    with_files?: boolean;
+};
+
+/**
+ * Backups
+ */
+export type Backups = {
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Files Size
+     */
+    files_size: number;
+    /**
+     * Backups
+     */
+    backups: Array<BackupOut>;
+    config: BackupConfig;
+};
+
+/**
  * Body_upload_new_item
  */
 export type BodyUploadNewItem = {
@@ -3037,3 +3124,97 @@ export type ChangeUserResponses = {
 };
 
 export type ChangeUserResponse = ChangeUserResponses[keyof ChangeUserResponses];
+
+export type ListBackupsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/backups';
+};
+
+export type ListBackupsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Backups;
+};
+
+export type ListBackupsResponse = ListBackupsResponses[keyof ListBackupsResponses];
+
+export type StartBackupData = {
+    body: BackupRequest;
+    path?: never;
+    query?: never;
+    url: '/api/admin/backups';
+};
+
+export type StartBackupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartBackupError = StartBackupErrors[keyof StartBackupErrors];
+
+export type StartBackupResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type SetBackupConfigData = {
+    body: BackupConfig;
+    path?: never;
+    query?: never;
+    url: '/api/admin/backups/config';
+};
+
+export type SetBackupConfigErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetBackupConfigError = SetBackupConfigErrors[keyof SetBackupConfigErrors];
+
+export type SetBackupConfigResponses = {
+    /**
+     * Successful Response
+     */
+    200: BackupConfig;
+};
+
+export type SetBackupConfigResponse = SetBackupConfigResponses[keyof SetBackupConfigResponses];
+
+export type DeleteBackupData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/admin/backups/{name}';
+};
+
+export type DeleteBackupErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteBackupError = DeleteBackupErrors[keyof DeleteBackupErrors];
+
+export type DeleteBackupResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteBackupResponse = DeleteBackupResponses[keyof DeleteBackupResponses];

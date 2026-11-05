@@ -2767,10 +2767,265 @@
           }
         }
       }
+    },
+    "/api/admin/backups": {
+      "get": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "List Backups",
+        "operationId": "list_backups",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backups"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Start Backup",
+        "description": "Queue a backup now (the worker writes it); 409 if one is running.",
+        "operationId": "start_backup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/backups/config": {
+      "put": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Set Backup Config",
+        "operationId": "set_backup_config",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/backups/{name}": {
+      "delete": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Delete Backup",
+        "operationId": "delete_backup",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "BackupConfig": {
+        "properties": {
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "off",
+              "daily",
+              "weekly"
+            ],
+            "title": "Schedule",
+            "default": "off"
+          },
+          "hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "default": 3
+          },
+          "with_files": {
+            "type": "boolean",
+            "title": "With Files",
+            "default": true
+          },
+          "keep": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Keep",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "title": "BackupConfig",
+        "description": "When backups run on their own (checked every hour by the worker)."
+      },
+      "BackupOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "paperus_version": {
+            "type": "string",
+            "title": "Paperus Version"
+          },
+          "with_files": {
+            "type": "boolean",
+            "title": "With Files"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "created_at",
+          "paperus_version",
+          "with_files",
+          "files",
+          "size",
+          "items"
+        ],
+        "title": "BackupOut"
+      },
+      "BackupRequest": {
+        "properties": {
+          "with_files": {
+            "type": "boolean",
+            "title": "With Files",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "BackupRequest"
+      },
+      "Backups": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "files_size": {
+            "type": "integer",
+            "title": "Files Size"
+          },
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupOut"
+            },
+            "type": "array",
+            "title": "Backups"
+          },
+          "config": {
+            "$ref": "#/components/schemas/BackupConfig"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "files_size",
+          "backups",
+          "config"
+        ],
+        "title": "Backups"
+      },
       "Body_upload_new_item": {
         "properties": {
           "upload": {
