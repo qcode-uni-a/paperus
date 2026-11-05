@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The menu's Manage part sits at the bottom of the window.
+
 ## 0.0.8 (2026-11-05)
 
 The first release with packages besides the container images.

@@ -98,28 +98,33 @@
 			<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
 		{/each}
 	{:else}
-		{#each MAIN as [path, label, icon] (path)}
-			<a href={path} class:current={path === library ? onLibrary && !filtered : active(path)}
-				><Icon path={icon} /><span>{label}</span></a
-			>
-			{#if path === collectionsPath}
-				{#each organize.collections.filter((c) => c.pinned) as pinned (pinned.id)}
-					{@const href = resolve('/collections/[id]', { id: pinned.id })}
-					<a {href} class="sub" class:current={page.url.pathname === href}
-						><span>{pinned.name}</span></a
-					>
-				{/each}
-			{/if}
-		{/each}
+		<div class="part">
+			{#each MAIN as [path, label, icon] (path)}
+				<a href={path} class:current={path === library ? onLibrary && !filtered : active(path)}
+					><Icon path={icon} /><span>{label}</span></a
+				>
+				{#if path === collectionsPath}
+					{#each organize.collections.filter((c) => c.pinned) as pinned (pinned.id)}
+						{@const href = resolve('/collections/[id]', { id: pinned.id })}
+						<a {href} class="sub" class:current={page.url.pathname === href}
+							><span>{pinned.name}</span></a
+						>
+					{/each}
+				{/if}
+			{/each}
+		</div>
 
-		<span class="group">Manage</span>
-		{#each MANAGE as [path, label, icon] (path)}
-			<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
-		{/each}
-		{#if session.user?.is_admin}
-			<a href={adminPath}><Icon path={mdiShieldAccountOutline} /><span>Administration</span></a>
-		{/if}
-		{#if session.user}<StorageMeter />{/if}
+		<!-- At the bottom of the window, below what is used every day. -->
+		<div class="part bottom">
+			<span class="group">Manage</span>
+			{#each MANAGE as [path, label, icon] (path)}
+				<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
+			{/each}
+			{#if session.user?.is_admin}
+				<a href={adminPath}><Icon path={mdiShieldAccountOutline} /><span>Administration</span></a>
+			{/if}
+			{#if session.user}<StorageMeter />{/if}
+		</div>
 	{/if}
 </nav>
 
@@ -127,11 +132,16 @@
 	/* Icons and labels, the current entry a rounded pill in the
 	   accent colour, flush with the left edge. */
 	nav {
-		display: grid;
-		align-content: start;
+		display: flex;
+		flex-direction: column;
 		gap: 2px;
 		position: sticky;
 		top: 72px;
+		/* The window's height below the header, so Manage sits at the
+		   bottom; scrolls when the window is too short for all. */
+		height: calc(100dvh - 72px);
+		overflow-y: auto;
+		padding-bottom: 16px;
 		width: 248px;
 		flex-shrink: 0;
 		margin-left: -16px;
@@ -139,6 +149,14 @@
 	}
 	nav[hidden] {
 		display: none;
+	}
+	.part {
+		display: grid;
+		gap: 2px;
+	}
+	.bottom {
+		margin-top: auto;
+		padding-top: 12px;
 	}
 	a {
 		display: flex;
@@ -201,6 +219,7 @@
 		inset: 0 auto 0 0;
 		z-index: 40;
 		width: min(300px, 85vw);
+		height: auto;
 		margin-left: 0;
 		padding: 16px 12px 16px 0;
 		overflow-y: auto;
