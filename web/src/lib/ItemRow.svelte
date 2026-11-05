@@ -19,7 +19,8 @@
 				>{/if}</span
 		>
 		<span class="badge">{typeName(item.type)}</span>
-		{#each item.tags as tag (tag.id)}<span class="tag">{tag.name}</span>{/each}
+		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span
+			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
 	</p>
 </li>
@@ -60,8 +61,9 @@
 		line-height: 1.6;
 		padding: 0 8px;
 		border-radius: 999px;
-		border: 1px solid var(--rule);
-		color: var(--muted);
+		border: 1px solid var(--tag-bg, var(--rule));
+		background: var(--tag-bg, none);
+		color: var(--tag-ink, var(--muted));
 	}
 	.reading {
 		color: var(--royal);

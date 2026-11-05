@@ -612,7 +612,7 @@ export type TagChange = {
  *
  * Colours a tag can have; the website gives each a light and dark shade.
  */
-export type TagColor = 'gray' | 'red' | 'orange' | 'yellow' | 'green' | 'teal' | 'blue' | 'purple' | 'pink';
+export type TagColor = 'gray' | 'brown' | 'red' | 'rose' | 'orange' | 'amber' | 'yellow' | 'lime' | 'green' | 'emerald' | 'teal' | 'cyan' | 'sky' | 'blue' | 'indigo' | 'violet' | 'purple' | 'pink';
 
 /**
  * TagIn

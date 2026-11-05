@@ -53,7 +53,7 @@
 	<div class="line">
 		<span class="label">Tags</span>
 		{#each item.tags as tag (tag.id)}
-			<span class="chip">
+			<span class="chip" data-tag-color={tag.color}>
 				<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
 				<button
 					onclick={async () =>
@@ -149,11 +149,11 @@
 		gap: 2px;
 		padding: 1px 4px 1px 10px;
 		border-radius: 999px;
-		background: var(--rail);
+		background: var(--tag-bg, var(--rail));
 		font-size: 0.92em;
 	}
 	.chip a {
-		color: var(--ink);
+		color: var(--tag-ink, var(--ink));
 		text-decoration: none;
 	}
 	.chip a:hover {
@@ -166,7 +166,7 @@
 		border: none;
 		border-radius: 50%;
 		background: none;
-		color: var(--muted);
+		color: var(--tag-ink, var(--muted));
 		line-height: 1;
 	}
 	.chip button:hover {

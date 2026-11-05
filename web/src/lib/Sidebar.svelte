@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
 	import { menu } from '#lib/menu.svelte.ts';
-	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import { loadOrganize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	// Like Immich: inside the administration, its menu replaces the normal one.
@@ -18,7 +18,7 @@
 	const filtered = $derived(params.has('collection') || params.has('tag'));
 	const onLibrary = $derived(page.url.pathname === library);
 
-	// Collections and tags, reloaded when other pages change them.
+	// Collections and tags for pickers, reloaded when pages change them.
 	$effect(() => {
 		if (session.user && !inAdmin) loadOrganize();
 	});
@@ -72,21 +72,15 @@
 
 		<a href={collectionsPath} class:current={active(collectionsPath)}><span>Collections</span></a>
 
-		{#if organize.tags.length}
-			<span class="group section">Tags</span>
-			<div class="tags">
-				{#each organize.tags as tag (tag.id)}
-					<a
-						class="tag"
-						href="{library}?tag={tag.id}"
-						class:current={onLibrary && params.getAll('tag').includes(tag.id)}
-						>{tag.name}<small>{tag.count}</small></a
-					>
-				{/each}
-			</div>
-		{/if}
-
 		<div class="bottom">
+			<span class="group">Manage</span>
+			<a
+				href={resolve('/manage/collections')}
+				class:current={active(resolve('/manage/collections'))}><span>Collections</span></a
+			>
+			<a href={resolve('/manage/tags')} class:current={active(resolve('/manage/tags'))}
+				><span>Tags</span></a
+			>
 			<a href={resolve('/trash')} class:current={active(resolve('/trash'))}><span>Trash</span></a>
 			{#if session.user?.is_admin}
 				<a href={adminPath}><span>Administration</span></a>
@@ -144,32 +138,6 @@
 		padding-left: 24px;
 		font-size: 0.95em;
 		color: var(--muted);
-	}
-	.section {
-		margin-top: 14px;
-	}
-	small {
-		color: var(--faint);
-		font-size: var(--step--1);
-	}
-	.tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px 6px;
-		padding: 4px 6px 0;
-	}
-	a.tag {
-		display: inline-flex;
-		gap: 5px;
-		align-items: baseline;
-		padding: 2px 9px;
-		border-radius: 999px;
-		background: var(--rail);
-		font-size: 0.9em;
-	}
-	a.tag.current {
-		background: var(--highlighter);
-		color: var(--on-highlighter);
 	}
 	.bottom {
 		display: grid;
