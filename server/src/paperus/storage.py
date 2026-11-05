@@ -18,6 +18,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable, Iterator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -97,6 +98,11 @@ class BlobStore(ABC):
     @abstractmethod
     def delete(self, sha256: bytes) -> None: ...
 
+    @abstractmethod
+    def iter_stored(self) -> Iterator[tuple[bytes, datetime, int]]:
+        """Every stored content: its SHA-256, when it was written, its size
+        (for integrity checks)."""
+
 
 class FilesystemStore(BlobStore):
     def __init__(self, root: Path) -> None:
@@ -126,6 +132,16 @@ class FilesystemStore(BlobStore):
 
     def delete(self, sha256: bytes) -> None:
         self.path(sha256).unlink(missing_ok=True)
+
+    def iter_stored(self) -> Iterator[tuple[bytes, datetime, int]]:
+        for path in (self.root / "blobs").glob("*/*/*"):
+            if len(path.name) == 64 and path.is_file():
+                try:
+                    stat = path.stat()
+                    written = datetime.fromtimestamp(stat.st_mtime, UTC)
+                    yield bytes.fromhex(path.name), written, stat.st_size
+                except (ValueError, OSError):
+                    continue
 
 
 class S3Store(BlobStore):
@@ -179,6 +195,19 @@ class S3Store(BlobStore):
 
     def delete(self, sha256: bytes) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=self.key(sha256))
+
+    def iter_stored(self) -> Iterator[tuple[bytes, datetime, int]]:
+        pages = self.client.get_paginator("list_objects_v2").paginate(
+            Bucket=self.bucket, Prefix=f"{self.prefix}blobs/"
+        )
+        for page in pages:
+            for entry in page.get("Contents", []):
+                name = entry.get("Key", "").rsplit("/", 1)[-1]
+                if len(name) == 64:
+                    try:
+                        yield bytes.fromhex(name), entry["LastModified"], entry["Size"]
+                    except (ValueError, KeyError):
+                        continue
 
 
 def make_blob_store(settings: Settings) -> BlobStore:

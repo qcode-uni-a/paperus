@@ -16,7 +16,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import trash
+from paperus import integrity, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -253,6 +253,31 @@ def empty_old_trash(timestamp: int) -> None:
             db, context.blobs, before=datetime.now(UTC) - timedelta(days=days)
         )
     log.info("emptied the trash: %s", done)
+
+
+@tasks.task(name="check_integrity", queue="backup", queueing_lock="integrity")
+def check_integrity_now(deep: bool = False, remove_unused: bool = False) -> None:
+    """Compare the database with the storage (see ``paperus.integrity``)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        report = integrity.check(
+            db, context.blobs, deep=deep, remove_unused=remove_unused
+        )
+    log.info("integrity check: %s", report.model_dump(exclude={"problems"}))
+
+
+@tasks.periodic(cron="15 4 * * 0")
+@tasks.task(name="weekly_integrity", queue="backup", queueing_lock="integrity")
+def weekly_integrity(timestamp: int) -> None:
+    check_integrity_now()
+
+
+def queue_integrity_check(
+    app: App, *, deep: bool = False, remove_unused: bool = False
+) -> None:
+    task = app.configure_task("paperus:check_integrity", queueing_lock="integrity")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(deep=deep, remove_unused=remove_unused)
 
 
 def queue_empty_trash(app: App) -> None:

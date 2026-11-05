@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 
-from paperus import system
+from paperus import integrity, system
 from paperus.api.deps import DB, CurrentUser
 from paperus.jobs import (
     queue_embedding_sweep,
     queue_empty_trash,
+    queue_integrity_check,
     queue_ml_configuration,
     queue_text_sweep,
 )
@@ -239,12 +240,18 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
 @router.post("/jobs/{job}", status_code=202)
 def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
-    (read files still pending), ``text-all`` (read every file again) or
-    ``trash`` (delete what is older than the trash days)."""
+    (read files still pending), ``text-all`` (read every file again),
+    ``trash`` (delete what is older than the trash days), ``integrity``
+    (check stored contents), ``integrity-deep`` (also their SHA-256) or
+    ``integrity-clean`` (check and remove unused stored contents)."""
+    jobs = request.app.state.jobs
     sweeps = {
         "embeddings": queue_embedding_sweep,
         "text": queue_text_sweep,
         "trash": queue_empty_trash,
+        "integrity": queue_integrity_check,
+        "integrity-deep": lambda app: queue_integrity_check(app, deep=True),
+        "integrity-clean": lambda app: queue_integrity_check(app, remove_unused=True),
     }
     if job == "text-all":
         count = reread_all(db)
@@ -252,5 +259,11 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
         return {"queued": job, "files": count}
     if job not in sweeps:
         raise HTTPException(404, f"unknown job {job!r}")
-    sweeps[job](request.app.state.jobs)
+    sweeps[job](jobs)
     return {"queued": job}
+
+
+@router.get("/integrity")
+def integrity_report(db: DB, admin: Admin) -> integrity.Report | None:
+    """The last integrity check's report (None before the first)."""
+    return integrity.last_report(db)
