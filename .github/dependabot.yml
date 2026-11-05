@@ -1,0 +1,71 @@
+# Weekly update pull requests for everything paperus depends on. Minor and
+# patch updates come grouped per kind; major ones one by one. New releases
+# wait a week first (cooldown), so a broken or malicious release has time
+# to be noticed. Security updates come at once, regardless of the schedule.
+version: 2
+
+updates:
+  - package-ecosystem: uv
+    directories: ["/server", "/ml"]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories: ["/web", "/client"]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        update-types: [minor, patch]
+
+  # Base images: python, node and uv (Dockerfiles).
+  - package-ecosystem: docker
+    directories: ["/", "/ml"]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      images:
+        update-types: [minor, patch]
+
+  # Postgres (compose files).
+  - package-ecosystem: docker-compose
+    directories: ["/", "/deploy"]
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pre-commit
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      hooks:
+        patterns: ["*"]

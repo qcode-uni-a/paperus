@@ -2,6 +2,9 @@
 #   docker run … paperus-server          migrate, then serve on port 8000
 #   docker run … paperus-server worker   background jobs
 
+# uv, from its own image (a FROM line, so Dependabot keeps it current).
+FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
+
 FROM node:24-slim AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
@@ -14,7 +17,7 @@ LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus server: API, website and worker" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /bin/uv
+COPY --from=uv /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH" \

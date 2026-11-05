@@ -1,11 +1,15 @@
 # paperus-ml: CPU image. Models are downloaded to /cache on first use;
 # mount a volume there so they survive updates.
+
+# uv, from its own image (a FROM line, so Dependabot keeps it current).
+FROM ghcr.io/astral-sh/uv:0.13.5 AS uv
+
 FROM python:3.13-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus machine learning service (embeddings)" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /bin/uv
+COPY --from=uv /uv /bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \

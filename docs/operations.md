@@ -231,6 +231,18 @@ Variables):
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
 
+## Checks and updates
+
+- **CI** (`.github/workflows/ci.yml`) on every push and pull request: the
+  pre-commit hooks on all files, then the server, the ML service, the
+  website, the TypeScript client and both container images.
+- **Dependabot** (`.github/dependabot.yml`) opens update pull requests every
+  Monday: Python (uv), npm, the base images (python, node, uv, Postgres),
+  GitHub Actions and the pre-commit hooks. Minor and patch updates come
+  grouped; major ones one by one. New releases wait a week first. Security
+  updates come at once. Merge when CI is green; a major update may need
+  changes (read its notes).
+
 ## Data protection and licences
 
 - Involve the data protection officer early: accounts, notes, usage logs are
