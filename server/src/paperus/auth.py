@@ -92,6 +92,14 @@ def start_session(
     return token
 
 
+def remove_expired_sessions(db: Session) -> int:
+    """Delete login sessions past their end; how many."""
+    result = db.execute(
+        delete(LoginSession).where(LoginSession.expires_at < datetime.now(UTC))
+    )
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def end_session(db: Session, token: str) -> None:
     db.execute(
         delete(LoginSession).where(LoginSession.token_hash == _token_hash(token))

@@ -17,6 +17,7 @@ from paperus.jobs import (
     queue_ml_configuration,
     queue_readable_copy,
     queue_text_sweep,
+    queue_tidy,
 )
 from paperus.ml import MLClient, MLLoading, MLRejected, MLUnavailable
 from paperus.models import LoginSession, User
@@ -219,7 +220,8 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     ``trash`` (delete what is older than the trash days), ``integrity``
     (check stored contents), ``integrity-deep`` (also their SHA-256) or
     ``integrity-clean`` (check and remove unused stored contents), ``copy``
-    (update the readable copy) or ``copy-remove`` (delete it)."""
+    (update the readable copy), ``copy-remove`` (delete it) or ``tidy``
+    (retry stalled jobs, delete old jobs and expired logins)."""
     jobs = request.app.state.jobs
     sweeps = {
         "embeddings": queue_embedding_sweep,
@@ -229,6 +231,7 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
         "integrity-deep": lambda app: queue_integrity_check(app, deep=True),
         "integrity-clean": lambda app: queue_integrity_check(app, remove_unused=True),
         "copy": queue_readable_copy,
+        "tidy": queue_tidy,
         "copy-remove": lambda app: queue_readable_copy(app, remove=True),
     }
     if job == "text-all":

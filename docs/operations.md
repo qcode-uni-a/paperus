@@ -231,6 +231,22 @@ Variables):
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
 
+## Database maintenance
+
+Postgres's autovacuum keeps tables and statistics in shape; nothing else
+needs scheduling so far (checked 2026-11-05). The worker tidies what grows
+without end:
+
+- **Every hour**: jobs whose worker stopped in the middle (killed, crashed)
+  are retried; otherwise they would stay "doing" for ever.
+- **Every night** at the night jobs' hour: finished background jobs older
+  than a week (failed ones after a month) and expired login sessions are
+  deleted. Without this, the job table grows by about 1,500 rows and 4,500
+  events a day.
+
+Search by meaning has no vector index yet (exact search; fine at pilot size,
+see issue #37).
+
 ## Checks and updates
 
 - **CI** (`.github/workflows/ci.yml`) on every push and pull request: the

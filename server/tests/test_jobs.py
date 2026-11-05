@@ -12,12 +12,12 @@ from procrastinate import App
 from sqlalchemy import Engine, delete, select, update
 from sqlalchemy.orm import Session
 
-from paperus import integrity, jobs
+from paperus import auth, integrity, jobs
 from paperus.backup import due
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
 from paperus.jobs import WorkerContext, job_limits, run_workers
-from paperus.models import Item, SystemSetting
+from paperus.models import Item, LoginSession, SystemSetting
 from paperus.storage import BlobStore
 from paperus.system import SystemConfig, load_config, save_config
 from tests.people import Person
@@ -151,3 +151,24 @@ def test_integrity_on_its_schedule(
     db.commit()
     jobs.scheduled_integrity(_at(4))
     assert integrity.last_report(db) is None
+
+
+def test_expired_sessions_removed(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    assert auth.remove_expired_sessions(db) == 0
+    db.execute(update(LoginSession).values(expires_at=datetime.now(UTC) - timedelta(1)))
+    assert auth.remove_expired_sessions(db) == 1
+    db.commit()
+    assert ada.get("/api/auth/me").status_code == 401
+
+
+def test_tidy(job_app: App, worker: None, db: Session, settings: Settings) -> None:
+    """Runs against Procrastinate (here its in-memory stand-in), at the
+    night hour and outside it."""
+    config = load_config(db, settings)
+    config.night_hour = 3
+    save_config(db, config)
+    db.commit()
+    context = cast(Any, type("Context", (), {"app": job_app}))
+    asyncio.run(jobs.tidy(context, _at(2)))
+    asyncio.run(jobs.tidy(context, _at(3)))

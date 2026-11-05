@@ -19,7 +19,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import integrity, readable, trash
+from paperus import auth, integrity, readable, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -350,6 +350,56 @@ def check_integrity_now(deep: bool = False, remove_unused: bool = False) -> None
             db, context.blobs, deep=deep, remove_unused=remove_unused
         )
     log.info("integrity check: %s", report.model_dump(exclude={"problems"}))
+
+
+# Finished jobs are kept this long (failed ones longer, to look into them).
+KEEP_JOBS = timedelta(days=7)
+KEEP_FAILED_JOBS = timedelta(days=30)
+
+
+@tasks.periodic(cron="20 * * * *")
+@tasks.task(name="tidy", queue="backup", queueing_lock="tidy", pass_context=True)
+async def tidy(job: JobContext, timestamp: int) -> None:
+    """Every hour: retry jobs whose worker stopped (killed mid-job). At
+    twenty past the night hour also: delete finished jobs and expired login
+    sessions, which nothing else removes."""
+    manager = job.app.job_manager
+    for stalled in await manager.get_stalled_jobs():
+        log.info(
+            "retrying job %s (%s): its worker stopped", stalled.id, stalled.task_name
+        )
+        await manager.retry_job(stalled)
+    context = _worker_context()
+
+    def night_hour() -> int:
+        with context.sessions() as db:
+            return load_config(db, context.settings).night_hour
+
+    hour = datetime.fromtimestamp(timestamp, UTC).hour
+    if timestamp and hour != await asyncio.to_thread(night_hour):
+        return
+    await manager.delete_old_jobs(nb_hours=int(KEEP_JOBS.total_seconds() // 3600))
+    await manager.delete_old_jobs(
+        nb_hours=int(KEEP_FAILED_JOBS.total_seconds() // 3600),
+        include_failed=True,
+        include_cancelled=True,
+        include_aborted=True,
+    )
+
+    def remove_sessions() -> int:
+        with context.sessions() as db:
+            removed = auth.remove_expired_sessions(db)
+            db.commit()
+            return removed
+
+    sessions = await asyncio.to_thread(remove_sessions)
+    log.info("tidied up: old jobs deleted, %d expired login sessions", sessions)
+
+
+def queue_tidy(app: App) -> None:
+    task = app.configure_task("paperus:tidy", queueing_lock="tidy")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
 
 
 @tasks.periodic(cron="45 * * * *")

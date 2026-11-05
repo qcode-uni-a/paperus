@@ -97,6 +97,16 @@
 				detail: backup ? (backups?.with_files ? 'Database and files' : 'Database only') : 'Off',
 				href: resolve('/admin/backups')
 			},
+			{
+				when: `Every night at ${localTime(config.night_hour ?? 2, 20)}`,
+				what: 'Tidy up',
+				detail: 'Finished jobs after a week, failed ones after a month, expired logins'
+			},
+			{
+				when: 'Every hour',
+				what: 'Retry stuck jobs',
+				detail: 'Jobs whose worker stopped in the middle'
+			},
 			{ when: 'Every 5 minutes', what: 'Read waiting files', detail: 'In case one was missed' },
 			{
 				when: 'Every 10 minutes',

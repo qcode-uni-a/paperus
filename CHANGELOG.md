@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Tidying up**: the worker retries jobs whose worker stopped in the middle
+  (hourly), and deletes old finished jobs and expired login sessions
+  (nightly). See Job settings and docs/operations.md.
 - **Share with group…** in a paper's menu: the group gets the paper, and
   the dialog says what changes for whom.
 - Group papers say who added them ("Added by ada, 3 days ago").
