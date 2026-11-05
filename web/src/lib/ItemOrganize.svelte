@@ -7,6 +7,7 @@
 	let { item, onchange }: { item: ItemDetail; onchange: () => void } = $props();
 
 	let tagInput = $state('');
+	let tagging = $state(false);
 	let adding = $state(false);
 	let error = $state('');
 
@@ -27,7 +28,18 @@
 		const name = tagInput.trim();
 		if (!name) return;
 		tagInput = '';
+		tagging = false;
 		await done(await addTag({ path: { item_id: item.id }, body: { name } }));
+	}
+
+	/** Open the list right away; the + was the click that asked for it. */
+	function openPicker(select: HTMLSelectElement) {
+		select.focus();
+		try {
+			select.showPicker();
+		} catch {
+			// Not supported everywhere; the focused list opens on the next tap.
+		}
 	}
 
 	async function addToCollection(id: string) {
@@ -50,17 +62,29 @@
 				>
 			</span>
 		{/each}
-		<form onsubmit={submitTag}>
-			<input
-				bind:value={tagInput}
-				list="tag-suggestions"
-				placeholder="Add tag"
-				aria-label="Add a tag"
-			/>
-			<datalist id="tag-suggestions">
-				{#each suggestions as name (name)}<option value={name}></option>{/each}
-			</datalist>
-		</form>
+		{#if tagging}
+			<form onsubmit={submitTag}>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					bind:value={tagInput}
+					list="tag-suggestions"
+					placeholder="New tag"
+					aria-label="Add a tag"
+					autofocus
+					onblur={() => {
+						if (!tagInput.trim()) tagging = false;
+					}}
+					onkeydown={(event) => {
+						if (event.key === 'Escape') tagging = false;
+					}}
+				/>
+				<datalist id="tag-suggestions">
+					{#each suggestions as name (name)}<option value={name}></option>{/each}
+				</datalist>
+			</form>
+		{:else}
+			{@render plus('Add a tag', () => (tagging = true))}
+		{/if}
 	</div>
 
 	<div class="line">
@@ -77,6 +101,7 @@
 		{/each}
 		{#if adding}
 			<select
+				{@attach openPicker}
 				aria-label="Add to collection"
 				onchange={(event) => addToCollection(event.currentTarget.value)}
 				onblur={() => (adding = false)}
@@ -87,7 +112,7 @@
 				{/each}
 			</select>
 		{:else if choices.length}
-			<button class="link" onclick={() => (adding = true)}>Add to collection</button>
+			{@render plus('Add to a collection', () => (adding = true))}
 		{:else if organize.collections.length === 0}
 			<span class="hint">Create collections in the menu with +.</span>
 		{/if}
@@ -95,11 +120,17 @@
 	{#if error}<p class="error">{error}</p>{/if}
 </div>
 
+{#snippet plus(label: string, onclick: () => void)}
+	<button class="plus" {onclick} aria-label={label} title={label}>
+		<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>
+	</button>
+{/snippet}
+
 <style>
 	.organize {
 		display: grid;
-		gap: 8px;
-		margin-top: 12px;
+		gap: 6px;
+		margin-top: 10px;
 	}
 	.line {
 		display: flex;
@@ -108,7 +139,7 @@
 		gap: 6px;
 	}
 	.label {
-		width: 92px;
+		width: 84px;
 		color: var(--muted);
 		font-size: var(--step--1);
 	}
@@ -152,16 +183,27 @@
 		padding: 3px 8px;
 		font-size: 0.92em;
 	}
-	.link {
-		border-color: transparent;
+	.plus {
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		border: 1px dashed var(--rule);
+		border-radius: 50%;
 		background: none;
-		color: var(--royal);
-		padding: 2px 6px;
-		font-size: 0.92em;
 	}
-	.link:hover:not(:disabled) {
+	.plus:hover:not(:disabled) {
+		border-color: var(--royal);
 		background: var(--rail);
-		border-color: transparent;
+	}
+	.plus svg {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: var(--muted);
+		stroke-width: 2.4;
+		stroke-linecap: round;
 	}
 	.hint {
 		color: var(--faint);

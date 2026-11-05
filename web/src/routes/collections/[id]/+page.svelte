@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { deleteCollection } from '#lib/api/client.ts';
-	import { closeOnScroll } from '#lib/dismiss.ts';
+	import DotsMenu from '#lib/DotsMenu.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
 	import { childrenOf, loadOrganize, organize } from '#lib/organize.svelte.ts';
@@ -11,18 +11,6 @@
 	const id = $derived(page.params.id ?? '');
 	let loaded = $state(false);
 	let editDialog = $state<CollectionDialog>();
-	let menu = $state<HTMLElement>();
-	let moreButton = $state<HTMLElement>();
-
-	$effect(() => closeOnScroll(() => menu?.hidePopover()));
-
-	/** Open the actions menu below its button, right-aligned with it. */
-	function placeMenu() {
-		if (!menu || !moreButton) return;
-		const rect = moreButton.getBoundingClientRect();
-		menu.style.setProperty('--top', `${rect.bottom + 6}px`);
-		menu.style.setProperty('--left', `${Math.max(12, rect.right - 250)}px`);
-	}
 	let includeInside = $state(true);
 
 	$effect(() => {
@@ -69,36 +57,12 @@
 				<a href={resolve('/collections/[id]', { id: step.id })}>{step.name}</a>
 			{/each}
 		</nav>
-		<button
-			bind:this={moreButton}
-			class="more"
-			popovertarget="collection-menu"
-			aria-haspopup="menu"
-			aria-label="Collection actions"
-			title="Edit or delete"
-		>
-			<svg viewBox="0 0 24 24" aria-hidden="true">
-				<circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle
-					cx="19"
-					cy="12"
-					r="1.8"
-				/>
-			</svg>
-		</button>
-		<div
-			id="collection-menu"
-			popover
-			bind:this={menu}
-			role="menu"
-			class="menu"
-			onbeforetoggle={placeMenu}
-		>
+		<DotsMenu label="Collection actions">
 			{#if inside.length}
 				<button
 					role="menuitemcheckbox"
 					aria-checked={includeInside}
-					class="check"
-					onclick={() => (menu?.hidePopover(), (includeInside = !includeInside))}
+					onclick={() => (includeInside = !includeInside)}
 				>
 					<svg viewBox="0 0 24 24" aria-hidden="true">
 						{#if includeInside}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
@@ -107,13 +71,9 @@
 				</button>
 				<hr />
 			{/if}
-			<button role="menuitem" onclick={() => (menu?.hidePopover(), editDialog?.open())}>
-				Edit
-			</button>
-			<button role="menuitem" class="danger" onclick={() => (menu?.hidePopover(), remove())}>
-				Delete
-			</button>
-		</div>
+			<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+			<button role="menuitem" class="danger" onclick={remove}>Delete</button>
+		</DotsMenu>
 	</div>
 
 	<header class="head">
@@ -173,81 +133,6 @@
 		font-family: var(--serif);
 		font-size: var(--step-1);
 		line-height: 1.5;
-	}
-	.more {
-		flex: none;
-		display: grid;
-		place-items: center;
-		width: 36px;
-		height: 36px;
-		margin-right: -6px;
-		padding: 0;
-		border-color: transparent;
-		border-radius: 50%;
-		background: none;
-	}
-	.more:hover:not(:disabled),
-	.more:focus-visible {
-		background: var(--rail);
-		border-color: transparent;
-	}
-	.more svg {
-		width: 20px;
-		height: 20px;
-		fill: var(--muted);
-	}
-	.menu {
-		position: fixed;
-		inset: var(--top) auto auto var(--left);
-		margin: 0;
-		padding: 6px;
-		width: 250px;
-		border: 1px solid var(--rule);
-		border-radius: 10px;
-		background: var(--surface);
-		color: var(--ink);
-		box-shadow: var(--shadow);
-	}
-	.menu button {
-		display: block;
-		width: 100%;
-		text-align: left;
-		padding: 9px 12px;
-		border: none;
-		border-radius: var(--radius);
-		background: none;
-		color: var(--ink);
-	}
-	.menu button:hover:not(:disabled) {
-		background: var(--rail);
-	}
-	.menu .check {
-		display: flex;
-		gap: 8px;
-		align-items: flex-start;
-		padding-left: 8px;
-	}
-	.check svg {
-		flex: none;
-		width: 18px;
-		height: 18px;
-		margin-top: 2px;
-		fill: none;
-		stroke: var(--royal);
-		stroke-width: 2.4;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-	}
-	.menu hr {
-		margin: 6px 4px;
-		border: none;
-		border-top: 1px solid var(--rule);
-	}
-	.menu button:not(.check) {
-		padding-left: 34px;
-	}
-	.menu button.danger {
-		color: var(--danger);
 	}
 	section {
 		display: grid;

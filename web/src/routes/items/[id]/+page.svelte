@@ -20,6 +20,7 @@
 		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
+	import DotsMenu from '#lib/DotsMenu.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import { fullName } from '#lib/format.ts';
@@ -178,7 +179,26 @@
 				<button type="button" onclick={() => (editing = false)}>Cancel</button>
 			</form>
 		{:else}
-			<h1>{item.title}</h1>
+			<div class="title">
+				<h1>{item.title}</h1>
+				{#if !item.deleted_at}
+					<DotsMenu label="Item actions">
+						{#if pdfFile}
+							<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
+								{showDetails ? 'Hide details' : 'Details and files'}
+							</button>
+						{/if}
+						<button
+							role="menuitem"
+							onclick={() => {
+								titleDraft = item?.title ?? '';
+								editing = true;
+							}}>Edit title</button
+						>
+						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
+					</DotsMenu>
+				{/if}
+			</div>
 		{/if}
 		<p class="muted">
 			{item.authors
@@ -187,22 +207,6 @@
 				<em>{item.container_title}</em>{/if}
 		</p>
 		<ItemOrganize {item} onchange={load} />
-		{#if !item.deleted_at}
-			<div class="row actions">
-				{#if pdfFile}
-					<button onclick={() => (showDetails = !showDetails)}>
-						{showDetails ? 'Hide details' : 'Details'}
-					</button>
-				{/if}
-				<button
-					onclick={() => {
-						titleDraft = item?.title ?? '';
-						editing = true;
-					}}>Edit title</button
-				>
-				<button class="danger" onclick={moveToTrash}>Move to trash</button>
-			</div>
-		{/if}
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
 
@@ -335,9 +339,25 @@
 	header {
 		margin-bottom: 16px;
 	}
+	.title {
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+	}
 	h1 {
+		flex: 1;
+		min-width: 0;
 		margin: 0 0 4px;
 		font-size: 1.5em;
+		overflow-wrap: anywhere;
+	}
+	@media (max-width: 720px) {
+		header {
+			margin-bottom: 12px;
+		}
+		h1 {
+			font-size: 1.2em;
+		}
 	}
 	header p {
 		margin: 0;
@@ -346,9 +366,6 @@
 		flex: 1;
 		min-width: 200px;
 		font-size: 1.4em;
-	}
-	.actions {
-		margin-top: 12px;
 	}
 	.trashed {
 		justify-content: space-between;
