@@ -38,6 +38,21 @@ Noted 2026-11-05.
 - **Sharing with single people** via small ad-hoc groups ("Anna & Ben"),
   so the owner model stays as it is.
 
+## Browser extension
+
+Noted 2026-11-05: as simple as possible.
+
+- A default owner (oneself or a group) chosen once in the extension's
+  settings; then **one click** saves the page's paper with its PDF, with no
+  popup of choices. The PDF is downloaded in the browser (proxy, campus
+  licences) and uploaded; the SHA-256 is sent first.
+- Manifest V3 for Chrome and Firefox, connected with a personal access
+  token that may only add papers.
+- On arXiv (listings, search results, abstract pages) a small paperus icon
+  next to each paper: one click saves it, a filled icon marks papers one
+  already has (one lookup per page). Other sites (Google Scholar, PubMed)
+  one at a time later.
+
 ## Ideas to decide later
 
 - **OAuth for MCP**, so claude.ai and ChatGPT can connect as custom

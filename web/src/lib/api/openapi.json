@@ -7566,6 +7566,44 @@
             ],
             "title": "Log Level",
             "default": "info"
+          },
+          "jobs_text": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Jobs Text",
+            "default": 2
+          },
+          "jobs_ml": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Jobs Ml",
+            "default": 1
+          },
+          "jobs_import": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Jobs Import",
+            "default": 1
+          },
+          "night_hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Night Hour",
+            "default": 2
+          },
+          "integrity_schedule": {
+            "type": "string",
+            "enum": [
+              "off",
+              "daily",
+              "weekly"
+            ],
+            "title": "Integrity Schedule",
+            "default": "weekly"
           }
         },
         "type": "object",

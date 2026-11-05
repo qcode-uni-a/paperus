@@ -5,6 +5,7 @@
 	import SettingRow from '#lib/admin/SettingRow.svelte';
 	import Switch from '#lib/admin/Switch.svelte';
 	import { runJob } from '#lib/api/client.ts';
+	import { localTime } from '#lib/format.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	const config = $derived(admin.config);
@@ -65,7 +66,7 @@
 <SectionButtons {changed} {saving} onreset={reset} onsave={save} />
 {#if config?.trash_days != null && !changed}
 	<p class="muted small">
-		Next run tonight at 02:30 (UTC).
+		Next run tonight at {localTime(config.night_hour ?? 2, 30)} (the night jobs’ hour, in Job settings).
 		<button class="link" onclick={runNow}>Run now</button>
 	</p>
 {/if}

@@ -7,7 +7,7 @@
 		startBackup
 	} from '#lib/api/client.ts';
 	import type { BackupConfig, Backups } from '#lib/api/generated/types.gen.ts';
-	import { ago } from '#lib/format.ts';
+	import { ago, localTime } from '#lib/format.ts';
 
 	let data = $state<Backups | null>(null);
 	let config = $state<BackupConfig | null>(null);
@@ -74,12 +74,6 @@
 	}
 
 	const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-	/** The hour in the browser's time zone, for the UTC hour stored. */
-	function localHour(utcHour: number): string {
-		const date = new Date();
-		date.setUTCHours(utcHour, 0, 0, 0);
-		return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-	}
 </script>
 
 <svelte:head><title>Backups · paperus</title></svelte:head>
@@ -116,7 +110,7 @@
 			<label
 				>At
 				<select bind:value={config.hour} disabled={config.schedule === 'off'}>
-					{#each HOURS as hour (hour)}<option value={hour}>{localHour(hour)}</option>{/each}
+					{#each HOURS as hour (hour)}<option value={hour}>{localTime(hour)}</option>{/each}
 				</select>
 			</label>
 			<label

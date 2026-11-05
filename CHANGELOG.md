@@ -12,6 +12,10 @@
   - Integrity checks: whether every file's stored contents are there
     (every Sunday night, or now), deeply also whether they are unchanged,
     and removing stored contents nothing uses any more.
+- **Job settings**: how many files are read, sent to the ML service and
+  imported at the same time (applied by the worker within half a minute,
+  no restart), and the hour of the night jobs; an overview of what runs
+  when. The integrity check runs every Sunday, every night or not at all.
 - **Prometheus metrics** for monitoring, on a port of their own (off by
   default): requests, searches, calls to the ML service, and the library's
   figures (papers, files waiting to be read, storage, background jobs, the

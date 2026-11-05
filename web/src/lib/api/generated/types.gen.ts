@@ -1773,6 +1773,26 @@ export type SystemConfig = {
      * Log Level
      */
     log_level?: 'debug' | 'info' | 'warning' | 'error';
+    /**
+     * Jobs Text
+     */
+    jobs_text?: number;
+    /**
+     * Jobs Ml
+     */
+    jobs_ml?: number;
+    /**
+     * Jobs Import
+     */
+    jobs_import?: number;
+    /**
+     * Night Hour
+     */
+    night_hour?: number;
+    /**
+     * Integrity Schedule
+     */
+    integrity_schedule?: 'off' | 'daily' | 'weekly';
 };
 
 /**

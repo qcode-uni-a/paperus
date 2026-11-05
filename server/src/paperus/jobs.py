@@ -4,9 +4,12 @@ The API queues jobs; ``paperus worker`` runs them. A periodic sweep queues
 whatever is still pending, so a job that failed to queue is not lost.
 """
 
+import asyncio
 import contextlib
 import logging
+import signal
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -199,8 +202,83 @@ def run_worker(settings: Settings) -> None:
     )
     app = make_job_app(settings)
     with app.open():
-        # Several at once, so a long import does not hold up new uploads.
-        app.run_worker(queues=["text", "ml", "backup", "import"], concurrency=3)
+        asyncio.run(run_workers(app, _job_limits))
+
+
+# How often the worker looks whether the number of jobs at once changed.
+LIMITS_SECONDS = 30.0
+
+
+def job_limits(config: SystemConfig) -> dict[str, int]:
+    """Jobs at once per queue (Administration → Settings → Job settings);
+    one maintenance job (backups, trash, integrity) at a time."""
+    return {
+        "text": config.jobs_text,
+        "ml": config.jobs_ml,
+        "import": config.jobs_import,
+        "backup": 1,
+    }
+
+
+def _job_limits() -> dict[str, int]:
+    context = _worker_context()
+    with context.sessions() as db:
+        return job_limits(load_config(db, context.settings))
+
+
+async def run_workers(
+    app: App,
+    limits: Callable[[], dict[str, int]],
+    stop: asyncio.Event | None = None,
+) -> None:
+    """One worker per queue, so a long import does not hold up new uploads,
+    each running as many jobs at once as the settings say. When a number
+    changes, that queue's worker is replaced: the old one finishes its
+    running jobs and takes no new ones."""
+    stop = stop or asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        with contextlib.suppress(NotImplementedError, RuntimeError, ValueError):
+            loop.add_signal_handler(signum, stop.set)
+    running: dict[str, tuple[int, asyncio.Task[None]]] = {}
+    stopping: list[asyncio.Task[None]] = []
+    async with app.open_async():
+        while not stop.is_set():
+            try:
+                wanted = await asyncio.to_thread(limits)
+            except Exception:
+                log.warning("could not read the job settings", exc_info=True)
+                wanted = {queue: number for queue, (number, _) in running.items()}
+                wanted = wanted or job_limits(SystemConfig(embedding_model=""))
+            for queue, number in wanted.items():
+                current = running.get(queue)
+                if current is not None and not current[1].done():
+                    if current[0] == number:
+                        continue
+                    log.info("%s: %d jobs at once (was %d)", queue, number, current[0])
+                    current[1].cancel()
+                    stopping.append(current[1])
+                elif current is not None and not current[1].cancelled():
+                    if error := current[1].exception():
+                        log.error("the %s worker stopped: %r", queue, error)
+                running[queue] = (
+                    number,
+                    asyncio.create_task(
+                        app.run_worker_async(
+                            queues=[queue],
+                            concurrency=number,
+                            name=queue,
+                            install_signal_handlers=False,
+                        )
+                    ),
+                )
+            stopping = [task for task in stopping if not task.done()]
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stop.wait(), LIMITS_SECONDS)
+        workers = [task for _, task in running.values()] + stopping
+        for task in workers:
+            task.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
 
 
 def _apply_here(config: SystemConfig) -> None:
@@ -239,18 +317,26 @@ def queue_ml_configuration(app: App) -> None:
         task.defer(timestamp=0)
 
 
-@tasks.periodic(cron="30 2 * * *")
+@tasks.periodic(cron="30 * * * *")
 @tasks.task(name="empty_trash", queue="backup", queueing_lock="empty-trash")
 def empty_old_trash(timestamp: int) -> None:
-    """Delete for good what has been in the trash longer than the days set
-    (Administration → Settings → Trash); nothing if none are set."""
+    """At half past the night hour (Administration → Settings → Job
+    settings), or when asked (``timestamp`` 0): delete for good what has been
+    in the trash longer than the days set; nothing if none are set."""
     context = _worker_context()
     with context.sessions() as db:
-        days = load_config(db, context.settings).trash_days
-        if days is None:
+        config = load_config(db, context.settings)
+        if config.trash_days is None:
+            return
+        if (
+            timestamp
+            and datetime.fromtimestamp(timestamp, UTC).hour != config.night_hour
+        ):
             return
         done = trash.empty(
-            db, context.blobs, before=datetime.now(UTC) - timedelta(days=days)
+            db,
+            context.blobs,
+            before=datetime.now(UTC) - timedelta(days=config.trash_days),
         )
     log.info("emptied the trash: %s", done)
 
@@ -266,10 +352,19 @@ def check_integrity_now(deep: bool = False, remove_unused: bool = False) -> None
     log.info("integrity check: %s", report.model_dump(exclude={"problems"}))
 
 
-@tasks.periodic(cron="15 4 * * 0")
-@tasks.task(name="weekly_integrity", queue="backup", queueing_lock="integrity")
-def weekly_integrity(timestamp: int) -> None:
-    check_integrity_now()
+@tasks.periodic(cron="45 * * * *")
+@tasks.task(name="scheduled_integrity", queue="backup")
+def scheduled_integrity(timestamp: int) -> None:
+    """Every hour: start an integrity check if its schedule says so (at the
+    night hour, every night or on Sundays)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        report = integrity.last_report(db)
+    now = datetime.fromtimestamp(timestamp, UTC)
+    last = report.checked_at if report else None
+    if due(last, config.integrity_schedule, config.night_hour, now, weekday=6):
+        check_integrity_now()
 
 
 def queue_integrity_check(

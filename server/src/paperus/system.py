@@ -45,6 +45,19 @@ class SystemConfig(BaseModel):
     # Logging
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
+    # Background jobs
+    jobs_text: int = Field(2, ge=1, le=16)
+    """Files read at the same time (each takes a CPU core)."""
+    jobs_ml: int = Field(1, ge=1, le=8)
+    """Files sent to the ML service at the same time."""
+    jobs_import: int = Field(1, ge=1, le=4)
+    """Imports at the same time (one owner's run one after another)."""
+    night_hour: int = Field(2, ge=0, le=23)
+    """Hour (UTC) of the nightly jobs: emptying the trash, the integrity
+    check."""
+    integrity_schedule: Literal["off", "daily", "weekly"] = "weekly"
+    """How often the integrity check runs (weekly: on Sundays)."""
+
 
 # Defaults from the environment: an unset value here falls back to them.
 _FROM_ENVIRONMENT = ("contact_email", "max_upload_mb")

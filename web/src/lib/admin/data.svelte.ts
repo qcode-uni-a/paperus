@@ -36,7 +36,12 @@ export const SETTINGS = [
 		'Whether every file’s stored contents are there and unchanged',
 		false
 	],
-	['jobs', 'Job settings', 'How many background jobs run at once, and when checks run', true],
+	[
+		'jobs',
+		'Job settings',
+		'How many background jobs run at once, and when the night jobs run',
+		false
+	],
 	['logging', 'Logging', 'How much the server and the worker write to their logs', false],
 	['server', 'Server', 'Public address, contact email for metadata services, upload limits', false],
 	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],

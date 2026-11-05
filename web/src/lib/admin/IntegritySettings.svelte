@@ -1,12 +1,20 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { formatSize } from '#lib/admin/data.svelte.ts';
+	import { saveConfig } from '#lib/admin/config.svelte.ts';
+	import { admin, formatSize } from '#lib/admin/data.svelte.ts';
+	import SettingRow from '#lib/admin/SettingRow.svelte';
 	import { integrityReport, runJob } from '#lib/api/client.ts';
 	import type { Report } from '#lib/api/generated/types.gen.ts';
-	import { ago } from '#lib/format.ts';
+	import { ago, localTime } from '#lib/format.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	let report = $state<Report | null>(null);
+	const config = $derived(admin.config);
+
+	async function setSchedule(event: Event) {
+		const value = (event.currentTarget as HTMLSelectElement).value as 'off' | 'daily' | 'weekly';
+		await saveConfig({ integrity_schedule: value }, 'Integrity check schedule');
+	}
 	let running = $state(false);
 	let alive = true;
 	$effect(() => () => (alive = false));
@@ -41,10 +49,27 @@
 </script>
 
 <p class="muted intro">
-	Compares the library with the storage: whether every file’s contents are there (a quick check,
-	also every Sunday night), and with a deep check whether they are unchanged (reads every file,
-	takes a while). Stored contents nothing uses any more can be removed.
+	Compares the library with the storage: whether every file’s contents are there (a quick check),
+	and with a deep check whether they are unchanged (reads every file, takes a while). Stored
+	contents nothing uses any more can be removed.
 </p>
+
+{#if config}
+	<SettingRow
+		id="integrity-schedule"
+		title="Check automatically"
+		description="A quick check at {localTime(
+			config.night_hour ?? 2,
+			45
+		)}, the night jobs’ hour (Job settings)."
+	>
+		<select id="integrity-schedule" value={config.integrity_schedule} onchange={setSchedule}>
+			<option value="weekly">Every Sunday</option>
+			<option value="daily">Every night</option>
+			<option value="off">Off</option>
+		</select>
+	</SettingRow>
+{/if}
 
 {#if report}
 	<div class="facts">

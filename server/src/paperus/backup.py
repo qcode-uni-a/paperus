@@ -254,11 +254,19 @@ def prune_pool(root: Path) -> None:
             path.unlink()
 
 
-def due(last: datetime | None, schedule: str, hour: int, now: datetime) -> bool:
-    """Whether a scheduled backup should run now (checked every hour)."""
+def due(
+    last: datetime | None,
+    schedule: str,
+    hour: int,
+    now: datetime,
+    *,
+    weekday: int = 0,
+) -> bool:
+    """Whether a scheduled job should run now (checked every hour); weekly
+    ones on ``weekday`` (Monday 0, as backups; Sunday 6)."""
     if schedule == "off" or now.hour != hour:
         return False
-    if schedule == "weekly" and now.weekday() != 0:  # Mondays
+    if schedule == "weekly" and now.weekday() != weekday:
         return False
     return last is None or now - last > timedelta(hours=20)
 
