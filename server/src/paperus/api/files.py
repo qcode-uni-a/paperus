@@ -28,7 +28,9 @@ from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import queue_text_extraction
 from paperus.models import (
     Blob,
+    Chunk,
     File,
+    FileChunk,
     FileRole,
     FileSource,
     Item,
@@ -322,6 +324,27 @@ def download_file(
             **safety,
         },
     )
+
+
+class PassageText(BaseModel):
+    page: int | None
+    text: str
+
+
+@router.get("/api/files/{file_id}/passages/{position}")
+def passage_text(
+    file_id: uuid.UUID, position: int, db: DB, access: CurrentAccess
+) -> PassageText:
+    """One passage of a file, as read from it (to find it on the page)."""
+    _get_file(db, access, file_id)
+    row = db.execute(
+        select(FileChunk.page, Chunk.text)
+        .join(Chunk, Chunk.sha256 == FileChunk.chunk_sha256)
+        .where(FileChunk.file_id == file_id, FileChunk.position == position)
+    ).first()
+    if row is None:
+        raise HTTPException(404, "passage not found")
+    return PassageText(page=row.page, text=row.text)
 
 
 def _get_file(

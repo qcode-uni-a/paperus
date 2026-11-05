@@ -84,6 +84,11 @@ def test_search_finds_passages_with_pages(
     assert hit["page"] == 1
     assert hit["passage_id"] == f"{file['id']}#0"
     assert "<mark>SPEI</mark>" in hit["snippet"]
+    # The passage's text, to find it on the page.
+    text = logged_in.get(f"/api/files/{file['id']}/passages/0").json()
+    assert text["page"] == 1
+    assert "SPEI" in text["text"] and "<mark>" not in text["text"]
+    assert logged_in.get(f"/api/files/{file['id']}/passages/99").status_code == 404
 
     [hit] = search(logged_in, '"linear interpolation"')
     assert hit["page"] == 2

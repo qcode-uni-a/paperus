@@ -1620,6 +1620,20 @@ export type Passage = {
 };
 
 /**
+ * PassageText
+ */
+export type PassageText = {
+    /**
+     * Page
+     */
+    page: number | null;
+    /**
+     * Text
+     */
+    text: string;
+};
+
+/**
  * PasswordChange
  */
 export type PasswordChange = {
@@ -3440,6 +3454,40 @@ export type DownloadFileResponses = {
      */
     200: unknown;
 };
+
+export type PassageTextData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+        /**
+         * Position
+         */
+        position: number;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/passages/{position}';
+};
+
+export type PassageTextErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PassageTextError = PassageTextErrors[keyof PassageTextErrors];
+
+export type PassageTextResponses = {
+    /**
+     * Successful Response
+     */
+    200: PassageText;
+};
+
+export type PassageTextResponse = PassageTextResponses[keyof PassageTextResponses];
 
 export type TrashFileData = {
     body?: never;

@@ -195,9 +195,12 @@
 									{#if group.kind === 'paper'}
 										<a
 											class="where"
-											href="{resolve('/items/[id]', { id: group.id })}{passage.page
-												? `?page=${passage.page}`
-												: ''}"
+											href="{resolve('/items/[id]', { id: group.id })}?{new URLSearchParams({
+												...(passage.page ? { page: String(passage.page) } : {}),
+												...(passage.file_id
+													? { file: passage.file_id, passage: String(passage.position) }
+													: {})
+											})}"
 										>
 											{passage.page ? `Page ${passage.page}` : 'Open'}
 										</a>

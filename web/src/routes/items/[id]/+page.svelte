@@ -9,6 +9,7 @@
 		FILE_ROLES,
 		getItem,
 		markViewed,
+		passageText,
 		pinVersion,
 		restoreFile,
 		restoreItem,
@@ -37,6 +38,19 @@
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
 	const startPage = $derived(Number(page.url.searchParams.get('page')) || 1);
+	/** A passage to mark, from a search result (?file=…&passage=…). */
+	let highlight = $state<{ page: number; text: string } | null>(null);
+	$effect(() => {
+		const file = page.url.searchParams.get('file');
+		const position = Number(page.url.searchParams.get('passage'));
+		highlight = null;
+		if (!file || !Number.isInteger(position) || page.url.searchParams.get('passage') === null)
+			return;
+		passageText({ path: { file_id: file, position } }).then(({ data }) => {
+			if (data?.page && page.url.searchParams.get('file') === file)
+				highlight = { page: data.page, text: data.text };
+		});
+	});
 
 	let item = $state<ItemDetail | null>(null);
 	let etag = $state<string | undefined>();
@@ -362,7 +376,11 @@
 	{/if}
 
 	{#if pdfFile}
-		<PdfViewer url="/api/files/{pdfFile.id}/content" {startPage} />
+		<PdfViewer
+			url="/api/files/{pdfFile.id}/content"
+			{startPage}
+			highlight={highlight && page.url.searchParams.get('file') === pdfFile.id ? highlight : null}
+		/>
 	{:else if textFile}
 		<TextViewer
 			url="/api/files/{textFile.id}/content"

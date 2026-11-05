@@ -11,7 +11,16 @@
 
 	GlobalWorkerOptions.workerSrc = workerUrl;
 
-	let { url, startPage = 1 }: { url: string; startPage?: number } = $props();
+	let {
+		url,
+		startPage = 1,
+		highlight = null
+	}: {
+		url: string;
+		startPage?: number;
+		/** A passage to mark on its page (e.g. from a search result). */
+		highlight?: { page: number; text: string } | null;
+	} = $props();
 
 	const MAX_WIDTH = 1000;
 	// Horizontal padding of the desk around the pages (see .pages).
@@ -52,6 +61,56 @@
 			task.destroy();
 		};
 	});
+
+	/** Letters and digits only, lower case: line breaks, hyphens at line
+	 * ends, spacing and ligatures (NFKC) differ between how the server read
+	 * the PDF and PDF.js's text layer; the letters do not. */
+	function letters(text: string): string {
+		return text
+			.normalize('NFKC')
+			.toLowerCase()
+			.replace(/[^\p{L}\p{N}]/gu, '');
+	}
+
+	/** Find a passage in a page's text layer and mark its spans. */
+	function mark(layer: HTMLElement, passage: string) {
+		const spans = [...layer.querySelectorAll<HTMLElement>('span')].filter(
+			(span) => !span.querySelector('span')
+		);
+		let page = '';
+		const ends: number[] = [];
+		for (const span of spans) {
+			page += letters(span.textContent ?? '');
+			ends.push(page.length);
+		}
+		const wanted = letters(passage);
+		if (!wanted || !page) return;
+		const WINDOW = 40;
+		// The start and the end of the passage, each by a stretch of its
+		// letters; tried a little further in if the first stretch differs.
+		let start = -1;
+		for (let at = 0; start < 0 && at < Math.min(wanted.length, 400); at += 20) {
+			const found = page.indexOf(wanted.slice(at, at + WINDOW));
+			if (found >= 0) start = Math.max(0, found - at);
+		}
+		if (start < 0) return;
+		let end = -1;
+		for (let at = wanted.length; end < 0 && at > Math.max(0, wanted.length - 400); at -= 20) {
+			const piece = wanted.slice(Math.max(0, at - WINDOW), at);
+			const found = page.indexOf(piece, start);
+			if (found >= 0) end = Math.min(page.length, found + piece.length + (wanted.length - at));
+		}
+		if (end < 0) end = Math.min(page.length, start + wanted.length);
+		let first: HTMLElement | null = null;
+		spans.forEach((span, index) => {
+			const from = index === 0 ? 0 : ends[index - 1];
+			if (ends[index] > start && from < end && ends[index] > from) {
+				span.classList.add('passage');
+				first ??= span;
+			}
+		});
+		(first as HTMLElement | null)?.scrollIntoView({ block: 'center' });
+	}
 
 	/** Render a page (canvas + selectable text) once it comes near the screen. */
 	function page(number: number) {
@@ -94,6 +153,7 @@
 						viewport
 					});
 					await text.render().catch(() => {});
+					if (highlight && highlight.page === number) mark(layer, highlight.text);
 				},
 				{ rootMargin: '800px 0px' }
 			);
@@ -196,5 +256,10 @@
 	}
 	.page :global(canvas) {
 		display: block;
+	}
+	/* The passage one came for (text layer spans are transparent text). */
+	.page :global(.textLayer span.passage) {
+		background: rgb(255 200 0 / 0.38);
+		border-radius: 2px;
 	}
 </style>

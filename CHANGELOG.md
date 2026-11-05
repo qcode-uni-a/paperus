@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Opening a search result marks the passage in the PDF and scrolls to it.
 - Search results show each paper's authors and year under its title (also
   for AI assistants through MCP), the way people recognise papers.
 - Search options: "Note" among the types, so notes can be searched alone

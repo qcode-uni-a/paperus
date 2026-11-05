@@ -1613,6 +1613,59 @@
         }
       }
     },
+    "/api/files/{file_id}/passages/{position}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Passage Text",
+        "description": "One passage of a file, as read from it (to find it on the page).",
+        "operationId": "passage_text",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Position"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassageText"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}": {
       "delete": {
         "tags": [
@@ -7882,6 +7935,31 @@
           "in_references"
         ],
         "title": "Passage"
+      },
+      "PassageText": {
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "text"
+        ],
+        "title": "PassageText"
       },
       "PasswordChange": {
         "properties": {

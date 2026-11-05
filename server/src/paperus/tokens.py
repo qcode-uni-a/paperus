@@ -102,6 +102,7 @@ _READ = ("GET", "HEAD")
 _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
     (_READ, re.compile(r"/api/search"), Scope.SEARCH),
     (_READ, re.compile(r"/api/files/[^/]+/content"), Scope.FILES_READ),
+    (_READ, re.compile(r"/api/files/[^/]+/passages/[^/]+"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/(items|tags|collections)(/.*)?"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/citations"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/duplicates"), Scope.PAPERS_READ),
