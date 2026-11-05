@@ -9,8 +9,9 @@
 with group sharing, search by meaning and integration with whatever AI
 assistant you already use.
 
-> Status: idea and design phase. Nothing is implemented yet. The pilot will run
-> on a small server at the university.
+> Status: early version (0.0.1) for a pilot in one group. It works, but every
+> user sees every item and the data format may still change. See the
+> [changelog](CHANGELOG.md) for what is there and what is missing.
 
 ## The idea
 
@@ -25,6 +26,25 @@ assistant you already use.
   with notes and annotations attached to them. Not a general notes app.
 - **No lock-in**: full export of files, BibTeX/CSL-JSON, Markdown notes and
   annotations at any time.
+
+## Installation
+
+Needs a Linux machine with Docker and about 4 GB of RAM (the model for search
+by meaning takes 2–3 GB).
+
+1. Download [`deploy/compose.yaml`](deploy/compose.yaml) and
+   [`deploy/example.env`](deploy/example.env) into a new folder; rename
+   `example.env` to `.env`.
+2. In `.env`, set `DB_PASSWORD` and `ML_TOKEN` (e.g. `openssl rand -hex 32`),
+   and the folders for files, database and models.
+3. Start: `docker compose up -d`. The first start downloads the model (about
+   2.3 GB).
+4. Create the first administrator:
+   `docker compose exec server paperus user create admin --admin`
+5. Open port 8000 through a reverse proxy with HTTPS (Caddy, nginx, Traefik).
+
+Back up the files folder and the database folder together. To update, change
+`PAPERUS_VERSION` or pull `release` again, then `docker compose up -d`.
 
 ## Documents
 
@@ -75,4 +95,5 @@ PyPI and npm (checked 2026-11-04).
 
 ## Licence
 
-Apache-2.0, see [LICENSE](LICENSE).
+Apache-2.0, see [LICENSE](LICENSE). Bundled fonts and libraries keep their
+own licences, see [THIRD_PARTY.md](THIRD_PARTY.md).

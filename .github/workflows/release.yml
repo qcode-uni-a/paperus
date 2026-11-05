@@ -1,0 +1,137 @@
+name: Release
+
+# For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
+# packages (PyPI) and the TypeScript client (npm), then the GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  versions:
+    name: Tag matches the package versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          status=0
+          for file in server/pyproject.toml ml/pyproject.toml; do
+            found=$(grep -m1 '^version = ' "$file" | cut -d'"' -f2)
+            [ "$found" = "$version" ] || { echo "::error file=$file::version $found, tag $version"; status=1; }
+          done
+          for file in web/package.json client/package.json; do
+            found=$(node -p "require('./$file').version")
+            [ "$found" = "$version" ] || { echo "::error file=$file::version $found, tag $version"; status=1; }
+          done
+          exit $status
+
+  images:
+    name: Image ${{ matrix.image }}
+    needs: [ci, versions]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - image: paperus-server
+            context: .
+          - image: paperus-ml
+            context: ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=semver,pattern={{version}}
+            type=raw,value=release
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  pypi:
+    name: PyPI (paperus, paperus-ml)
+    needs: [ci, versions]
+    runs-on: ubuntu-latest
+    # Trusted publishing: pypi.org knows this repository, workflow and
+    # environment; no password is stored here.
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: |
+          (cd server && uv build -o ../dist)
+          (cd ml && uv build -o ../dist)
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+
+  npm:
+    name: npm (paperus)
+    needs: [ci, versions]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      # Trusted publishing once it is set up on npmjs.com; the first release
+      # (before the package exists) needs an NPM_TOKEN secret instead.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  release:
+    name: GitHub release
+    needs: [images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || echo "See CHANGELOG.md." > notes.md
+      - run: gh release create "$GITHUB_REF_NAME" --title "paperus $GITHUB_REF_NAME" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}
