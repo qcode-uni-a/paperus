@@ -53,6 +53,26 @@ Noted 2026-11-05: as simple as possible.
   already has (one lookup per page). Other sites (Google Scholar, PubMed)
   one at a time later.
 
+## Formulas (needs discussion)
+
+Noted 2026-11-05. Text read from PDFs garbles formulas: a PDF only stores
+where each glyph sits, so fractions, sub- and superscripts and roots lose
+their structure (`1 X+ϵ` for 1/(X+ϵ)). Search still works on the words
+around them, and the PDF viewer shows them right; but passages for AI
+assistants (MCP) and quotes cannot be trusted where formulas are.
+
+Options, to discuss before building anything:
+
+- **arXiv's LaTeX source** for arXiv papers: exact formulas, open access.
+  Open: keep it as another file of the same version (a new file role
+  "source", next to the PDF), or only use it once to replace the PDF's
+  garbled passages and not keep it?
+- **A formula-recognition model** in the ML service for other PDFs, as an
+  optional, slow step per paper (e.g. Docling's formula step, MIT; check
+  licences and speed first; Nougat's weights are non-commercial, Marker
+  GPL, MinerU AGPL).
+- Or leave it as it is.
+
 ## Ideas to decide later
 
 - **OAuth for MCP**, so claude.ai and ChatGPT can connect as custom
