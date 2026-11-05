@@ -255,6 +255,7 @@ ROUTES = {
     ("GET", "/api/files/{file_id}/passages/{position}"): "papers.read",
     ("GET", "/api/files/unreadable"): None,
     ("POST", "/api/files/{file_id}/read-again"): "papers.write",
+    ("POST", "/api/files/{file_id}/download-again"): "papers.write",
     ("GET", "/api/files/{file_id}/content"): "files.read",
     ("POST", "/api/files/{file_id}/restore"): "papers.write",
     ("GET", "/api/groups"): "groups.read",

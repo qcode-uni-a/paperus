@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Download again** for a damaged file: a fresh open-access copy from
+  arXiv, or by DOI via Unpaywall (with the contact email set), replaces it;
+  only a whole PDF that opens is taken. Without a known source, "Upload a
+  good copy" leads to the paper.
 - PDFs are read in helper processes: in parallel on several cores, each
   with a memory and time limit, so a broken PDF can no longer take the
   worker down (453 files re-read in 95 seconds, 1.5 GB at most).

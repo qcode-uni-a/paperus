@@ -9,6 +9,7 @@
 		FILE_ROLES,
 		getItem,
 		markViewed,
+		downloadAgain,
 		passageText,
 		readFileAgain,
 		pinVersion,
@@ -364,6 +365,13 @@
 										>{readingProblem(file.text_error)}</span
 									>
 									{#if writable}
+										{#if item.identifiers.some((i) => i.scheme === 'arxiv' || i.scheme === 'doi')}
+											<button
+												onclick={() => act(() => downloadAgain({ path: { file_id: file.id } }))}
+												title="A fresh open-access copy (arXiv, or by DOI via Unpaywall) replaces this file"
+												>Download again</button
+											>
+										{/if}
 										<button onclick={() => act(() => readFileAgain({ path: { file_id: file.id } }))}
 											>Read again</button
 										>

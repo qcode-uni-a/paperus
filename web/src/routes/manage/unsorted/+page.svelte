@@ -4,6 +4,7 @@
 		addVersion,
 		errorMessage,
 		listItems,
+		downloadAgain,
 		readFileAgain,
 		unreadableFiles,
 		type Item
@@ -38,6 +39,19 @@
 	async function loadUnreadable() {
 		const { data } = await unreadableFiles();
 		unreadable = data ?? [];
+	}
+	let downloading = $state<string | null>(null);
+	let problems = $state<Record<string, string>>({});
+	async function download(file: UnreadableFile) {
+		downloading = file.file_id;
+		problems[file.file_id] = '';
+		const { error } = await downloadAgain({ path: { file_id: file.file_id } });
+		downloading = null;
+		if (error) {
+			problems[file.file_id] = errorMessage(error);
+			return;
+		}
+		retried[file.file_id] = true;
 	}
 	async function readAgain(file: UnreadableFile) {
 		const { error } = await readFileAgain({ path: { file_id: file.file_id } });
@@ -98,13 +112,28 @@
 						<span class="muted">{file.filename}</span>
 						<span>{readingProblem(file.error)}</span>
 						{#if file.error}<small class="muted" title={file.error}>{file.error}</small>{/if}
+						{#if problems[file.file_id]}<small class="error">{problems[file.file_id]}</small>{/if}
 					</div>
 					<div class="actions">
 						<a href="/api/files/{file.file_id}/content" target="_blank" rel="noopener">Open file</a>
-						{#if file.writable}
-							<button onclick={() => readAgain(file)} disabled={retried[file.file_id]}>
-								{retried[file.file_id] ? 'Reading…' : 'Read again'}
-							</button>
+						{#if file.writable && !retried[file.file_id]}
+							{#if file.can_download}
+								<button
+									class="primary"
+									onclick={() => download(file)}
+									disabled={downloading === file.file_id}
+									title="A fresh open-access copy (arXiv, or by DOI via Unpaywall) replaces the damaged file"
+								>
+									{downloading === file.file_id ? 'Downloading…' : 'Download again'}
+								</button>
+							{:else}
+								<a class="button" href={resolve('/items/[id]', { id: file.item_id })}
+									>Upload a good copy</a
+								>
+							{/if}
+							<button onclick={() => readAgain(file)}>Read again</button>
+						{:else if retried[file.file_id]}
+							<span class="muted">Reading…</span>
 						{/if}
 					</div>
 				</li>
@@ -208,7 +237,19 @@
 	}
 	.actions {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 10px;
+	}
+	.button {
+		display: inline-flex;
+		align-items: center;
+		padding: 7px 14px;
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		background: var(--surface);
+		color: var(--ink);
+		font-weight: 600;
+		text-decoration: none;
 	}
 </style>

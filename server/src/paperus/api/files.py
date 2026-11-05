@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from paperus import library, system
+from paperus import library, open_access, system
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import queue_text_extraction
@@ -371,10 +371,14 @@ class UnreadableFile(BaseModel):
     library_id: uuid.UUID
     writable: bool
     """The person may read it again, replace or remove it."""
+    can_download: bool = False
+    """An open-access copy may be found (arXiv ID, or DOI via Unpaywall)."""
 
 
 @router.get("/api/files/unreadable")
-def unreadable_files(db: DB, access: CurrentAccess) -> list[UnreadableFile]:
+def unreadable_files(
+    request: Request, db: DB, access: CurrentAccess
+) -> list[UnreadableFile]:
     """Files whose text could not be read, of the papers the person can see
     (Manage → Unsorted): to read again, replace or remove."""
     rows = db.execute(
@@ -390,6 +394,7 @@ def unreadable_files(db: DB, access: CurrentAccess) -> list[UnreadableFile]:
         .order_by(Item.title, File.filename)
         .limit(500)
     ).all()
+    email = system.load_config(db, request.app.state.settings).contact_email
     return [
         UnreadableFile(
             file_id=file.id,
@@ -400,10 +405,47 @@ def unreadable_files(db: DB, access: CurrentAccess) -> list[UnreadableFile]:
             item_title=item.title,
             library_id=item.library_id,
             writable=access.can_write_item(item),
+            can_download=bool(open_access.sources(item, email)),
         )
         for file, item in rows
         if access.can_read_item(item)
     ]
+
+
+@router.post("/api/files/{file_id}/download-again")
+def download_again(
+    file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> FileOut:
+    """Replace a file (e.g. a damaged PDF) with a fresh open-access copy of
+    its paper: from arXiv, or by DOI via Unpaywall; only a whole PDF that
+    opens is taken. 409 if none is found."""
+    file = _get_file(db, access, file_id, write=True)
+    settings = request.app.state.settings
+    try:
+        stored = open_access.fetch(
+            request.app.state.http,
+            request.app.state.blobs,
+            file.version.item,
+            contact_email=system.load_config(db, settings).contact_email,
+            max_bytes=system.max_upload_bytes(db, settings),
+        )
+    except open_access.NoSource as error:
+        raise HTTPException(409, f"no good copy found: {error}") from error
+    db.execute(
+        insert(Blob)
+        .values(sha256=stored.sha256, size=stored.size)
+        .on_conflict_do_nothing()
+    )
+    # The old content goes when nothing uses it any more (emptying the trash).
+    file.blob_sha256 = stored.sha256
+    file.media_type = PDF
+    file.source = FileSource.OPEN_ACCESS
+    file.text_status = TextStatus.PENDING
+    file.text_error = None
+    db.commit()
+    db.refresh(file)
+    queue_text_extraction(request.app.state.jobs, file.id)
+    return file_out(file)
 
 
 @router.post("/api/files/{file_id}/read-again", status_code=202)

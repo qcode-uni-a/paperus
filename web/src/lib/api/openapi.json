@@ -1692,6 +1692,50 @@
         }
       }
     },
+    "/api/files/{file_id}/download-again": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Download Again",
+        "description": "Replace a file (e.g. a damaged PDF) with a fresh open-access copy of\nits paper: from arXiv, or by DOI via Unpaywall; only a whole PDF that\nopens is taken. 409 if none is found.",
+        "operationId": "download_again",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}/read-again": {
       "post": {
         "tags": [
@@ -9287,6 +9331,11 @@
           "writable": {
             "type": "boolean",
             "title": "Writable"
+          },
+          "can_download": {
+            "type": "boolean",
+            "title": "Can Download",
+            "default": false
           }
         },
         "type": "object",

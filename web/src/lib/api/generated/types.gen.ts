@@ -2335,6 +2335,10 @@ export type UnreadableFile = {
      * Writable
      */
     writable: boolean;
+    /**
+     * Can Download
+     */
+    can_download?: boolean;
 };
 
 /**
@@ -3597,6 +3601,36 @@ export type UnreadableFilesResponses = {
 };
 
 export type UnreadableFilesResponse = UnreadableFilesResponses[keyof UnreadableFilesResponses];
+
+export type DownloadAgainData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/download-again';
+};
+
+export type DownloadAgainErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadAgainError = DownloadAgainErrors[keyof DownloadAgainErrors];
+
+export type DownloadAgainResponses = {
+    /**
+     * Successful Response
+     */
+    200: FileOut;
+};
+
+export type DownloadAgainResponse = DownloadAgainResponses[keyof DownloadAgainResponses];
 
 export type ReadFileAgainData = {
     body?: never;
