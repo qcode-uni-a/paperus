@@ -19,6 +19,7 @@ from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
+    File,
     Item,
     ItemTag,
     ItemView,
@@ -497,6 +498,7 @@ def list_items(
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
     sort: Literal["added", "recent", "opened"] = "added",
     offset: Annotated[int, Query(ge=0)] = 0,
+    unsorted: bool = False,
 ) -> list[ItemOut]:
     """Items the person can read, newest first; ``before`` = last ``id`` for
     the next page. ``library`` shows one library only. ``sort=recent``:
@@ -504,7 +506,9 @@ def list_items(
     newest first, paged with ``offset`` instead of ``before``;
     ``sort=opened``: only items the reader opened, by when.
 
-    ``trashed=true`` lists the trash instead. ``tag`` (repeatable: items
+    ``trashed=true`` lists the trash instead. ``unsorted=true``: only papers
+    whose details could not be found (all guessed from their file; papers
+    still being read are left out). ``tag`` (repeatable: items
     with all of them) and ``collection`` (with its subcollections unless
     ``nested=false``) filter the list, and ``title`` to items with all of its
     words in their title (any case). ``X-Total-Count`` is the number of
@@ -538,6 +542,23 @@ def list_items(
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():
         conditions.append(Item.title.icontains(word, autoescape=True))
+    if unsorted:
+        conditions.append(
+            Item.id.not_in(
+                select(Version.item_id).where(
+                    Version.metadata_source != MetadataSource.FILE
+                )
+            )
+        )
+        conditions.append(
+            Item.id.not_in(
+                select(Version.item_id)
+                .join(File)
+                .where(
+                    File.text_status == TextStatus.PENDING, File.deleted_at.is_(None)
+                )
+            )
+        )
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
     if sort in ("recent", "opened"):

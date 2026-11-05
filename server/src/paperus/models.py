@@ -703,3 +703,23 @@ class Import(Record, Base):
     report: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None]
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotDuplicate(Base):
+    """Two papers someone said are different, though they look alike; they
+    are not suggested as duplicates again. ``item_a`` < ``item_b``."""
+
+    __tablename__ = "not_duplicates"
+
+    item_a: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_b: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
