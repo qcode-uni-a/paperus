@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { SETTINGS } from '#lib/admin/data.svelte.ts';
 	import AuthSettings from '#lib/admin/AuthSettings.svelte';
+	import UsersSettings from '#lib/admin/UsersSettings.svelte';
 	import JobSettings from '#lib/admin/JobSettings.svelte';
 	import IntegritySettings from '#lib/admin/IntegritySettings.svelte';
 	import LoggingSettings from '#lib/admin/LoggingSettings.svelte';
@@ -39,11 +40,7 @@
 			'An optional readable copy of the library on disk, e.g. {year}/{first author} - {title}.pdf',
 			'Files themselves stay stored once by content (SHA-256)'
 		],
-		trash: ['Days until the trash is emptied automatically', 'Emptying the trash now'],
-		users: [
-			'Making users administrators (now: Administration → Users)',
-			'What happens to a removed user’s papers and notes'
-		]
+		trash: ['Days until the trash is emptied automatically', 'Emptying the trash now']
 	};
 </script>
 
@@ -68,6 +65,8 @@
 				<MlSettings />
 			{:else if slug === 'integrity'}
 				<IntegritySettings />
+			{:else if slug === 'users'}
+				<UsersSettings />
 			{:else if slug === 'authentication'}
 				<AuthSettings />
 			{:else if slug === 'jobs'}

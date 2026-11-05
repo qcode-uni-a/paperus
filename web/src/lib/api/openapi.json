@@ -4382,6 +4382,103 @@
         }
       }
     },
+    "/api/admin/users/{user_id}/private": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Private Things",
+        "operationId": "private_things",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Private"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{user_id}/hand-over": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Hand Over",
+        "description": "Give a deactivated person's papers, notes, tags and collections to a\ngroup or another person.",
+        "operationId": "hand_over",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandOver"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Private"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/backups": {
       "get": {
         "tags": [
@@ -5733,6 +5830,37 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HandOver": {
+        "properties": {
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "title": "HandOver",
+        "description": "To a group or to another person (one of the two)."
+      },
       "IdentifierIn": {
         "properties": {
           "scheme": {
@@ -6323,6 +6451,29 @@
           "source"
         ],
         "title": "ItemTagOut"
+      },
+      "Joining": {
+        "properties": {
+          "group_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Group Id"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reader",
+              "member"
+            ],
+            "title": "Role",
+            "default": "member"
+          }
+        },
+        "type": "object",
+        "required": [
+          "group_id"
+        ],
+        "title": "Joining"
       },
       "KnownFile": {
         "properties": {
@@ -7500,6 +7651,35 @@
         ],
         "title": "PasswordChange"
       },
+      "Private": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "notes": {
+            "type": "integer",
+            "title": "Notes"
+          },
+          "tags": {
+            "type": "integer",
+            "title": "Tags"
+          },
+          "collections": {
+            "type": "integer",
+            "title": "Collections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "notes",
+          "tags",
+          "collections"
+        ],
+        "title": "Private",
+        "description": "What a person's own library holds (the trash included)."
+      },
       "Problem": {
         "properties": {
           "file_id": {
@@ -8106,6 +8286,14 @@
             "type": "boolean",
             "title": "Oidc Create Accounts",
             "default": true
+          },
+          "new_user_groups": {
+            "items": {
+              "$ref": "#/components/schemas/Joining"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "New User Groups"
           }
         },
         "type": "object",

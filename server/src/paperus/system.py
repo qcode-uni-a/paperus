@@ -4,6 +4,7 @@ defaults; values saved here override them.
 """
 
 import logging
+import uuid
 from typing import Literal, Self
 
 import httpx2
@@ -16,6 +17,11 @@ from paperus.metadata import user_agent
 from paperus.models import SystemSetting
 
 KEY = "config"
+
+
+class Joining(BaseModel):
+    group_id: uuid.UUID
+    role: Literal["reader", "member"] = "member"
 
 
 class SystemConfig(BaseModel):
@@ -80,6 +86,11 @@ class SystemConfig(BaseModel):
     """The claim that becomes the username (e.g. preferred_username, email);
     an existing account of that name is linked on its first login."""
     oidc_create_accounts: bool = True
+
+    # Users
+    new_user_groups: list[Joining] = Field(default_factory=list, max_length=20)
+    """Groups new accounts join (made by an administrator or on a first
+    OIDC login)."""
     """Create an account on someone's first OIDC login; off: only
     people an administrator added beforehand."""
 

@@ -222,6 +222,9 @@ def user_for(db: Session, claims: dict[str, Any], config: SystemConfig) -> User:
                     f"there is no account {username} yet; ask an administrator"
                 )
             user = auth.create_user(db, username, secrets.token_urlsafe(32))
+            auth.join_groups(
+                db, user, [(g.group_id, g.role) for g in config.new_user_groups]
+            )
         user.oidc_subject = subject
     if user.deactivated_at is not None:
         raise LoginFailed("this account is deactivated")

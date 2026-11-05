@@ -19,6 +19,9 @@
   added beforehand), linked by username, or linked by hand with "Link my
   account" (also in one's own settings). Password login can be limited to
   administrators.
+- **Users settings**: groups (with a role) that new accounts join, and
+  handing a departed person's papers, notes, collections and tags to a
+  group or another person (tags merge by name).
 - **Authentication settings**: how long one stays logged in, the shortest
   password, and logging everyone out.
 - **Job settings**: how many files are read, sent to the ML service and

@@ -227,6 +227,8 @@ ROUTES = {
     ("PUT", "/api/admin/authentication/secret"): None,
     ("POST", "/api/admin/authentication/check"): None,
     ("DELETE", "/api/admin/sessions"): None,
+    ("GET", "/api/admin/users/{user_id}/private"): None,
+    ("POST", "/api/admin/users/{user_id}/hand-over"): None,
     ("POST", "/api/auth/logout"): None,
     ("GET", "/api/auth/me"): "papers.read",
     ("POST", "/api/auth/password"): None,

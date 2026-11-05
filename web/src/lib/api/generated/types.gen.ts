@@ -567,6 +567,22 @@ export type HttpValidationError = {
 };
 
 /**
+ * HandOver
+ *
+ * To a group or to another person (one of the two).
+ */
+export type HandOver = {
+    /**
+     * Group Id
+     */
+    group_id?: string | null;
+    /**
+     * User Id
+     */
+    user_id?: string | null;
+};
+
+/**
  * IdentifierIn
  */
 export type IdentifierIn = {
@@ -877,6 +893,20 @@ export type ItemTagOut = {
     name: string;
     color: TagColor | null;
     source: TagSource;
+};
+
+/**
+ * Joining
+ */
+export type Joining = {
+    /**
+     * Group Id
+     */
+    group_id: string;
+    /**
+     * Role
+     */
+    role?: 'reader' | 'member';
 };
 
 /**
@@ -1552,6 +1582,30 @@ export type PasswordChange = {
 };
 
 /**
+ * Private
+ *
+ * What a person's own library holds (the trash included).
+ */
+export type Private = {
+    /**
+     * Items
+     */
+    items: number;
+    /**
+     * Notes
+     */
+    notes: number;
+    /**
+     * Tags
+     */
+    tags: number;
+    /**
+     * Collections
+     */
+    collections: number;
+};
+
+/**
  * Problem
  */
 export type Problem = {
@@ -1907,6 +1961,10 @@ export type SystemConfig = {
      * Oidc Create Accounts
      */
     oidc_create_accounts?: boolean;
+    /**
+     * New User Groups
+     */
+    new_user_groups?: Array<Joining>;
 };
 
 /**
@@ -5014,6 +5072,66 @@ export type ChangeUserResponses = {
 };
 
 export type ChangeUserResponse = ChangeUserResponses[keyof ChangeUserResponses];
+
+export type PrivateThingsData = {
+    body?: never;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/admin/users/{user_id}/private';
+};
+
+export type PrivateThingsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PrivateThingsError = PrivateThingsErrors[keyof PrivateThingsErrors];
+
+export type PrivateThingsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Private;
+};
+
+export type PrivateThingsResponse = PrivateThingsResponses[keyof PrivateThingsResponses];
+
+export type HandOverData = {
+    body: HandOver;
+    path: {
+        /**
+         * User Id
+         */
+        user_id: string;
+    };
+    query?: never;
+    url: '/api/admin/users/{user_id}/hand-over';
+};
+
+export type HandOverErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type HandOverError = HandOverErrors[keyof HandOverErrors];
+
+export type HandOverResponses = {
+    /**
+     * Successful Response
+     */
+    200: Private;
+};
+
+export type HandOverResponse = HandOverResponses[keyof HandOverResponses];
 
 export type ListBackupsData = {
     body?: never;

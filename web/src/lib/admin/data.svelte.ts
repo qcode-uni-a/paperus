@@ -46,7 +46,12 @@ export const SETTINGS = [
 	['server', 'Server', 'Public address, contact email for metadata services, upload limits', false],
 	['storage-template', 'Storage template', 'A readable copy of the library on disk', true],
 	['trash', 'Trash', 'When the trash empties itself', false],
-	['users', 'Users', "What happens to a removed person's papers and notes", true],
+	[
+		'users',
+		'Users',
+		'Groups new people join, and handing over the things of people who left',
+		false
+	],
 	['authentication', 'Authentication', 'OIDC login, passwords, how long one stays logged in', false]
 ] as const;
 

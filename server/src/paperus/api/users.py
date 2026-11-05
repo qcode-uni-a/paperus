@@ -9,11 +9,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from paperus import auth
+from paperus import auth, handover
 from paperus.api.admin import Admin
 from paperus.api.auth import check_password_length
 from paperus.api.deps import DB
-from paperus.models import Item, Library, Membership, User
+from paperus.models import Group, Item, Library, Membership, User
+from paperus.system import load_config
 
 router = APIRouter(prefix="/api/admin/users", tags=["users"])
 
@@ -95,6 +96,10 @@ def create_user(body: NewUser, request: Request, db: DB, admin: Admin) -> UserRo
         user = auth.create_user(
             db, body.username, body.password, is_admin=body.is_admin
         )
+        config = load_config(db, request.app.state.settings)
+        auth.join_groups(
+            db, user, [(g.group_id, g.role) for g in config.new_user_groups]
+        )
         db.commit()
     except IntegrityError as error:
         db.rollback()
@@ -144,3 +149,66 @@ def change_user(
             auth.end_sessions(db, user)
     db.commit()
     return _rows(db, user.id)[0]
+
+
+class Private(BaseModel):
+    """What a person's own library holds (the trash included)."""
+
+    items: int
+    notes: int
+    tags: int
+    collections: int
+
+
+@router.get("/{user_id}/private")
+def private_things(user_id: uuid.UUID, db: DB, admin: Admin) -> Private:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "user not found")
+    found = handover.private(db, _own_library(db, user))
+    return Private(**found.__dict__)
+
+
+class HandOver(BaseModel):
+    """To a group or to another person (one of the two)."""
+
+    group_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+
+
+def _own_library(db: DB, user: User) -> uuid.UUID:
+    library = db.scalar(select(Library.id).where(Library.user_id == user.id))
+    if library is None:
+        raise HTTPException(404, "the person has no library")
+    return library
+
+
+@router.post("/{user_id}/hand-over")
+def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Private:
+    """Give a deactivated person's papers, notes, tags and collections to a
+    group or another person."""
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(404, "user not found")
+    if user.deactivated_at is None:
+        raise HTTPException(409, "deactivate the person first")
+    if (body.group_id is None) == (body.user_id is None):
+        raise HTTPException(422, "name a group or a person")
+    if body.group_id is not None:
+        if db.get(Group, body.group_id) is None:
+            raise HTTPException(404, "group not found")
+        target = db.scalar(select(Library.id).where(Library.group_id == body.group_id))
+    else:
+        receiver = db.get(User, body.user_id)
+        if (
+            receiver is None
+            or receiver.deactivated_at is not None
+            or receiver.id == user.id
+        ):
+            raise HTTPException(422, "hand over to another active person")
+        target = _own_library(db, receiver)
+    if target is None:
+        raise HTTPException(404, "the group has no library")
+    moved = handover.hand_over(db, _own_library(db, user), target)
+    db.commit()
+    return Private(**moved.__dict__)

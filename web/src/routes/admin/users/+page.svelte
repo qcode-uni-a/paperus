@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { changeUser, createUser, errorMessage, listUsers } from '#lib/api/client.ts';
 	import type { UserRow } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
@@ -123,6 +124,9 @@
 					</button>
 					{#if user.deactivated_at}
 						<button class="link" onclick={() => change(user, { active: true })}>Reactivate</button>
+						{#if user.papers}
+							<a class="link" href="{resolve('/admin/settings')}?open=users#users">Hand over</a>
+						{/if}
 					{:else if !me}
 						<button class="link danger" onclick={() => deactivate(user)}>Deactivate</button>
 					{/if}

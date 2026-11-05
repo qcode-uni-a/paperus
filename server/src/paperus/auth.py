@@ -2,6 +2,7 @@
 
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
@@ -9,7 +10,7 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from paperus.models import Library, LoginSession, User
+from paperus.models import Group, Library, LoginSession, Membership, User
 
 SESSION_LIFETIME = timedelta(days=30)
 
@@ -43,6 +44,18 @@ def create_user(
     db.flush()
     user.default_library_id = library.id
     return user
+
+
+def join_groups(db: Session, user: User, groups: list[tuple[uuid.UUID, str]]) -> None:
+    """Make a new account a member of these groups (with these roles);
+    groups deleted meanwhile are skipped."""
+    existing = set(
+        db.scalars(select(Group.id).where(Group.id.in_([g for g, _ in groups])))
+    )
+    for group_id, role in groups:
+        if group_id in existing:
+            db.add(Membership(group_id=group_id, user_id=user.id, role=role))
+    db.flush()
 
 
 def authenticate(db: Session, username: str, password: str) -> User | None:
