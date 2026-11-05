@@ -24,6 +24,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 COPY server/pyproject.toml server/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
+COPY server/README.md ./
 COPY server/src ./src
 RUN uv sync --frozen --no-dev
 COPY --from=web /web/build ./web
