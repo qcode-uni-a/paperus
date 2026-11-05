@@ -745,6 +745,43 @@ export type MemberOut = {
 };
 
 /**
+ * MergeInto
+ */
+export type MergeInto = {
+    /**
+     * Into
+     */
+    into: string;
+};
+
+/**
+ * MergeOut
+ */
+export type MergeOut = {
+    item: ItemDetail;
+    /**
+     * Versions
+     */
+    versions: number;
+    /**
+     * Files
+     */
+    files: number;
+    /**
+     * Tags
+     */
+    tags: number;
+    /**
+     * Collections
+     */
+    collections: number;
+    /**
+     * Left Behind
+     */
+    left_behind: Array<string>;
+};
+
+/**
  * MetadataSource
  */
 export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
@@ -1741,6 +1778,68 @@ export type MarkViewedResponses = {
 };
 
 export type MarkViewedResponse = MarkViewedResponses[keyof MarkViewedResponses];
+
+export type ListDuplicatesData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/duplicates';
+};
+
+export type ListDuplicatesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListDuplicatesError = ListDuplicatesErrors[keyof ListDuplicatesErrors];
+
+export type ListDuplicatesResponses = {
+    /**
+     * Response List Duplicates
+     *
+     * Successful Response
+     */
+    200: Array<ItemOut>;
+};
+
+export type ListDuplicatesResponse = ListDuplicatesResponses[keyof ListDuplicatesResponses];
+
+export type MergeItemData = {
+    body: MergeInto;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/merge';
+};
+
+export type MergeItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MergeItemError = MergeItemErrors[keyof MergeItemErrors];
+
+export type MergeItemResponses = {
+    /**
+     * Successful Response
+     */
+    200: MergeOut;
+};
+
+export type MergeItemResponse = MergeItemResponses[keyof MergeItemResponses];
 
 export type FindUploadData = {
     body?: never;

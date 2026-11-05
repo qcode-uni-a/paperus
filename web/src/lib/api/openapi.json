@@ -826,6 +826,108 @@
         }
       }
     },
+    "/api/items/{item_id}/duplicates": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "List Duplicates",
+        "description": "Papers the person can see that share an identifier or a file with\nthis one: candidates for merging.",
+        "operationId": "list_duplicates",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemOut"
+                  },
+                  "title": "Response List Duplicates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/merge": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Merge Item",
+        "description": "Merge this paper into another one (the same paper twice). Needs the\nright to change this one; what may move to the other depends on the\nperson's rights there (see docs/permissions.md).",
+        "operationId": "merge_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeInto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads/{sha256}": {
       "get": {
         "tags": [
@@ -3984,6 +4086,60 @@
           "inherited_from"
         ],
         "title": "MemberOut"
+      },
+      "MergeInto": {
+        "properties": {
+          "into": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Into"
+          }
+        },
+        "type": "object",
+        "required": [
+          "into"
+        ],
+        "title": "MergeInto"
+      },
+      "MergeOut": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ItemDetail"
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "tags": {
+            "type": "integer",
+            "title": "Tags"
+          },
+          "collections": {
+            "type": "integer",
+            "title": "Collections"
+          },
+          "left_behind": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left Behind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "versions",
+          "files",
+          "tags",
+          "collections",
+          "left_behind"
+        ],
+        "title": "MergeOut"
       },
       "MetadataSource": {
         "type": "string",

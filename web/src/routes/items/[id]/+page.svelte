@@ -24,6 +24,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
+	import MergeDialog from '#lib/MergeDialog.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
@@ -40,6 +41,7 @@
 	let error = $state('');
 
 	let editDialog = $state<ItemEditDialog>();
+	let mergeDialog = $state<MergeDialog>();
 
 	let addingVersion = $state(false);
 	let versionDoi = $state('');
@@ -199,6 +201,7 @@
 					{/if}
 					{#if writable}
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+						<button role="menuitem" onclick={() => mergeDialog?.open()}>Merge into…</button>
 						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
 					{/if}
 				</MenuButton>
@@ -212,7 +215,10 @@
 		</p>
 
 		<ItemOrganize {item} onchange={load} />
-		{#if writable}<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />{/if}
+		{#if writable}
+			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
+			<MergeDialog bind:this={mergeDialog} {item} />
+		{/if}
 		{#if error}<p class="error">{error}</p>{/if}
 	</header>
 
