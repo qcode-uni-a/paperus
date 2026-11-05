@@ -2545,6 +2545,28 @@
         }
       }
     },
+    "/api/storage": {
+      "get": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Storage",
+        "description": "How full the storage is (for the bar at the bottom of the menu).",
+        "operationId": "storage",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Storage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/config": {
       "get": {
         "tags": [
@@ -4997,6 +5019,29 @@
         ],
         "title": "DefaultLibrary"
       },
+      "Disk": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "free": {
+            "type": "integer",
+            "title": "Free"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "used",
+          "free"
+        ],
+        "title": "Disk"
+      },
       "DuplicateOut": {
         "properties": {
           "keep": {
@@ -7384,6 +7429,9 @@
             },
             "type": "object",
             "title": "Jobs"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/Usage"
           }
         },
         "type": "object",
@@ -7394,9 +7442,47 @@
           "chunks",
           "embedded",
           "embedding_model",
-          "jobs"
+          "jobs",
+          "storage"
         ],
         "title": "Stats"
+      },
+      "Storage": {
+        "properties": {
+          "library_bytes": {
+            "type": "integer",
+            "title": "Library Bytes"
+          },
+          "disk_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Total"
+          },
+          "disk_free": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Free"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_bytes",
+          "disk_total",
+          "disk_free"
+        ],
+        "title": "Storage"
       },
       "SystemConfig": {
         "properties": {
@@ -7826,6 +7912,53 @@
           "last_used_at"
         ],
         "title": "TokenOut"
+      },
+      "Usage": {
+        "properties": {
+          "library_bytes": {
+            "type": "integer",
+            "title": "Library Bytes"
+          },
+          "disk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Disk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backups_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backups Bytes"
+          },
+          "backups_disk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Disk"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_bytes",
+          "disk",
+          "backups_bytes",
+          "backups_disk"
+        ],
+        "title": "Usage"
       },
       "UserBrief": {
         "properties": {

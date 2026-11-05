@@ -14,6 +14,7 @@ from prometheus_client.registry import Collector
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from paperus import usage
 from paperus.backup import last_backup_time
 from paperus.config import Settings
 from paperus.models import (
@@ -185,6 +186,25 @@ class LibraryCollector(Collector):
             for status, number in statuses.items():
                 jobs.add_metric([queue, status], float(number))
         yield jobs
+        with self.sessions() as db:
+            space = usage.usage(db, self.settings)
+        if space.disk is not None:
+            yield GaugeMetricFamily(
+                "paperus_disk_total_bytes",
+                "Size of the disk the files are on",
+                value=float(space.disk.total),
+            )
+            yield GaugeMetricFamily(
+                "paperus_disk_free_bytes",
+                "Free space on the disk the files are on",
+                value=float(space.disk.free),
+            )
+        if space.backups_bytes is not None:
+            yield GaugeMetricFamily(
+                "paperus_backups_bytes",
+                "Space the backups take",
+                value=float(space.backups_bytes),
+            )
         last = last_backup_time(self.settings.backup_path)
         if last is not None:
             yield GaugeMetricFamily(

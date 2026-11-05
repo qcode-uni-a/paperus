@@ -1,9 +1,10 @@
-"""Emptying the trash by hand (the trash page)."""
+"""Emptying the trash by hand (the trash page), and how full the storage
+is (the menu)."""
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from paperus import trash
+from paperus import trash, usage
 from paperus.api.deps import DB, CurrentAccess
 
 router = APIRouter(tags=["trash"])
@@ -21,3 +22,22 @@ def empty_trash(request: Request, db: DB, access: CurrentAccess) -> Emptied:
     own and that of groups where they are a member or admin."""
     done = trash.empty(db, request.app.state.blobs, libraries=access.writable)
     return Emptied(items=done.items, notes=done.notes, files=done.files)
+
+
+class Storage(BaseModel):
+    library_bytes: int
+    """What the stored files take (each content once)."""
+    disk_total: int | None
+    disk_free: int | None
+    """Of the disk the files are on; None with storage in the cloud (S3)."""
+
+
+@router.get("/api/storage")
+def storage(request: Request, db: DB, access: CurrentAccess) -> Storage:
+    """How full the storage is (for the bar at the bottom of the menu)."""
+    found = usage.usage(db, request.app.state.settings)
+    return Storage(
+        library_bytes=found.library_bytes,
+        disk_total=found.disk.total if found.disk else None,
+        disk_free=found.disk.free if found.disk else None,
+    )

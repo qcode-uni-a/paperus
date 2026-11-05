@@ -17,6 +17,9 @@
   figures (papers, files waiting to be read, storage, background jobs, the
   last backup); the ML service reports its requests, batch times and
   loaded models. See docs/operations.md.
+- **Storage use**: how much space the library takes and how much is free,
+  at the bottom of the menu and in Administration → Server stats (with the
+  backups); also as Prometheus metrics.
 - **Empty trash** on the trash page: deletes for good what one may change.
 - The search bar is hidden in the administration.
 

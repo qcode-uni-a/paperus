@@ -22,6 +22,7 @@
 		mdiTrashCanOutline
 	} from '@mdi/js';
 	import Icon from '#lib/Icon.svelte';
+	import StorageMeter from '#lib/StorageMeter.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -118,6 +119,7 @@
 		{#if session.user?.is_admin}
 			<a href={adminPath}><Icon path={mdiShieldAccountOutline} /><span>Administration</span></a>
 		{/if}
+		{#if session.user}<StorageMeter />{/if}
 	{/if}
 </nav>
 

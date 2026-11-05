@@ -339,6 +339,24 @@ export type DefaultLibrary = {
 };
 
 /**
+ * Disk
+ */
+export type Disk = {
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Used
+     */
+    used: number;
+    /**
+     * Free
+     */
+    free: number;
+};
+
+/**
  * DuplicateOut
  */
 export type DuplicateOut = {
@@ -1702,6 +1720,25 @@ export type Stats = {
             [key: string]: number;
         };
     };
+    storage: Usage;
+};
+
+/**
+ * Storage
+ */
+export type Storage = {
+    /**
+     * Library Bytes
+     */
+    library_bytes: number;
+    /**
+     * Disk Total
+     */
+    disk_total: number | null;
+    /**
+     * Disk Free
+     */
+    disk_free: number | null;
 };
 
 /**
@@ -1888,6 +1925,22 @@ export type TokenOut = {
      * Last Used At
      */
     last_used_at: string | null;
+};
+
+/**
+ * Usage
+ */
+export type Usage = {
+    /**
+     * Library Bytes
+     */
+    library_bytes: number;
+    disk: Disk | null;
+    /**
+     * Backups Bytes
+     */
+    backups_bytes: number | null;
+    backups_disk: Disk | null;
 };
 
 /**
@@ -3614,6 +3667,22 @@ export type EmptyTrashResponses = {
 };
 
 export type EmptyTrashResponse = EmptyTrashResponses[keyof EmptyTrashResponses];
+
+export type StorageData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/storage';
+};
+
+export type StorageResponses = {
+    /**
+     * Successful Response
+     */
+    200: Storage;
+};
+
+export type StorageResponse = StorageResponses[keyof StorageResponses];
 
 export type GetConfigData = {
     body?: never;

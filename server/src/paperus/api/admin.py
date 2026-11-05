@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from paperus import integrity, metrics, system
+from paperus import integrity, metrics, system, usage
 from paperus.api.deps import DB, CurrentUser
 from paperus.jobs import (
     queue_embedding_sweep,
@@ -94,6 +94,8 @@ class Stats(BaseModel):
     embedding_model: str
     jobs: dict[str, dict[str, int]]
     """Background jobs per queue and status (todo, doing, failed, …)."""
+    storage: usage.Usage
+    """Space the library and the backups take, and what is free."""
 
 
 def _ml(request: Request) -> MLClient:
@@ -197,6 +199,7 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
         embedded=figures.embedded,
         embedding_model=figures.embedding_model,
         jobs=figures.jobs,
+        storage=usage.usage(db, request.app.state.settings),
     )
 
 
