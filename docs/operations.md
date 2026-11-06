@@ -232,7 +232,7 @@ Variables):
 - Firefox add-on (addons.mozilla.org, listed since 0.0.10): an API key
   from <https://addons.mozilla.org/developers/addon/api/key/> as the
   secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` (in an environment
-  `firefox`), then `PUBLISH_FIREFOX` = `true`. Each release hands in the
+  `firefox`), then `PUBLISH_FIREFOX` = `true`. A release hands in the
   new version with its source (`extension/amo-metadata.json`: the notes for
   the reviewers); it is listed once Mozilla approves it.
 
@@ -243,9 +243,13 @@ Variables):
   the secret `CHROME_SERVICE_ACCOUNT_KEY` (environment `chrome`), the
   variables `CHROME_PUBLISHER_ID` (Dashboard → Account) and
   `CHROME_ITEM_ID` (the extension's ID, in the item's address), and
-  `PUBLISH_CHROME` = `true`. Each release uploads the new version and hands
+  `PUBLISH_CHROME` = `true`. A release uploads the new version and hands
   it in for review. Actions → "Check store access" tests both stores' keys
   without uploading anything.
+- Both stores only get a new version when the extension changed since the
+  previous release tag: the release builds both and compares what ships,
+  apart from the version (`.github/scripts/extension-changed.sh`). The
+  GitHub release always has the zips.
 
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
