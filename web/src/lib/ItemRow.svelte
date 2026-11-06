@@ -49,7 +49,11 @@
 		padding: 14px 0 16px;
 		border-bottom: 1px solid var(--rule);
 		display: grid;
+		/* Never wider than the list: a long word (a LaTeX formula, a URL)
+		   breaks instead of widening the page. */
+		grid-template-columns: minmax(0, 1fr);
 		gap: 4px;
+		overflow-wrap: anywhere;
 	}
 	.note {
 		color: var(--muted);

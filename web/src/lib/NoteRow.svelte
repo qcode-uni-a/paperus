@@ -46,7 +46,10 @@
 		padding: 14px 0 16px;
 		border-bottom: 1px solid var(--rule);
 		display: grid;
+		/* Never wider than the list (see ItemRow). */
+		grid-template-columns: minmax(0, 1fr);
 		gap: 4px;
+		overflow-wrap: anywhere;
 	}
 	.corner {
 		position: absolute;
@@ -66,6 +69,9 @@
 		line-height: 1.3;
 		color: var(--ink);
 		text-decoration: none;
+	}
+	.title span {
+		min-width: 0;
 	}
 	.title:hover span {
 		color: var(--royal);

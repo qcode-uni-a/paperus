@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- On phones, the library no longer grows wider than the screen when a
+  title holds a long formula or address (also in the notes list).
 - **Smart collections** (#23): a collection that finds its papers by
   rules instead of papers added to it: with all, any or none of some tags,
   of some types, published in some years, owned by someone, added in the
