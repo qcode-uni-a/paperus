@@ -60,6 +60,15 @@ def client(tiny: Encoder) -> Iterator[TestClient]:
         yield client
 
 
+def test_rerank_needs_a_reranker(client: TestClient) -> None:
+    body = {"model": "bge-m3", "query": "rain", "passages": ["rain"]}
+    assert client.post("/rerank", json=body).status_code == 422
+    rerankers = [
+        m["name"] for m in client.get("/models").json() if m["task"] == "rerank"
+    ]
+    assert "bge-reranker-v2-m3" in rerankers
+
+
 def test_embed(client: TestClient) -> None:
     response = client.post(
         "/embed",

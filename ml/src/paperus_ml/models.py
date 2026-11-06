@@ -13,7 +13,7 @@ Scores are the published retrieval averages of the full-precision models
 from dataclasses import dataclass
 from typing import Literal
 
-Task = Literal["embedding"]
+Task = Literal["embedding", "rerank"]
 
 SCORES = {
     "en": "Retrieval, English (MTEB eng v2)",
@@ -239,6 +239,60 @@ MODELS = {
                 ("de", 48.2),
                 ("multilingual", 49.3),
             ),
+        ),
+        # Rerankers: read a query and a passage together and score how well
+        # they fit; for reordering the best search hits. Tested on our own
+        # question set (docs/search.md): bge-reranker-v2-m3 best, MiniLM
+        # English only.
+        ModelSpec(
+            name="bge-reranker-v2-m3",
+            repo="onnx-community/bge-reranker-v2-m3-ONNX",
+            revision="6f5ff65298512715a1e669753bc754d2bc8f367b",
+            onnx_file="onnx/model_int8.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
+            tokenizer_file="tokenizer.json",
+            task="rerank",
+            pooling="cls",
+            dimensions=1,
+            max_tokens=512,
+            description=(
+                "Multilingual reranker, the best on our questions; half a second "
+                "per search on a GPU, many seconds on a CPU."
+            ),
+            licence="Apache-2.0",
+            download_mb=571,
+        ),
+        ModelSpec(
+            name="gte-multilingual-reranker-base",
+            repo="onnx-community/gte-multilingual-reranker-base",
+            revision="ee64367e35a2db0da46bb6497e13a18f8bd585cb",
+            onnx_file="onnx/model_int8.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
+            tokenizer_file="tokenizer.json",
+            task="rerank",
+            pooling="cls",
+            dimensions=1,
+            max_tokens=512,
+            description=(
+                "Multilingual reranker, about twice as fast as bge-reranker-v2-m3."
+            ),
+            licence="Apache-2.0",
+            download_mb=341,
+        ),
+        ModelSpec(
+            name="ms-marco-minilm-l6",
+            repo="cross-encoder/ms-marco-MiniLM-L-6-v2",
+            revision="233902d25c440f23af6f7d6e94d2946bac0bee0a",
+            onnx_file="onnx/model_quint8_avx2.onnx",
+            gpu_onnx_file="onnx/model.onnx",
+            tokenizer_file="tokenizer.json",
+            task="rerank",
+            pooling="cls",
+            dimensions=1,
+            max_tokens=512,
+            description="Small English reranker; fast enough for a CPU.",
+            licence="Apache-2.0",
+            download_mb=23,
         ),
     ]
 }

@@ -32,6 +32,11 @@ class SystemConfig(BaseModel):
     ml_threads: int | None = Field(None, ge=0, le=1024)
     """CPU threads the ML service uses per model; 0: all it sees; None: the
     ML service's own setting (``PAPERUS_ML_INTRA_OP_THREADS``)."""
+    rerank: Literal["auto", "on", "off"] = "auto"
+    """Reorder the best search hits with a reranker (better first hits):
+    "auto" when the ML service runs on a GPU, as on a CPU it takes seconds
+    per search."""
+    rerank_model: str = "bge-reranker-v2-m3"
 
     # Server
     public_url: HttpUrl | None = None

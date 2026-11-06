@@ -72,6 +72,7 @@ class MLClient:
         self.http.headers.update(headers)
         self._failed_at: dict[str, float] = {}
         self._vectors: dict[str, tuple[str, float]] = {}
+        self._device: tuple[str, float] | None = None
 
     def _ordered_urls(self) -> list[str]:
         now = time.monotonic()
@@ -152,6 +153,51 @@ class MLClient:
             except httpx2.HTTPError as error:
                 result.append((url, str(error) or type(error).__name__))
         return result
+
+    def rerank(
+        self, query: str, passages: list[str], *, model: str, timeout: float
+    ) -> list[float]:
+        """How well each passage answers the query (higher fits better), from
+        the first service that answers; raises MLUnavailable, MLLoading or
+        MLRejected."""
+        errors = []
+        loading = False
+        for url in self._ordered_urls():
+            try:
+                response = self.http.post(
+                    f"{url}/rerank",
+                    json={"model": model, "query": query, "passages": passages},
+                    timeout=timeout,
+                )
+            except httpx2.HTTPError as error:
+                self._failed_at[url] = time.monotonic()
+                errors.append(f"{url}: {error}")
+                continue
+            if response.status_code == 503:
+                loading = True
+                errors.append(f"{url}: {_detail(response)}")
+                continue
+            if 400 <= response.status_code < 500:
+                metrics.ML_CALLS.labels("rerank", "rejected").inc()
+                raise MLRejected(response.status_code, _detail(response))
+            if response.is_error:
+                errors.append(f"{url}: {response.status_code} {_detail(response)}")
+                continue
+            metrics.ML_CALLS.labels("rerank", "ok").inc()
+            scores: list[float] = response.json()["scores"]
+            return scores
+        metrics.ML_CALLS.labels("rerank", "loading" if loading else "unavailable").inc()
+        message = "; ".join(errors) or "no ML service configured"
+        raise MLLoading(message) if loading else MLUnavailable(message)
+
+    def device(self) -> str:
+        """Where the first ML service runs its models ("cpu" or "cuda"),
+        asked at most once a minute; "cpu" if it does not say."""
+        if self._device and time.monotonic() - self._device[1] < VECTORS_TTL:
+            return self._device[0]
+        device = str(self.service_config().get("device") or "cpu")
+        self._device = (device, time.monotonic())
+        return device
 
     def vectors_name(self, model: str) -> str:
         """What the model's vectors are stored as: its name, or with the

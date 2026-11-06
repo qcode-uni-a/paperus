@@ -64,6 +64,16 @@ def gpu_count() -> int:
     return 0
 
 
+def run_options(device: Device) -> onnxruntime.RunOptions:
+    """On a GPU, give the memory a run needed back afterwards: a reranker's
+    batch briefly needs gigabytes, and the card is shared with other models
+    (and maybe a desktop)."""
+    options = onnxruntime.RunOptions()
+    if device == "cuda":
+        options.add_run_config_entry("memory.enable_memory_arena_shrinkage", "gpu:0")
+    return options
+
+
 def providers(device: Device) -> list[str | tuple[str, dict[str, str]]]:
     """For ONNX Runtime; on the GPU, the CPU as a fallback (when the GPU
     cannot be used after all, e.g. no card reachable from the container)."""

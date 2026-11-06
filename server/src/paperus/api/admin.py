@@ -129,16 +129,24 @@ def set_config(
     search keeps working and search by meaning covers more and more."""
     current = system.load_config(db, request.app.state.settings)
     model_changed = body.embedding_model != current.embedding_model
-    if model_changed:
+    rerank_changed = (body.rerank, body.rerank_model) != (
+        current.rerank,
+        current.rerank_model,
+    )
+    if model_changed or (rerank_changed and body.rerank != "off"):
         try:
-            known = {m.name for m in _models(_ml(request)) if m.task == "embedding"}
+            known = [(m.name, m.task) for m in _models(_ml(request))]
         except (MLUnavailable, MLRejected) as error:
             raise HTTPException(
                 503, "ML service unreachable; cannot check the model"
             ) from error
-        if body.embedding_model not in known:
+        if model_changed and (body.embedding_model, "embedding") not in known:
             raise HTTPException(
                 422, f"the ML service has no model {body.embedding_model!r}"
+            )
+        if rerank_changed and (body.rerank_model, "rerank") not in known:
+            raise HTTPException(
+                422, f"the ML service has no reranker {body.rerank_model!r}"
             )
     system.save_config(db, body)
     db.commit()
@@ -150,7 +158,7 @@ def set_config(
         getattr(body, name) != getattr(current, name) for name in copy
     ):
         queue_readable_copy(request.app.state.jobs)
-    if model_changed or body.ml_threads != current.ml_threads:
+    if model_changed or rerank_changed or body.ml_threads != current.ml_threads:
         # The worker sends it at once (first in its queue), and every minute.
         queue_ml_configuration(request.app.state.jobs)
     return body

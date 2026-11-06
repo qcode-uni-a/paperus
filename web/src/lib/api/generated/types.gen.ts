@@ -1690,6 +1690,10 @@ export type Passage = {
      * In References
      */
     in_references: boolean;
+    /**
+     * Reranked
+     */
+    reranked?: boolean;
 };
 
 /**
@@ -2071,6 +2075,14 @@ export type SystemConfig = {
      * Ml Threads
      */
     ml_threads?: number | null;
+    /**
+     * Rerank
+     */
+    rerank?: 'auto' | 'on' | 'off';
+    /**
+     * Rerank Model
+     */
+    rerank_model?: string;
     /**
      * Public Url
      */

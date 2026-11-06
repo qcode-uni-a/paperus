@@ -8257,6 +8257,11 @@
           "in_references": {
             "type": "boolean",
             "title": "In References"
+          },
+          "reranked": {
+            "type": "boolean",
+            "title": "Reranked",
+            "default": false
           }
         },
         "type": "object",
@@ -8870,6 +8875,21 @@
               }
             ],
             "title": "Ml Threads"
+          },
+          "rerank": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "on",
+              "off"
+            ],
+            "title": "Rerank",
+            "default": "auto"
+          },
+          "rerank_model": {
+            "type": "string",
+            "title": "Rerank Model",
+            "default": "bge-reranker-v2-m3"
           },
           "public_url": {
             "anyOf": [

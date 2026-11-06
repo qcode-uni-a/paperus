@@ -93,6 +93,11 @@ def main(argv: list[str] | None = None) -> None:
     evaluate_.add_argument(
         "--each", action="store_true", help="also show each question's rank"
     )
+    evaluate_.add_argument(
+        "--rerank",
+        choices=["on", "off"],
+        help="rerank the hits or not (default: the administration's setting)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -123,7 +128,8 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(import_command(args.path, args.user, args.group))
     elif args.command == "evaluate":
         logging.basicConfig(level=logging.WARNING)
-        sys.exit(evaluate_command(args.path, args.user, each=args.each))
+        rerank = None if args.rerank is None else args.rerank == "on"
+        sys.exit(evaluate_command(args.path, args.user, each=args.each, rerank=rerank))
     elif args.command == "user" and args.user_command == "create":
         sys.exit(
             create_user_command(
@@ -291,7 +297,9 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
     return 0
 
 
-def evaluate_command(path_text: str, username: str, *, each: bool = False) -> int:
+def evaluate_command(
+    path_text: str, username: str, *, each: bool = False, rerank: bool | None = None
+) -> int:
     """Search with each question in every mode and print the scores."""
     questions = load_questions(Path(path_text))
     settings = Settings()
@@ -303,7 +311,9 @@ def evaluate_command(path_text: str, username: str, *, each: bool = False) -> in
             if user is None:
                 print(f"No user {username!r}.", file=sys.stderr)
                 return 1
-            results = evaluate(db, Access.of(db, user), ml, settings, questions)
+            results = evaluate(
+                db, Access.of(db, user), ml, settings, questions, rerank=rerank
+            )
             print(report(results, questions if each else None))
     finally:
         ml.close()

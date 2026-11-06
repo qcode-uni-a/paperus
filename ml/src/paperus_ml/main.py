@@ -23,6 +23,7 @@ from paperus_ml.config import Settings
 from paperus_ml.encoder import Encoder
 from paperus_ml.manager import ModelFailed, ModelLoading, ModelManager, UnknownModel
 from paperus_ml.models import MODELS, SCORES, Kind
+from paperus_ml.rerank import Reranker
 from paperus_ml.samples import sample_passages
 
 MAX_TEXTS = 256
@@ -44,6 +45,19 @@ class EmbedResponse(BaseModel):
     different variants must not be mixed."""
     dimensions: int
     embeddings: list[list[float]]
+
+
+class RerankRequest(BaseModel):
+    model: str
+    query: str = Field(min_length=1, max_length=2000)
+    passages: list[str] = Field(min_length=1, max_length=200)
+
+
+class RerankResponse(BaseModel):
+    model: str
+    scores: list[float]
+    """One per passage, in their order: higher fits better (only the order
+    means something)."""
 
 
 class ModelInfo(BaseModel):
@@ -212,12 +226,18 @@ def create_app(
         not loaded yet starts loading and the answer is 503 "loading": ask
         again. Other requests for the model wait while it measures, so they
         do not slow the measurement (other models still can)."""
-        encoder = _model(name)
+        model = _model(name)
         passages = sample_passages()
-        with encoder.running:
-            encoder.embed(passages[:2], "passage")  # warm up
-            started = time.monotonic()
-            encoder.embed(passages, "passage")
+        with model.running:
+            if isinstance(model, Reranker):
+                # Search hits: one query against all passages.
+                model.score("what did the measurements show", passages[:2])
+                started = time.monotonic()
+                model.score("what did the measurements show", passages)
+            else:
+                model.embed(passages[:2], "passage")  # warm up
+                started = time.monotonic()
+                model.embed(passages, "passage")
             seconds = time.monotonic() - started
         return Speed(
             model=name,
@@ -226,7 +246,7 @@ def create_app(
             passages_per_second=round(len(passages) / max(seconds, 1e-6), 1),
         )
 
-    def _model(name: str) -> Encoder:
+    def _model(name: str) -> Encoder | Reranker:
         try:
             return models.get(name, wait=settings.load_wait)
         except UnknownModel as error:
@@ -244,7 +264,10 @@ def create_app(
     def embed(body: EmbedRequest) -> EmbedResponse:
         """Runs in FastAPI's thread pool; ONNX Runtime releases the GIL."""
         try:
-            vectors = _model(body.model).embed(body.texts, body.kind)
+            model = _model(body.model)
+            if not isinstance(model, Encoder):
+                raise HTTPException(422, f"{body.model!r} is not an embedding model")
+            vectors = model.embed(body.texts, body.kind)
         except HTTPException as error:
             outcome = "loading" if error.status_code == 503 else "error"
             metrics.REQUESTS.labels(body.model, body.kind, outcome).inc()
@@ -257,5 +280,22 @@ def create_app(
             dimensions=vectors.shape[1],
             embeddings=vectors.tolist(),
         )
+
+    @app.post("/rerank", dependencies=[Depends(check_token)])
+    def rerank(body: RerankRequest) -> RerankResponse:
+        """Score how well each passage answers the query, for reordering
+        search hits. Runs in FastAPI's thread pool, like /embed."""
+        try:
+            model = _model(body.model)
+        except HTTPException as error:
+            outcome = "loading" if error.status_code == 503 else "error"
+            metrics.REQUESTS.labels(body.model, "rerank", outcome).inc()
+            raise
+        if not isinstance(model, Reranker):
+            raise HTTPException(422, f"{body.model!r} is not a reranker")
+        scores = model.score(body.query, body.passages)
+        metrics.REQUESTS.labels(body.model, "rerank", "ok").inc()
+        metrics.TEXTS.labels(body.model, "rerank").inc(len(body.passages))
+        return RerankResponse(model=body.model, scores=scores)
 
     return app

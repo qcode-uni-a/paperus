@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Reranking** (#9): a reranker reorders the best 40 hits of a search,
+  in the website and for AI assistants. On our test questions the right
+  paper comes first 89 times in 100 instead of 66 (German questions too).
+  Administration → Settings → Machine learning → Reranking: Automatic (on
+  when the ML service has a GPU; about 0.6 s per search), Always, Off; the
+  reranker (bge-reranker-v2-m3, gte-multilingual-reranker-base,
+  ms-marco-MiniLM). If it fails, results come in the usual order.
+  `paperus evaluate --rerank on|off` compares.
 - **ML service on an NVIDIA GPU**: the image `paperus-ml:<version>-cuda`
   (1.7 GB download) runs the models on the GPU when the container gets one,
   else on the CPU. About 20× faster on an RTX 2080 SUPER (arctic-embed-m-v2:

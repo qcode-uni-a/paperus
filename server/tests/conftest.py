@@ -123,6 +123,9 @@ class FakeML:
         self.deleted: list[str] = []
         self.config: dict[str, Any] = {"threads": 0, "keep": []}
         self.variant: str | None = None
+        self.device = "cpu"
+        self.rerank_down = False
+        self.reranked: list[dict[str, Any]] = []
         """Another model file (e.g. "fp16" on a GPU): other vectors."""
 
     def vectors(self, model: str) -> str:
@@ -139,6 +142,9 @@ class FakeML:
         return [x / norm for x in vector]
 
     MODELS: ClassVar[list[str]] = ["bge-m3", "multilingual-e5-small"]
+    RERANKERS: ClassVar[list[str]] = ["bge-reranker-v2-m3"]
+    FAVOURITE = "drizzle"
+    """The fake reranker puts passages with this word first."""
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         if self.down:
@@ -148,7 +154,19 @@ class FakeML:
         if request.url.path == "/config":
             if request.method == "PUT":
                 self.config = json.loads(request.content)
-            return httpx2.Response(200, json={**self.config, "cores": 8, "loaded": []})
+            return httpx2.Response(
+                200,
+                json={**self.config, "cores": 8, "loaded": [], "device": self.device},
+            )
+        if request.url.path == "/rerank":
+            body = json.loads(request.content)
+            if self.rerank_down:
+                return httpx2.Response(500)
+            if body["model"] not in self.RERANKERS:
+                return httpx2.Response(422, json={"detail": "not a reranker"})
+            self.reranked.append(body)
+            scores = [float(self.FAVOURITE in p.lower()) for p in body["passages"]]
+            return httpx2.Response(200, json={"model": body["model"], "scores": scores})
         if request.url.path.endswith("/speed"):
             name = request.url.path.split("/")[2]
             if name not in self.MODELS:
@@ -175,6 +193,17 @@ class FakeML:
                     "cached_bytes": None,
                 }
                 for name in self.MODELS
+            ] + [
+                {
+                    "name": name,
+                    "task": "rerank",
+                    "dimensions": 1,
+                    "vectors": name,
+                    "max_tokens": 512,
+                    "loaded": False,
+                    "cached_bytes": None,
+                }
+                for name in self.RERANKERS
             ]
             return httpx2.Response(200, json=models)
         if request.method == "DELETE":

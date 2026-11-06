@@ -122,3 +122,9 @@ a CPU. Ways to make it usable: fewer candidates (e.g. 20), shorter
 passages, all cores, a GPU (#10), or reranking only when asked (a "sort
 by relevance" step, or for AI assistants, which wait anyway). Jina's
 reranker was left out: its licence forbids commercial use.
+
+On the GPU (RTX 2080 SUPER, fp16, through paperus, library re-embedded with
+the GPU's vectors): without reranking hybrid 0.64 / 0.86 / 0.75, with
+bge-reranker-v2-m3 0.89 / 0.98 / 0.93 (meaning the same); German questions
+3 of 4 first. About 0.6 s per search with reranking, 0.15 s without.
+Adopted as "Automatic" (on with a GPU).

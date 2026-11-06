@@ -89,13 +89,23 @@ def evaluate(
     settings: Settings,
     questions: list[Question],
     modes: tuple[Mode, ...] = get_args(Mode),
+    rerank: bool | None = None,
 ) -> list[ModeResult]:
+    """``rerank``: on or off whatever the administration's setting."""
     results = []
     for mode in modes:
         result = ModeResult(mode)
         for question in questions:
             used, passages = run_search(
-                db, access, ml, settings, question.q, mode=mode, per_item=1, limit=TOP
+                db,
+                access,
+                ml,
+                settings,
+                question.q,
+                mode=mode,
+                per_item=1,
+                limit=TOP,
+                rerank=rerank,
             )
             result.used.add(used)
             papers = [p.item_id for p in passages if p.item_id is not None]

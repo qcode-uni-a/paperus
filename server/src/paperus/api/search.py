@@ -16,7 +16,7 @@ from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
 from paperus.ml import MLClient, MLRejected, MLUnavailable
 from paperus.models import Item
-from paperus.system import load_config
+from paperus.system import SystemConfig, load_config
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["search"])
@@ -28,6 +28,10 @@ Match = Literal["keyword", "meaning"]
 CANDIDATES = 50
 RRF_K = 60
 QUERY_TIMEOUT = 30.0
+# Hits the reranker reorders (then cut to what was asked), and how long a
+# search waits for it before showing them in the usual order.
+RERANK_POOL = 40
+RERANK_TIMEOUT = 15.0
 
 
 class Passage(BaseModel):
@@ -56,6 +60,8 @@ class Passage(BaseModel):
     """How the passage was found: by its words, its meaning, or both."""
     in_references: bool
     """From the item's reference list (found by words only)."""
+    reranked: bool = False
+    """Ordered by the reranker (``score`` is then its score)."""
 
 
 # Keyword and meaning candidates are ranked separately, then fused by
@@ -128,6 +134,7 @@ _SEARCH = text(
         FROM fused JOIN visible vis USING (source_id, position)
     )
     SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
+           c.text AS chunk_text,
            vis.version_id,
            vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
@@ -183,36 +190,51 @@ def run_search(
     library_id: uuid.UUID | None = None,
     per_item: int | None = None,
     item_id: uuid.UUID | None = None,
+    rerank: bool | None = None,
 ) -> tuple[Mode, list[Passage]]:
     """Passages for ``q`` that the person may read, and the mode used
     (hybrid falls back to keywords without the ML service). ``per_item``:
     at most that many per paper or note (more candidates are looked at, so
-    more papers fill the list); ``item_id``: within that paper only."""
+    more papers fill the list); ``item_id``: within that paper only;
+    ``rerank``: overrides the administration's setting (for evaluating)."""
     started = time.perf_counter()
-    model = load_config(db, settings).embedding_model
+    config = load_config(db, settings)
+    model = config.embedding_model
     vector = None
     if mode != "keyword" and (found := _query_vector(ml, model, q)) is not None:
         vector, model = found
     used: Mode = mode if vector is not None or mode == "keyword" else "keyword"
+    reranker = _reranker(config, ml) if used != "keyword" else None
+    if rerank is not None:
+        reranker = config.rerank_model if rerank and used != "keyword" else None
+    asked, per_paper = limit, per_item
+    if reranker:
+        # More hits, and more per paper, for the reranker to choose from.
+        limit = max(limit, RERANK_POOL)
+        per_item = per_item + 1 if per_item else None
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []
-    rows = db.execute(
-        _SEARCH,
-        {
-            "query": q,
-            "limit": limit,
-            "vector": vector,
-            "model": model,
-            "use_keyword": used != "meaning",
-            "use_meaning": vector is not None,
-            "types": types or [],
-            "libraries": libraries,
-            "item": item_id,
-            "per_item": per_item or limit,
-            "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
-        },
-    ).mappings()
+    rows = (
+        db.execute(
+            _SEARCH,
+            {
+                "query": q,
+                "limit": limit,
+                "vector": vector,
+                "model": model,
+                "use_keyword": used != "meaning",
+                "use_meaning": vector is not None,
+                "types": types or [],
+                "libraries": libraries,
+                "item": item_id,
+                "per_item": per_item or limit,
+                "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
+            },
+        )
+        .mappings()
+        .all()
+    )
     passages = [
         Passage(
             passage_id=f"{row['source_id']}#{row['position']}",
@@ -238,10 +260,60 @@ def run_search(
         )
         for row in rows
     ]
+    texts = [row["chunk_text"] for row in rows]
+    if reranker and passages:
+        passages = _rerank(ml, reranker, q, passages, texts, per_paper)
+    passages = passages[:asked]
     _add_authors(db, passages)
     metrics.SEARCHES.labels(used).inc()
     metrics.SEARCH_SECONDS.observe(time.perf_counter() - started)
     return used, passages
+
+
+def _reranker(config: SystemConfig, ml: MLClient) -> str | None:
+    """The reranker to use, if any: "auto" uses it when the ML service runs
+    on a GPU (on a CPU a search would take seconds)."""
+    if config.rerank == "off":
+        return None
+    if config.rerank == "on":
+        return config.rerank_model
+    try:
+        return config.rerank_model if ml.device() == "cuda" else None
+    except (MLUnavailable, MLRejected):
+        return None
+
+
+def _rerank(
+    ml: MLClient,
+    model: str,
+    query: str,
+    passages: list[Passage],
+    texts: list[str],
+    per_item: int | None,
+) -> list[Passage]:
+    """The hits in the reranker's order, at most ``per_item`` per paper or
+    note; in the usual order if the reranker fails or takes too long."""
+    started = time.perf_counter()
+    try:
+        scores = ml.rerank(query, texts, model=model, timeout=RERANK_TIMEOUT)
+    except (MLUnavailable, MLRejected) as error:
+        log.warning("reranking unavailable, usual order: %s", error)
+        return passages
+    metrics.ML_SECONDS.labels("rerank").observe(time.perf_counter() - started)
+    for passage, score in zip(passages, scores, strict=True):
+        passage.score = score
+        passage.reranked = True
+    ordered = sorted(passages, key=lambda p: p.score, reverse=True)
+    if per_item is None:
+        return ordered
+    taken: dict[uuid.UUID | None, int] = {}
+    result = []
+    for passage in ordered:
+        source = passage.item_id or passage.note_id
+        if taken.get(source, 0) < per_item:
+            taken[source] = taken.get(source, 0) + 1
+            result.append(passage)
+    return result
 
 
 def _add_authors(db: Session, passages: list[Passage]) -> None:

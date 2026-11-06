@@ -19,6 +19,39 @@
 	const current = $derived(config?.embedding_model ?? '');
 	const models = $derived(admin.ml?.models.filter((m) => m.task === 'embedding') ?? []);
 	const passages = $derived(admin.stats?.chunks ?? 0);
+	const rerankers = $derived(admin.ml?.models.filter((m) => m.task === 'rerank') ?? []);
+	const onGpu = $derived(admin.ml?.service?.device === 'cuda');
+
+	// Reranking: chosen here, saved with the button.
+	let rerank = $state<'auto' | 'on' | 'off' | null>(null);
+	let rerankModel = $state<string | null>(null);
+	$effect(() => {
+		if (config && rerank === null) {
+			rerank = config.rerank ?? 'auto';
+			rerankModel = config.rerank_model ?? 'bge-reranker-v2-m3';
+		}
+	});
+	const reranking = $derived(rerank === 'on' || (rerank === 'auto' && onGpu));
+	/** Per search, from a measured speed: the best 40 hits are reranked. */
+	function perSearch(name: string): string | null {
+		const speed = speeds[name]?.passages_per_second;
+		if (!speed) return null;
+		const seconds = 40 / speed;
+		return seconds < 1 ? `${Math.round(seconds * 1000)} ms` : `${seconds.toFixed(1)} s`;
+	}
+
+	async function saveRerank() {
+		if (!config || !rerank || !rerankModel) return;
+		error = message = '';
+		saving = true;
+		const { error: failure } = await setConfig({
+			body: { ...config, rerank, rerank_model: rerankModel }
+		});
+		saving = false;
+		if (failure) error = errorMessage(failure);
+		else message = 'Reranking saved.';
+		await loadAdmin();
+	}
 	/** The score columns, from what the service says they mean. */
 	const benchmarks = $derived(
 		Object.entries(models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {})
@@ -215,6 +248,68 @@
 </section>
 
 <section class="part">
+	<h3>Reranking</h3>
+	<p class="muted">
+		A reranker reads the question together with each of the best 40 hits and puts the best answers
+		first. On our test questions the right paper came first 86 instead of 66 times in 100. It takes
+		about half a second per search on a GPU, but many seconds on a CPU.
+	</p>
+	<fieldset class="choice">
+		<legend class="visually-hidden">Reranking</legend>
+		<label
+			><input type="radio" bind:group={rerank} value="auto" /> Automatic: on when the ML service runs
+			on a GPU</label
+		>
+		<label
+			><input type="radio" bind:group={rerank} value="on" /> Always (slow searches on a CPU)</label
+		>
+		<label><input type="radio" bind:group={rerank} value="off" /> Off</label>
+	</fieldset>
+	<p class="device">
+		{reranking ? 'Search results are reranked.' : 'Search results are not reranked.'}
+	</p>
+	{#if rerankers.length}
+		<label class="model"
+			>Reranker
+			<select bind:value={rerankModel}>
+				{#each rerankers as model (model.name)}
+					<option value={model.name}>{model.name}</option>
+				{/each}
+			</select>
+		</label>
+		{@const chosen = rerankers.find((m) => m.name === rerankModel)}
+		{#if chosen}
+			<p class="muted">
+				{chosen.description}
+				{chosen.licence ? `${chosen.licence}.` : ''}
+				{chosen.cached_bytes != null
+					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
+					: chosen.download_mb
+						? `${chosen.download_mb} MB to download.`
+						: ''}
+				{#if perSearch(chosen.name)}
+					About {perSearch(chosen.name)} per search on this server.
+				{/if}
+			</p>
+			<div class="buttons">
+				<button onclick={() => measure(chosen)} disabled={measuring !== null}>
+					{measuring === chosen.name ? 'Measuring…' : 'Measure speed'}
+				</button>
+				<button
+					class="primary"
+					onclick={saveRerank}
+					disabled={saving ||
+						!config ||
+						(rerank === config.rerank && rerankModel === config.rerank_model)}>Save</button
+				>
+			</div>
+		{/if}
+	{:else}
+		<p class="muted">The ML service is not reachable or offers no reranker.</p>
+	{/if}
+</section>
+
+<section class="part">
 	<h3>CPU cores</h3>
 	<p class="muted">
 		How many cores the ML service uses for each model. Fewer keep the database and the website quick
@@ -285,6 +380,37 @@
 	}
 	p {
 		margin: 0;
+	}
+	.choice {
+		display: grid;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		border: none;
+	}
+	.choice label {
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 8px;
+	}
+	.choice input {
+		width: auto;
+		margin: 0;
+	}
+	.model {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		font-weight: 600;
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 	.cores {
 		display: flex;

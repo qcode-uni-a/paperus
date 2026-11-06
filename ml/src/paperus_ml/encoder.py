@@ -11,7 +11,7 @@ import onnxruntime
 from tokenizers import Encoding, Tokenizer
 
 from paperus_ml import metrics
-from paperus_ml.device import CUDA, Device, providers
+from paperus_ml.device import CUDA, Device, providers, run_options
 from paperus_ml.models import Kind, ModelSpec
 
 Vectors = npt.NDArray[np.float32]
@@ -87,6 +87,7 @@ class Encoder:
             "cuda" if self.session.get_providers()[0] == CUDA else "cpu"
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
+        self.run_options = run_options(self.device)
         # One batch at a time: each already uses all cores, so batches of
         # simultaneous requests would only compete for them. Per batch, not
         # per request, so a search query waits for one batch at most.
@@ -116,7 +117,7 @@ class Encoder:
             feed["token_type_ids"] = np.zeros_like(ids)
         with self.running:
             started = time.perf_counter()
-            hidden = self.session.run(None, feed)[0]
+            hidden = self.session.run(None, feed, self.run_options)[0]
             metrics.BATCH_SECONDS.labels(self.spec.name).observe(
                 time.perf_counter() - started
             )

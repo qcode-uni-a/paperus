@@ -126,9 +126,13 @@ five minutes, so a restarted ML service gets them back):
 The image `paperus-ml:<version>-cuda` (e.g. `release-cuda`) is the same
 service with ONNX Runtime's GPU build and CUDA (about 4 GB larger). On the
 host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
-generation on) and the NVIDIA Container Toolkit, registered with Docker:
+generation on) and the NVIDIA Container Toolkit, set up for Docker:
 
 ```sh
+# Docker 28 and newer find GPUs through CDI: describe them once (again
+# after a driver update).
+nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+# Older Docker: register the NVIDIA runtime instead.
 nvidia-ctk runtime configure --runtime=docker && systemctl restart docker
 ```
 
@@ -159,6 +163,19 @@ the vectors differ (arctic: cosine 0.96–0.97), so they are stored under
 another name (`arctic-embed-m-v2@fp16`) and a switch between CPU and GPU
 re-embeds the library like a change of model (minutes on a GPU). All
 addresses in `PAPERUS_ML_URLS` should run on the same kind of hardware.
+
+### Reranking
+
+A reranker reads the question with each of the best 40 hits and puts the
+best answers first (Administration → Settings → Machine learning →
+Reranking). On our test questions (docs/search.md) bge-reranker-v2-m3 put
+the right paper first 89 times in 100 instead of 66, and in the top five 98
+times. A search then takes about 0.6 s on an RTX 2080 SUPER instead of
+0.15 s; on a CPU many seconds, so "Automatic" (the default) reranks only
+when the ML service runs on a GPU. The reranker needs about 1.2 GB of GPU
+memory; the ML service gives back what a batch needed after each run, so
+models and other programs share the card. If reranking fails or takes
+longer than 15 s, results come in the usual order.
 
 ## Monitoring (Prometheus)
 

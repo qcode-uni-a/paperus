@@ -13,10 +13,12 @@ from paperus_ml.config import Settings
 from paperus_ml.device import Device, choose
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
+from paperus_ml.rerank import Reranker
 
 log = logging.getLogger(__name__)
 
-Loader = Callable[[ModelSpec], Encoder]
+Model = Encoder | Reranker
+Loader = Callable[[ModelSpec], Model]
 
 
 class UnknownModel(KeyError):
@@ -36,7 +38,7 @@ class ModelManager:
         self.settings = settings
         self._load = loader or self._download_and_load
         # name → (encoder, last used, threads it was loaded with)
-        self._models: dict[str, tuple[Encoder, float, int]] = {}
+        self._models: dict[str, tuple[Model, float, int]] = {}
         self._loading: dict[str, threading.Event] = {}
         self._errors: dict[str, str] = {}
         self._guard = threading.Lock()
@@ -72,7 +74,7 @@ class ModelManager:
             self._errors.pop(name, None)
             shutil.rmtree(self.model_dir(spec), ignore_errors=True)
 
-    def _download_and_load(self, spec: ModelSpec) -> Encoder:
+    def _download_and_load(self, spec: ModelSpec) -> Model:
         model_dir = self.model_dir(spec)
         # Revision changes download the changed files into the same folder.
         snapshot_download(
@@ -81,7 +83,8 @@ class ModelManager:
             local_dir=model_dir,
             allow_patterns=[f"{spec.onnx_file_for(self.device)}*", spec.tokenizer_file],
         )
-        encoder = Encoder(
+        kind = Reranker if spec.task == "rerank" else Encoder
+        encoder = kind(
             spec,
             model_dir,
             intra_op_threads=self.threads,
@@ -93,7 +96,7 @@ class ModelManager:
             log.warning("%s: no usable GPU, running on the CPU", spec.name)
         return encoder
 
-    def get(self, name: str, wait: float | None = None) -> Encoder:
+    def get(self, name: str, wait: float | None = None) -> Model:
         """The model, downloading and loading it on first use (and again when
         the threads changed). ``wait=None`` blocks until it is ready; with
         ``wait`` in seconds, loading continues in the background and
@@ -116,7 +119,7 @@ class ModelManager:
             raise ModelFailed(name, self._errors[name])
         raise ModelLoading(name)
 
-    def _ready(self, name: str) -> Encoder | None:
+    def _ready(self, name: str) -> Model | None:
         """The loaded model, if loaded with the current threads."""
         entry = self._models.get(name)
         if entry is None or entry[2] != self.threads:
@@ -124,7 +127,7 @@ class ModelManager:
         self._models[name] = (entry[0], time.monotonic(), entry[2])
         return entry[0]
 
-    def _load_now(self, name: str, spec: ModelSpec) -> Encoder:
+    def _load_now(self, name: str, spec: ModelSpec) -> Model:
         with self._locks[name]:
             ready = self._ready(name)
             if ready is not None:

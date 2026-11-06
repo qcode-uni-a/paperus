@@ -314,7 +314,17 @@ def send_ml_config(db: Session, settings: Settings, ml: MLClient) -> None:
     """The ML settings of the administration, to every ML service."""
     config = load_config(db, settings)
     _apply_here(config)
-    for error in ml.configure(threads=config.ml_threads, keep=[config.embedding_model]):
+    keep = [config.embedding_model]
+    # The reranker too while search uses it ("auto": with a GPU).
+    if config.rerank == "on":
+        keep.append(config.rerank_model)
+    elif config.rerank == "auto":
+        try:
+            if ml.device() == "cuda":
+                keep.append(config.rerank_model)
+        except (MLUnavailable, MLRejected):
+            pass
+    for error in ml.configure(threads=config.ml_threads, keep=keep):
         log.info("ML service not configured: %s", error)
 
 
