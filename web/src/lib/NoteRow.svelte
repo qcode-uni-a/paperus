@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import NoteIcon from '#lib/NoteIcon.svelte';
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -27,7 +28,7 @@
 		{#if about && note.items.length}
 			<span
 				>About {#each note.items as paper, i (paper.item_id)}{i ? ', ' : ''}<a
-						href={resolve('/items/[id]', { id: paper.item_id })}>{paper.title}</a
+						href={resolve('/items/[id]', { id: paper.item_id })}><Title text={paper.title} /></a
 					>{/each}</span
 			>
 		{/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { addItems, errorMessage, listItems, type Item } from '#lib/api/client.ts';
 	import { shortAuthors } from '#lib/format.ts';
 	import { libraryForCollection, loadOrganize } from '#lib/organize.svelte.ts';
@@ -87,7 +88,7 @@
 						onchange={() => toggle(item.id)}
 					/>
 					<span>
-						<strong>{item.title}</strong>
+						<strong><Title text={item.title} /></strong>
 						<small>{shortAuthors(item.authors)}{item.year ? ` (${item.year})` : ''}</small>
 						{#if here}<small>Already in this collection</small>{/if}
 					</span>

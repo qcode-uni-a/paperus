@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { errorMessage, setOwner } from '#lib/api/client.ts';
 	import { isShared, libraryName, writableLibraries } from '#lib/organize.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
@@ -62,7 +63,8 @@
 				</select>
 			</label>
 			<p class="note">
-				Everyone in {libraryName(group)} sees “{item.title}”, its files and the group's tags on it.
+				Everyone in {libraryName(group)} sees “<Title text={item.title} />”, its files and the
+				group's tags on it.
 				{#if isShared(item.library_id)}
 					{libraryName(item.library_id)} no longer sees it, and its collections let it go.
 				{:else}

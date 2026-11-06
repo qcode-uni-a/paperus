@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { resolve } from '$app/paths';
 	import { libraryById, type Collection } from '#lib/organize.svelte.ts';
 	import SharedIcon from '#lib/SharedIcon.svelte';
@@ -34,7 +35,7 @@
 					style:--lift="{(sheets.length - 1 - index) * 4}px"
 				>
 					<span class="fold"></span>
-					<span class="title">{sheet.title}</span>
+					<span class="title"><Title text={sheet.title} /></span>
 					<span class="line"></span>
 					<span class="line short" class:marked={front}></span>
 					<span class="line"></span>

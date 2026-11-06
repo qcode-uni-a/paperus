@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { dismissFirstOwner, hints } from '#lib/hints.svelte.ts';
@@ -24,7 +25,9 @@
 	{#if hint}
 		<h2 id="owner-hint-title">Who owns your papers</h2>
 		<p>
-			<em>{hint.title}</em> belongs to <strong>{owner}</strong>{isShared(hint.libraryId)
+			<em><Title text={hint.title} /></em> belongs to <strong>{owner}</strong>{isShared(
+				hint.libraryId
+			)
 				? ': everyone in the group sees it.'
 				: ': only you see it.'}
 		</p>

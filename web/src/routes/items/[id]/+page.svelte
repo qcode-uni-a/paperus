@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -239,7 +240,7 @@
 	<header>
 		<div class="title">
 			<h1>
-				{item.title}{#if isShared(item.library_id)}<span class="shared-mark"
+				<Title text={item.title} />{#if isShared(item.library_id)}<span class="shared-mark"
 						><SharedIcon size={18} owner={item.library_id} /></span
 					>{/if}
 			</h1>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
+	import { plainTitle } from '#lib/title.svelte.ts';
 	import { beforeNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
@@ -361,11 +363,11 @@
 				<a
 					href="{resolve('/items/[id]', { id: paper.item_id })}{paper.page
 						? `?page=${paper.page}`
-						: ''}">{paper.title}{paper.page ? `, page ${paper.page}` : ''}</a
+						: ''}"><Title text={paper.title} />{paper.page ? `, page ${paper.page}` : ''}</a
 				>
 				{#if writable}<button
 						class="remove"
-						aria-label="Not about {paper.title}"
+						aria-label="Not about {plainTitle(paper.title)}"
 						title="Not about this paper"
 						onclick={() => unlink(paper.item_id)}>×</button
 					>{/if}
@@ -416,7 +418,7 @@
 			{#each found.filter((item) => !note?.items.some((p) => p.item_id === item.id)) as item (item.id)}
 				<li>
 					<button onclick={() => link(item)}>
-						<strong>{item.title}</strong>
+						<strong><Title text={item.title} /></strong>
 						<small>{shortAuthors(item.authors)}{item.year ? ` (${item.year})` : ''}</small>
 					</button>
 				</li>

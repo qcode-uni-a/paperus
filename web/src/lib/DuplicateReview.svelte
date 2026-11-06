@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
+	import { plainTitle } from '#lib/title.svelte.ts';
 	import { mdiArrowLeftBold, mdiClose } from '@mdi/js';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
@@ -86,7 +88,11 @@
 			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
 			return;
 		}
-		notify({ kind: 'success', title: 'Merged', text: `“${away.title}” is in the trash.` });
+		notify({
+			kind: 'success',
+			title: 'Merged',
+			text: `“${plainTitle(away.title)}” is in the trash.`
+		});
 		await loadOrganize();
 		done();
 	}
@@ -101,7 +107,11 @@
 			notify({ kind: 'warning', title: 'Not moved to the trash', text: errorMessage(error) });
 			return;
 		}
-		notify({ kind: 'success', title: 'In the trash', text: `“${away.title}”, not merged.` });
+		notify({
+			kind: 'success',
+			title: 'In the trash',
+			text: `“${plainTitle(away.title)}”, not merged.`
+		});
 		done();
 	}
 
@@ -359,7 +369,7 @@
 			{/if}
 		</div>
 		<a class="title" href={resolve('/items/[id]', { id: item.id })} target="_blank" rel="noopener"
-			>{item.title}</a
+			><Title text={item.title} /></a
 		>
 	</article>
 {/snippet}

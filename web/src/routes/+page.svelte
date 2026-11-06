@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -186,7 +187,9 @@
 								><span class="badge">Note</span> {group.title || 'Untitled note'}</a
 							>
 						{:else}
-							<a class="source" href={resolve('/items/[id]', { id: group.id })}>{group.title}</a>
+							<a class="source" href={resolve('/items/[id]', { id: group.id })}
+								><Title text={group.title} /></a
+							>
 							{#if group.byline}<p class="byline">{group.byline}</p>{/if}
 						{/if}
 						<ul class="passages">

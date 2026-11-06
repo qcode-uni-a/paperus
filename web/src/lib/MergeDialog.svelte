@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
@@ -114,7 +115,7 @@
 {#snippet choice(other: Item)}
 	<li>
 		<button class="paper" onclick={() => choose(other)}>
-			<strong>{other.title}</strong>
+			<strong><Title text={other.title} /></strong>
 			<small>{meta(other)}</small>
 		</button>
 	</li>
@@ -163,13 +164,13 @@
 		<div class="pair">
 			<div class="card from">
 				<small>This paper, to the trash</small>
-				<strong>{item.title}</strong>
+				<strong><Title text={item.title} /></strong>
 				<small>{meta(item)}</small>
 			</div>
 			<span class="arrow" aria-hidden="true">→</span>
 			<div class="card to">
 				<small>Stays, takes over</small>
-				<strong>{chosen.title}</strong>
+				<strong><Title text={chosen.title} /></strong>
 				<small>{meta(chosen)}</small>
 			</div>
 		</div>

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Formulas in titles**: LaTeX in paper titles (as APS writes them,
+  `$\ensuremath{\nu}=1/3$`) is typeset with KaTeX, and Crossref's `<i>`,
+  `<sub>`, `<sup>` show as such, wherever titles are shown.
 - On phones, the library no longer grows wider than the screen when a
   title holds a long formula or address (also in the notes list).
 - **Smart collections** (#23): a collection that finds its papers by

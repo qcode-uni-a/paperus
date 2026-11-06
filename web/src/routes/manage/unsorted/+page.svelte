@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
+	import { plainTitle } from '#lib/title.svelte.ts';
 	import { resolve } from '$app/paths';
 	import {
 		addVersion,
@@ -108,7 +110,9 @@
 			{#each unreadable as file (file.file_id)}
 				<li>
 					<div class="what">
-						<a href={resolve('/items/[id]', { id: file.item_id })}>{file.item_title}</a>
+						<a href={resolve('/items/[id]', { id: file.item_id })}
+							><Title text={file.item_title} /></a
+						>
 						<span class="muted">{file.filename}</span>
 						<span>{readingProblem(file.error)}</span>
 						{#if file.error}<small class="muted" title={file.error}>{file.error}</small>{/if}
@@ -157,7 +161,7 @@
 						<input
 							bind:value={entered[item.id]}
 							placeholder="DOI or arXiv ID, e.g. 10.1038/… or 2611.04768"
-							aria-label="DOI or arXiv ID of {item.title}"
+							aria-label="DOI or arXiv ID of {plainTitle(item.title)}"
 						/>
 						<button disabled={busy === item.id || !entered[item.id]?.trim()}>
 							{busy === item.id ? 'Looking up…' : 'Look up'}

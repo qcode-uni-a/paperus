@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { resolve } from '$app/paths';
 	import { saveConfig } from '#lib/admin/config.svelte.ts';
 	import { admin, formatSize } from '#lib/admin/data.svelte.ts';
@@ -101,7 +102,9 @@
 		<ul class="problems">
 			{#each report.problems as problem (problem.file_id)}
 				<li>
-					<a href={resolve('/items/[id]', { id: problem.item_id })}>{problem.title}</a>
+					<a href={resolve('/items/[id]', { id: problem.item_id })}
+						><Title text={problem.title} /></a
+					>
 					<span class="muted">{problem.filename}</span>
 				</li>
 			{/each}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
@@ -21,7 +22,7 @@
 			/>{/if}<StarButton item={item.id} starred={item.favourite ?? false} size={16} /></span
 	>
 	{#if note}<span class="note">{note}</span>{/if}
-	<a class="title" href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
+	<a class="title" href={resolve('/items/[id]', { id: item.id })}><Title text={item.title} /></a>
 	<p class="reference">
 		{#if authors || item.year || item.container_title}<span
 				>{#if authors}{authors}{/if}{#if item.year}{authors

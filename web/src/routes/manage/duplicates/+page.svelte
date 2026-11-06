@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Title from '#lib/Title.svelte';
 	import { resolve } from '$app/paths';
 	import { tick } from 'svelte';
 	import { errorMessage, listDuplicatesEverywhere, markDifferent } from '#lib/api/client.ts';
@@ -127,7 +128,7 @@
 										: 'The other one'}</span
 							>
 							<div class="title">
-								<a href={resolve('/items/[id]', { id: item.id })}>{item.title}</a>
+								<a href={resolve('/items/[id]', { id: item.id })}><Title text={item.title} /></a>
 								{#if isShared(item.library_id)}<SharedIcon owner={item.library_id} size={13} />{/if}
 							</div>
 							{#if line(item)}<small>{line(item)}</small>{/if}
