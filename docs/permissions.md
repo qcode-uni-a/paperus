@@ -93,6 +93,12 @@ because of it; they need a membership like everyone else.
 - Giving a group's collection to me: its papers stay where they are.
 - Planned: showing a group's collection inside one of mine (a personal
   link); never the other way round.
+- **Smart collections** hold the papers that match their rules (tags,
+  type, year, owner, recently added) instead of papers added to them. Each
+  person sees the matching papers they can see; a group's smart collection
+  matches only the group's papers. They hold no other collections, and a
+  folder they are kept in does not count their papers. Only an empty
+  collection can become smart.
 
 ## Groups
 

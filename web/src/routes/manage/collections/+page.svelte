@@ -51,6 +51,7 @@
 		const into = organize.collections.find((c) => c.id === target);
 		return (
 			into !== undefined &&
+			!into.rules &&
 			into.library_id === moving.library_id &&
 			moving.parent_id !== target &&
 			!within(dragged).has(target)

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Smart collections** (#23): a collection that finds its papers by
+  rules instead of papers added to it: with all, any or none of some tags,
+  of some types, published in some years, owned by someone, added in the
+  last days. "New collection" → Smart; the collection page says its rules
+  in words. Lists, exports, AI assistants and the menu's counts use the
+  matching papers; a group's smart collection holds only its papers.
 - **OCR** (#26): scanned PDFs, scanned pages inside PDFs, and images (PNG,
   JPEG, TIFF, WebP) are read in the background by the ML service, so they
   can be searched and AI assistants can read them. Columns are read one

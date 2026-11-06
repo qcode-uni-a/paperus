@@ -2,11 +2,43 @@
 
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Select, func, select
+from pydantic import BaseModel, Field
+from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import Session
 
-from paperus.models import Collection, CollectionItem, Item, ItemTag, Tag, TagSource
+from paperus.models import (
+    Collection,
+    CollectionItem,
+    Item,
+    ItemTag,
+    Library,
+    Tag,
+    TagSource,
+)
+
+
+class Rules(BaseModel):
+    """What a smart collection holds: the papers matching every rule given
+    (none given: all papers)."""
+
+    tags_all: list[uuid.UUID] = []
+    """With all of these tags."""
+    tags_any: list[uuid.UUID] = []
+    """With at least one of these tags."""
+    tags_none: list[uuid.UUID] = []
+    """With none of these tags."""
+    types: list[str] = []
+    """Of one of these types (CSL: article-journal, book, …)."""
+    year_from: int | None = Field(None, ge=0, le=9999)
+    year_to: int | None = Field(None, ge=0, le=9999)
+    """Published in these years (both included)."""
+    owners: list[uuid.UUID] = []
+    """Owned by one of these libraries (a person's or a group's). A group's
+    smart collection holds only that group's papers anyway."""
+    added_days: int | None = Field(None, ge=1, le=36500)
+    """Added to paperus in the last so many days."""
 
 
 class NotFound(LookupError):
@@ -94,6 +126,8 @@ def move_collection(
             raise NotFound("parent collection not found")
         if parent.library_id != collection.library_id:
             raise Conflict("collections nest only within one library")
+        if parent.rules is not None:
+            raise Conflict("a smart collection holds no other collections")
         if parent_id in descendants(db, collection.id):
             raise Conflict("a collection cannot move into itself or below itself")
     collection.parent_id = parent_id
@@ -153,6 +187,65 @@ def add_to_collection(
 def item_ids_in(
     db: Session, collection_id: uuid.UUID, *, nested: bool
 ) -> Select[uuid.UUID]:
-    """Ids of items in the collection (and below it if ``nested``)."""
+    """Ids of items in the collection (and below it if ``nested``); for a
+    smart collection, those matching its rules. Smart collections inside
+    another one add nothing to it (they are saved searches, kept there)."""
+    collection = db.get(Collection, collection_id)
+    if collection is not None and collection.rules is not None:
+        return select(Item.id).where(*matching(db, collection))
     ids = descendants(db, collection_id) if nested else [collection_id]
     return select(CollectionItem.item_id).where(CollectionItem.collection_id.in_(ids))
+
+
+def matching(db: Session, collection: Collection) -> list[ColumnElement[bool]]:
+    """Conditions on items for a smart collection's rules (who may see
+    which item is up to the caller)."""
+    rules = Rules.model_validate(collection.rules or {})
+
+    def tagged(tag_ids: list[uuid.UUID]) -> Select[uuid.UUID]:
+        return select(ItemTag.item_id).where(ItemTag.tag_id.in_(tag_ids))
+
+    conditions: list[ColumnElement[bool]] = [
+        Item.id.in_(tagged([tag_id])) for tag_id in rules.tags_all
+    ]
+    if rules.tags_any:
+        conditions.append(Item.id.in_(tagged(rules.tags_any)))
+    if rules.tags_none:
+        conditions.append(Item.id.not_in(tagged(rules.tags_none)))
+    if rules.types:
+        conditions.append(Item.type.in_(rules.types))
+    if rules.year_from is not None:
+        conditions.append(Item.year >= rules.year_from)
+    if rules.year_to is not None:
+        conditions.append(Item.year <= rules.year_to)
+    if rules.owners:
+        conditions.append(Item.library_id.in_(rules.owners))
+    if rules.added_days is not None:
+        since = datetime.now(UTC) - timedelta(days=rules.added_days)
+        conditions.append(Item.created_at >= since)
+    owner = collection.library_id
+    group = db.scalar(select(Library.group_id).where(Library.id == owner))
+    if group is not None:
+        conditions.append(Item.library_id == collection.library_id)
+    return conditions
+
+
+def make_smart(db: Session, collection: Collection, rules: Rules | None) -> None:
+    """Give a collection rules (or take them away: an empty collection to
+    add papers to). Only an empty collection becomes smart: the papers in it
+    would be hidden."""
+    if rules is not None and collection.rules is None:
+        has_items = db.scalar(
+            select(CollectionItem.item_id)
+            .where(CollectionItem.collection_id == collection.id)
+            .limit(1)
+        )
+        has_children = db.scalar(
+            select(Collection.id).where(Collection.parent_id == collection.id).limit(1)
+        )
+        if has_items is not None or has_children is not None:
+            raise Conflict(
+                "only an empty collection without collections inside can become "
+                "a smart collection"
+            )
+    collection.rules = rules.model_dump(mode="json") if rules is not None else None

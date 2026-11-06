@@ -3,10 +3,11 @@
 	import { organize } from '#lib/organize.svelte.ts';
 	import { addFiles } from '#lib/uploads.svelte.ts';
 
-	// On a collection's page, dropped files go into that collection too.
+	// On a collection's page, dropped files go into that collection too
+	// (not a smart one: it finds its papers itself).
 	const collection = $derived(
 		page.route.id === '/collections/[id]'
-			? organize.collections.find((c) => c.id === page.params.id)
+			? organize.collections.find((c) => c.id === page.params.id && !c.rules)
 			: undefined
 	);
 

@@ -5,9 +5,11 @@
 		errorMessage,
 		previewMove
 	} from '#lib/api/client.ts';
+	import type { Rules } from '#lib/api/generated/types.gen.ts';
 	import {
 		defaultLibrary,
 		flatTree,
+		isSmart,
 		libraryById,
 		libraryName,
 		loadOrganize,
@@ -15,6 +17,7 @@
 		writableLibraries,
 		type Collection
 	} from '#lib/organize.svelte.ts';
+	import RulesEditor from '#lib/RulesEditor.svelte';
 
 	/** Create a collection (optionally inside ``parentId``) or edit ``collection``. */
 	let {
@@ -34,6 +37,9 @@
 	let library = $state('');
 	let error = $state('');
 	let saving = $state(false);
+	// A smart collection: papers matching rules instead of papers added.
+	let smart = $state(false);
+	let rules = $state<Rules>({});
 	// Giving it to another owner: how many papers that owner does not have
 	// yet, and whether they go along or leave the collection.
 	let missing = $state<number | null>(null);
@@ -54,7 +60,9 @@
 	/** Collections of the same library, but not the collection itself or
 	 * anything inside it (collections nest only within one library). */
 	const parents = $derived.by(() => {
-		if (!collection || moving) return flatTree(library || undefined);
+		const holding = (rows: ReturnType<typeof flatTree>) =>
+			rows.filter(({ collection: c }) => !isSmart(c));
+		if (!collection || moving) return holding(flatTree(library || undefined));
 		const excluded = new Set([collection.id]);
 		let grew = true;
 		while (grew) {
@@ -66,11 +74,16 @@
 				}
 			}
 		}
-		return flatTree(collection.library_id).filter(({ collection: c }) => !excluded.has(c.id));
+		return holding(flatTree(collection.library_id)).filter(
+			({ collection: c }) => !excluded.has(c.id)
+		);
 	});
 
-	/** ``inLibrary``: preselect this library for a new collection. */
-	export function open(inLibrary?: string) {
+	/** ``inLibrary``: preselect this library for a new collection;
+	 * ``asSmart``: start as a smart collection. */
+	export function open(inLibrary?: string, asSmart = false) {
+		smart = collection ? isSmart(collection) : asSmart;
+		rules = structuredClone($state.snapshot(collection?.rules) ?? {});
 		name = collection?.name ?? '';
 		description = collection?.description ?? '';
 		parent = collection ? (collection.parent_id ?? '') : (parentId ?? '');
@@ -83,7 +96,12 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		saving = true;
-		const body = { name, description: description.trim() || null, parent_id: parent || null };
+		const body = {
+			name,
+			description: description.trim() || null,
+			parent_id: parent || null,
+			...(smart ? { rules } : {})
+		};
 		const move = moving ? { library_id: library, add_papers: addPapers } : {};
 		const result = collection
 			? await changeCollection({
@@ -104,8 +122,25 @@
 
 <dialog bind:this={dialog} aria-labelledby="collection-dialog-title">
 	<form onsubmit={save}>
-		<h2 id="collection-dialog-title">{collection ? 'Edit collection' : 'New collection'}</h2>
+		<h2 id="collection-dialog-title">
+			{collection ? (smart ? 'Edit smart collection' : 'Edit collection') : 'New collection'}
+		</h2>
+		{#if !collection}
+			<fieldset class="kind">
+				<legend class="visually-hidden">Kind of collection</legend>
+				<label class="choice"
+					><input type="radio" bind:group={smart} value={false} /> Papers you add to it</label
+				>
+				<label class="choice"
+					><input type="radio" bind:group={smart} value={true} /> Smart: the papers that match rules,
+					by themselves</label
+				>
+			</fieldset>
+		{/if}
 		<label>Name <input bind:value={name} required maxlength="200" /></label>
+		{#if smart}
+			<RulesEditor bind:rules library={library || collection?.library_id || ''} />
+		{/if}
 		<label>
 			Description <span class="optional">(optional)</span>
 			<textarea bind:value={description} rows="3"></textarea>
@@ -166,7 +201,8 @@
 
 <style>
 	dialog {
-		width: min(480px, calc(100vw - 32px));
+		width: min(560px, calc(100vw - 32px));
+		max-height: calc(100dvh - 32px);
 		padding: 22px 24px 24px;
 		border: 1px solid var(--rule);
 		border-radius: 12px;
@@ -215,6 +251,21 @@
 	}
 	.choice input {
 		width: auto;
+	}
+	.kind {
+		display: grid;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		border: none;
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 	.optional {
 		font-weight: 400;

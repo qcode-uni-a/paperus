@@ -99,10 +99,12 @@ def issued_year(csl: dict[str, Any]) -> int | None:
 
 
 def refresh_item(item: Item) -> None:
-    """Update the cached type and title after versions or overrides change."""
+    """Update the cached type, title and year after versions or overrides
+    change."""
     csl = citation_csl(item)
     item.type = csl_type(csl)
     item.title = csl_title(csl)
+    item.year = issued_year(csl)
 
 
 def find_identifier(

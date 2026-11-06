@@ -44,6 +44,7 @@
 	const choices = $derived(
 		[...(itemWritable ? flatTree(item.library_id) : []), ...flatTree(own?.id)].filter(
 			({ collection }, index, all) =>
+				!collection.rules &&
 				!item.collection_ids.includes(collection.id) &&
 				all.findIndex((row) => row.collection.id === collection.id) === index
 		)

@@ -210,6 +210,7 @@ export type CollectionChange = {
      * Add Papers
      */
     add_papers?: boolean;
+    rules?: Rules | null;
 };
 
 /**
@@ -252,6 +253,7 @@ export type CollectionChanged = {
      * Pinned
      */
     pinned?: boolean;
+    rules?: Rules | null;
     /**
      * Left Out
      */
@@ -278,6 +280,7 @@ export type CollectionIn = {
      * Library Id
      */
     library_id?: string | null;
+    rules?: Rules | null;
 };
 
 /**
@@ -320,6 +323,7 @@ export type CollectionOut = {
      * Pinned
      */
     pinned?: boolean;
+    rules?: Rules | null;
 };
 
 /**
@@ -1972,6 +1976,47 @@ export type RevisionOut = {
  * What a member may do in a group (and every group inside it).
  */
 export type Role = 'reader' | 'member' | 'admin';
+
+/**
+ * Rules
+ *
+ * What a smart collection holds: the papers matching every rule given
+ * (none given: all papers).
+ */
+export type Rules = {
+    /**
+     * Tags All
+     */
+    tags_all?: Array<string>;
+    /**
+     * Tags Any
+     */
+    tags_any?: Array<string>;
+    /**
+     * Tags None
+     */
+    tags_none?: Array<string>;
+    /**
+     * Types
+     */
+    types?: Array<string>;
+    /**
+     * Year From
+     */
+    year_from?: number | null;
+    /**
+     * Year To
+     */
+    year_to?: number | null;
+    /**
+     * Owners
+     */
+    owners?: Array<string>;
+    /**
+     * Added Days
+     */
+    added_days?: number | null;
+};
 
 /**
  * Scheme

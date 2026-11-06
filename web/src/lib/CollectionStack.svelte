@@ -48,7 +48,10 @@
 				>{#each collection.name.split('_') as part, index (index)}{#if index}_<wbr
 						/>{/if}{part}{/each}</strong
 			>
-			<span>{collection.count} {collection.count === 1 ? 'item' : 'items'}</span>
+			<span
+				>{collection.rules ? 'Smart · ' : ''}{collection.count}
+				{collection.count === 1 ? 'item' : 'items'}</span
+			>
 		</div>
 	</a>
 </div>

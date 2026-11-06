@@ -12,7 +12,13 @@
 	import { downloadCitations } from '#lib/citations.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemList from '#lib/ItemList.svelte';
-	import { childrenOf, libraryById, loadOrganize, organize } from '#lib/organize.svelte.ts';
+	import {
+		childrenOf,
+		describeRules,
+		libraryById,
+		loadOrganize,
+		organize
+	} from '#lib/organize.svelte.ts';
 
 	const id = $derived(page.params.id ?? '');
 	let loaded = $state(false);
@@ -89,7 +95,7 @@
 			{/each}
 		</nav>
 		<div class="tools">
-			{#if writable}
+			{#if writable && !collection.rules}
 				<CollectionAdd collection={collection.id} onadded={() => list?.refresh()} />
 			{/if}
 			{#if collection}
@@ -123,7 +129,9 @@
 					{#if writable}
 						<hr />
 						<button role="menuitem" onclick={writeNote}>New note here</button>
-						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
+						<button role="menuitem" onclick={() => editDialog?.open()}
+							>{collection.rules ? 'Edit rules' : 'Edit'}</button
+						>
 						<button role="menuitem" class="danger" onclick={remove}>Delete</button>
 					{/if}
 				</MenuButton>
@@ -134,6 +142,13 @@
 	<header class="head">
 		<div>
 			<h1>{collection.name}</h1>
+			{#if collection.rules}
+				<p class="rules">
+					<span class="badge">Smart</span>
+					{describeRules(collection.rules)}
+					{#if writable}<button class="link" onclick={() => editDialog?.open()}>Change</button>{/if}
+				</p>
+			{/if}
 			{#if collection.description}<p class="description">{collection.description}</p>{/if}
 		</div>
 	</header>
@@ -197,6 +212,30 @@
 		margin: 0;
 		font-size: var(--step-4);
 		letter-spacing: -0.02em;
+	}
+	.rules {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+		margin: 8px 0 0;
+		color: var(--muted);
+	}
+	.rules .badge {
+		padding: 1px 8px;
+		border-radius: 999px;
+		background: var(--tag-teal-bg);
+		color: var(--tag-teal-ink);
+		font-size: var(--step--1);
+		font-weight: 600;
+	}
+	.rules .link {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--royal);
+		text-decoration: underline;
+		min-height: 0;
 	}
 	.description {
 		margin: 8px 0 0;

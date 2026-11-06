@@ -5578,6 +5578,16 @@
             "type": "boolean",
             "title": "Add Papers",
             "default": false
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rules"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5645,6 +5655,16 @@
             "title": "Pinned",
             "default": false
           },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rules"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "left_out": {
             "type": "integer",
             "title": "Left Out",
@@ -5704,6 +5724,16 @@
               }
             ],
             "title": "Library Id"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rules"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5772,6 +5802,16 @@
             "type": "boolean",
             "title": "Pinned",
             "default": false
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Rules"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -8706,6 +8746,96 @@
         ],
         "title": "Role",
         "description": "What a member may do in a group (and every group inside it)."
+      },
+      "Rules": {
+        "properties": {
+          "tags_all": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Tags All",
+            "default": []
+          },
+          "tags_any": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Tags Any",
+            "default": []
+          },
+          "tags_none": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Tags None",
+            "default": []
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Types",
+            "default": []
+          },
+          "year_from": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year From"
+          },
+          "year_to": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year To"
+          },
+          "owners": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Owners",
+            "default": []
+          },
+          "added_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 36500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added Days"
+          }
+        },
+        "type": "object",
+        "title": "Rules",
+        "description": "What a smart collection holds: the papers matching every rule given\n(none given: all papers)."
       },
       "Scheme": {
         "type": "string",

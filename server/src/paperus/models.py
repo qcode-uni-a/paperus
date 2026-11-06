@@ -295,6 +295,8 @@ class Item(Record, Trashable, Base):
     """The owner: a person's or a group's library."""
     type: Mapped[str] = mapped_column(String(64))
     title: Mapped[str]
+    year: Mapped[int | None] = mapped_column(index=True)
+    """Of publication, as cited (for smart collections' rules)."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )
@@ -580,6 +582,9 @@ class Collection(Record, Base):
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("collections.id", ondelete="CASCADE"), index=True
     )
+    rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """A smart collection: it holds the papers matching these rules
+    (``organize.Rules``) instead of papers added to it."""
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )

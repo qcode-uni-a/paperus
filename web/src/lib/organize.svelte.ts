@@ -1,5 +1,6 @@
 import { listCollections, listLibraries, listTags } from '#lib/api/client.ts';
-import type { CollectionOut, LibraryOut, TagOut } from '#lib/api/generated/types.gen.ts';
+import type { CollectionOut, LibraryOut, Rules, TagOut } from '#lib/api/generated/types.gen.ts';
+import { plural } from '#lib/format.ts';
 
 export type Collection = CollectionOut;
 export type Tag = TagOut;
@@ -98,4 +99,35 @@ export function libraryForCollection(collectionId: string | undefined): string |
 /** Whether a group owns it (it is shared with the group's members). */
 export function isShared(libraryId: string | null | undefined): boolean {
 	return libraryById(libraryId)?.kind === 'group';
+}
+
+/** A smart collection finds its papers by rules; papers are not added to it. */
+export function isSmart(collection: Collection | undefined): boolean {
+	return collection?.rules != null;
+}
+
+/** A smart collection's rules in words: "tagged radar, from 2020, books". */
+export function describeRules(rules: Rules): string {
+	const tagNames = (ids: string[] | undefined) =>
+		(ids ?? []).map((id) => organize.tags.find((t) => t.id === id)?.name ?? '?');
+	const and = (names: string[], word: string) =>
+		names.length > 1 ? `${names.slice(0, -1).join(', ')} ${word} ${names.at(-1)}` : names[0];
+	const parts: string[] = [];
+	if (rules.tags_all?.length) parts.push(`tagged ${and(tagNames(rules.tags_all), 'and')}`);
+	if (rules.tags_any?.length) parts.push(`tagged ${and(tagNames(rules.tags_any), 'or')}`);
+	if (rules.tags_none?.length) parts.push(`not tagged ${and(tagNames(rules.tags_none), 'or')}`);
+	if (rules.types?.length) parts.push(and(rules.types.map(plural), 'or'));
+	const { year_from: from, year_to: to } = rules;
+	if (from != null && to != null)
+		parts.push(from === to ? `published in ${from}` : `published ${from}–${to}`);
+	else if (from != null) parts.push(`published in ${from} or later`);
+	else if (to != null) parts.push(`published in ${to} or earlier`);
+	if (rules.owners?.length) parts.push(`owned by ${and(rules.owners.map(libraryName), 'or')}`);
+	if (rules.added_days != null)
+		parts.push(
+			rules.added_days === 1
+				? 'added today or yesterday'
+				: `added in the last ${rules.added_days} days`
+		);
+	return parts.length ? `Papers ${parts.join(', ')}.` : 'All papers.';
 }

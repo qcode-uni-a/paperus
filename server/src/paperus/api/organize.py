@@ -87,6 +87,9 @@ class CollectionOut(BaseModel):
     """The last items added (up to three), for previews."""
     pinned: bool = False
     """The person pinned it to their sidebar."""
+    rules: organize.Rules | None = None
+    """A smart collection: it holds the papers matching these rules (papers
+    cannot be added to it, and it holds no collections)."""
 
 
 class CollectionIn(BaseModel):
@@ -96,6 +99,8 @@ class CollectionIn(BaseModel):
     library_id: uuid.UUID | None = None
     """The parent's library if inside another collection, else the person's
     default library if not given."""
+    rules: organize.Rules | None = None
+    """Given: a smart collection."""
 
 
 class CollectionChange(BaseModel):
@@ -116,6 +121,9 @@ class CollectionChange(BaseModel):
     add_papers: bool = False
     """On a move into a group: give the papers the group does not own yet to
     the group (those the person may change) instead of leaving them out."""
+    rules: organize.Rules | None = None
+    """New rules of a smart collection; given on an empty collection, it
+    becomes one; ``null`` turns a smart collection into an empty one."""
 
 
 class MovePreview(BaseModel):
@@ -154,6 +162,13 @@ def _collection(
     if write:
         access.require_write(collection.library_id)
     return collection
+
+
+def _not_smart(collection: Collection) -> None:
+    if collection.rules is not None:
+        raise HTTPException(
+            409, "a smart collection finds its papers by its rules; change those"
+        )
 
 
 def _tag(db: DB, access: Access, tag_id: uuid.UUID, *, write: bool = False) -> Tag:
@@ -345,7 +360,12 @@ def delete_tag(tag_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
 
 
 def _collection_out(db: DB, access: Access, collection: Collection) -> CollectionOut:
-    count, recent = _contents(db, access, collection.id).get(collection.id, (0, []))
+    if collection.rules is not None:
+        count, recent = _smart_contents(db, access, collection)
+        direct = count
+    else:
+        count, recent = _contents(db, access, collection.id).get(collection.id, (0, []))
+        direct = _direct_counts(db, access, collection.id).get(collection.id, 0)
     return CollectionOut(
         id=collection.id,
         library_id=collection.library_id,
@@ -353,10 +373,37 @@ def _collection_out(db: DB, access: Access, collection: Collection) -> Collectio
         description=collection.description,
         parent_id=collection.parent_id,
         count=count,
-        direct=_direct_counts(db, access, collection.id).get(collection.id, 0),
+        direct=direct,
         recent=recent,
         pinned=collection.id in _pinned(db, access),
+        rules=_rules(collection),
     )
+
+
+def _rules(collection: Collection) -> organize.Rules | None:
+    if collection.rules is None:
+        return None
+    return organize.Rules.model_validate(collection.rules)
+
+
+def _smart_contents(
+    db: DB, access: Access, collection: Collection, per_collection: int = 3
+) -> tuple[int, list[ItemPreview]]:
+    """How many papers match a smart collection's rules (of those the
+    person can read), and the last added."""
+    conditions = [
+        *organize.matching(db, collection),
+        Item.deleted_at.is_(None),
+        access.item_filter(),
+    ]
+    count = db.scalar(select(func.count()).select_from(Item).where(*conditions))
+    recent = db.execute(
+        select(Item.id, Item.title)
+        .where(*conditions)
+        .order_by(Item.id.desc())
+        .limit(per_collection)
+    )
+    return count or 0, [ItemPreview(id=i, title=title) for i, title in recent]
 
 
 def _pinned(db: DB, access: Access) -> set[uuid.UUID]:
@@ -395,20 +442,26 @@ def list_collections(db: DB, access: CurrentAccess) -> list[CollectionOut]:
         .where(Collection.library_id.in_(access.readable))
         .order_by(func.lower(Collection.name))
     )
-    return [
-        CollectionOut(
-            id=c.id,
-            library_id=c.library_id,
-            name=c.name,
-            description=c.description,
-            parent_id=c.parent_id,
-            count=contents.get(c.id, (0, []))[0],
-            direct=direct.get(c.id, 0),
-            recent=contents.get(c.id, (0, []))[1],
-            pinned=c.id in pinned,
+    result = []
+    for c in collections:
+        count, recent = contents.get(c.id, (0, []))
+        if c.rules is not None:
+            count, recent = _smart_contents(db, access, c)
+        result.append(
+            CollectionOut(
+                id=c.id,
+                library_id=c.library_id,
+                name=c.name,
+                description=c.description,
+                parent_id=c.parent_id,
+                count=count,
+                direct=count if c.rules is not None else direct.get(c.id, 0),
+                recent=recent,
+                pinned=c.id in pinned,
+                rules=_rules(c),
+            )
         )
-        for c in collections
-    ]
+    return result
 
 
 def _contents(
@@ -473,6 +526,8 @@ def create_collection(
         parent = _collection(db, access, body.parent_id, write=True)
         if body.library_id not in (None, parent.library_id):
             raise HTTPException(409, "collections nest only within one library")
+        if parent.rules is not None:
+            raise HTTPException(409, "a smart collection holds no other collections")
         library_id = parent.library_id
     else:
         library_id = access.target_library(body.library_id)
@@ -483,6 +538,7 @@ def create_collection(
         parent_id=body.parent_id,
         created_by=access.user.id,
         change=0,
+        rules=body.rules.model_dump(mode="json") if body.rules else None,
     )
     db.add(collection)
     db.commit()
@@ -524,6 +580,8 @@ def change_collection(
             db.flush()
         if "parent_id" in given:
             organize.move_collection(db, collection, body.parent_id)
+        if "rules" in given:
+            organize.make_smart(db, collection, body.rules)
     except organize.NotFound as error:
         raise HTTPException(404, str(error)) from error
     except organize.Conflict as error:
@@ -625,6 +683,7 @@ def add_items(
     """Add items; those the collection may not hold (a group's collection
     holds only that group's items) or the person cannot read are skipped."""
     collection = _collection(db, access, collection_id, write=True)
+    _not_smart(collection)
     organize.add_to_collection(
         db,
         collection,
@@ -641,6 +700,7 @@ def remove_item(
     collection_id: uuid.UUID, item_id: uuid.UUID, db: DB, access: CurrentAccess
 ) -> CollectionOut:
     collection = _collection(db, access, collection_id, write=True)
+    _not_smart(collection)
     item = _item(db, access, item_id)
     item.collection_links = [
         link for link in item.collection_links if link.collection_id != collection_id
