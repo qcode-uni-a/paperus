@@ -95,6 +95,30 @@ def untag_item(item: Item, tag_id: uuid.UUID) -> None:
     item.tag_links = [link for link in item.tag_links if link.tag_id != tag_id]
 
 
+def merge_tags(db: Session, source: Tag, target: Tag) -> int:
+    """One tag instead of two of the same meaning: ``target`` goes on every
+    paper ``source`` is on, then ``source`` is deleted; how many papers it
+    went on. Callers check that both are the person's to change."""
+    added = 0
+    for item in db.scalars(
+        select(Item).join(ItemTag).where(ItemTag.tag_id == source.id)
+    ).unique():
+        old = next(link for link in item.tag_links if link.tag_id == source.id)
+        if not any(link.tag_id == target.id for link in item.tag_links):
+            item.tag_links.append(
+                ItemTag(
+                    tag_id=target.id,
+                    tag=target,
+                    source=old.source,
+                    added_by=old.added_by,
+                )
+            )
+            added += 1
+        untag_item(item, source.id)
+    db.delete(source)
+    return added
+
+
 def rename_tag(db: Session, tag: Tag, name: str) -> None:
     other = find_tag(db, tag.library_id, name)
     if other is not None and other.id != tag.id:

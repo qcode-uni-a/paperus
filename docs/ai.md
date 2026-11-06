@@ -23,7 +23,17 @@ pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 `list_collections`, `list_documents`, `list_tags`, `my_access` (who the
 token acts for, its rights and the tools they allow, groups with
 `groups.read`), `export_citations` (BibTeX or CSL-JSON); with write
-scopes `add_tags` and `add_document`. The
+scopes `add_tags` and `add_document`. **Tidying** (what Manage does in the
+website, `server/src/paperus/mcp_manage.py`): `library_checkup` (what
+needs looking at, with the tools for it), `list_duplicates`,
+`merge_papers`, `not_duplicates`, `list_unsorted` (with the beginning of
+each file's text, to recognise the paper), `set_doi`,
+`list_unreadable_files`, `retry_file`, `list_missing_pdfs`,
+`download_open_access`, `mark_file_not_needed`, `remove_tags`,
+`rename_tag` (merges into an existing tag of that name),
+`create_collection`, `add_to_collection`, `remove_from_collection`,
+`list_trash`, `restore_papers`. Not for AI assistants: groups and their
+members, and emptying the trash (it cannot be undone). The
 server's instructions describe the search workflow: search, pick 2–5
 papers, compare their abstracts, read the best one's passage, repeat. Not yet: OAuth (needed for claude.ai and ChatGPT
 connectors), notes and annotations, the AI inbox, citation export.

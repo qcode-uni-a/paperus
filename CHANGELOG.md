@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Tidying with AI assistants** (MCP): the Manage pages as tools.
+  `library_checkup` says what needs looking at; duplicates (list, merge,
+  keep apart), papers without details (list with the beginning of their
+  text, set a DOI), unreadable files (read again, fresh open copy),
+  missing PDFs (list, download an open copy, mark as not needed), tags
+  (take off, rename, merge two into one), collections (create, add,
+  remove), the trash (list, restore). Each needs the matching token
+  scope; the instructions tell the assistant to ask before changing
+  anything. Groups and emptying the trash stay with people.
 - **Manage → Missing**: papers without a PDF ("No file"), and published
   papers with only their preprint's ("Only the preprint"). Per paper:
   download an open copy (the journal's own if open access, else the arXiv

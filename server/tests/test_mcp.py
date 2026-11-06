@@ -126,8 +126,28 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "get_note",
         "create_note",
         "update_note",
+        # Tidying (see test_mcp_manage).
+        "library_checkup",
+        "list_duplicates",
+        "merge_papers",
+        "not_duplicates",
+        "list_unsorted",
+        "set_doi",
+        "list_unreadable_files",
+        "retry_file",
+        "list_missing_pdfs",
+        "download_open_access",
+        "mark_file_not_needed",
+        "remove_tags",
+        "rename_tag",
+        "create_collection",
+        "add_to_collection",
+        "remove_from_collection",
+        "list_trash",
+        "restore_papers",
     }
     assert tools["search"]["annotations"]["readOnlyHint"] is True
+    assert tools["merge_papers"]["annotations"]["destructiveHint"] is True
     assert tools["add_tags"]["annotations"]["readOnlyHint"] is False
     # Without a token, nothing.
     response = client.post(

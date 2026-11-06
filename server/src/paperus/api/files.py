@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, BinaryIO
+from typing import Annotated, Any, BinaryIO
 from urllib.parse import quote
 
 from fastapi import (
@@ -19,7 +19,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -431,17 +431,24 @@ def download_again(
     its paper: from arXiv, or by DOI via Unpaywall; only a whole PDF that
     opens is taken. 409 if none is found."""
     file = _get_file(db, access, file_id, write=True)
-    settings = request.app.state.settings
     try:
-        stored, _ = open_access.fetch(
-            request.app.state.http,
-            request.app.state.blobs,
-            file.version.item,
-            contact_email=system.load_config(db, settings).contact_email,
-            max_bytes=system.max_upload_bytes(db, settings),
-        )
+        replace_with_open_access(db, request.app.state, file)
     except open_access.NoSource as error:
         raise HTTPException(409, f"no good copy found: {error}") from error
+    return file_out(file)
+
+
+def replace_with_open_access(db: Session, state: Any, file: File) -> None:  # noqa: ANN401 (the app's state)
+    """The file's contents replaced by a fresh open-access copy of its paper
+    (``open_access.NoSource`` if none), to be read again. Commits."""
+    settings = state.settings
+    stored, _ = open_access.fetch(
+        state.http,
+        state.blobs,
+        file.version.item,
+        contact_email=system.load_config(db, settings).contact_email,
+        max_bytes=system.max_upload_bytes(db, settings),
+    )
     db.execute(
         insert(Blob)
         .values(sha256=stored.sha256, size=stored.size)
@@ -455,8 +462,7 @@ def download_again(
     file.text_error = None
     db.commit()
     db.refresh(file)
-    queue_text_extraction(request.app.state.jobs, file.id)
-    return file_out(file)
+    queue_text_extraction(state.jobs, file.id)
 
 
 @router.post("/api/files/{file_id}/read-again", status_code=202)
@@ -465,11 +471,18 @@ def read_file_again(
 ) -> FileOut:
     """Read the file's text once more (e.g. after a fix in paperus)."""
     file = _get_file(db, access, file_id, write=True)
+    read_again(db, file)
+    queue_text_extraction(request.app.state.jobs, file.id)
+    return file_out(file)
+
+
+def read_again(db: Session, file: File) -> None:
+    """Its passages dropped (they come back, with their vectors, if
+    unchanged) and its text pending. Commits; the caller queues reading."""
+    db.execute(delete(FileChunk).where(FileChunk.file_id == file.id))
     file.text_status = TextStatus.PENDING
     file.text_error = None
     db.commit()
-    queue_text_extraction(request.app.state.jobs, file.id)
-    return file_out(file)
 
 
 @router.delete("/api/files/{file_id}", status_code=204)
