@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Browser extension in the stores**: listed on addons.mozilla.org
+  (Firefox 140 or later, and Firefox for Android 142 or later); handed in
+  at the Chrome Web Store. Firefox asks at install whether it may send the
+  page's address and content, which goes only to your own paperus.
+- Releases hand a new version of the extension to both stores, only when
+  the extension changed; each release also has its source code for
+  Mozilla's review. Actions → "Check store access" tests the store keys.
+- The extension is type-checked against paperus's API, and a server test
+  keeps the API description (`openapi.json`) current, so a server change
+  that would break the extension shows in CI.
+
 ## 0.0.10 (2026-11-06)
 
 Tested with a real Zotero library (381 papers, 60 collections): it now
