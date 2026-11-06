@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.0.10 (2026-11-06)
+
+Tested with a real Zotero library (381 papers, 60 collections): it now
+comes over complete, and what goes wrong can be seen and fixed. Plus a
+browser extension to save papers in one click.
 
 - **Browser extension** (Chrome and Firefox, `extension/`): one click saves
   the paper you are reading with its PDF (downloaded with your own access)
@@ -8,21 +12,6 @@
   shows which ones you have. Connected from its settings with a token that
   may only add papers. Until it is in the stores: the zips on the GitHub
   release, loaded unpacked.
-- `paperus evaluate questions.json --user <name>`: how well each search mode
-  finds the paper each question means (hit@1, hit@5, MRR@10); first results
-  in `docs/search.md`.
-- `GET /api/items/lookup?id=arxiv:…&id=doi:…`: which of these papers one has.
-- **Download again** for a damaged file: a fresh open-access copy from
-  arXiv, or by DOI via Unpaywall (with the contact email set), replaces it;
-  only a whole PDF that opens is taken. Without a known source, "Upload a
-  good copy" leads to the paper.
-- PDFs are read in helper processes: in parallel on several cores, each
-  with a memory and time limit, so a broken PDF can no longer take the
-  worker down (453 files re-read in 95 seconds, 1.5 GB at most).
-- Zotero import: saved web pages (snapshots) are left out next to a PDF;
-  alone, they stay.
-- Zotero import: a file on its own that was downloaded from arXiv gets its
-  arXiv ID from the address Zotero kept (e.g. "2601.pdf" is 2601.01704).
 - **Duplicates**: "Review one by one" shows each pair side by side (first
   page, details with differences marked) and what merging does, with
   keyboard shortcuts; clearer cards in the list ("Keep this one" ← "Merged
@@ -30,28 +19,38 @@
   differ (two books called "Introduction to Quantum Optics").
 - **Files that could not be read**: listed under Manage → Unsorted with the
   reason in plain words, and "Read again" there and on the paper's page.
-- Importing the same export again repeats nothing: papers without
-  identifiers (e.g. web pages saved in Zotero) are recognised by type and
-  title.
-- Jobs page: a chart per queue (two minutes, with scales and times), shown
-  with the chart button in its header.
+  **Download again** replaces a damaged file with a fresh open-access copy
+  from arXiv, or by DOI via Unpaywall (with the contact email set); only a
+  whole PDF that opens is taken. Without a known source, "Upload a good
+  copy" leads to the paper.
+- **Jobs page**: live numbers per queue, running imports, "Read failed
+  files again", and a chart per queue (two minutes, with scales and times),
+  shown with the chart button in its header.
+- **Zotero import**:
+  - Files of the same name in a zip (arXiv snapshots are often all
+    "2310.html") are no longer left out when the zip has a top folder.
+  - Files on their own in Zotero (no paper around them, e.g. lecture
+    notes, a thesis, scanned notes) come along as documents instead of
+    being left out; one downloaded from arXiv gets its arXiv ID from the
+    address Zotero kept (e.g. "2601.pdf" is 2601.01704).
+  - Saved web pages (snapshots) are left out next to a PDF; alone, they
+    stay and are read as text, without markup, scripts or embedded images.
+  - Importing the same export again repeats nothing: papers without
+    identifiers are recognised by type and title.
+  - An import whose worker stopped in the middle goes on when retried.
+  - Dropping the export on the import page chooses it (it used to start a
+    normal upload); a dropped folder gets a note to zip it first.
+- **Fixed: reading PDFs in parallel.** PDFium is not thread-safe; two files
+  read at once could make the worker grow until it was killed (15 GB with
+  the Zotero import), or fail on valid PDFs. PDFs are now read in helper
+  processes, in parallel, each with a memory and time limit (453 files
+  re-read in 95 seconds, 1.5 GB at most).
+- `paperus evaluate questions.json --user <name>`: how well each search mode
+  finds the paper each question means (hit@1, hit@5, MRR@10); first results
+  in `docs/search.md`.
+- `GET /api/items/lookup?id=arxiv:…&id=doi:…`: which of these papers one has.
 - Long collection names wrap (after an underscore where possible) instead
   of running into the next one.
-- **Fixed: reading PDFs in parallel.** PDFium is not thread-safe; two files
-  read at once could make the worker grow until it was killed (15 GB with a
-  Zotero import), or fail on valid PDFs. One file at a time inside PDFium.
-- **Fixed: files of the same name in a zip** (arXiv snapshots are often all
-  "2310.html") were left out when the zip had a top folder.
-- Saved web pages (e.g. Zotero snapshots) are read as text, without markup,
-  scripts or embedded images (one page made a passage too long to index).
-- **Read failed files again** on the Jobs page, which also shows live
-  numbers per queue, a chart of the last ten minutes and running imports.
-- An import whose worker stopped in the middle goes on when retried.
-- Zotero import: files on their own in Zotero (no paper around them, e.g.
-  lecture notes, a thesis, scanned notes) come along as documents instead
-  of being left out. Found with a real export of 381 papers.
-- Import page: dropping the export there chooses it (it used to start a
-  normal upload); a dropped folder gets a note to zip it first.
 
 ## 0.0.9 (2026-11-05)
 
