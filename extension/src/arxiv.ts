@@ -2,6 +2,8 @@
  * button next to each paper. Dimmed: not in paperus yet, a click saves it
  * with its PDF. Full with a check: in paperus, a click opens it there. */
 
+import { settings } from './paperus';
+
 const ICON = chrome.runtime.getURL('icons/icon-32.png');
 const ID = /(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d+)?/;
 
@@ -96,7 +98,7 @@ async function start(): Promise<void> {
 	for (const spot of found) spot.after.after(buttons.get(spot.id)!.host);
 	const known: Record<string, string | null> =
 		(await chrome.runtime.sendMessage({ type: 'lookup', ids: found.map((s) => s.id) })) ?? {};
-	const server = (await chrome.storage.local.get('settings')).settings?.server as string | undefined;
+	const server = (await settings())?.server;
 	for (const [id, item] of Object.entries(known)) {
 		if (item && server) buttons.get(id)?.set('have', new URL(`/items/${item}`, server).href);
 	}
