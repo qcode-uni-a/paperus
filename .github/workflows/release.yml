@@ -177,12 +177,9 @@ jobs:
           cache-dependency-path: extension/package-lock.json
       - run: npm ci && npm run build
       - id: google
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
-          create_credentials_file: false
+        run: node "$GITHUB_WORKSPACE/.github/scripts/google-token.mjs"
+        env:
+          CHROME_SERVICE_ACCOUNT_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
       # Upload, wait until the store has processed it, then hand it in for
       # review; it is published once approved (not waited for here).
       - run: |
@@ -207,7 +204,7 @@ jobs:
           curl --fail-with-body -sS -H "$auth" -H "Content-Type: application/json" \
             -X POST -d '{}' "$api/v2/$item:publish"
         env:
-          TOKEN: ${{ steps.google.outputs.access_token }}
+          TOKEN: ${{ steps.google.outputs.token }}
           PUBLISHER: ${{ vars.CHROME_PUBLISHER_ID }}
           ITEM: ${{ vars.CHROME_ITEM_ID }}
 

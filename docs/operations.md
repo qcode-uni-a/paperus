@@ -237,8 +237,7 @@ Variables):
   the reviewers); it is listed once Mozilla approves it.
 
 - Chrome extension (Chrome Web Store, handed in by hand for 0.0.10): in
-  Google Cloud, a project with the "Chrome Web Store API" and the "IAM
-  Service Account Credentials API" (for the access token) enabled and a
+  Google Cloud, a project with the "Chrome Web Store API" enabled and a
   service account (no roles) with a JSON key; the service account's email
   added in the store's Developer Dashboard under Account. Then the key as
   the secret `CHROME_SERVICE_ACCOUNT_KEY` (environment `chrome`), the

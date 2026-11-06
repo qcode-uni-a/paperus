@@ -43,17 +43,18 @@ jobs:
     runs-on: ubuntu-latest
     environment: chrome
     steps:
-      - id: google
-        uses: google-github-actions/auth@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          credentials_json: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
-          create_credentials_file: false
+          node-version: 26
+      - id: google
+        run: node "$GITHUB_WORKSPACE/.github/scripts/google-token.mjs"
+        env:
+          CHROME_SERVICE_ACCOUNT_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
       - run: >
           curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN"
           "https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER/items/$ITEM:fetchStatus"
         env:
-          TOKEN: ${{ steps.google.outputs.access_token }}
+          TOKEN: ${{ steps.google.outputs.token }}
           PUBLISHER: ${{ vars.CHROME_PUBLISHER_ID }}
           ITEM: ${{ vars.CHROME_ITEM_ID }}
