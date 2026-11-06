@@ -229,6 +229,13 @@ Variables):
   repository `paperus`, workflow `release.yml`, environment `npm`), then
   delete the token and the secret.
 
+- Firefox add-on (addons.mozilla.org, listed since 0.0.10): an API key
+  from <https://addons.mozilla.org/developers/addon/api/key/> as the
+  secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` (in an environment
+  `firefox`), then `PUBLISH_FIREFOX` = `true`. Each release hands in the
+  new version with its source (`extension/amo-metadata.json`: the notes for
+  the reviewers); it is listed once Mozilla approves it.
+
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
 

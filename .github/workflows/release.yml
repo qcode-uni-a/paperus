@@ -1,9 +1,10 @@
 name: Release
 
 # For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
-# packages (PyPI) and the TypeScript client (npm), then the GitHub release.
-# PyPI and npm only run once switched on with the repository variables
-# PUBLISH_PYPI and PUBLISH_NPM (see docs/operations.md, "Releases").
+# packages (PyPI), the TypeScript client (npm) and the Firefox add-on, then
+# the GitHub release. PyPI, npm and Firefox only run once switched on with
+# the repository variables PUBLISH_PYPI, PUBLISH_NPM and PUBLISH_FIREFOX (see
+# docs/operations.md, "Releases").
 on:
   push:
     tags: ["v*"]
@@ -129,6 +130,34 @@ jobs:
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  firefox:
+    name: Firefox add-on (addons.mozilla.org)
+    needs: [ci, versions]
+    if: vars.PUBLISH_FIREFOX == 'true'
+    runs-on: ubuntu-latest
+    environment: firefox
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci && npm run build && npm run source
+      # Handed in with its source for Mozilla's review; listed once approved
+      # (not waited for here).
+      - run: >
+          npx --yes web-ext@8.10.0 sign --channel listed
+          --source-dir dist/firefox --artifacts-dir dist/signed
+          --upload-source-code "dist/paperus-extension-source-${GITHUB_REF_NAME#v}.zip"
+          --amo-metadata amo-metadata.json --approval-timeout 0
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
 
   release:
     name: GitHub release

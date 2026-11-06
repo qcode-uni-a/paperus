@@ -1,0 +1,5 @@
+{
+	"version": {
+		"approval_notes": "Source: attached. Build: Node.js 22+ (we use 26) and python3; in the source folder run `npm ci && npm run build`. The output in `dist/firefox` is the submitted add-on (not minified). The extension works only with a self-hosted paperus server (https://github.com/qcode-uni-a/paperus), which the user connects in the options page; it then gets an access token that may only add papers. Data goes only to that server, never to the developers."
+	}
+}
