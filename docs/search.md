@@ -13,14 +13,14 @@ author's AI assistant.
 
 ## Chunking
 
-| Method | Use |
-| --- | --- |
-| Structure-aware (paragraphs/sections from GROBID or Docling, ~200–500 tokens, short paragraphs merged, long ones split with overlap) | **Default** |
-| Small-to-big (embed paragraphs, return the surrounding context) | Via `get_passage(context=±n)` at query time |
-| Cheap contextual retrieval (prepend `Title › Section › Subsection`) | Default, before embedding |
-| Late chunking (embed long context, pool per chunk) | Experiment later |
-| LLM-generated chunk context (Anthropic's contextual retrieval) | Not on the server (no LLM there) |
-| Semantic chunking | Only for unstructured text |
+| Method                                                                                                                               | Use                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| Structure-aware (paragraphs/sections from GROBID or Docling, ~200–500 tokens, short paragraphs merged, long ones split with overlap) | **Default**                                 |
+| Small-to-big (embed paragraphs, return the surrounding context)                                                                      | Via `get_passage(context=±n)` at query time |
+| Cheap contextual retrieval (prepend `Title › Section › Subsection`)                                                                  | Default, before embedding                   |
+| Late chunking (embed long context, pool per chunk)                                                                                   | Experiment later                            |
+| LLM-generated chunk context (Anthropic's contextual retrieval)                                                                       | Not on the server (no LLM there)            |
+| Semantic chunking                                                                                                                    | Only for unstructured text                  |
 
 Figure and table captions, abstracts and equations are separate chunk types.
 
@@ -102,3 +102,23 @@ in one physicist’s library (376 papers), with multilingual-e5-small:
   on its own, but hybrid only 0.68 / 0.89 / 0.77. The questions share the
   abstracts' words, which favours keywords; not adopted until real
   questions from the group confirm it.
+
+### Reranking trial (#9, 2026-11-06)
+
+The same 44 questions: hybrid search's top 40 passages (at most 2 per
+paper) reordered by a cross-encoder, int8 ONNX on the CPU (8 threads):
+
+| reranker (licence)                          | languages | hit@1 | hit@5 | MRR@10 | per search |
+| ------------------------------------------- | --------- | ----- | ----- | ------ | ---------- |
+| none (hybrid)                               |           | 0.66  | 0.91  | 0.77   |            |
+| ms-marco-MiniLM-L-6-v2 (Apache-2.0)         | English   | 0.75  | 0.89  | 0.82   | 1.7 s      |
+| mxbai-rerank-xsmall-v1 (Apache-2.0)         | English   | 0.75  | 0.95  | 0.83   | 7 s        |
+| gte-multilingual-reranker-base (Apache-2.0) | many      | 0.86  | 0.95  | 0.91   | 10 s       |
+| bge-reranker-v2-m3 (Apache-2.0)             | many      | 0.86  | 0.98  | 0.91   | 21 s       |
+
+The multilingual ones put the right paper first for 20 more questions in
+100 (German questions too: 2 of 4 first), but take seconds per search on
+a CPU. Ways to make it usable: fewer candidates (e.g. 20), shorter
+passages, all cores, a GPU (#10), or reranking only when asked (a "sort
+by relevance" step, or for AI assistants, which wait anyway). Jina's
+reranker was left out: its licence forbids commercial use.
