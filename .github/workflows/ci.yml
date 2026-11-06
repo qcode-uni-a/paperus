@@ -145,3 +145,11 @@ jobs:
           push: false
           cache-from: type=gha,scope=ml
           cache-to: type=gha,mode=max,scope=ml
+      # The variant for NVIDIA GPUs (paperus-ml:<version>-cuda).
+      - uses: docker/build-push-action@v7
+        with:
+          context: ml
+          push: false
+          build-args: DEVICE=cuda
+          cache-from: type=gha,scope=ml-cuda
+          cache-to: type=gha,mode=max,scope=ml-cuda

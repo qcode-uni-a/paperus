@@ -156,14 +156,18 @@ _SEARCH = text(
 )
 
 
-def _query_vector(ml: MLClient, model: str, query: str) -> str | None:
-    """The query's vector as pgvector text, or None if the ML service is down."""
+def _query_vector(ml: MLClient, model: str, query: str) -> tuple[str, str] | None:
+    """The query's vector as pgvector text, and what the passages' vectors
+    to compare with are stored as; None if the ML service is down."""
     try:
-        [vector] = ml.embed([query], model=model, kind="query", timeout=QUERY_TIMEOUT)
+        embedded = ml.embed_named(
+            [query], model=model, kind="query", timeout=QUERY_TIMEOUT
+        )
     except (MLUnavailable, MLRejected):
         log.warning("search by meaning unavailable; keyword search only", exc_info=True)
         return None
-    return "[" + ",".join(f"{x:.6g}" for x in vector) + "]"
+    [vector] = embedded.values
+    return "[" + ",".join(f"{x:.6g}" for x in vector) + "]", embedded.vectors
 
 
 def run_search(
@@ -187,8 +191,8 @@ def run_search(
     started = time.perf_counter()
     model = load_config(db, settings).embedding_model
     vector = None
-    if mode != "keyword":
-        vector = _query_vector(ml, model, q)
+    if mode != "keyword" and (found := _query_vector(ml, model, q)) is not None:
+        vector, model = found
     used: Mode = mode if vector is not None or mode == "keyword" else "keyword"
     libraries = access.readable
     if library_id is not None:

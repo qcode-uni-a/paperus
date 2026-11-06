@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **ML service on an NVIDIA GPU**: the image `paperus-ml:<version>-cuda`
+  (1.7 GB download) runs the models on the GPU when the container gets one,
+  else on the CPU. About 20× faster on an RTX 2080 SUPER (arctic-embed-m-v2:
+  188 passages/s instead of 8). `PAPERUS_ML_DEVICE` (`auto`, `cpu`,
+  `cuda`); the administration says which it uses. See docs/operations.md.
+  - Vectors from the GPU's model files (fp16) are stored apart from the
+    CPU's (int8) and never mixed: switching re-embeds the library, as a
+    change of model does. Vectors stored so far stay valid.
+- The CPU image of the ML service is smaller (539 MB instead of 793 MB
+  unpacked): no download cache inside.
 - **Menu**: Duplicates and Unsorted show how many wait there (unsorted
   papers and unreadable files together; the details on hover), updated
   when changing pages and every minute.

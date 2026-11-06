@@ -1,5 +1,6 @@
 """Embedding chunks for search by meaning."""
 
+import logging
 import uuid
 
 from sqlalchemy import select
@@ -16,6 +17,8 @@ from paperus.models import (
     NoteChunk,
     TextStatus,
 )
+
+log = logging.getLogger(__name__)
 
 BATCH = 32
 
@@ -42,12 +45,14 @@ def missing_chunks(db: Session, file_id: uuid.UUID, model: str) -> list[Chunk]:
 
 def embed_file(db: Session, ml: MLClient, model: str, file_id: uuid.UUID) -> int:
     """Embed the file's missing chunks, committing per batch; returns the count."""
-    return _embed(db, ml, model, missing_chunks(db, file_id, model))
+    vectors = ml.vectors_name(model)
+    return _embed(db, ml, model, vectors, missing_chunks(db, file_id, vectors))
 
 
 def embed_note(db: Session, ml: MLClient, model: str, note_id: uuid.UUID) -> int:
     """Embed the note's chunks that lack a vector; returns the count."""
-    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
+    vectors = ml.vectors_name(model)
+    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == vectors)
     chunks = list(
         db.scalars(
             select(Chunk)
@@ -56,19 +61,29 @@ def embed_note(db: Session, ml: MLClient, model: str, note_id: uuid.UUID) -> int
             .distinct()
         )
     )
-    return _embed(db, ml, model, chunks)
+    return _embed(db, ml, model, vectors, chunks)
 
 
-def _embed(db: Session, ml: MLClient, model: str, chunks: list[Chunk]) -> int:
+def _embed(
+    db: Session, ml: MLClient, model: str, vectors: str, chunks: list[Chunk]
+) -> int:
+    """Stored as ``vectors`` (the model's name, or with its file's variant);
+    as the service says it, should it run another file meanwhile."""
     for start in range(0, len(chunks), BATCH):
         batch = chunks[start : start + BATCH]
-        vectors = ml.embed([c.text for c in batch], model=model, kind="passage")
+        embedded = ml.embed_named([c.text for c in batch], model=model, kind="passage")
+        if embedded.vectors != vectors:
+            log.warning("the ML service now gives %s vectors", embedded.vectors)
         db.execute(
             insert(Embedding)
             .values(
                 [
-                    {"chunk_sha256": c.sha256, "model": model, "embedding": v}
-                    for c, v in zip(batch, vectors, strict=True)
+                    {
+                        "chunk_sha256": c.sha256,
+                        "model": embedded.vectors,
+                        "embedding": v,
+                    }
+                    for c, v in zip(batch, embedded.values, strict=True)
                 ]
             )
             .on_conflict_do_nothing()

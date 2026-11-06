@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     model_ttl: int = 300
     # Models to load at startup, never unloaded, e.g. ["bge-m3"].
     preload: list[str] = []
+    # "auto": an NVIDIA GPU if the GPU build of ONNX Runtime is installed
+    # (the -cuda image), else the CPU; "cpu" or "cuda" to insist.
+    device: Literal["auto", "cpu", "cuda"] = "auto"
     # ONNX Runtime threads per model; 0 lets ONNX Runtime decide.
     intra_op_threads: int = 0
     # Most texts and tokens per inference batch (memory grows with both).

@@ -127,6 +127,13 @@
 		The model turns passages and queries into vectors. Better models find more of what is meant;
 		faster ones get a large library ready sooner.
 	</p>
+	{#if admin.ml?.service}
+		<p class="device">
+			Runs on {admin.ml.service.device === 'cuda'
+				? 'an NVIDIA GPU: models take seconds where a CPU takes minutes.'
+				: `the CPU (${admin.ml.service.cores} cores).`}
+		</p>
+	{/if}
 	<p class="warning" role="note">
 		<strong>Changing the model computes new vectors for the whole library</strong>
 		({passages.toLocaleString()} passages), which can take hours on a CPU. Until it is done, search by

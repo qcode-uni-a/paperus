@@ -11,6 +11,7 @@ import onnxruntime
 from tokenizers import Encoding, Tokenizer
 
 from paperus_ml import metrics
+from paperus_ml.device import CUDA, Device, providers
 from paperus_ml.models import Kind, ModelSpec
 
 Vectors = npt.NDArray[np.float32]
@@ -67,6 +68,7 @@ class Encoder:
         intra_op_threads: int = 0,
         max_batch_texts: int = 32,
         max_batch_tokens: int = 16384,
+        device: Device = "cpu",
     ) -> None:
         self.spec = spec
         self.max_batch_texts = max_batch_texts
@@ -75,9 +77,14 @@ class Encoder:
         self.tokenizer.enable_truncation(spec.max_tokens)
         self.tokenizer.no_padding()
         self.session = onnxruntime.InferenceSession(
-            str(model_dir / spec.onnx_file),
+            str(model_dir / spec.onnx_file_for(device)),
             sess_options=session_options(intra_op_threads),
-            providers=["CPUExecutionProvider"],
+            providers=providers(device),
+        )
+        # Where it actually runs: ONNX Runtime falls back to the CPU when
+        # the GPU cannot be used.
+        self.device: Device = (
+            "cuda" if self.session.get_providers()[0] == CUDA else "cpu"
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
         # One batch at a time: each already uses all cores, so batches of

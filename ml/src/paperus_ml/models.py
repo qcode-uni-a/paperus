@@ -34,6 +34,9 @@ class ModelSpec:
     pooling: Pooling
     dimensions: int
     max_tokens: int
+    gpu_onnx_file: str | None = None
+    """On a GPU: the fp16 (or full-precision) export, as int8 runs slowly
+    there; vectors differ from the int8 ones only by rounding."""
     query_prefix: str = ""
     passage_prefix: str = ""
     task: Task = "embedding"
@@ -43,6 +46,26 @@ class ModelSpec:
     download_mb: int = 0
     scores: tuple[tuple[str, float], ...] = ()
     """Published retrieval scores (nDCG@10, out of 100) by benchmark, see SCORES."""
+
+    def onnx_file_for(self, device: str) -> str:
+        return (
+            (self.gpu_onnx_file or self.onnx_file)
+            if device == "cuda"
+            else self.onnx_file
+        )
+
+    def vectors(self, device: str) -> str:
+        """What the vectors are stored as in paperus: the model's name for
+        its usual file, with the variant for another one (``…@fp16``), as
+        vectors of different files must not be mixed."""
+        file = self.onnx_file_for(device)
+        if file == self.onnx_file:
+            return self.name
+        if "fp16" in file:
+            return f"{self.name}@fp16"
+        if "int8" in file or "quant" in file:
+            return f"{self.name}@int8"
+        return f"{self.name}@fp32"
 
     def prefix(self, kind: Kind) -> str:
         return self.query_prefix if kind == "query" else self.passage_prefix
@@ -75,6 +98,7 @@ MODELS = {
             repo="Xenova/bge-m3",
             revision="4de13258303883538bd53b696b452bf8099f0858",
             onnx_file="onnx/model_int8.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="cls",
             dimensions=1024,
@@ -94,6 +118,7 @@ MODELS = {
             repo="Snowflake/snowflake-arctic-embed-m-v2.0",
             revision="95c2741480856aa9666782eb4afe11959938017f",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="cls",
             dimensions=768,
@@ -116,6 +141,7 @@ MODELS = {
             repo="Snowflake/snowflake-arctic-embed-l-v2.0",
             revision="ac6544c8a46e00af67e330e85a9028c66b8cfd9a",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="cls",
             dimensions=1024,
@@ -139,6 +165,7 @@ MODELS = {
             repo="onnx-community/gte-multilingual-base",
             revision="2edbf5e672aab465f9ed4c154a8b61791c082c69",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="cls",
             dimensions=768,
@@ -154,6 +181,7 @@ MODELS = {
             repo="Xenova/multilingual-e5-base",
             revision="1ec9243030a27d1a115d5c340572074c125b58b2",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="mean",
             dimensions=768,
@@ -174,6 +202,7 @@ MODELS = {
             repo="Xenova/multilingual-e5-large",
             revision="00fc3aeb3dbb95842de2ac1961d33c6319acf57b",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="mean",
             dimensions=1024,
@@ -195,6 +224,7 @@ MODELS = {
             repo="Xenova/multilingual-e5-small",
             revision="761b726dd34fb83930e26aab4e9ac3899aa1fa78",
             onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
             tokenizer_file="tokenizer.json",
             pooling="mean",
             dimensions=384,

@@ -31,7 +31,7 @@ from paperus.models import (
     TextStatus,
     User,
 )
-from paperus.system import load_config
+from paperus.system import load_config, vectors_in_use
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ class Figures:
 def library_figures(db: Session, settings: Settings) -> Figures:
     """The library's figures (also for Administration → Server stats)."""
     model = load_config(db, settings).embedding_model
+    vectors = vectors_in_use(db, model)
     count = func.count()
     visible_chunks = (
         select(FileChunk.chunk_sha256)
@@ -134,7 +135,9 @@ def library_figures(db: Session, settings: Settings) -> Figures:
         embedded=number(
             select(count)
             .select_from(Embedding)
-            .where(Embedding.model == model, Embedding.chunk_sha256.in_(visible_chunks))
+            .where(
+                Embedding.model == vectors, Embedding.chunk_sha256.in_(visible_chunks)
+            )
         ),
         embedding_model=model,
         imports_running=number(

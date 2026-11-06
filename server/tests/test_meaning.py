@@ -137,6 +137,25 @@ def test_trashed_files_are_not_found_by_meaning(
     assert search(logged_in, "missing")[0] == []
 
 
+def test_another_model_file_is_embedded_again(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    """The ML service on a GPU runs another file of the model (fp16): its
+    vectors are not mixed with the stored ones, the library is embedded
+    again, as after a change of model."""
+    file_id = uuid.UUID(prepare(logged_in, db, blobs, fake_ml))
+    fake_ml.variant = "fp16"
+    ml = fake_ml.client()
+    assert ml.vectors_name(MODEL) == f"{MODEL}@fp16"
+    assert files_missing_embeddings(db, f"{MODEL}@fp16") == [file_id]
+    # Meanwhile search by meaning finds nothing rather than comparing with
+    # vectors of the other file.
+    assert search(logged_in, "missing", mode="meaning")[0] == []
+    assert embed_file(db, ml, MODEL, file_id) == 1
+    assert search(logged_in, "missing", mode="meaning")[0] != []
+    assert set(db.scalars(select(Embedding.model))) == {MODEL, f"{MODEL}@fp16"}
+
+
 def test_ml_client_falls_back_and_sends_token(fake_ml: FakeML) -> None:
     seen: list[httpx2.Request] = []
 

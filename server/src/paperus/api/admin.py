@@ -75,6 +75,8 @@ class MLServiceState(BaseModel):
     keep: list[str]
     cores: int
     """CPU cores this ML service may use."""
+    device: str = "cpu"
+    """Where its models run: "cpu", or "cuda" (an NVIDIA GPU)."""
     loaded: list[str]
     loading: list[str] = []
 

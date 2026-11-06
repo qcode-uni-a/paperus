@@ -7,6 +7,7 @@ machine can be added in front of a local fallback.
 
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import httpx2
@@ -18,6 +19,17 @@ log = logging.getLogger(__name__)
 
 Kind = Literal["query", "passage"]
 RETRY_FAILED_AFTER = 30.0
+# How long the service's answer to "what are this model's vectors stored
+# as" is reused (it changes only when the service restarts on other hardware).
+VECTORS_TTL = 60.0
+
+
+@dataclass
+class Embedded:
+    vectors: str
+    """What to store them as: the model's name, or with the variant of the
+    service's model file (``…@fp16``)."""
+    values: list[list[float]]
 
 
 class MLUnavailable(RuntimeError):
@@ -59,6 +71,7 @@ class MLClient:
         self.http = http or httpx2.Client(timeout=timeout)
         self.http.headers.update(headers)
         self._failed_at: dict[str, float] = {}
+        self._vectors: dict[str, tuple[str, float]] = {}
 
     def _ordered_urls(self) -> list[str]:
         now = time.monotonic()
@@ -73,6 +86,13 @@ class MLClient:
         self, texts: list[str], *, model: str, kind: Kind, timeout: float | None = None
     ) -> list[list[float]]:
         """One vector per text; raises MLUnavailable if no service answers."""
+        return self.embed_named(texts, model=model, kind=kind, timeout=timeout).values
+
+    def embed_named(
+        self, texts: list[str], *, model: str, kind: Kind, timeout: float | None = None
+    ) -> Embedded:
+        """One vector per text, and what to store them as (see
+        ``vectors_name``)."""
         started = time.perf_counter()
         try:
             vectors = self._embed(texts, model=model, kind=kind, timeout=timeout)
@@ -91,7 +111,7 @@ class MLClient:
 
     def _embed(
         self, texts: list[str], *, model: str, kind: Kind, timeout: float | None
-    ) -> list[list[float]]:
+    ) -> Embedded:
         errors = []
         loading = False
         for url in self._ordered_urls():
@@ -116,8 +136,9 @@ class MLClient:
                 errors.append(f"{url}: {response.status_code} {_detail(response)}")
                 continue
             self._failed_at.pop(url, None)
-            embeddings: list[list[float]] = response.json()["embeddings"]
-            return embeddings
+            body = response.json()
+            # Services before 0.0.11 do not say: their vectors are the model's.
+            return Embedded(body.get("vectors") or model, body["embeddings"])
         message = "; ".join(errors) or "no ML service configured"
         raise MLLoading(message) if loading else MLUnavailable(message)
 
@@ -131,6 +152,20 @@ class MLClient:
             except httpx2.HTTPError as error:
                 result.append((url, str(error) or type(error).__name__))
         return result
+
+    def vectors_name(self, model: str) -> str:
+        """What the model's vectors are stored as: its name, or with the
+        variant of the file the service runs (``…@fp16`` on a GPU), as
+        vectors of different files must not be mixed. Raises MLUnavailable."""
+        cached = self._vectors.get(model)
+        if cached and time.monotonic() - cached[1] < VECTORS_TTL:
+            return cached[0]
+        for entry in self.models():
+            if entry.get("name") == model:
+                name = str(entry.get("vectors") or model)
+                self._vectors[model] = (name, time.monotonic())
+                return name
+        raise MLRejected(404, f"the ML service has no model {model!r}")
 
     def models(self) -> list[dict[str, Any]]:
         """The models the service offers (``GET /models``)."""

@@ -105,7 +105,8 @@ Secure session cookie, uploads, downloads with range requests.
 
 ## ML service (search by meaning)
 
-The `ml` container computes the vectors for search by meaning on the CPU.
+The `ml` container computes the vectors for search by meaning, on the CPU
+or on an NVIDIA GPU (below).
 Its settings are made under Administration → Settings → Machine learning
 and sent to it by the server (at once, when the server starts, and every
 five minutes, so a restarted ML service gets them back):
@@ -119,6 +120,45 @@ five minutes, so a restarted ML service gets them back):
 - **One batch at a time per model**: each batch uses all of its cores;
   simultaneous requests (several uploads, a search) take turns batch by
   batch, so a search waits for one batch at most.
+
+### On an NVIDIA GPU
+
+The image `paperus-ml:<version>-cuda` (e.g. `release-cuda`) is the same
+service with ONNX Runtime's GPU build and CUDA (about 4 GB larger). On the
+host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
+generation on) and the NVIDIA Container Toolkit, registered with Docker:
+
+```sh
+nvidia-ctk runtime configure --runtime=docker && systemctl restart docker
+```
+
+In `compose.yaml`:
+
+```yaml
+  ml:
+    image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}-cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+Administration → Settings → Machine learning then says "GPU"; without a
+reachable card the image runs on the CPU and logs why
+(`PAPERUS_ML_DEVICE=cuda` refuses to start instead). Measured on an RTX
+2080 SUPER (8 GB), against 24 CPU cores: arctic-embed-m-v2 188 passages/s
+instead of 8, multilingual-e5-small 409 instead of 24, bge-m3 35 instead of
+3. GPU memory per loaded model: 0.65 GB (e5-small), 1.6 GB (arctic), 3 GB
+(bge-m3).
+
+On the GPU the models run their fp16 files instead of the CPU's int8 ones;
+the vectors differ (arctic: cosine 0.96–0.97), so they are stored under
+another name (`arctic-embed-m-v2@fp16`) and a switch between CPU and GPU
+re-embeds the library like a change of model (minutes on a GPU). All
+addresses in `PAPERUS_ML_URLS` should run on the same kind of hardware.
 
 ## Monitoring (Prometheus)
 

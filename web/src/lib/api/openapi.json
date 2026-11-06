@@ -7325,6 +7325,11 @@
             "type": "integer",
             "title": "Cores"
           },
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "default": "cpu"
+          },
           "loaded": {
             "items": {
               "type": "string"

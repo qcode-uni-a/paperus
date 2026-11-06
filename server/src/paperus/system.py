@@ -179,6 +179,28 @@ def save_oidc_secret(db: Session, secret: str | None) -> None:
     )
 
 
+VECTORS_KEY = "vectors"
+
+
+def vectors_in_use(db: Session, model: str) -> str:
+    """What the model's vectors are stored as, as the ML service last said:
+    the model's name, or with the variant of its model file (``…@fp16`` on a
+    GPU). For figures; embedding and search ask the ML service."""
+    row = db.get(SystemSetting, VECTORS_KEY)
+    known = row.value.get(model) if row else None
+    return str(known) if known else model
+
+
+def save_vectors_in_use(db: Session, model: str, vectors: str) -> None:
+    row = db.get(SystemSetting, VECTORS_KEY)
+    value = {**(row.value if row else {}), model: vectors}
+    db.execute(
+        insert(SystemSetting)
+        .values(key=VECTORS_KEY, value=value)
+        .on_conflict_do_update(index_elements=["key"], set_={"value": value})
+    )
+
+
 BACKUPS_KEY = "backups"
 
 

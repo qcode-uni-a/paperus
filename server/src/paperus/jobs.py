@@ -19,7 +19,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import auth, integrity, readable, trash
+from paperus import auth, integrity, readable, system, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -31,7 +31,7 @@ from paperus.embedding import (
 )
 from paperus.importing.run import run_import
 from paperus.metadata import make_http_client
-from paperus.ml import MLClient, MLUnavailable, make_ml_client
+from paperus.ml import MLClient, MLRejected, MLUnavailable, make_ml_client
 from paperus.models import Import, ImportStatus
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
@@ -119,9 +119,19 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
     context = _worker_context()
     with context.sessions() as db:
         model = load_config(db, context.settings).embedding_model
-        for file_id in files_missing_embeddings(db, model):
+        # What the ML service's vectors are stored as: a switch to another
+        # model file (CPU to GPU) re-embeds like a change of model.
+        try:
+            vectors = context.ml.vectors_name(model)
+        except (MLUnavailable, MLRejected) as error:
+            log.info("not looking for missing embeddings: %s", error)
+            return
+        if vectors != system.vectors_in_use(db, model):
+            system.save_vectors_in_use(db, model, vectors)
+            db.commit()
+        for file_id in files_missing_embeddings(db, vectors):
             queue_embedding(job.app, file_id)
-        for note_id in notes_missing_embeddings(db, model):
+        for note_id in notes_missing_embeddings(db, vectors):
             queue_note_embedding(job.app, note_id)
 
 

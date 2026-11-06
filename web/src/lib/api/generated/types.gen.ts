@@ -1182,6 +1182,10 @@ export type MlServiceState = {
      */
     cores: number;
     /**
+     * Device
+     */
+    device?: string;
+    /**
      * Loaded
      */
     loaded: Array<string>;

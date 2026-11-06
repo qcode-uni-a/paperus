@@ -68,6 +68,7 @@ def test_embed(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["model"] == "bge-m3"
+    assert body["vectors"] == "bge-m3"
     assert body["dimensions"] == DIMENSIONS
     assert len(body["embeddings"]) == 2
 

@@ -45,7 +45,16 @@ services:
     restart: unless-stopped
 
   ml:
+    # For an NVIDIA GPU: add "-cuda" to the tag and the "deploy" lines below
+    # (see docs/operations.md, "On an NVIDIA GPU").
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     environment:
       PAPERUS_ML_TOKEN: ${ML_TOKEN}
       # PAPERUS_ML_METRICS_PORT: 9465

@@ -10,6 +10,7 @@ from pathlib import Path
 from huggingface_hub import snapshot_download
 
 from paperus_ml.config import Settings
+from paperus_ml.device import Device, choose
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
 
@@ -45,6 +46,8 @@ class ModelManager:
         self._keep = set(settings.preload)
         self.threads = settings.intra_op_threads
         """CPU threads per model (0: all ONNX Runtime sees); set by paperus."""
+        self.device: Device = choose(settings.device)
+        """Where models run (each model loads the file for it)."""
 
     def model_dir(self, spec: ModelSpec) -> Path:
         """<cache>/<task>/<model>, with plain files: the shared Hugging Face
@@ -55,7 +58,7 @@ class ModelManager:
     def cached_bytes(self, spec: ModelSpec) -> int | None:
         """Size on disk if the model is downloaded, else None."""
         directory = self.model_dir(spec)
-        if not (directory / spec.onnx_file).is_file():
+        if not (directory / spec.onnx_file_for(self.device)).is_file():
             return None
         return sum(p.stat().st_size for p in directory.rglob("*") if p.is_file())
 
@@ -76,15 +79,19 @@ class ModelManager:
             spec.repo,
             revision=spec.revision,
             local_dir=model_dir,
-            allow_patterns=[f"{spec.onnx_file}*", spec.tokenizer_file],
+            allow_patterns=[f"{spec.onnx_file_for(self.device)}*", spec.tokenizer_file],
         )
-        return Encoder(
+        encoder = Encoder(
             spec,
             model_dir,
             intra_op_threads=self.threads,
             max_batch_texts=self.settings.max_batch_texts,
             max_batch_tokens=self.settings.max_batch_tokens,
+            device=self.device,
         )
+        if encoder.device != self.device:
+            log.warning("%s: no usable GPU, running on the CPU", spec.name)
+        return encoder
 
     def get(self, name: str, wait: float | None = None) -> Encoder:
         """The model, downloading and loading it on first use (and again when

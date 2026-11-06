@@ -38,6 +38,10 @@ class EmbedRequest(BaseModel):
 
 class EmbedResponse(BaseModel):
     model: str
+    vectors: str
+    """What to store the vectors as: the model's name, with the variant of
+    its file when not the usual one (``…@fp16`` on a GPU); vectors of
+    different variants must not be mixed."""
     dimensions: int
     embeddings: list[list[float]]
 
@@ -49,6 +53,8 @@ class ModelInfo(BaseModel):
     revision: str
     dimensions: int
     max_tokens: int
+    vectors: str
+    """What its vectors are stored as on this service (see EmbedResponse)."""
     loaded: bool
     cached_bytes: int | None
     """Size of the downloaded files; None if not downloaded yet."""
@@ -74,6 +80,8 @@ class ServiceState(BaseModel):
     keep: list[str]
     cores: int
     """CPU cores this service may use."""
+    device: str = "cpu"
+    """Where models run: "cpu", or "cuda" (an NVIDIA GPU)."""
     loaded: list[str]
     loading: list[str]
     started: str
@@ -155,6 +163,7 @@ def create_app(
                 revision=s.revision,
                 dimensions=s.dimensions,
                 max_tokens=s.max_tokens,
+                vectors=s.vectors(models.device),
                 loaded=s.name in loaded,
                 cached_bytes=models.cached_bytes(s),
                 description=s.description,
@@ -179,6 +188,7 @@ def create_app(
             threads=models.threads,
             keep=models.kept,
             cores=usable_cores(),
+            device=models.device,
             loaded=models.loaded(),
             loading=models.loading(),
             started=started,
@@ -243,6 +253,7 @@ def create_app(
         metrics.TEXTS.labels(body.model, body.kind).inc(len(body.texts))
         return EmbedResponse(
             model=body.model,
+            vectors=MODELS[body.model].vectors(models.device),
             dimensions=vectors.shape[1],
             embeddings=vectors.tolist(),
         )

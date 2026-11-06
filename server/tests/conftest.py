@@ -122,6 +122,11 @@ class FakeML:
         self.requests: list[dict[str, Any]] = []
         self.deleted: list[str] = []
         self.config: dict[str, Any] = {"threads": 0, "keep": []}
+        self.variant: str | None = None
+        """Another model file (e.g. "fp16" on a GPU): other vectors."""
+
+    def vectors(self, model: str) -> str:
+        return f"{model}@{self.variant}" if self.variant else model
 
     def vector(self, text: str) -> list[float]:
         vector = [0.0] * self.DIMENSIONS
@@ -164,6 +169,7 @@ class FakeML:
                     "name": name,
                     "task": "embedding",
                     "dimensions": self.DIMENSIONS,
+                    "vectors": self.vectors(name),
                     "max_tokens": 512,
                     "loaded": False,
                     "cached_bytes": None,
@@ -183,6 +189,7 @@ class FakeML:
             200,
             json={
                 "model": body["model"],
+                "vectors": self.vectors(body["model"]),
                 "dimensions": self.DIMENSIONS,
                 "embeddings": vectors,
             },
