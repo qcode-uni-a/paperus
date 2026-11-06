@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { plainTitle } from '#lib/title.svelte.ts';
 	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -107,7 +108,16 @@
 			.filter((f) => !f.deleted_at && isText(f.media_type, f.filename));
 		return texts.find((f) => f.role === 'main') ?? texts[0] ?? null;
 	});
-	const viewed = $derived(pdfFile ?? textFile);
+	/** Without a PDF or text: an image (a photographed note, a scan). */
+	const SHOWN_IMAGES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+	const imageFile = $derived.by(() => {
+		if (!item || pdfFile || textFile) return null;
+		const images = item.versions
+			.flatMap((v) => v.files)
+			.filter((f) => !f.deleted_at && f.media_type.startsWith('image/'));
+		return images.find((f) => f.role === 'main') ?? images[0] ?? null;
+	});
+	const viewed = $derived(pdfFile ?? textFile ?? imageFile);
 	// Readers of a group see its papers but change nothing of them.
 	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
 
@@ -448,10 +458,38 @@
 			mediaType={textFile.media_type}
 			filename={textFile.filename}
 		/>
+	{:else if imageFile}
+		<figure class="image">
+			{#if SHOWN_IMAGES.includes(imageFile.media_type)}
+				<a href="/api/files/{imageFile.id}/content" target="_blank" rel="noreferrer"
+					><img src="/api/files/{imageFile.id}/content" alt={plainTitle(item.title)} /></a
+				>
+			{:else}
+				<p class="muted">
+					Browsers cannot show this image ({imageFile.filename}).
+					<a href="/api/files/{imageFile.id}/content" target="_blank" rel="noreferrer">Open it</a>
+				</p>
+			{/if}
+		</figure>
 	{/if}
 {/if}
 
 <style>
+	.image {
+		margin: 0;
+		padding: 12px;
+		border-radius: 12px;
+		background: var(--desk);
+		text-align: center;
+	}
+	.image img {
+		display: block;
+		max-width: 100%;
+		height: auto;
+		margin: 0 auto;
+		border-radius: 4px;
+		box-shadow: var(--shadow);
+	}
 	.problem {
 		flex-basis: 100%;
 		color: var(--danger);
