@@ -3035,6 +3035,28 @@
         }
       }
     },
+    "/api/manage/counts": {
+      "get": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Manage Counts",
+        "description": "How many duplicates, unsorted papers and unreadable files the person\ncan see.",
+        "operationId": "manage_counts",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManageCounts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/trash": {
       "delete": {
         "tags": [
@@ -7406,6 +7428,29 @@
           "models"
         ],
         "title": "MLStatus"
+      },
+      "ManageCounts": {
+        "properties": {
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates"
+          },
+          "unsorted": {
+            "type": "integer",
+            "title": "Unsorted"
+          },
+          "unreadable": {
+            "type": "integer",
+            "title": "Unreadable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duplicates",
+          "unsorted",
+          "unreadable"
+        ],
+        "title": "ManageCounts"
       },
       "MemberIn": {
         "properties": {

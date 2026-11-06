@@ -26,6 +26,7 @@ from paperus.api import (
     health,
     imports,
     items,
+    manage,
     notes,
     organize,
     search,
@@ -107,6 +108,7 @@ def create_app(
     app.include_router(notes.router)
     app.include_router(imports.router)
     app.include_router(duplicates.router)
+    app.include_router(manage.router)
     app.include_router(trash.router)
     app.include_router(admin.router)
     app.include_router(organize.router)

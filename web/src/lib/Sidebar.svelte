@@ -20,6 +20,8 @@
 		mdiTagMultipleOutline,
 		mdiTrashCanOutline
 	} from '@mdi/js';
+	import { manageCounts } from '#lib/api/client.ts';
+	import type { ManageCounts } from '#lib/api/generated/types.gen.ts';
 	import Icon from '#lib/Icon.svelte';
 	import StorageMeter from '#lib/StorageMeter.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
@@ -66,6 +68,39 @@
 		[resolve('/manage/unsorted'), 'Unsorted', mdiFileQuestionOutline],
 		[resolve('/trash'), 'Trash', mdiTrashCanOutline]
 	] as const;
+
+	// How many duplicates and unsorted papers (or unreadable files) wait:
+	// after each change of page (one may just have resolved some) and every
+	// minute.
+	let counts = $state<ManageCounts | null>(null);
+	const refreshCounts = () => manageCounts().then(({ data }) => (counts = data ?? counts));
+	$effect(() => {
+		void page.url.pathname;
+		if (session.user && !inAdmin) refreshCounts();
+	});
+	$effect(() => {
+		if (!session.user) return;
+		const timer = setInterval(refreshCounts, 60_000);
+		return () => clearInterval(timer);
+	});
+	const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+	const badges = $derived<Record<string, { count: number; title: string }>>({
+		[resolve('/manage/duplicates')]: {
+			count: counts?.duplicates ?? 0,
+			title: count(counts?.duplicates ?? 0, 'possible duplicate', 'possible duplicates')
+		},
+		[resolve('/manage/unsorted')]: {
+			count: (counts?.unsorted ?? 0) + (counts?.unreadable ?? 0),
+			title: [
+				counts?.unsorted
+					? count(counts.unsorted, 'paper without details', 'papers without details')
+					: '',
+				counts?.unreadable ? count(counts.unreadable, 'unreadable file', 'unreadable files') : ''
+			]
+				.filter(Boolean)
+				.join(', ')
+		}
+	});
 
 	function active(path: string): boolean {
 		const current = page.url.pathname;
@@ -117,7 +152,13 @@
 		<div class="part bottom">
 			<span class="group">Manage</span>
 			{#each MANAGE as [path, label, icon] (path)}
-				<a href={path} class:current={active(path)}><Icon path={icon} /><span>{label}</span></a>
+				{@const badge = badges[path]}
+				<a href={path} class:current={active(path)}
+					><Icon path={icon} /><span>{label}</span>
+					{#if badge?.count}<span class="count" title={badge.title}
+							>{badge.count}<span class="visually-hidden">: {badge.title}</span></span
+						>{/if}</a
+				>
 			{/each}
 			{#if session.user}<StorageMeter />{/if}
 		</div>
@@ -183,6 +224,30 @@
 	a span {
 		overflow: hidden;
 		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	/* How many wait there, at the right end of the entry. */
+	a .count {
+		margin-left: auto;
+		min-width: 22px;
+		padding: 1px 7px;
+		border-radius: 999px;
+		background: var(--accent-soft);
+		color: var(--royal);
+		font-size: var(--step--1);
+		font-weight: 650;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+	a.current .count {
+		background: var(--surface);
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
 		white-space: nowrap;
 	}
 	a.sub {

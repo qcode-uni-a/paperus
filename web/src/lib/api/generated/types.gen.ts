@@ -1237,6 +1237,24 @@ export type MlStatus = {
 };
 
 /**
+ * ManageCounts
+ */
+export type ManageCounts = {
+    /**
+     * Duplicates
+     */
+    duplicates: number;
+    /**
+     * Unsorted
+     */
+    unsorted: number;
+    /**
+     * Unreadable
+     */
+    unreadable: number;
+};
+
+/**
  * MemberIn
  */
 export type MemberIn = {
@@ -4396,6 +4414,22 @@ export type MarkDifferentResponses = {
 };
 
 export type MarkDifferentResponse = MarkDifferentResponses[keyof MarkDifferentResponses];
+
+export type ManageCountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/manage/counts';
+};
+
+export type ManageCountsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ManageCounts;
+};
+
+export type ManageCountsResponse = ManageCountsResponses[keyof ManageCountsResponses];
 
 export type EmptyTrashData = {
     body?: never;

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Menu**: Duplicates and Unsorted show how many wait there (unsorted
+  papers and unreadable files together; the details on hover), updated
+  when changing pages and every minute.
 - **Browser extension in the stores**: listed on addons.mozilla.org
   (Firefox 140 or later, and Firefox for Android 142 or later); handed in
   at the Chrome Web Store. Firefox asks at install whether it may send the

@@ -21,6 +21,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
 
 from paperus import library, open_access, system
 from paperus.access import Access
@@ -375,12 +376,9 @@ class UnreadableFile(BaseModel):
     """An open-access copy may be found (arXiv ID, or DOI via Unpaywall)."""
 
 
-@router.get("/api/files/unreadable")
-def unreadable_files(
-    request: Request, db: DB, access: CurrentAccess
-) -> list[UnreadableFile]:
-    """Files whose text could not be read, of the papers the person can see
-    (Manage → Unsorted): to read again, replace or remove."""
+def unreadable(db: Session, access: Access) -> list[tuple[File, Item]]:
+    """Files whose text could not be read, with their papers, of the papers
+    the person can see (at most 500)."""
     rows = db.execute(
         select(File, Item)
         .join(Version, Version.id == File.version_id)
@@ -394,6 +392,15 @@ def unreadable_files(
         .order_by(Item.title, File.filename)
         .limit(500)
     ).all()
+    return [(file, item) for file, item in rows if access.can_read_item(item)]
+
+
+@router.get("/api/files/unreadable")
+def unreadable_files(
+    request: Request, db: DB, access: CurrentAccess
+) -> list[UnreadableFile]:
+    """Files whose text could not be read, of the papers the person can see
+    (Manage → Unsorted): to read again, replace or remove."""
     email = system.load_config(db, request.app.state.settings).contact_email
     return [
         UnreadableFile(
@@ -407,8 +414,7 @@ def unreadable_files(
             writable=access.can_write_item(item),
             can_download=bool(open_access.sources(item, email)),
         )
-        for file, item in rows
-        if access.can_read_item(item)
+        for file, item in unreadable(db, access)
     ]
 
 

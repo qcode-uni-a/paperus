@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, object_session
+from sqlalchemy.sql.elements import ColumnElement
 
 from paperus import changes, library, merge, metadata
 from paperus.access import Access
@@ -507,6 +508,28 @@ def restore_item(
     return item_detail(item, access, response)
 
 
+def unsorted_conditions() -> list[ColumnElement[bool]]:
+    """Papers with a PDF whose details could not be found: all guessed from
+    the file, and none still being read (Manage → Unsorted)."""
+    return [
+        Item.id.not_in(
+            select(Version.item_id).where(
+                Version.metadata_source != MetadataSource.FILE
+            )
+        ),
+        Item.id.not_in(
+            select(Version.item_id)
+            .join(File)
+            .where(File.text_status == TextStatus.PENDING, File.deleted_at.is_(None))
+        ),
+        Item.id.in_(
+            select(Version.item_id)
+            .join(File)
+            .where(File.media_type == "application/pdf", File.deleted_at.is_(None))
+        ),
+    ]
+
+
 @router.get("/api/items")
 def list_items(
     response: Response,
@@ -579,29 +602,7 @@ def list_items(
             )
         )
     if unsorted:
-        conditions.append(
-            Item.id.not_in(
-                select(Version.item_id).where(
-                    Version.metadata_source != MetadataSource.FILE
-                )
-            )
-        )
-        conditions.append(
-            Item.id.not_in(
-                select(Version.item_id)
-                .join(File)
-                .where(
-                    File.text_status == TextStatus.PENDING, File.deleted_at.is_(None)
-                )
-            )
-        )
-        conditions.append(
-            Item.id.in_(
-                select(Version.item_id)
-                .join(File)
-                .where(File.media_type == "application/pdf", File.deleted_at.is_(None))
-            )
-        )
+        conditions.extend(unsorted_conditions())
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
     if sort in ("recent", "opened"):

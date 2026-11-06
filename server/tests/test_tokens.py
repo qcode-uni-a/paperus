@@ -251,6 +251,7 @@ ROUTES = {
     ("PUT", "/api/collections/{collection_id}/pin"): None,
     ("GET", "/api/duplicates"): "papers.read",
     ("POST", "/api/duplicates/different"): None,
+    ("GET", "/api/manage/counts"): None,
     ("DELETE", "/api/files/{file_id}"): "papers.write",
     ("GET", "/api/files/{file_id}/passages/{position}"): "papers.read",
     ("GET", "/api/files/unreadable"): None,

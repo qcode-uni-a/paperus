@@ -137,6 +137,23 @@ def test_unsorted(client: TestClient, db: Session) -> None:
     unsorted = ada.get("/api/items", params={"unsorted": True}).json()
     assert [i["title"] for i in unsorted] == ["scan_2024_03.pdf"]
 
+    # The numbers next to Manage → Duplicates and Unsorted in the menu.
+    paper(ada, "A Paper with Details.")
+    db.execute(
+        update(File)
+        .where(File.media_type == "text/markdown")
+        .values(text_status=TextStatus.FAILED)
+    )
+    db.commit()
+    counts = ada.get("/api/manage/counts").json()
+    assert counts == {"duplicates": 1, "unsorted": 1, "unreadable": 1}
+    bob = Person(client, db, "bob")
+    assert bob.get("/api/manage/counts").json() == {
+        "duplicates": 0,
+        "unsorted": 0,
+        "unreadable": 0,
+    }
+
 
 def test_merging_keeps_notes_and_stars(client: TestClient, db: Session) -> None:
     ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
