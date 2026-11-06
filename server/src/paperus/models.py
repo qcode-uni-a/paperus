@@ -297,6 +297,14 @@ class Item(Record, Trashable, Base):
     title: Mapped[str]
     year: Mapped[int | None] = mapped_column(index=True)
     """Of publication, as cited (for smart collections' rules)."""
+    file_wanted: Mapped[bool] = mapped_column(server_default=text("true"))
+    """False: no file is needed (a web page, a book on the shelf); not
+    listed under Manage → Missing."""
+    open_access_tried_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    open_access_error: Mapped[str | None]
+    """Why the last try found no open-access copy."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )

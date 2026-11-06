@@ -433,7 +433,7 @@ def download_again(
     file = _get_file(db, access, file_id, write=True)
     settings = request.app.state.settings
     try:
-        stored = open_access.fetch(
+        stored, _ = open_access.fetch(
             request.app.state.http,
             request.app.state.blobs,
             file.version.item,

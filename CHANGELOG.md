@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Manage → Missing**: papers without a PDF ("No file"), and published
+  papers with only their preprint's ("Only the preprint"). Per paper:
+  download an open copy (the journal's own if open access, else the arXiv
+  version, which paperus finds by the DOI via OpenAlex and adds as the
+  paper's preprint version), open it at the publisher to save the PDF with
+  the browser extension (it lands in this paper), upload a file, or mark
+  it as needing no (further) file. "Download all open-access copies" works
+  through a section in the background. The menu shows how many.
+- **Open-access copies by themselves** (Administration → Settings →
+  Server, off by default): papers added without a file, also by the
+  extension, AI assistants or an import, get an open copy in the
+  background, a few hundred every ten minutes.
 - **Formulas in titles**: LaTeX in paper titles (as APS writes them,
   `$\ensuremath{\nu}=1/3$`) is typeset with KaTeX, and Crossref's `<i>`,
   `<sub>`, `<sup>` show as such, wherever titles are shown.

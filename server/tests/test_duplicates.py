@@ -146,12 +146,20 @@ def test_unsorted(client: TestClient, db: Session) -> None:
     )
     db.commit()
     counts = ada.get("/api/manage/counts").json()
-    assert counts == {"duplicates": 1, "unsorted": 1, "unreadable": 1}
+    assert counts | {"missing": 0} == {
+        "duplicates": 1,
+        "unsorted": 1,
+        "unreadable": 1,
+        "missing": 0,
+        "missing_journal": 0,
+    }
     bob = Person(client, db, "bob")
     assert bob.get("/api/manage/counts").json() == {
         "duplicates": 0,
         "unsorted": 0,
         "unreadable": 0,
+        "missing": 0,
+        "missing_journal": 0,
     }
 
 

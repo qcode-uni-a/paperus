@@ -3041,7 +3041,7 @@
           "manage"
         ],
         "summary": "Manage Counts",
-        "description": "How many duplicates, unsorted papers and unreadable files the person\ncan see.",
+        "description": "How many duplicates, unsorted papers, unreadable files and papers\nmissing a file the person can see.",
         "operationId": "manage_counts",
         "responses": {
           "200": {
@@ -3050,6 +3050,240 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ManageCounts"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/manage/missing": {
+      "get": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Missing Papers",
+        "description": "Papers the person can see that miss a file, newest first: without\nany (``section=file``), or published ones with only their preprint's\n(``section=journal``); with ``hidden=true`` those marked as needing no\n(further) file, of both sections.",
+        "operationId": "missing_papers",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "file",
+                "journal"
+              ],
+              "type": "string",
+              "default": "file",
+              "title": "Section"
+            }
+          },
+          {
+            "name": "hidden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Hidden"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissingPapers"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/open-access": {
+      "post": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Download Open Access",
+        "description": "Download an open-access copy of the paper and add it: for a paper\nwithout a file, from arXiv (also its arXiv version, found by its DOI)\nor one Unpaywall knows; for the journal's version (``section=journal``)\nonly the journal's own copy. 409 with the reason if none is found.",
+        "operationId": "download_open_access",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "file",
+                "journal"
+              ],
+              "type": "string",
+              "default": "file",
+              "title": "Section"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/manage/missing/open-access": {
+      "post": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Download All Open Access",
+        "description": "Try to download open-access copies for all papers of the section\nthat the person may change, in the background (not those tried in the\nlast day).",
+        "operationId": "download_all_open_access",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "file",
+                "journal"
+              ],
+              "type": "string",
+              "default": "file",
+              "title": "Section"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Queued"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/file-wanted": {
+      "put": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Set File Wanted",
+        "description": "Mark a paper as needing no (further) file: it leaves Manage \u2192 Missing;\nor as needing one again.",
+        "operationId": "set_file_wanted",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileWanted"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -6191,6 +6425,19 @@
         "title": "FileSource",
         "description": "Where a file came from; matters for sharing rules."
       },
+      "FileWanted": {
+        "properties": {
+          "wanted": {
+            "type": "boolean",
+            "title": "Wanted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wanted"
+        ],
+        "title": "FileWanted"
+      },
       "GroupChange": {
         "properties": {
           "name": {
@@ -7497,6 +7744,16 @@
           "unreadable": {
             "type": "integer",
             "title": "Unreadable"
+          },
+          "missing": {
+            "type": "integer",
+            "title": "Missing",
+            "default": 0
+          },
+          "missing_journal": {
+            "type": "integer",
+            "title": "Missing Journal",
+            "default": 0
           }
         },
         "type": "object",
@@ -7738,6 +7995,109 @@
           "file"
         ],
         "title": "MetadataSource"
+      },
+      "MissingCounts": {
+        "properties": {
+          "file": {
+            "type": "integer",
+            "title": "File"
+          },
+          "journal": {
+            "type": "integer",
+            "title": "Journal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "journal"
+        ],
+        "title": "MissingCounts"
+      },
+      "MissingPaper": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ItemOut"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "open_access": {
+            "type": "boolean",
+            "title": "Open Access"
+          },
+          "tried_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tried At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "version_id",
+          "open_access",
+          "tried_at",
+          "error"
+        ],
+        "title": "MissingPaper"
+      },
+      "MissingPapers": {
+        "properties": {
+          "papers": {
+            "items": {
+              "$ref": "#/components/schemas/MissingPaper"
+            },
+            "type": "array",
+            "title": "Papers"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MissingCounts"
+          },
+          "hidden": {
+            "type": "integer",
+            "title": "Hidden"
+          }
+        },
+        "type": "object",
+        "required": [
+          "papers",
+          "total",
+          "counts",
+          "hidden"
+        ],
+        "title": "MissingPapers"
       },
       "MovePreview": {
         "properties": {
@@ -8522,6 +8882,19 @@
         ],
         "title": "ProviderFound"
       },
+      "Queued": {
+        "properties": {
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "papers"
+        ],
+        "title": "Queued"
+      },
       "ReadableCopy": {
         "properties": {
           "path": {
@@ -9083,6 +9456,11 @@
               }
             ],
             "title": "Contact Email"
+          },
+          "open_access_auto": {
+            "type": "boolean",
+            "title": "Open Access Auto",
+            "default": false
           },
           "max_upload_mb": {
             "anyOf": [

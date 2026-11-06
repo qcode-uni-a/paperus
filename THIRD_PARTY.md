@@ -43,4 +43,6 @@ follow [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) and
 anew for paperus.
 
 Metadata comes from doi.org, Crossref and DataCite at runtime, under their
-terms of use.
+terms of use; where a paper has open copies (and its arXiv version) from
+OpenAlex and Unpaywall, open-access PDFs from arXiv and the places those
+list.

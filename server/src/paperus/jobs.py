@@ -16,10 +16,10 @@ from datetime import UTC, datetime, timedelta
 import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
 from procrastinate.exceptions import AlreadyEnqueued
-from sqlalchemy import Engine, make_url
+from sqlalchemy import Engine, func, make_url, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import auth, integrity, ocr, readable, system, trash
+from paperus import auth, integrity, missing, ocr, readable, system, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -32,7 +32,7 @@ from paperus.embedding import (
 from paperus.importing.run import run_import
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLRejected, MLUnavailable, make_ml_client
-from paperus.models import Import, ImportStatus
+from paperus.models import Import, ImportStatus, Item
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
 from paperus.system import (
@@ -229,6 +229,79 @@ def queue_pending_files(job: JobContext, timestamp: int) -> None:
     with context.sessions() as db:
         for file_id in pending_files(db):
             queue_text_extraction(job.app, file_id)
+
+
+# Papers without a file (Manage → Missing → Try all): one download each.
+@tasks.task(name="fetch_open_access", queue="text", pass_context=True)
+def fetch_open_access(
+    job: JobContext, item_id: str, user_id: str | None, section: str = "file"
+) -> None:
+    context = _worker_context()
+    which: missing.Section = "journal" if section == "journal" else "file"
+    add = missing.add_journal_copy if which == "journal" else missing.add_open_access
+    with context.sessions() as db:
+        item = db.get(Item, uuid.UUID(item_id))
+        if item is None or not db.scalar(
+            select(func.count())
+            .select_from(Item)
+            .where(Item.id == item.id, *missing.conditions(which))
+        ):
+            return  # gone, or it has the file by now
+        file = add(
+            db,
+            context.http,
+            context.blobs,
+            item,
+            contact_email=load_config(db, context.settings).contact_email,
+            max_bytes=max_upload_bytes(db, context.settings),
+            user_id=uuid.UUID(user_id) if user_id else None,
+        )
+        file_id = file.id if file is not None else None
+    if file_id is not None:
+        queue_text_extraction(job.app, file_id)
+
+
+def queue_open_access(
+    app: App, item_id: uuid.UUID, user_id: uuid.UUID | None, section: str = "file"
+) -> None:
+    task = app.configure_task(
+        "paperus:fetch_open_access", queueing_lock=f"open-access-{item_id}"
+    )
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(
+            item_id=str(item_id),
+            user_id=str(user_id) if user_id else None,
+            section=section,
+        )
+
+
+# Administration → Settings → Server: open-access copies by themselves.
+OPEN_ACCESS_WAIT = timedelta(minutes=2)
+OPEN_ACCESS_PER_SWEEP = 200
+
+
+@tasks.periodic(cron="*/10 * * * *")
+@tasks.task(
+    name="queue_open_access_sweep",
+    queue="text",
+    queueing_lock="open-access-sweep",
+    pass_context=True,
+)
+def queue_open_access_sweep(job: JobContext, timestamp: int) -> None:
+    """Papers added without a file (by hand, the extension, AI assistants,
+    imports) get an open-access copy tried, if the setting is on; a few
+    hundred per sweep, so a large import is worked through politely."""
+    context = _worker_context()
+    with context.sessions() as db:
+        if not load_config(db, context.settings).open_access_auto:
+            return
+        waiting = missing.never_tried(
+            db,
+            added_before=datetime.now(UTC) - OPEN_ACCESS_WAIT,
+            limit=OPEN_ACCESS_PER_SWEEP,
+        )
+    for item_id, added_by in waiting:
+        queue_open_access(job.app, item_id, added_by)
 
 
 def queue_text_extraction(app: App, file_id: uuid.UUID) -> None:

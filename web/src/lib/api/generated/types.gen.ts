@@ -541,6 +541,16 @@ export type FileRole = 'main' | 'supplementary' | 'slides' | 'transcript' | 'rec
 export type FileSource = 'upload' | 'open_access' | 'browser' | 'import';
 
 /**
+ * FileWanted
+ */
+export type FileWanted = {
+    /**
+     * Wanted
+     */
+    wanted: boolean;
+};
+
+/**
  * GroupChange
  */
 export type GroupChange = {
@@ -1261,6 +1271,14 @@ export type ManageCounts = {
      * Unreadable
      */
     unreadable: number;
+    /**
+     * Missing
+     */
+    missing?: number;
+    /**
+     * Missing Journal
+     */
+    missing_journal?: number;
 };
 
 /**
@@ -1371,6 +1389,62 @@ export type MergeStep = {
  * MetadataSource
  */
 export type MetadataSource = 'lookup' | 'manual' | 'import' | 'sync' | 'file';
+
+/**
+ * MissingCounts
+ */
+export type MissingCounts = {
+    /**
+     * File
+     */
+    file: number;
+    /**
+     * Journal
+     */
+    journal: number;
+};
+
+/**
+ * MissingPaper
+ */
+export type MissingPaper = {
+    item: ItemOut;
+    /**
+     * Version Id
+     */
+    version_id: string | null;
+    /**
+     * Open Access
+     */
+    open_access: boolean;
+    /**
+     * Tried At
+     */
+    tried_at: string | null;
+    /**
+     * Error
+     */
+    error: string | null;
+};
+
+/**
+ * MissingPapers
+ */
+export type MissingPapers = {
+    /**
+     * Papers
+     */
+    papers: Array<MissingPaper>;
+    /**
+     * Total
+     */
+    total: number;
+    counts: MissingCounts;
+    /**
+     * Hidden
+     */
+    hidden: number;
+};
 
 /**
  * MovePreview
@@ -1830,6 +1904,16 @@ export type ProviderFound = {
 };
 
 /**
+ * Queued
+ */
+export type Queued = {
+    /**
+     * Papers
+     */
+    papers: number;
+};
+
+/**
  * ReadableCopy
  */
 export type ReadableCopy = {
@@ -2157,6 +2241,10 @@ export type SystemConfig = {
      * Contact Email
      */
     contact_email?: string | null;
+    /**
+     * Open Access Auto
+     */
+    open_access_auto?: boolean;
     /**
      * Max Upload Mb
      */
@@ -4532,6 +4620,143 @@ export type ManageCountsResponses = {
 };
 
 export type ManageCountsResponse = ManageCountsResponses[keyof ManageCountsResponses];
+
+export type MissingPapersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Section
+         */
+        section?: 'file' | 'journal';
+        /**
+         * Hidden
+         */
+        hidden?: boolean;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/manage/missing';
+};
+
+export type MissingPapersErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MissingPapersError = MissingPapersErrors[keyof MissingPapersErrors];
+
+export type MissingPapersResponses = {
+    /**
+     * Successful Response
+     */
+    200: MissingPapers;
+};
+
+export type MissingPapersResponse = MissingPapersResponses[keyof MissingPapersResponses];
+
+export type DownloadOpenAccessData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: {
+        /**
+         * Section
+         */
+        section?: 'file' | 'journal';
+    };
+    url: '/api/items/{item_id}/open-access';
+};
+
+export type DownloadOpenAccessErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadOpenAccessError = DownloadOpenAccessErrors[keyof DownloadOpenAccessErrors];
+
+export type DownloadOpenAccessResponses = {
+    /**
+     * Successful Response
+     */
+    200: FileOut;
+};
+
+export type DownloadOpenAccessResponse = DownloadOpenAccessResponses[keyof DownloadOpenAccessResponses];
+
+export type DownloadAllOpenAccessData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Section
+         */
+        section?: 'file' | 'journal';
+    };
+    url: '/api/manage/missing/open-access';
+};
+
+export type DownloadAllOpenAccessErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadAllOpenAccessError = DownloadAllOpenAccessErrors[keyof DownloadAllOpenAccessErrors];
+
+export type DownloadAllOpenAccessResponses = {
+    /**
+     * Successful Response
+     */
+    202: Queued;
+};
+
+export type DownloadAllOpenAccessResponse = DownloadAllOpenAccessResponses[keyof DownloadAllOpenAccessResponses];
+
+export type SetFileWantedData = {
+    body: FileWanted;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/file-wanted';
+};
+
+export type SetFileWantedErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetFileWantedError = SetFileWantedErrors[keyof SetFileWantedErrors];
+
+export type SetFileWantedResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetFileWantedResponse = SetFileWantedResponses[keyof SetFileWantedResponses];
 
 export type EmptyTrashData = {
     body?: never;

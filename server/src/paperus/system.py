@@ -50,6 +50,10 @@ class SystemConfig(BaseModel):
         None, max_length=200, pattern=r"^[^@\s]+@[^@\s]+$"
     )
     """Sent to Crossref and other metadata services, which ask for one."""
+    open_access_auto: bool = False
+    """Papers added without a file get an open-access copy by themselves, in
+    the background: their arXiv version (found via OpenAlex), else one
+    Unpaywall knows (needs the contact email). Sends their DOIs there."""
     max_upload_mb: int | None = Field(None, ge=1, le=100_000)
     """Largest file one may upload (an import's files each)."""
 

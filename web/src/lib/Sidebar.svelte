@@ -10,6 +10,7 @@
 		mdiBriefcaseOutline,
 		mdiCogOutline,
 		mdiContentDuplicate,
+		mdiFileDownloadOutline,
 		mdiFileQuestionOutline,
 		mdiFolderCogOutline,
 		mdiFolderMultipleOutline,
@@ -66,10 +67,12 @@
 		[resolve('/manage/groups'), 'Groups', mdiAccountGroupOutline],
 		[resolve('/manage/duplicates'), 'Duplicates', mdiContentDuplicate],
 		[resolve('/manage/unsorted'), 'Unsorted', mdiFileQuestionOutline],
+		[resolve('/manage/missing'), 'Missing', mdiFileDownloadOutline],
 		[resolve('/trash'), 'Trash', mdiTrashCanOutline]
 	] as const;
 
-	// How many duplicates and unsorted papers (or unreadable files) wait:
+	// How many duplicates, unsorted papers (or unreadable files) and papers
+	// without a file wait:
 	// after each change of page (one may just have resolved some) and every
 	// minute.
 	let counts = $state<ManageCounts | null>(null);
@@ -96,6 +99,23 @@
 					? count(counts.unsorted, 'paper without details', 'papers without details')
 					: '',
 				counts?.unreadable ? count(counts.unreadable, 'unreadable file', 'unreadable files') : ''
+			]
+				.filter(Boolean)
+				.join(', ')
+		},
+		[resolve('/manage/missing')]: {
+			count: (counts?.missing ?? 0) + (counts?.missing_journal ?? 0),
+			title: [
+				counts?.missing
+					? count(counts.missing, 'paper without a file', 'papers without a file')
+					: '',
+				counts?.missing_journal
+					? count(
+							counts.missing_journal,
+							'paper with only its preprint',
+							'papers with only their preprint'
+						)
+					: ''
 			]
 				.filter(Boolean)
 				.join(', ')

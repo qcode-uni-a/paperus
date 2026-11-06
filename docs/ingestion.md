@@ -36,13 +36,26 @@ Manual metadata is never replaced; only placeholders are.
 
 ## PDFs
 
-Order when an item has no PDF yet:
+Order when an item has no PDF yet (Manage → Missing; by itself in the
+background with Administration → Server → Open-access copies):
 
-1. **Server, open access only**: Unpaywall, arXiv, PubMed Central, bioRxiv,
-   publisher OA links. Re-check periodically (e.g. weekly), since open
-   versions often appear later.
+1. **Server, open access only** (done): the journal's own open copy where
+   OpenAlex lists one (published or accepted version), else the paper's
+   arXiv version (found via OpenAlex by its DOI; added as the paper's
+   preprint version, with its details from arXiv's DOI), else what
+   Unpaywall knows (with the contact email). Publishers often refuse
+   downloads by servers even of open papers (ACS answered 403 in a test);
+   then the browser gets them. Manage → Missing also lists published
+   papers with only their preprint's PDF ("Only the preprint"); open
+   access there means the journal's copy only. Later: re-check
+   periodically, since open versions often appear later.
 2. **Browser**: the extension downloads the PDF in the user's own session
-   (including the university proxy or Shibboleth) and uploads it.
+   (including the university proxy or Shibboleth) and uploads it; on the
+   publisher's page of a paper paperus has, by its DOI, into that paper
+   (its shown version, i.e. the published one). Later: the Missing page
+   asking the extension to fetch many at once (background tabs; one
+   permission prompt for publisher sites). The website itself cannot: the
+   browser does not let a page read other sites' files.
 3. **Manual**: the item stays metadata-only with status "no PDF"; a
    "Get PDF" button opens the publisher page through the university's proxy
    prefix (e.g. EZproxy, configurable) and the extension catches the download.
