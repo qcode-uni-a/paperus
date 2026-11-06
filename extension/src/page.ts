@@ -21,8 +21,27 @@ export interface PageInfo {
 	abstract: string | null;
 }
 
+/** A DOI or arXiv ID in an address: arxiv.org/abs/…, arxiv.org/pdf/…,
+ * doi.org/10.…, a publisher's /doi/pdf/10.…. */
+export function idsInUrl(url: string): { doi: string | null; arxiv: string | null } {
+	let text = url;
+	try {
+		text = decodeURIComponent(url);
+	} catch {
+		// Left as it is.
+	}
+	const arxiv = text.match(/arxiv\.org\/(?:abs|pdf|html)\/([^?#/]+?)(?:v\d+)?(?:\.pdf)?(?:[?#]|$)/);
+	const doi = text.match(
+		/(?:doi\.org|\/doi(?:\/(?:abs|full|pdf|epdf|pdfdirect|reader))?)\/(10\.\d{4,9}\/[^\s?#"'<>]+)/
+	);
+	return {
+		doi: doi?.[1].replace(/\.pdf$/i, '').replace(/[.,;)]+$/, '') ?? null,
+		arxiv: arxiv?.[1] ?? null
+	};
+}
+
 /** The paper's details from the page: Highwire/Google Scholar tags
- * (citation_*), Dublin Core, and DOIs or arXiv IDs in the address. */
+ * (citation_*) and Dublin Core (the address: see idsInUrl). */
 export function readPage(): PageInfo {
 	const meta = (...names: string[]): string | null => {
 		for (const name of names) {
@@ -41,16 +60,15 @@ export function readPage(): PageInfo {
 	const doiIn = (text: string | null): string | null =>
 		text?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
 	const url = location.href;
-	const arxivInUrl = url.match(/arxiv\.org\/(?:abs|pdf|html)\/([^?#/]+?)(?:v\d+)?(?:\.pdf)?(?:[?#]|$)/);
+	const isPdf = document.contentType === 'application/pdf';
 	const pdfLink = meta('citation_pdf_url');
 	return {
 		url,
-		isPdf: document.contentType === 'application/pdf',
-		title: meta('citation_title', 'dc.title', 'og:title') ?? (document.title || null),
-		doi:
-			doiIn(meta('citation_doi', 'dc.identifier', 'prism.doi', 'bepress_citation_doi')) ??
-			doiIn(url.includes('doi.org/') ? url : null),
-		arxiv: meta('citation_arxiv_id') ?? arxivInUrl?.[1] ?? null,
+		isPdf,
+		// A PDF's title is its file name: none, paperus reads the PDF instead.
+		title: meta('citation_title', 'dc.title', 'og:title') ?? (isPdf ? null : document.title || null),
+		doi: doiIn(meta('citation_doi', 'dc.identifier', 'prism.doi', 'bepress_citation_doi')),
+		arxiv: meta('citation_arxiv_id'),
 		pdfUrl: pdfLink ? new URL(pdfLink, url).href : null,
 		authors: metas('citation_author').length ? metas('citation_author') : metas('dc.creator'),
 		date: meta('citation_publication_date', 'citation_date', 'citation_online_date', 'dc.date'),

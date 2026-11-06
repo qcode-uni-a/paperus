@@ -4,6 +4,13 @@ One click on the paperus button saves the paper you are reading to your
 paperus library, with its PDF. On arXiv, a small button next to each paper
 does the same; a full one with a check means you have it already.
 
+- **An open PDF** is saved as it is; paperus reads its details from the
+  file (a DOI or arXiv ID in it). Firefox's PDF viewer lets no extension
+  in, so there the extension fetches the PDF itself: Firefox asks once per
+  website for that.
+- **Another owner** (a group): right-click the button, "Save to …". A plain
+  click saves to the owner chosen in the settings.
+
 - The PDF is downloaded in your browser, with your own access (campus
   network, publisher login), and sent to paperus; one paperus has already
   (same SHA-256) is not sent again.
@@ -46,4 +53,5 @@ the review. What it sends and keeps: `PRIVACY.md`.
 `src/arxiv.ts` puts the buttons on arXiv, `src/options.*` is the settings
 page. For automated tests, `PAPERUS_EXTENSION_TEST_HOST="http://localhost/*"`
 allows a paperus address up front (a robot cannot answer the permission
-prompt).
+prompt) and lets extension pages ask for a save by message (`testSave`,
+with a tab ID), as a robot cannot click the button either.

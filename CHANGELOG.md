@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Browser extension**: one click saves an open PDF too (also in
+  Firefox's PDF viewer, which asks once per website); paperus reads its
+  details from the file. A right click on the button saves to another
+  owner ("Save to Radar project"); a plain click still goes to the owner
+  chosen in the settings.
 - **Reranking** (#9): a reranker reorders the best 40 hits of a search,
   in the website and for AI assistants. On our test questions the right
   paper comes first 89 times in 100 instead of 66 (German questions too).

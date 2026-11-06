@@ -17,8 +17,9 @@ const base = {
 		default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' }
 	},
 	// activeTab: the page one clicks on, only then; scripting: to read its
-	// details and fetch its PDF there; storage: the connection.
-	permissions: ['activeTab', 'scripting', 'storage'],
+	// details and fetch its PDF there; storage: the connection; contextMenus:
+	// the button's menu (save to another owner).
+	permissions: ['activeTab', 'scripting', 'storage', 'contextMenus'],
 	host_permissions: ['https://arxiv.org/*'],
 	// The person's own paperus, asked for when connecting.
 	optional_host_permissions: ['https://*/*', 'http://*/*'],
@@ -72,6 +73,7 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	await build({
 		entryPoints: ['src/background.ts', 'src/options.ts'],
 		bundle: true,
+		define: { TEST: String(!!process.env.PAPERUS_EXTENSION_TEST_HOST) },
 		format: 'esm',
 		target: 'es2022',
 		outdir: out,

@@ -51,8 +51,9 @@ Back up from Administration → Backups (now, or daily or weekly), into
 or pull `release` again, then `docker compose up -d`.
 
 **Browser extension** (Chrome, Firefox): one click saves the paper you are
-reading, with its PDF; on arXiv, a button next to each paper. Until it is in
-the stores, load it from the release's zips: see
+reading, with its PDF, or the PDF you have open; right-click it to save to
+another owner; on arXiv, a button next to each paper. Until it is in the
+stores, load it from the release's zips: see
 [extension/README.md](extension/README.md).
 
 ## Documents
