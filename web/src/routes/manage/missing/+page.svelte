@@ -28,6 +28,85 @@
 	let hiddenCount = $state(0);
 	let showHidden = $state(false);
 	let busy = $state<string | null>(null);
+
+	// The paperus browser extension, if installed and connected here: it
+	// marks the page, and gets PDFs at the publishers with one's own access.
+	let extension = $state(false);
+	let fetching = $state<{ done: number; total: number } | null>(null);
+	$effect(() => {
+		// Set by the extension's page script, possibly after this ran.
+		const root = document.documentElement;
+		const check = () =>
+			(extension = (root.dataset.paperusExtensionFeatures ?? '').split(' ').includes('get-pdfs'));
+		check();
+		const marked = new MutationObserver(check);
+		marked.observe(root, {
+			attributes: true,
+			attributeFilter: ['data-paperus-extension-features']
+		});
+		const listen = (event: MessageEvent) => {
+			if (event.source !== window || event.origin !== location.origin) return;
+			const data = event.data;
+			if (data?.type === 'paperus:getPdfsProgress') {
+				fetching = { done: data.done, total: data.total };
+			} else if (data?.type === 'paperus:getPdfsDone') {
+				fetching = null;
+				finished(data);
+			}
+		};
+		window.addEventListener('message', listen);
+		return () => {
+			marked.disconnect();
+			window.removeEventListener('message', listen);
+		};
+	});
+
+	type Cause = 'robot-check' | 'access' | 'no-pdf' | 'error';
+	const CAUSES: Record<Cause, [string, string]> = {
+		access: ['needs access you do not have', 'need access you do not have'],
+		'robot-check': ['was stopped by a robot check', 'were stopped by a robot check'],
+		'no-pdf': ['had no PDF at the publisher', 'had no PDF at the publisher'],
+		error: ['failed otherwise', 'failed otherwise']
+	};
+
+	function finished(result: {
+		total: number;
+		saved: number;
+		failed: { item_id: string; reason: string; cause?: Cause }[];
+	}) {
+		for (const { item_id, reason } of result.failed) problems[item_id] = reason;
+		got += result.saved;
+		const counts = new Map<Cause, number>();
+		for (const { cause } of result.failed) {
+			counts.set(cause ?? 'error', (counts.get(cause ?? 'error') ?? 0) + 1);
+		}
+		const why = [...counts].map(([cause, n]) => `${n} ${CAUSES[cause][n === 1 ? 0 : 1]}`);
+		notify({
+			kind: result.saved ? 'success' : 'info',
+			title: `${result.saved} of ${result.total} ${result.total === 1 ? 'PDF' : 'PDFs'} saved`,
+			text: why.length
+				? `${why.join(', ')}. The reason is shown with each paper.`
+				: 'All saved with the browser extension.'
+		});
+		load('file');
+		load('journal');
+	}
+
+	/** Ask the extension to get these papers' PDFs at their publishers. */
+	function getWithExtension(papers: MissingPaper[], section: Section) {
+		const wanted = papers
+			.filter((p) => writable(p) && publisherLink(p))
+			.map((p) => ({
+				item_id: p.item.id,
+				version_id: section === 'journal' ? p.version_id : null,
+				title: plainTitle(p.item.title),
+				url: publisherLink(p)!
+			}));
+		if (!wanted.length) return;
+		for (const p of wanted) problems[p.item_id] = '';
+		fetching = { done: 0, total: wanted.length };
+		window.postMessage({ type: 'paperus:get-pdfs', papers: wanted }, location.origin);
+	}
 	let problems = $state<Record<string, string>>({});
 	let got = $state(0);
 
@@ -166,6 +245,14 @@
 							{busy === paper.item.id ? 'Looking…' : 'Download open access'}
 						</button>
 					{/if}
+					{#if link && extension && writable(paper)}
+						<button
+							onclick={() => getWithExtension([paper], section)}
+							disabled={fetching !== null}
+							title="The browser extension opens the paper at its publisher and saves its PDF, with your access"
+							>Get with the extension</button
+						>
+					{/if}
 					{#if link}
 						<a class="button" href={link} target="_blank" rel="noopener">At the publisher</a>
 					{/if}
@@ -223,6 +310,29 @@
 	</p>
 </header>
 
+{#if !extension}
+	<aside class="extension">
+		<strong>Get PDFs with your own access</strong>
+		<p>
+			Install the paperus browser extension (Firefox, Chrome) and connect it to this paperus. This
+			page can then fetch the PDFs from the publishers for you, through your campus network or
+			login, one paper or all at once. Until then, open a paper at the publisher and save its PDF by
+			hand.
+		</p>
+		<a
+			href="https://github.com/qcode-uni-a/paperus/tree/main/extension#readme"
+			target="_blank"
+			rel="noopener">How to install the extension</a
+		>
+	</aside>
+{/if}
+
+{#if fetching}
+	<p class="fetching" role="status">
+		Getting PDFs with the browser extension: {fetching.done} of {fetching.total}…
+	</p>
+{/if}
+
 {#if got}<p class="saved" role="status">{got} {got === 1 ? 'file' : 'files'} added.</p>{/if}
 
 {#if showHidden}
@@ -239,6 +349,12 @@
 			{#if untried('file') > 1}
 				<button onclick={() => tryAll('file')}>Download all open-access copies</button>
 			{/if}
+			{#if extension && (lists.file?.papers.length ?? 0) > 1}
+				<button
+					onclick={() => getWithExtension(lists.file?.papers ?? [], 'file')}
+					disabled={fetching !== null}>Get all with the extension</button
+				>
+			{/if}
 		</div>
 		{@render list(lists.file, 'Every paper has a file.', 'file')}
 	</section>
@@ -249,6 +365,12 @@
 			{#if lists.journal?.total}<span class="count">{lists.journal.total}</span>{/if}
 			{#if untried('journal') > 1}
 				<button onclick={() => tryAll('journal')}>Download all open-access copies</button>
+			{/if}
+			{#if extension && (lists.journal?.papers.length ?? 0) > 1}
+				<button
+					onclick={() => getWithExtension(lists.journal?.papers ?? [], 'journal')}
+					disabled={fetching !== null}>Get all with the extension</button
+				>
 			{/if}
 		</div>
 		<p class="muted">
@@ -360,6 +482,24 @@
 	}
 	.saved {
 		color: var(--success);
+	}
+	.extension {
+		display: grid;
+		gap: 6px;
+		justify-items: start;
+		max-width: 70ch;
+		margin: 0 0 20px;
+		padding: 14px 16px;
+		border-left: 4px solid var(--royal);
+		border-radius: 0 10px 10px 0;
+		background: var(--rail);
+	}
+	.extension p {
+		margin: 0;
+	}
+	.fetching {
+		color: var(--royal);
+		font-weight: 600;
 	}
 	.toggle {
 		margin: 0;

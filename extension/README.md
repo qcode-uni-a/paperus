@@ -10,6 +10,12 @@ does the same; a full one with a check means you have it already.
   website for that.
 - **Another owner** (a group): right-click the button, "Save to …". A plain
   click saves to the owner chosen in the settings.
+- **Many PDFs at once**: paperus' Manage → Missing page asks the extension
+  to get the PDFs of papers it lacks: each opened at its publisher in a
+  background tab, its PDF saved into the paper. The first time, a small
+  window asks for access to publisher sites (the browser's prompt). A
+  paper that fails says why: a check for robots (a captcha), no access (a
+  login or paywall), or no PDF on the page. The result shows in paperus.
 
 - The PDF is downloaded in your browser, with your own access (campus
   network, publisher login), and sent to paperus; one paperus has already
@@ -48,10 +54,13 @@ zips). The output is not minified: `dist/firefox` is what is handed in at
 addons.mozilla.org, `npm run source` packs the source (what git has) for
 the review. What it sends and keeps: `PRIVACY.md`.
 
-`src/background.ts` handles the button and the calls to paperus,
-`src/page.ts` runs inside the web page (details, PDF, the note),
-`src/arxiv.ts` puts the buttons on arXiv, `src/options.*` is the settings
-page. For automated tests, `PAPERUS_EXTENSION_TEST_HOST="http://localhost/*"`
+`src/background.ts` handles the button, the calls to paperus and getting
+PDFs for Manage → Missing, `src/page.ts` runs inside the web page
+(details, PDF, the note, what a page shows), `src/causes.ts` tells why a
+page gave no PDF, `src/arxiv.ts` puts the buttons on arXiv, `src/site.ts`
+runs on the connected paperus (marks the page, passes requests on),
+`src/allow.*` asks for access to publisher sites, `src/options.*` is the
+settings page. For automated tests, `PAPERUS_EXTENSION_TEST_HOST="http://localhost/*"`
 allows a paperus address up front (a robot cannot answer the permission
 prompt) and lets extension pages ask for a save by message (`testSave`,
 with a tab ID), as a robot cannot click the button either.

@@ -83,19 +83,30 @@ export function readPage(): PageInfo {
 }
 
 /** The PDF, fetched from the page with the reader's access; as base64
- * (results travel as JSON). Null if it is not a PDF (e.g. a login page). */
+ * (results travel as JSON). Otherwise why not: the answer's status and,
+ * for a web page (a login, a robot check), its beginning. */
 export async function fetchPdf(
 	url: string,
 	maxBytes: number
-): Promise<{ base64: string; size: number } | { error: string }> {
+): Promise<
+	{ base64: string; size: number } | { error: string; status?: number; html?: string }
+> {
 	try {
 		const response = await fetch(url, { credentials: 'include' });
-		if (!response.ok) return { error: `The PDF link answered ${response.status}.` };
 		const buffer = await response.arrayBuffer();
-		if (buffer.byteLength > maxBytes) return { error: 'The PDF is larger than paperus takes.' };
 		const bytes = new Uint8Array(buffer);
 		const head = String.fromCharCode(...bytes.slice(0, 5));
-		if (head !== '%PDF-') return { error: 'The PDF link gave a web page (a login?), not a PDF.' };
+		if (!response.ok || head !== '%PDF-') {
+			const html = new TextDecoder().decode(bytes.slice(0, 100_000));
+			return {
+				error: response.ok
+					? 'The PDF link gave a web page, not a PDF.'
+					: `The PDF link answered ${response.status}.`,
+				status: response.status,
+				html
+			};
+		}
+		if (buffer.byteLength > maxBytes) return { error: 'The PDF is larger than paperus takes.' };
 		let binary = '';
 		for (let i = 0; i < bytes.length; i += 0x8000) {
 			binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -104,6 +115,25 @@ export async function fetchPdf(
 	} catch (error) {
 		return { error: `The PDF could not be fetched: ${String(error)}` };
 	}
+}
+
+/** What the page shows, for telling why it gave no PDF (see causes.ts). */
+export function pageSignals(): {
+	title: string;
+	text: string;
+	captcha: boolean;
+	password: boolean;
+} {
+	return {
+		title: document.title,
+		text: (document.body?.innerText ?? '').slice(0, 20000),
+		captcha: !!document.querySelector(
+			'.g-recaptcha, .h-captcha, .cf-turnstile, #challenge-form, #challenge-running, ' +
+				'iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #px-captcha, ' +
+				'iframe[src*="captcha-delivery.com"]'
+		),
+		password: !!document.querySelector('input[type="password"]')
+	};
 }
 
 /** A small note in the page's corner: saved, or what went wrong. */

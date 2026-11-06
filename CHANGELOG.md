@@ -10,6 +10,17 @@
   the browser extension (it lands in this paper), upload a file, or mark
   it as needing no (further) file. "Download all open-access copies" works
   through a section in the background. The menu shows how many.
+- **Getting PDFs with the browser extension** (Manage → Missing): with the
+  extension installed and connected, "Get with the extension" (one paper)
+  and "Get all with the extension" (a section) open each paper at its
+  publisher in a background tab and save its PDF with your own access; a
+  notice says how many were saved and why the others were not (a robot
+  check, no access, no PDF), each paper shows its reason. The first time,
+  the extension asks once for access to publisher sites. Without the
+  extension the page says how to get it. The one-click save also says
+  when a publisher showed a robot check or a login instead of the PDF.
+- Administration → Server → Contact email says that Unpaywall answers only
+  with one.
 - **Open-access copies by themselves** (Administration → Settings →
   Server, off by default): papers added without a file, also by the
   extension, AI assistants or an import, get an open copy in the

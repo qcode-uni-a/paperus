@@ -13,6 +13,15 @@ What it sends to your paperus, and when:
   it to).
 - **On arXiv pages**: the arXiv IDs of the papers listed there, to show
   which ones are already in your library.
+- **When you ask from paperus' Missing page**: for each paper you chose,
+  the extension opens its publisher's page in a background tab (with your
+  access), downloads the PDF the page links and sends it to your paperus.
+  For that it asks you once for access to websites; it uses it only for
+  these requests and for the paperus button.
+
+On your paperus' own pages, a small script tells paperus that the
+extension is installed and passes on such requests; it reads nothing
+there.
 
 What it keeps in your browser: your paperus address, an access token that
 may only add papers and see which ones you have, the owner new papers go

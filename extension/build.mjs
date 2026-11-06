@@ -71,7 +71,7 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	const out = `dist/${name}`;
 	mkdirSync(out, { recursive: true });
 	await build({
-		entryPoints: ['src/background.ts', 'src/options.ts'],
+		entryPoints: ['src/background.ts', 'src/options.ts', 'src/allow.ts'],
 		bundle: true,
 		define: { TEST: String(!!process.env.PAPERUS_EXTENSION_TEST_HOST) },
 		format: 'esm',
@@ -81,7 +81,7 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	});
 	// Content scripts are not modules.
 	await build({
-		entryPoints: ['src/arxiv.ts'],
+		entryPoints: ['src/arxiv.ts', 'src/site.ts'],
 		bundle: true,
 		format: 'iife',
 		target: 'es2022',
@@ -89,6 +89,7 @@ for (const [name, manifest] of Object.entries(browsers)) {
 		logLevel: 'warning'
 	});
 	cpSync('src/options.html', `${out}/options.html`);
+	cpSync('src/allow.html', `${out}/allow.html`);
 	cpSync('src/options.css', `${out}/options.css`);
 	cpSync('icons', `${out}/icons`, { recursive: true });
 	writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, '\t') + '\n');

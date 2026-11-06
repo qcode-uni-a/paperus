@@ -66,7 +66,7 @@
 <SettingRow
 	id="contact-email"
 	title="Contact email"
-	description="Sent to Crossref and other services when looking up details; they ask for one, to reach whoever runs this installation."
+	description="Sent to Crossref and other services when looking up details; they ask for one, to reach whoever runs this installation. Unpaywall, which knows open-access copies of papers (Manage → Missing), answers only with one."
 >
 	<input id="contact-email" type="email" bind:value={email} placeholder="library@uni-example.de" />
 </SettingRow>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>paperus: get PDFs</title>
+		<link rel="stylesheet" href="options.css" />
+	</head>
+	<body>
+		<main>
+			<h1><img src="icons/icon-48.png" alt="" width="32" height="32" /> Get PDFs</h1>
+			<p>
+				To get the PDFs of <strong id="count">these papers</strong>, paperus opens each paper at
+				its publisher in a background tab and saves its PDF, with your access (campus network,
+				login). For that, the browser asks you once to allow the extension on publisher sites.
+			</p>
+			<p class="muted small">
+				It reads a page only when you ask from paperus' Missing page, and sends the PDFs only to
+				your paperus.
+			</p>
+			<button id="allow" class="primary">Allow and start</button>
+			<p id="message" role="status"></p>
+		</main>
+		<script src="allow.js" type="module"></script>
+	</body>
+</html>

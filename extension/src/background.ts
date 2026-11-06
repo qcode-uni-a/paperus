@@ -2,7 +2,8 @@
  * its PDF (fetched in the page, with the reader's own access); an open PDF
  * is saved as it is, paperus reads its details. The button's menu (right
  * click) saves to another owner. */
-import { fetchPdf, idsInUrl, type PageInfo, readPage, showNote } from './page';
+import { type Cause, causeOf, EXPLAINED, signalsOfHtml } from './causes';
+import { fetchPdf, idsInUrl, type PageInfo, pageSignals, readPage, showNote } from './page';
 import { type Api, call, PaperusError, saveSettings, type Settings, settings } from './paperus';
 
 declare const TEST: boolean;
@@ -10,7 +11,7 @@ declare const TEST: boolean;
 const MAX_BYTES = 512 * 1024 * 1024;
 const FIREFOX = chrome.runtime.getURL('').startsWith('moz-extension:');
 
-type Pdf = { base64: string; size: number } | { error: string };
+type Pdf = { base64: string; size: number } | { error: string; status?: number; html?: string };
 type Saved = { ok: true; text: string; link: string };
 /** A library one may add to, named for menus and messages. */
 interface Owner {
@@ -38,17 +39,40 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 	await saveTab(tab, owners?.find((o) => o.id === ownerId) ?? { id: ownerId, name: 'the owner chosen' });
 });
 
-chrome.runtime.onInstalled.addListener(() => refreshMenu());
-chrome.runtime.onStartup.addListener(() => refreshMenu());
-chrome.storage.onChanged.addListener((changes) => {
-	if ('settings' in changes) refreshMenu();
+chrome.runtime.onInstalled.addListener(() => {
+	refreshMenu();
+	void registerSite();
+});
+chrome.runtime.onStartup.addListener(() => {
+	refreshMenu();
+	void registerSite();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+	if (area === 'local' && 'settings' in changes) {
+		refreshMenu();
+		void registerSite();
+	}
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, reply) => {
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
 	const handlers: Record<string, () => Promise<unknown>> = {
 		lookup: () => lookup(message.ids),
 		saveArxiv: () => saveArxiv(message.id),
-		connect: () => connect(message.server)
+		connect: () => connect(message.server),
+		getPdfs: async () => {
+			if (sender.tab?.id !== undefined && (await fromPaperus(sender.url))) {
+				void getPdfs(message.papers, sender.tab.id);
+			}
+			return { ok: true };
+		},
+		getPdfsAllowed: async () => {
+			const { getPdfs: waiting } = (await chrome.storage.session.get('getPdfs')) as {
+				getPdfs?: { papers: Wanted[]; tabId: number };
+			};
+			await chrome.storage.session.remove('getPdfs');
+			if (waiting) void getPdfs(waiting.papers, waiting.tabId);
+			return { ok: true };
+		}
 	};
 	// Automated tests cannot click the button; they send this instead.
 	if (TEST) {
@@ -203,7 +227,7 @@ async function save(
 	const known = added.status === 200;
 	let fileNote: string;
 	if ('error' in pdf) {
-		fileNote = ` ${pdf.error}`;
+		fileNote = ` ${pdfProblem(pdf)}`;
 	} else {
 		const bytes = decode(pdf);
 		if (await holder(bytes)) {
@@ -382,4 +406,134 @@ async function connect(server: string): Promise<{ ok: boolean; text: string }> {
 		}
 	}
 	return { ok: false, text: 'No connection: the paperus page was not confirmed within 5 minutes.' };
+}
+
+/** The paperus page script (site.ts): on the connected paperus only. */
+async function registerSite(): Promise<void> {
+	await chrome.scripting.unregisterContentScripts({ ids: ['paperus-site'] }).catch(() => undefined);
+	const config = await settings();
+	if (!config) return;
+	await chrome.scripting
+		.registerContentScripts([
+			{ id: 'paperus-site', matches: [site(config.server)], js: ['site.js'], runAt: 'document_start' }
+		])
+		.catch((error) => console.warn('paperus: page script not registered', error));
+}
+
+async function fromPaperus(url: string | undefined): Promise<boolean> {
+	const config = await settings();
+	return !!config && !!url && new URL(url).origin === new URL(config.server).origin;
+}
+
+/** Papers paperus has no (journal) PDF for (Manage → Missing): each opened
+ * at its publisher in a background tab, its PDF fetched there with the
+ * person's access and saved into the paper (``version_id``: that version).
+ * Needs access to publisher sites, asked for once on an extension page.
+ * Progress and the result go back to the paperus tab. */
+interface Wanted {
+	item_id: string;
+	version_id?: string | null;
+	title: string;
+	url: string;
+}
+
+const PUBLISHERS = { origins: ['https://*/*', 'http://*/*'] };
+// One at a time: publishers take many quick downloads for a robot.
+const PAGE_WAIT_MS = 45_000;
+
+async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
+	if (!TEST && !(await chrome.permissions.contains(PUBLISHERS))) {
+		await chrome.storage.session.set({ getPdfs: { papers, tabId } });
+		await chrome.windows.create({
+			url: chrome.runtime.getURL('allow.html'),
+			type: 'popup',
+			width: 520,
+			height: 440
+		});
+		return;
+	}
+	const report = (message: object) => chrome.tabs.sendMessage(tabId, message).catch(() => undefined);
+	let saved = 0;
+	const failed: { item_id: string; reason: string; cause: Cause }[] = [];
+	for (const [index, paper] of papers.entries()) {
+		const problem = await getOne(paper);
+		if (problem) failed.push({ item_id: paper.item_id, ...problem });
+		else saved++;
+		await report({ type: 'getPdfsProgress', done: index + 1, total: papers.length, saved });
+	}
+	await report({ type: 'getPdfsDone', total: papers.length, saved, failed });
+}
+
+/** Why a PDF link gave no PDF, in words: a robot check, no access, … */
+function pdfProblem(pdf: { error: string; status?: number; html?: string }): string {
+	if (pdf.html === undefined) return pdf.error;
+	const cause = causeOf(signalsOfHtml(pdf.html, pdf.status ?? 200));
+	return cause === 'no-pdf' ? pdf.error : EXPLAINED[cause];
+}
+
+/** One paper's PDF from its publisher's page: null once saved, else why
+ * not (a robot check, no access, no PDF, or another error). */
+async function getOne(paper: Wanted): Promise<{ cause: Cause; reason: string } | null> {
+	const because = (cause: Cause, detail?: string) => ({
+		cause,
+		reason: detail && cause === 'error' ? detail : EXPLAINED[cause]
+	});
+	if (!/^https?:\/\//.test(paper.url)) return because('error', 'No address to open.');
+	const tab = await chrome.tabs.create({ url: paper.url, active: false });
+	const tabId = tab.id!;
+	try {
+		await loaded(tabId);
+		const page = await inPage(tabId, readPage);
+		const pdfUrl = page.isPdf ? page.url : page.pdfUrl;
+		if (!pdfUrl) return because(causeOf(await inPage(tabId, pageSignals)));
+		const pdf = await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES);
+		if ('error' in pdf) {
+			const cause = pdf.html === undefined ? 'no-pdf' : causeOf(signalsOfHtml(pdf.html, pdf.status ?? 200));
+			return because(cause === 'no-pdf' ? 'error' : cause, pdf.error);
+		}
+		const form = new FormData();
+		const name = filename({ url: pdfUrl, pdfUrl });
+		form.append('upload', new Blob([decode(pdf)], { type: 'application/pdf' }), name);
+		const { status } = paper.version_id
+			? await call<Api.UploadToVersionData>('/api/versions/{version_id}/files', {
+					method: 'POST',
+					path: { version_id: paper.version_id },
+					form
+				})
+			: await call<Api.UploadToItemData>('/api/items/{item_id}/files', {
+					method: 'POST',
+					path: { item_id: paper.item_id },
+					form
+				});
+		return status < 300 ? null : because('error', 'paperus no longer has this paper.');
+	} catch (error) {
+		return because('error', error instanceof Error ? error.message : String(error));
+	} finally {
+		await chrome.tabs.remove(tabId).catch(() => undefined);
+	}
+}
+
+/** Until the tab has loaded (and a moment more: pages fill in their
+ * details by script). */
+function loaded(tabId: number): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const finish = (error?: Error) => {
+			clearTimeout(timer);
+			chrome.tabs.onUpdated.removeListener(listener);
+			if (error) reject(error);
+			else setTimeout(resolve, 1500);
+		};
+		const listener = (id: number, change: { status?: string }) => {
+			if (id === tabId && change.status === 'complete') finish();
+		};
+		const timer = setTimeout(
+			() => finish(new Error('The publisher’s page did not finish loading.')),
+			PAGE_WAIT_MS
+		);
+		chrome.tabs.onUpdated.addListener(listener);
+		// It may have loaded already.
+		chrome.tabs.get(tabId).then((tab) => {
+			if (tab.status === 'complete') finish();
+		}, () => finish(new Error('The tab was closed.')));
+	});
 }
