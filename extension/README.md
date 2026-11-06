@@ -20,7 +20,7 @@ release, or build it (below).
 
 - **Chrome, Edge, Brave**: unzip; open `chrome://extensions`, switch on
   Developer mode, "Load unpacked", choose the folder.
-- **Firefox** (140 or later): open `about:debugging#/runtime/this-firefox`,
+- **Firefox** (140 or later; on Android 142): open `about:debugging#/runtime/this-firefox`,
   "Load Temporary Add-on…", choose the zip (until Firefox restarts; a signed
   version comes with the store).
 

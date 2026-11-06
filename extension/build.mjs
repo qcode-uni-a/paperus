@@ -58,7 +58,9 @@ const browsers = {
 				// details, its PDF, and the arXiv IDs on arXiv pages (to mark the
 				// papers one has).
 				data_collection_permissions: { required: ['browsingActivity', 'websiteContent'] }
-			}
+			},
+			// The same consent dialog on Android came with 142.
+			gecko_android: { strict_min_version: '142.0' }
 		}
 	}
 };
