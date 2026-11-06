@@ -19,7 +19,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, func, make_url, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import auth, integrity, missing, ocr, readable, system, trash
+from paperus import auth, integrity, missing, ocr, published, readable, system, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -273,6 +273,45 @@ def queue_open_access(
             user_id=str(user_id) if user_id else None,
             section=section,
         )
+
+
+# Preprints' published versions (Administration → Settings → Server).
+PUBLISHED_PER_HOUR = 40
+
+
+@tasks.periodic(cron="20 * * * *")
+@tasks.task(
+    name="find_published_versions",
+    queue="text",
+    queueing_lock="find-published",
+    pass_context=True,
+)
+def find_published_versions(job: JobContext, timestamp: int) -> None:
+    """A few dozen preprints an hour, each at most once a month: arXiv and
+    OpenAlex are asked for their journal versions. Found ones are added;
+    with open-access copies on, the journal's PDF is tried too."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.find_published:
+            return
+        items = published.waiting(db, PUBLISHED_PER_HOUR)
+        upgraded = published.check(
+            db, context.http, items, contact_email=config.contact_email
+        )
+        found = [(item.id, item.added_by) for item in upgraded]
+    log.info("published versions: %d of %d preprints", len(found), len(items))
+    if config.open_access_auto:
+        for item_id, added_by in found:
+            queue_open_access(job.app, item_id, added_by, "journal")
+
+
+def queue_published_check(app: App) -> None:
+    task = app.configure_task(
+        "paperus:find_published_versions", queueing_lock="find-published"
+    )
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
 
 
 # Administration → Settings → Server: open-access copies by themselves.

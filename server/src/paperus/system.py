@@ -50,6 +50,9 @@ class SystemConfig(BaseModel):
         None, max_length=200, pattern=r"^[^@\s]+@[^@\s]+$"
     )
     """Sent to Crossref and other metadata services, which ask for one."""
+    find_published: bool = True
+    """Look for the published versions of preprints (by their arXiv IDs, at
+    arXiv and OpenAlex) and add those found; a few dozen papers an hour."""
     open_access_auto: bool = False
     """Papers added without a file get an open-access copy by themselves, in
     the background: their arXiv version (found via OpenAlex), else one

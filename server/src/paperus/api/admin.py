@@ -16,6 +16,7 @@ from paperus.jobs import (
     queue_integrity_check,
     queue_ml_configuration,
     queue_ocr_sweep,
+    queue_published_check,
     queue_readable_copy,
     queue_text_sweep,
     queue_tidy,
@@ -243,7 +244,8 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
     (read files still pending), ``text-failed`` (try failed files again),
     ``text-all`` (read every file again), ``ocr`` (read scans waiting
-    for OCR), ``trash`` (delete what is older than the trash days), ``integrity``
+    for OCR), ``published`` (look for preprints' published versions),
+    ``trash`` (delete what is older than the trash days), ``integrity``
     (check stored contents), ``integrity-deep`` (also their SHA-256) or
     ``integrity-clean`` (check and remove unused stored contents), ``copy``
     (update the readable copy), ``copy-remove`` (delete it) or ``tidy``
@@ -253,6 +255,7 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
         "embeddings": queue_embedding_sweep,
         "text": queue_text_sweep,
         "ocr": queue_ocr_sweep,
+        "published": queue_published_check,
         "trash": queue_empty_trash,
         "integrity": queue_integrity_check,
         "integrity-deep": lambda app: queue_integrity_check(app, deep=True),

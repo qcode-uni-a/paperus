@@ -8,6 +8,15 @@ get them (open copies by the server, the rest with the browser
 extension), smart collections fill themselves, and AI assistants can tidy
 the library.
 
+- **Published versions of preprints**, found by themselves: every hour a
+  few dozen preprints are looked up at arXiv (the DOI the authors entered)
+  and OpenAlex; a published version found is added (only if its title
+  matches) and from then on shown and cited. On a physicist's library,
+  55 of 130 preprints got theirs. Administration → Server → Published
+  versions (on by default); Jobs → "Look for published versions" starts
+  it at once. With open-access copies on, the journal's PDF is tried too.
+- Formulas in titles from Crossref (MathML) are kept as LaTeX (`$g$`)
+  and typeset, instead of markup in the title.
 - **Tidying with AI assistants** (MCP): the Manage pages as tools.
   `library_checkup` says what needs looking at; duplicates (list, merge,
   keep apart), papers without details (list with the beginning of their

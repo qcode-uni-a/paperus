@@ -94,7 +94,9 @@
 	}
 	const rate = $derived(perMinute(history.samples, Date.now()));
 
-	async function run(job: 'text' | 'embeddings' | 'ocr' | 'text-all' | 'text-failed') {
+	async function run(
+		job: 'text' | 'embeddings' | 'ocr' | 'published' | 'text-all' | 'text-failed'
+	) {
 		if (
 			job === 'text-all' &&
 			!confirm(
@@ -197,6 +199,11 @@
 						>
 					{/if}
 					<button onclick={() => run('text')}>Read waiting files now</button>
+					<button
+						onclick={() => run('published')}
+						title="Ask arXiv and OpenAlex for the published versions of preprints (a few dozen at a time)"
+						>Look for published versions</button
+					>
 					<button onclick={() => run('text-all')}>Read all files again</button>
 				</div>
 			{:else if q.queue === 'ml' && stats}

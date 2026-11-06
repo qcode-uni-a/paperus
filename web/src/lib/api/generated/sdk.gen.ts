@@ -729,7 +729,8 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
  * Start a sweep now: ``embeddings`` (embed what is missing), ``text``
  * (read files still pending), ``text-failed`` (try failed files again),
  * ``text-all`` (read every file again), ``ocr`` (read scans waiting
- * for OCR), ``trash`` (delete what is older than the trash days), ``integrity``
+ * for OCR), ``published`` (look for preprints' published versions),
+ * ``trash`` (delete what is older than the trash days), ``integrity``
  * (check stored contents), ``integrity-deep`` (also their SHA-256) or
  * ``integrity-clean`` (check and remove unused stored contents), ``copy``
  * (update the readable copy), ``copy-remove`` (delete it) or ``tidy``

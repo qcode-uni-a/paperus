@@ -9,6 +9,7 @@
 	let email = $state('');
 	let uploadMb = $state(512);
 	let openAccess = $state(false);
+	let findPublished = $state(true);
 	let saving = $state(false);
 
 	function reset() {
@@ -16,6 +17,7 @@
 		email = config?.contact_email ?? '';
 		uploadMb = config?.max_upload_mb ?? 512;
 		openAccess = config?.open_access_auto ?? false;
+		findPublished = config?.find_published ?? true;
 	}
 	// The page reloads its data every few seconds: start over only when the
 	// saved values change (not while someone is typing).
@@ -26,7 +28,8 @@
 			config.public_url,
 			config.contact_email,
 			config.max_upload_mb,
-			config.open_access_auto
+			config.open_access_auto,
+			config.find_published
 		]);
 		if (saved === seen) return;
 		seen = saved;
@@ -38,7 +41,8 @@
 			(publicUrl !== (config.public_url ?? '') ||
 				email !== (config.contact_email ?? '') ||
 				uploadMb !== config.max_upload_mb ||
-				openAccess !== (config.open_access_auto ?? false))
+				openAccess !== (config.open_access_auto ?? false) ||
+				findPublished !== (config.find_published ?? true))
 	);
 
 	async function save() {
@@ -48,7 +52,8 @@
 				public_url: publicUrl.trim() || null,
 				contact_email: email.trim() || null,
 				max_upload_mb: uploadMb,
-				open_access_auto: openAccess
+				open_access_auto: openAccess,
+				find_published: findPublished
 			},
 			'Server settings'
 		);
@@ -69,6 +74,15 @@
 	description="Sent to Crossref and other services when looking up details; they ask for one, to reach whoever runs this installation. Unpaywall, which knows open-access copies of papers (Manage → Missing), answers only with one."
 >
 	<input id="contact-email" type="email" bind:value={email} placeholder="library@uni-example.de" />
+</SettingRow>
+<SettingRow
+	id="find-published"
+	title="Published versions"
+	description="Preprints get their published version by themselves: paperus asks arXiv (the DOI the authors entered) and OpenAlex, a few dozen papers an hour, each at most once a month, and adds a version only if its title matches. It is then the one shown and cited; its PDF comes with the open-access copies below, or under Manage → Missing."
+>
+	<label class="check"
+		><input id="find-published" type="checkbox" bind:checked={findPublished} /> Look for them</label
+	>
 </SettingRow>
 <SettingRow
 	id="open-access"

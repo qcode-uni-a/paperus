@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx2
 
-from paperus import __version__
+from paperus import __version__, mathml
 from paperus.config import Settings
 from paperus.identifiers import is_arxiv_doi
 from paperus.models import VersionKind
@@ -51,6 +51,12 @@ def fetch_csl(client: httpx2.Client, doi: str) -> dict[str, Any]:
         raise MetadataUnavailable("doi.org did not return JSON") from error
     if not isinstance(csl, dict):
         raise MetadataUnavailable("doi.org did not return a CSL-JSON object")
+    for key in ("title", "subtitle", "original-title"):
+        value = csl.get(key)
+        if isinstance(value, str):
+            csl[key] = mathml.to_tex(value)
+        elif isinstance(value, list):
+            csl[key] = [mathml.to_tex(v) if isinstance(v, str) else v for v in value]
     return csl
 
 

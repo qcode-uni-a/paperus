@@ -305,6 +305,10 @@ class Item(Record, Trashable, Base):
     )
     open_access_error: Mapped[str | None]
     """Why the last try found no open-access copy."""
+    published_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    """A preprint: when paperus last looked for its published version."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )

@@ -2242,6 +2242,10 @@ export type SystemConfig = {
      */
     contact_email?: string | null;
     /**
+     * Find Published
+     */
+    find_published?: boolean;
+    /**
      * Open Access Auto
      */
     open_access_auto?: boolean;

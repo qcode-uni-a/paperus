@@ -94,10 +94,24 @@ Details:
 - Adding an identifier that belongs to a version of an existing item finds
   that item; adding a known preprint's published DOI adds a version.
 
-### Finding published versions of preprints (later)
+### Finding published versions of preprints
 
-A nightly background job checks items whose preferred version is a preprint
-(also once on ingest). When it finds a newer version, it adds it and tries
+**Built** (`server/src/paperus/published.py`, Administration → Server →
+Published versions, on by default): every hour up to 40 preprints (with an
+arXiv ID, without a journal version), each at most once a month, are looked
+up: arXiv's API first (the DOI the authors entered, 50 papers per request,
+3 s apart), else OpenAlex (the DOI of the work it links the preprint to).
+The version is added only if its title matches (nearly the same text, or
+at least half of the longer words: papers are often renamed on
+publication). On one physicist's library (130 preprints, checked
+2026-11-07): 55 found and taken, 5 turned away (a wrong DOI on arXiv,
+OpenAlex links to other papers of the same group, strong renames). Not
+built: DataCite (its links for arXiv papers come from the same author
+entries), Crossref relations, the title search fallback. The journal PDF
+then comes with the open-access copies (if on) or Manage → Missing.
+
+The original plan: a nightly background job checks items whose preferred
+version is a preprint (also once on ingest). When it finds a newer version, it adds it and tries
 to obtain its PDF the usual way (open access on the server, otherwise
 "Get PDF" for the user's browser).
 Sources, all free, checked 2026-11-04 with arXiv 2006.10256 (NumPy paper):
