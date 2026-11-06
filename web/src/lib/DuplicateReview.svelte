@@ -109,52 +109,121 @@
 		}
 	}
 
-	const collectionNames = (item: ItemOut) =>
+	const collectionNames = (item: ItemOut): string[] =>
 		item.collection_ids
 			.map((id) => organize.collections.find((c) => c.id === id)?.name)
-			.filter(Boolean)
-			.join(', ');
+			.filter((name): name is string => Boolean(name));
 
-	/** A paper's details, each as label and text, to compare line by line. */
-	function details(item: ItemOut): [string, string][] {
+	/** What becomes of a value when merging: on the kept paper it stays; on
+	 * the other it moves over, is there already, or goes to the trash with
+	 * the paper. Plain: not known yet. */
+	type Fate = 'stays' | 'moves' | 'same' | 'goes' | 'plain';
+	type Chip = { text: string; fate: Fate; why?: string };
+	const FATE: Record<Fate, { mark: string; words: string }> = {
+		stays: { mark: '✓', words: 'stays' },
+		moves: { mark: '←', words: 'moves to the kept paper' },
+		same: { mark: '=', words: 'there already' },
+		goes: { mark: '✕', words: 'goes to the trash with the paper' },
+		plain: { mark: '', words: '' }
+	};
+
+	const identifierText = (i: { scheme: string; value: string }) =>
+		`${i.scheme.toUpperCase()} ${i.value}`;
+
+	/** A paper's details, each with its label, to compare line by line. */
+	function details(item: ItemOut): [string, string[]][] {
 		return [
-			['Authors', item.authors.map(fullName).join(', ') || '–'],
-			['Year', item.year ? String(item.year) : '–'],
-			['Published in', item.container_title ?? '–'],
-			['Type', typeName(item.type)],
-			[
-				'Identifiers',
-				item.identifiers.map((i) => `${i.scheme.toUpperCase()} ${i.value}`).join(', ') || 'none'
-			],
-			['Files', (item.files ?? []).map((f) => f.filename).join(', ') || 'none'],
-			['Tags', item.tags.map((t) => t.name).join(', ') || 'none'],
-			['Collections', collectionNames(item) || 'none'],
-			['Owner', libraryName(item.library_id)]
+			['Authors', item.authors.length ? [item.authors.map(fullName).join(', ')] : []],
+			['Year', item.year ? [String(item.year)] : []],
+			['Published in', item.container_title ? [item.container_title] : []],
+			['Type', [typeName(item.type)]],
+			['Identifiers', item.identifiers.map(identifierText)],
+			['Files', (item.files ?? []).map((f) => f.filename)],
+			['Tags', item.tags.map((t) => t.name)],
+			['Collections', collectionNames(item)],
+			['Owner', [libraryName(item.library_id)]]
 		];
 	}
+	// Rows whose things merging moves one by one: from the merge's own plan.
+	const PLANNED: Record<string, string> = {
+		Files: 'file',
+		Tags: 'tag',
+		Collections: 'collection',
+		Notes: 'note'
+	};
+	const FROM_STEP: Record<string, Fate> = { move: 'moves', already: 'same', stays: 'goes' };
+
+	function fateOf(label: string, text: string, onKept: string[]): Chip {
+		if (!steps) return { text, fate: 'plain' };
+		if (label === 'Identifiers') {
+			// It goes along with its version.
+			const id = text.replace(/^(\S+) /, (_, scheme: string) => `${scheme.toLowerCase()} `);
+			const version = steps.find((s) => s.kind === 'version' && s.name.includes(id));
+			if (version)
+				return { text, fate: FROM_STEP[version.action], why: version.reason ?? undefined };
+		}
+		if (onKept.includes(text)) return { text, fate: 'same' };
+		// Kept with its version when that moves over (the kept paper's
+		// details are the ones shown); otherwise gone with the paper.
+		if (label !== 'Owner' && steps.some((s) => s.kind === 'version' && s.action === 'move')) {
+			return {
+				text,
+				fate: 'moves',
+				why: 'kept with its version; the kept paper’s details are shown'
+			};
+		}
+		return { text, fate: 'goes', why: 'the kept paper’s details are used' };
+	}
+
 	const rows = $derived.by(() => {
 		if (!keep || !away) return [];
 		const left = details(keep);
-		const right = details(away);
-		return left.map(([label, value], i) => ({
-			label,
-			left: value,
-			right: right[i][1],
-			differs: value !== right[i][1]
-		}));
+		const right = new Map(details(away));
+		const result = left.map(([label, values]) => {
+			const theirs = right.get(label) ?? [];
+			const kind = PLANNED[label];
+			const planned = kind && steps ? steps.filter((s) => s.kind === kind) : null;
+			return {
+				label,
+				left: values.map((text): Chip => ({ text, fate: 'stays' })),
+				right: planned
+					? planned.map((s): Chip => ({
+							text: s.name,
+							fate: FROM_STEP[s.action],
+							why: s.reason ?? undefined
+						}))
+					: theirs.map((text) => fateOf(label, text, values))
+			};
+		});
+		// Notes are only known from the plan (the kept paper's are not listed).
+		const notes = (steps ?? []).filter((s) => s.kind === 'note');
+		if (notes.length) {
+			result.push({
+				label: 'Notes',
+				left: notes
+					.filter((s) => s.action === 'already')
+					.map((s): Chip => ({ text: s.name, fate: 'stays' })),
+				right: notes.map((s): Chip => ({ text: s.name, fate: FROM_STEP[s.action] }))
+			});
+		}
+		return result;
 	});
-
-	const STEP_KIND: Record<string, string> = {
-		version: 'Version',
-		file: 'File',
-		tag: 'Tag',
-		collection: 'Collection',
-		note: 'Note'
-	};
-	const moving = $derived((steps ?? []).filter((s) => s.action === 'move'));
-	const already = $derived((steps ?? []).filter((s) => s.action === 'already'));
-	const staying = $derived((steps ?? []).filter((s) => s.action === 'stays'));
 </script>
+
+{#snippet chips(list: Chip[])}
+	{#if list.length === 0}<span class="muted">none</span>{/if}
+	{#each list as chip, i (i)}
+		{@const fate = FATE[chip.fate]}
+		<span
+			class="chip {chip.fate}"
+			title={[fate.words, chip.why].filter(Boolean).join(': ') || undefined}
+			>{#if fate.mark}<b aria-hidden="true">{fate.mark}</b>
+			{/if}{chip.text}{#if fate.words}<span class="visually-hidden"
+					>({fate.words}{chip.why ? `: ${chip.why}` : ''})</span
+				>{/if}</span
+		>
+	{/each}
+{/snippet}
 
 {#snippet paper(item: ItemOut, role: string, kept: boolean)}
 	{@const pdf = (item.files ?? []).find((f) => f.media_type === 'application/pdf')}
@@ -205,56 +274,40 @@
 			{@render paper(away, 'Merged into it, then to the trash', false)}
 		</div>
 
+		{#if !pair.can_merge}
+			<p class="warn">Cannot merge: {pair.why.join(', ')}.</p>
+		{:else}
+			<p class="legend">
+				{#each ['stays', 'moves', 'same', 'goes'] as const as fate (fate)}
+					<span class="chip {fate}"
+						><b aria-hidden="true">{FATE[fate].mark}</b> {FATE[fate].words}</span
+					>
+				{/each}
+				{#if steps === null}<span class="muted">Working it out…</span>{/if}
+			</p>
+		{/if}
+
 		<table class="compare">
+			<thead>
+				<tr>
+					<th scope="col">Kept</th>
+					<th></th>
+					<th scope="col">Merged into it, then to the trash (can be restored)</th>
+				</tr>
+			</thead>
 			<tbody>
 				{#each rows as row (row.label)}
-					<tr class:differs={row.differs}>
-						<td>{row.left}</td>
+					<tr>
+						<td>{@render chips(row.left)}</td>
 						<th scope="row">{row.label}</th>
-						<td>{row.right}</td>
+						<td>{@render chips(row.right)}</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
-
-		<section class="plan">
-			<h3>What merging does</h3>
-			{#if !pair.can_merge}
-				<p class="warn">Cannot merge: {pair.why.join(', ')}.</p>
-			{:else if steps === null}
-				<p class="muted">Working it out…</p>
-			{:else}
-				{#if !swapped && pair.why.length}<p class="muted">
-						Suggested to keep the left one because it {pair.why.join(', ')}.
-					</p>{/if}
-				<ul>
-					{#each moving as step (step.kind + step.name)}
-						<li class="move">
-							<b>{STEP_KIND[step.kind]}</b>
-							{step.name} <span class="muted">moves to the kept paper</span>
-						</li>
-					{/each}
-					{#each already as step (step.kind + step.name)}
-						<li class="already">
-							<b>{STEP_KIND[step.kind]}</b>
-							{step.name}
-							<span class="muted">is there already{step.reason ? ` (${step.reason})` : ''}</span>
-						</li>
-					{/each}
-					{#each staying as step (step.kind + step.name)}
-						<li class="stays">
-							<b>{STEP_KIND[step.kind]}</b>
-							{step.name}
-							<span class="muted">stays behind{step.reason ? `: ${step.reason}` : ''}</span>
-						</li>
-					{/each}
-					<li class="trash">
-						<b>Paper</b> “{away.title}”
-						<span class="muted">goes to the trash (can be restored)</span>
-					</li>
-				</ul>
-			{/if}
-		</section>
+		{#if pair.can_merge && !swapped && pair.why.length}<p class="muted why">
+				Suggested to keep the left one because it {pair.why.join(', ')}.
+			</p>{/if}
 
 		<footer>
 			<div class="keys muted">
@@ -300,10 +353,6 @@
 	h2 {
 		margin: 0 0 6px;
 		font-size: var(--step-2);
-	}
-	h3 {
-		margin: 0 0 6px;
-		font-size: var(--step-0);
 	}
 	.reasons {
 		display: flex;
@@ -396,36 +445,72 @@
 		text-align: center;
 		white-space: nowrap;
 	}
-	.compare tr.differs td {
-		background: color-mix(in srgb, var(--highlighter) 22%, transparent);
-	}
-	.plan ul {
-		display: grid;
-		gap: 3px;
-		margin: 0;
-		padding: 0;
-		list-style: none;
+	.compare thead th {
+		border-top: none;
 		font-size: var(--step--1);
+		font-weight: 650;
+		color: var(--muted);
+		white-space: normal;
 	}
-	.plan li::before {
+	.compare thead th:first-child {
+		text-align: right;
+	}
+	.compare thead th:last-child {
+		text-align: left;
+	}
+	.compare td {
+		line-height: 1.9;
+	}
+	/* Each value with what becomes of it: the border's colour and a mark. */
+	.chip {
 		display: inline-block;
-		width: 1.4em;
-		font-weight: 700;
+		margin: 1px 2px;
+		padding: 0 8px;
+		border: 1.5px solid var(--rule);
+		border-radius: 999px;
+		line-height: 1.6;
+		overflow-wrap: anywhere;
 	}
-	.plan .move::before {
-		content: '→';
+	.chip b {
+		margin-right: 2px;
+	}
+	.chip.stays,
+	.chip.moves {
+		border-color: var(--success);
+	}
+	.chip.stays b,
+	.chip.moves b {
 		color: var(--success);
 	}
-	.plan .already::before {
-		content: '=';
+	.chip.same {
+		border-style: dashed;
 		color: var(--muted);
 	}
-	.plan .stays::before {
-		content: '×';
+	.chip.goes {
+		border-color: var(--danger);
+	}
+	.chip.goes b {
 		color: var(--danger);
 	}
-	.plan .trash::before {
-		content: '🗑';
+	.legend {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+		margin: 14px 0 0;
+		font-size: var(--step--1);
+	}
+	.why {
+		margin: 0;
+		font-size: var(--step--1);
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 	.warn {
 		color: var(--danger);

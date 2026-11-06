@@ -5,6 +5,11 @@
 - **Menu**: Duplicates and Unsorted show how many wait there (unsorted
   papers and unreadable files together; the details on hover), updated
   when changing pages and every minute.
+- **Duplicate review**: the comparison table shows what merging does with
+  each value instead of a list below it: green on the kept paper (stays)
+  and for what moves over from the other one (all its files, tags,
+  collections, notes, and its version with its details), grey for what is
+  there already, red for what goes to the trash with the paper.
 - **Browser extension in the stores**: listed on addons.mozilla.org
   (Firefox 140 or later, and Firefox for Android 142 or later); handed in
   at the Chrome Web Store. Firefox asks at install whether it may send the
