@@ -236,6 +236,16 @@ Variables):
   new version with its source (`extension/amo-metadata.json`: the notes for
   the reviewers); it is listed once Mozilla approves it.
 
+- Chrome extension (Chrome Web Store, handed in by hand for 0.0.10): in
+  Google Cloud, a project with the "Chrome Web Store API" enabled and a
+  service account (no roles) with a JSON key; the service account's email
+  added in the store's Developer Dashboard under Account. Then the key as
+  the secret `CHROME_SERVICE_ACCOUNT_KEY` (environment `chrome`), the
+  variables `CHROME_PUBLISHER_ID` (Dashboard → Account) and
+  `CHROME_ITEM_ID` (the extension's ID, in the item's address), and
+  `PUBLISH_CHROME` = `true`. Each release uploads the new version and hands
+  it in for review.
+
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.
 

@@ -1,10 +1,10 @@
 name: Release
 
 # For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
-# packages (PyPI), the TypeScript client (npm) and the Firefox add-on, then
-# the GitHub release. PyPI, npm and Firefox only run once switched on with
-# the repository variables PUBLISH_PYPI, PUBLISH_NPM and PUBLISH_FIREFOX (see
-# docs/operations.md, "Releases").
+# packages (PyPI), the TypeScript client (npm) and the browser extension
+# (Firefox, Chrome), then the GitHub release. Each of these only runs once
+# switched on with its repository variable (PUBLISH_PYPI, PUBLISH_NPM,
+# PUBLISH_FIREFOX, PUBLISH_CHROME; see docs/operations.md, "Releases").
 on:
   push:
     tags: ["v*"]
@@ -158,6 +158,58 @@ jobs:
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+
+  chrome:
+    name: Chrome extension (Chrome Web Store)
+    needs: [ci, versions]
+    if: vars.PUBLISH_CHROME == 'true'
+    runs-on: ubuntu-latest
+    environment: chrome
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci && npm run build
+      - id: google
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+      # Upload, wait until the store has processed it, then hand it in for
+      # review; it is published once approved (not waited for here).
+      - run: |
+          set -euo pipefail
+          api=https://chromewebstore.googleapis.com
+          item="publishers/$PUBLISHER/items/$ITEM"
+          auth="Authorization: Bearer $TOKEN"
+          curl --fail-with-body -sS -H "$auth" -X POST \
+            -T "dist/paperus-chrome-${GITHUB_REF_NAME#v}.zip" \
+            "$api/upload/v2/$item:upload" | tee upload.json
+          state=$(jq -r .uploadState upload.json)
+          for _ in $(seq 60); do
+            case "$state" in
+              SUCCEEDED) break ;;
+              *IN_PROGRESS) sleep 10
+                state=$(curl --fail-with-body -sS -H "$auth" "$api/v2/$item:fetchStatus" |
+                  jq -r .lastAsyncUploadState) ;;
+              *) echo "Upload failed: $state"; exit 1 ;;
+            esac
+          done
+          test "$state" = SUCCEEDED
+          curl --fail-with-body -sS -H "$auth" -H "Content-Type: application/json" \
+            -X POST -d '{}' "$api/v2/$item:publish"
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+          PUBLISHER: ${{ vars.CHROME_PUBLISHER_ID }}
+          ITEM: ${{ vars.CHROME_ITEM_ID }}
 
   release:
     name: GitHub release
