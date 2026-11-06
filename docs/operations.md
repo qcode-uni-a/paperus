@@ -349,6 +349,28 @@ see issue #37).
   updates come at once. Merge when CI is green; a major update may need
   changes (read its notes).
 
+## Outside services
+
+What the server sends where (for the data protection description and for
+firewalls). Each request names paperus and the contact email from
+Administration → Server (`User-Agent: paperus/<version> (mailto:…)`), as
+these services ask; nothing about people or their notes is sent.
+
+| Service | What it gets | When | Off with |
+| --- | --- | --- | --- |
+| doi.org (Crossref, DataCite) | A DOI | Adding a paper by DOI, a DOI found in a file, published versions found | (needed for details) |
+| arXiv: `export.arxiv.org` | arXiv IDs, 50 at a time | Looking for preprints' published versions (hourly, each paper monthly) | Server → Published versions |
+| arXiv: `arxiv.org/pdf` | An arXiv ID | Downloading an open copy (Missing, Download again, open-access copies) | (on request) / Server → Open-access copies |
+| OpenAlex: `api.openalex.org` | A DOI or arXiv ID | Published versions; a paper's arXiv version and the journal's open copy | Server → Published versions / Open-access copies |
+| Unpaywall: `api.unpaywall.org` | A DOI | Open copies, only with a contact email | No contact email |
+| Publishers, repositories | A PDF address OpenAlex or Unpaywall gave | Downloading an open copy | as above |
+| Hugging Face | A model name | The ML service's first use of a model | Model cache filled once |
+| The OIDC provider | The login | OIDC login | Server → OIDC |
+
+The browser extension talks only to the person's paperus and, on their
+click, to the page they are on or (Manage → Missing) the publishers' pages
+of the papers they chose (see `extension/PRIVACY.md`).
+
 ## Data protection and licences
 
 - Involve the data protection officer early: accounts, notes, usage logs are
@@ -360,7 +382,10 @@ see issue #37).
 - The pilot assumes sharing licensed PDFs within a group is allowed. When an
   admin adds users to a group, warn that the group's licences must permit
   this.
-- Never fetch from publishers automatically (campus IP range, licences).
+- The server never fetches from publishers behind a login (campus IP
+  range, licences): only open copies, on request or by itself with
+  Server → Open-access copies on. Copies behind a login come through the
+  person's own browser (the extension), only on their click.
 - Meeting notes: participants-only by default, retention setting.
 
 ## Self-hosting principles
