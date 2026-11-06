@@ -129,26 +129,25 @@ host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
 generation on) and the NVIDIA Container Toolkit, set up for Docker:
 
 ```sh
-# Docker 28 and newer find GPUs through CDI: describe them once (again
-# after a driver update).
-nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
-# Older Docker: register the NVIDIA runtime instead.
-nvidia-ctk runtime configure --runtime=docker && systemctl restart docker
+# Describe the GPUs for Docker (CDI), once and again after a driver update.
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+nvidia-ctk cdi list    # nvidia.com/gpu=all, nvidia.com/gpu=0, …
 ```
 
-In `compose.yaml`:
+In `compose.yaml`, the GPU by its CDI name (Docker 28 and newer):
 
 ```yaml
   ml:
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}-cuda
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    devices:
+      - nvidia.com/gpu=all
 ```
+
+The older form, `deploy.resources.reservations.devices` with
+`driver: nvidia` (or `docker run --gpus all`), needs the NVIDIA runtime
+registered in Docker (`sudo nvidia-ctk runtime configure --runtime=docker`
+and a restart of Docker); with only CDI it fails with "could not select
+device driver".
 
 Administration → Settings → Machine learning then says "GPU"; without a
 reachable card the image runs on the CPU and logs why
