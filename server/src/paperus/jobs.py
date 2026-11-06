@@ -19,7 +19,7 @@ from procrastinate.exceptions import AlreadyEnqueued
 from sqlalchemy import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import auth, integrity, readable, system, trash
+from paperus import auth, integrity, ocr, readable, system, trash
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -71,8 +71,63 @@ def _worker_context() -> WorkerContext:
 def extract_text(job: JobContext, file_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
-        process_file(db, context.blobs, uuid.UUID(file_id), context.http)
+        config = load_config(db, context.settings)
+        scans = process_file(
+            db, context.blobs, uuid.UUID(file_id), context.http, ocr=config.ocr
+        )
     queue_embedding(job.app, uuid.UUID(file_id))
+    if scans:
+        queue_ocr(job.app, uuid.UUID(file_id))
+
+
+# Scanned pages, one file at a time (a few seconds per page on a CPU), in a
+# queue of their own so they do not hold up embedding. Retried like
+# embedding while the ML service is down; the sweep catches the rest.
+@tasks.task(
+    name="ocr_file",
+    queue="ocr",
+    retry=RetryStrategy(
+        max_attempts=10, exponential_wait=2, retry_exceptions={MLUnavailable}
+    ),
+    pass_context=True,
+)
+def ocr_file(job: JobContext, file_id: str) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.ocr:
+            return
+        again = ocr.read_scans(
+            db, context.blobs, context.ml, config.ocr_model, uuid.UUID(file_id)
+        )
+    for other in again:
+        queue_text_extraction(job.app, other)
+
+
+@tasks.periodic(cron="*/10 * * * *")
+@tasks.task(
+    name="queue_pending_ocr", queue="ocr", queueing_lock="ocr-sweep", pass_context=True
+)
+def queue_pending_ocr(job: JobContext, timestamp: int) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        if not load_config(db, context.settings).ocr:
+            return
+        for file_id in ocr.waiting(db):
+            queue_ocr(job.app, file_id)
+
+
+def queue_ocr(app: App, file_id: uuid.UUID) -> None:
+    task = app.configure_task("paperus:ocr_file", queueing_lock=f"ocr-{file_id}")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(file_id=str(file_id))
+
+
+def queue_ocr_sweep(app: App) -> None:
+    """Look for scans waiting for OCR now (e.g. after switching it on)."""
+    task = app.configure_task("paperus:queue_pending_ocr", queueing_lock="ocr-sweep")
+    with contextlib.suppress(AlreadyEnqueued):
+        task.defer(timestamp=0)
 
 
 # The ML service may be down or busy (model download): retry for about half
@@ -225,6 +280,7 @@ def job_limits(config: SystemConfig) -> dict[str, int]:
     return {
         "text": config.jobs_text,
         "ml": config.jobs_ml,
+        "ocr": 1,
         "import": config.jobs_import,
         "backup": 1,
     }

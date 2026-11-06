@@ -52,6 +52,35 @@
 		else message = 'Reranking saved.';
 		await loadAdmin();
 	}
+	// OCR: chosen here, saved with the button.
+	const ocrModels = $derived(admin.ml?.models.filter((m) => m.task === 'ocr') ?? []);
+	// The saved settings until changed here.
+	let ocrChoice = $state<boolean | null>(null);
+	let ocrModelChoice = $state<string | null>(null);
+	const ocr = $derived(ocrChoice ?? config?.ocr ?? true);
+	const ocrModel = $derived(ocrModelChoice ?? config?.ocr_model ?? 'pp-ocrv6-small');
+	/** Seconds per page, from a measured speed (pages per second). */
+	function perPage(name: string): string | null {
+		const speed = speeds[name]?.passages_per_second;
+		if (!speed) return null;
+		const seconds = 1 / speed;
+		return seconds < 1 ? `${Math.round(seconds * 1000)} ms` : `${seconds.toFixed(1)} s`;
+	}
+
+	async function saveOcr() {
+		if (!config) return;
+		error = message = '';
+		saving = true;
+		const { error: failure } = await setConfig({
+			body: { ...config, ocr, ocr_model: ocrModel }
+		});
+		saving = false;
+		if (failure) error = errorMessage(failure);
+		else message = 'OCR saved.';
+		await loadAdmin();
+		ocrChoice = ocrModelChoice = null;
+	}
+
 	/** The score columns, from what the service says they mean. */
 	const benchmarks = $derived(
 		Object.entries(models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {})
@@ -310,6 +339,57 @@
 </section>
 
 <section class="part">
+	<h3>Reading scans (OCR)</h3>
+	<p class="muted">
+		Pages without text, such as scanned PDFs, scanned pages inside a PDF and images (photos of
+		notes, scans), are read in the background, so they can be searched and AI assistants can read
+		them. Text the PDF has is used as it is. Handwriting is read poorly.
+	</p>
+	<label class="check"
+		><input type="checkbox" bind:checked={() => ocr, (on) => (ocrChoice = on)} /> Read scanned pages and
+		images</label
+	>
+	{#if ocrModels.length}
+		<label class="model"
+			>OCR model
+			<select bind:value={() => ocrModel, (name) => (ocrModelChoice = name)}>
+				{#each ocrModels as model (model.name)}
+					<option value={model.name}>{model.name}</option>
+				{/each}
+			</select>
+		</label>
+		{@const chosen = ocrModels.find((m) => m.name === ocrModel)}
+		{#if chosen}
+			<p class="muted">
+				{chosen.description}
+				{chosen.licence ? `${chosen.licence}.` : ''}
+				{chosen.cached_bytes != null
+					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
+					: chosen.download_mb
+						? `${chosen.download_mb} MB to download.`
+						: ''}
+				{#if perPage(chosen.name)}
+					About {perPage(chosen.name)} per page on this server.
+				{/if}
+			</p>
+			<div class="buttons">
+				<button onclick={() => measure(chosen)} disabled={measuring !== null}>
+					{measuring === chosen.name ? 'Measuring…' : 'Measure speed'}
+				</button>
+				<button
+					class="primary"
+					onclick={saveOcr}
+					disabled={saving || !config || (ocr === config.ocr && ocrModel === config.ocr_model)}
+					>Save</button
+				>
+			</div>
+		{/if}
+	{:else}
+		<p class="muted">The ML service is not reachable or offers no OCR model.</p>
+	{/if}
+</section>
+
+<section class="part">
 	<h3>CPU cores</h3>
 	<p class="muted">
 		How many cores the ML service uses for each model. Fewer keep the database and the website quick
@@ -403,6 +483,15 @@
 		align-items: center;
 		gap: 10px;
 		font-weight: 600;
+	}
+	.check {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.check input {
+		width: auto;
+		margin: 0;
 	}
 	.visually-hidden {
 		position: absolute;

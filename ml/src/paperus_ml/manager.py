@@ -13,11 +13,12 @@ from paperus_ml.config import Settings
 from paperus_ml.device import Device, choose
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
+from paperus_ml.ocr import Reader
 from paperus_ml.rerank import Reranker
 
 log = logging.getLogger(__name__)
 
-Model = Encoder | Reranker
+Model = Encoder | Reranker | Reader
 Loader = Callable[[ModelSpec], Model]
 
 
@@ -83,8 +84,15 @@ class ModelManager:
             local_dir=model_dir,
             allow_patterns=[f"{spec.onnx_file_for(self.device)}*", spec.tokenizer_file],
         )
-        kind = Reranker if spec.task == "rerank" else Encoder
-        encoder = kind(
+        if spec.detector is not None:
+            snapshot_download(
+                spec.detector.repo,
+                revision=spec.detector.revision,
+                local_dir=model_dir / spec.detector.folder,
+                allow_patterns=[f"{spec.detector.onnx_file}*"],
+            )
+        kinds = {"embedding": Encoder, "rerank": Reranker, "ocr": Reader}
+        encoder = kinds[spec.task](
             spec,
             model_dir,
             intra_op_threads=self.threads,

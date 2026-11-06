@@ -513,6 +513,7 @@ export type FileOut = {
      * Text Error
      */
     text_error?: string | null;
+    ocr_status?: OcrStatus | null;
     /**
      * Created At
      */
@@ -1603,6 +1604,14 @@ export type NoteOut = {
 };
 
 /**
+ * OcrStatus
+ *
+ * Pages without text (scans) are read by OCR in the ML service;
+ * ``None``: the file has none.
+ */
+export type OcrStatus = 'pending' | 'done' | 'skipped' | 'failed';
+
+/**
  * Owner
  */
 export type Owner = {
@@ -2023,6 +2032,10 @@ export type Stats = {
      */
     files_failed: number;
     /**
+     * Files Ocr
+     */
+    files_ocr?: number;
+    /**
      * Chunks
      */
     chunks: number;
@@ -2083,6 +2096,14 @@ export type SystemConfig = {
      * Rerank Model
      */
     rerank_model?: string;
+    /**
+     * Ocr
+     */
+    ocr?: boolean;
+    /**
+     * Ocr Model
+     */
+    ocr_model?: string;
     /**
      * Public Url
      */

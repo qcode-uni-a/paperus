@@ -126,6 +126,8 @@ class FakeML:
         self.device = "cpu"
         self.rerank_down = False
         self.reranked: list[dict[str, Any]] = []
+        self.read: list[bytes] = []
+        """Images sent to OCR."""
         """Another model file (e.g. "fp16" on a GPU): other vectors."""
 
     def vectors(self, model: str) -> str:
@@ -145,6 +147,9 @@ class FakeML:
     RERANKERS: ClassVar[list[str]] = ["bge-reranker-v2-m3"]
     FAVOURITE = "drizzle"
     """The fake reranker puts passages with this word first."""
+    OCR_MODELS: ClassVar[list[str]] = ["pp-ocrv6-small"]
+    SCANNED = "Scanned typewriter page on drizzle measured at the old station"
+    """What the fake OCR reads on any image, with its number."""
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         if self.down:
@@ -167,6 +172,25 @@ class FakeML:
             self.reranked.append(body)
             scores = [float(self.FAVOURITE in p.lower()) for p in body["passages"]]
             return httpx2.Response(200, json={"model": body["model"], "scores": scores})
+        if request.url.path.startswith("/ocr/"):
+            model = request.url.path.split("/")[2]
+            if model not in self.OCR_MODELS:
+                return httpx2.Response(422, json={"detail": "not an OCR model"})
+            if not request.content.startswith((b"\x89PNG", b"\xff\xd8")):
+                return httpx2.Response(422, json={"detail": "not an image"})
+            self.read.append(request.content)
+            text = f"{self.SCANNED} {len(self.read)}"
+            line = {"text": text, "score": 0.98, "box": [10, 10, 900, 40]}
+            return httpx2.Response(
+                200,
+                json={
+                    "model": model,
+                    "text": text,
+                    "lines": [line],
+                    "width": 1700,
+                    "height": 2200,
+                },
+            )
         if request.url.path.endswith("/speed"):
             name = request.url.path.split("/")[2]
             if name not in self.MODELS:
@@ -182,29 +206,44 @@ class FakeML:
                 },
             )
         if request.url.path == "/models":
-            models = [
-                {
-                    "name": name,
-                    "task": "embedding",
-                    "dimensions": self.DIMENSIONS,
-                    "vectors": self.vectors(name),
-                    "max_tokens": 512,
-                    "loaded": False,
-                    "cached_bytes": None,
-                }
-                for name in self.MODELS
-            ] + [
-                {
-                    "name": name,
-                    "task": "rerank",
-                    "dimensions": 1,
-                    "vectors": name,
-                    "max_tokens": 512,
-                    "loaded": False,
-                    "cached_bytes": None,
-                }
-                for name in self.RERANKERS
-            ]
+            models = (
+                [
+                    {
+                        "name": name,
+                        "task": "embedding",
+                        "dimensions": self.DIMENSIONS,
+                        "vectors": self.vectors(name),
+                        "max_tokens": 512,
+                        "loaded": False,
+                        "cached_bytes": None,
+                    }
+                    for name in self.MODELS
+                ]
+                + [
+                    {
+                        "name": name,
+                        "task": "rerank",
+                        "dimensions": 1,
+                        "vectors": name,
+                        "max_tokens": 512,
+                        "loaded": False,
+                        "cached_bytes": None,
+                    }
+                    for name in self.RERANKERS
+                ]
+                + [
+                    {
+                        "name": name,
+                        "task": "ocr",
+                        "dimensions": 0,
+                        "vectors": name,
+                        "max_tokens": 0,
+                        "loaded": False,
+                        "cached_bytes": None,
+                    }
+                    for name in self.OCR_MODELS
+                ]
+            )
             return httpx2.Response(200, json=models)
         if request.method == "DELETE":
             self.deleted.append(request.url.path.rsplit("/", 1)[1])

@@ -3289,7 +3289,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again), ``ocr`` (read scans waiting\nfor OCR), ``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -6084,6 +6084,16 @@
             ],
             "title": "Text Error"
           },
+          "ocr_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OcrStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -8100,6 +8110,17 @@
         ],
         "title": "NoteOut"
       },
+      "OcrStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "done",
+          "skipped",
+          "failed"
+        ],
+        "title": "OcrStatus",
+        "description": "Pages without text (scans) are read by OCR in the ML service;\n``None``: the file has none."
+      },
       "Owner": {
         "properties": {
           "library_id": {
@@ -8780,6 +8801,11 @@
             "type": "integer",
             "title": "Files Failed"
           },
+          "files_ocr": {
+            "type": "integer",
+            "title": "Files Ocr",
+            "default": 0
+          },
           "chunks": {
             "type": "integer",
             "title": "Chunks"
@@ -8890,6 +8916,16 @@
             "type": "string",
             "title": "Rerank Model",
             "default": "bge-reranker-v2-m3"
+          },
+          "ocr": {
+            "type": "boolean",
+            "title": "Ocr",
+            "default": true
+          },
+          "ocr_model": {
+            "type": "string",
+            "title": "Ocr Model",
+            "default": "pp-ocrv6-small"
           },
           "public_url": {
             "anyOf": [

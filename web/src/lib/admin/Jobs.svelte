@@ -24,6 +24,12 @@
 			color: 'var(--success)'
 		},
 		{
+			queue: 'ocr',
+			title: 'Reading scans',
+			description: 'Text of scanned pages and images (OCR), from the ML service.',
+			color: 'var(--tag-teal-ink)'
+		},
+		{
 			queue: 'import',
 			title: 'Imports',
 			description: 'Libraries from Zotero and others.',
@@ -88,7 +94,7 @@
 	}
 	const rate = $derived(perMinute(history.samples, Date.now()));
 
-	async function run(job: 'text' | 'embeddings' | 'text-all' | 'text-failed') {
+	async function run(job: 'text' | 'embeddings' | 'ocr' | 'text-all' | 'text-failed') {
 		if (
 			job === 'text-all' &&
 			!confirm(
@@ -202,6 +208,17 @@
 				<div class="buttons">
 					<button onclick={() => run('embeddings')}>Look for missing vectors now</button>
 				</div>
+			{:else if q.queue === 'ocr' && stats}
+				<p class="muted small">
+					{stats.files_ocr
+						? `${stats.files_ocr.toLocaleString()} ${stats.files_ocr === 1 ? 'file waits' : 'files wait'} for its scanned pages to be read.`
+						: 'No scanned pages waiting.'}
+				</p>
+				{#if stats.files_ocr}
+					<div class="buttons">
+						<button onclick={() => run('ocr')}>Read scans now</button>
+					</div>
+				{/if}
 			{/if}
 		</section>
 	{/each}

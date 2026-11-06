@@ -200,10 +200,30 @@
 	const TEXT_STATUS: Record<string, string> = {
 		pending: 'Reading text…',
 		done: 'Searchable',
-		no_text: 'No text (scan?)',
+		no_text: 'No text',
 		unsupported: 'Not searchable',
 		failed: 'Text extraction failed'
 	};
+
+	/** Searchable or not, and what happens with scanned pages (OCR). */
+	function readingStatus(file: { text_status: string; ocr_status?: string | null }): string {
+		const text = TEXT_STATUS[file.text_status];
+		const allScanned = file.text_status === 'no_text';
+		switch (file.ocr_status) {
+			case 'pending':
+				return allScanned ? 'Scan: reading its text…' : `${text}; reading the scanned pages…`;
+			case 'done':
+				return allScanned ? text : `${text} (scanned pages read by OCR)`;
+			case 'skipped':
+				return allScanned
+					? 'Scan, not read (OCR is off)'
+					: `${text}; scanned pages not read (OCR is off)`;
+			case 'failed':
+				return `${text}; reading the scanned pages failed`;
+			default:
+				return text;
+		}
+	}
 </script>
 
 {#if notFound}
@@ -359,7 +379,7 @@
 									>{file.filename}</a
 								>
 								<span class="badge">{file.role}</span>
-								<span class="muted">{size(file.size)} · {TEXT_STATUS[file.text_status]}</span>
+								<span class="muted">{size(file.size)} · {readingStatus(file)}</span>
 								{#if file.text_status === 'failed' && !file.deleted_at}
 									<span class="problem" title={file.text_error ?? ''}
 										>{readingProblem(file.text_error)}</span

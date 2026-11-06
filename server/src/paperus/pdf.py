@@ -11,7 +11,9 @@ import contextlib
 import logging
 import os
 import resource
+import struct
 import threading
+import zlib
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
@@ -29,6 +31,10 @@ MEMORY_BYTES = 3 * 1024**3
 SECONDS = 300
 # A helper is replaced after this many PDFs, so leaks cannot add up.
 TASKS_PER_HELPER = 50
+# Pages for OCR: at this resolution, and at most this many pixels on the
+# longer side (posters).
+OCR_DPI = 200
+OCR_MAX_SIDE = 4000
 
 
 class PdfError(Exception):
@@ -70,9 +76,9 @@ def _reset(pool: ProcessPoolExecutor) -> None:
     pool.shutdown(wait=False, cancel_futures=True)
 
 
-def _run[T](function: Callable[[str], T], path: Path) -> T:
+def _run[T](function: Callable[..., T], path: Path, *args: object) -> T:
     pool = _get_pool()
-    future = pool.submit(function, str(path))
+    future = pool.submit(function, str(path), *args)
     try:
         return future.result(timeout=SECONDS)
     except TimeoutError as error:
@@ -93,6 +99,30 @@ def pages(path: Path) -> list[str]:
 def title(path: Path) -> str | None:
     """The title the PDF's own metadata gives, if any."""
     return _run(_title, path)
+
+
+def render(path: Path, index: int) -> bytes:
+    """Page ``index`` (from 0) as a greyscale PNG, for OCR."""
+    return _run(_render, path, index)
+
+
+def png(width: int, height: int, pixels: bytes, stride: int) -> bytes:
+    """An 8-bit greyscale PNG of rows of pixels (``stride`` bytes apart)."""
+    rows = b"".join(
+        b"\0" + pixels[y * stride : y * stride + width] for y in range(height)
+    )
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(rows, 6))
+        + chunk(b"IEND", b"")
+    )
 
 
 # In the helper process:
@@ -132,3 +162,20 @@ def _title(path: str) -> str | None:
     finally:
         pdf.close()
     return value or None
+
+
+def _render(path: str, index: int) -> bytes:
+    pdf = _open(path)
+    try:
+        page = pdf[index]
+        width, height = page.get_size()
+        scale = min(OCR_DPI / 72, OCR_MAX_SIDE / max(width, height, 1))
+        bitmap = page.render(scale=scale, grayscale=True)
+        image = png(bitmap.width, bitmap.height, bytes(bitmap.buffer), bitmap.stride)
+        bitmap.close()
+        page.close()
+        return image
+    except pypdfium2.PdfiumError as error:
+        raise PdfError(f"PdfiumError: {error}") from None
+    finally:
+        pdf.close()

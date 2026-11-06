@@ -1,4 +1,5 @@
-"""Downloads multilingual-e5-small (118 MB): PAPERUS_ML_TEST_DOWNLOAD=1."""
+"""Downloads real models (multilingual-e5-small, 118 MB, and smaller ones):
+PAPERUS_ML_TEST_DOWNLOAD=1."""
 
 import os
 from pathlib import Path
@@ -8,7 +9,9 @@ import pytest
 from paperus_ml.config import Settings
 from paperus_ml.encoder import Encoder
 from paperus_ml.manager import ModelManager
+from paperus_ml.ocr import Reader
 from paperus_ml.rerank import Reranker
+from paperus_ml.samples import sample_page
 
 pytestmark = [
     pytest.mark.download,
@@ -51,3 +54,16 @@ def test_reranker_puts_the_answer_first(tmp_path: Path) -> None:
         ],
     )
     assert max(range(3), key=scores.__getitem__) == 1
+
+
+def test_ocr_reads_a_two_column_page(tmp_path: Path) -> None:
+    """Downloads PP-OCRv6 small (31 MB)."""
+    cache = Path(os.environ.get("PAPERUS_ML_CACHE_PATH", tmp_path))
+    reader = ModelManager(Settings(cache_path=cache)).get("pp-ocrv6-small")
+    assert isinstance(reader, Reader)
+    page = reader.read(sample_page())
+    assert (page.width, page.height) == (1654, 2339)
+    assert "blind zones below the radar beam" in " ".join(page.text.split())
+    # The left column first, then the right one (not line by line across).
+    in_right = [line.box[0] > 800 for line in page.lines]
+    assert in_right == sorted(in_right) and 30 < in_right.count(False) < 60

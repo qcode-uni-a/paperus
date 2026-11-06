@@ -32,6 +32,16 @@ class Embedded:
     values: list[list[float]]
 
 
+@dataclass
+class Read:
+    """What OCR read on one image."""
+
+    text: str
+    lines: list[dict[str, Any]]
+    width: int
+    height: int
+
+
 class MLUnavailable(RuntimeError):
     pass
 
@@ -187,6 +197,45 @@ class MLClient:
             scores: list[float] = response.json()["scores"]
             return scores
         metrics.ML_CALLS.labels("rerank", "loading" if loading else "unavailable").inc()
+        message = "; ".join(errors) or "no ML service configured"
+        raise MLLoading(message) if loading else MLUnavailable(message)
+
+    def ocr(self, image: bytes, *, model: str, timeout: float = 300) -> Read:
+        """The text in an image (PNG, JPEG, …), from the first service that
+        answers; raises MLUnavailable, MLLoading or MLRejected (e.g. not an
+        image)."""
+        errors = []
+        loading = False
+        started = time.perf_counter()
+        for url in self._ordered_urls():
+            try:
+                response = self.http.post(
+                    f"{url}/ocr/{model}",
+                    content=image,
+                    headers={"Content-Type": "application/octet-stream"},
+                    timeout=timeout,
+                )
+            except httpx2.HTTPError as error:
+                self._failed_at[url] = time.monotonic()
+                errors.append(f"{url}: {error}")
+                continue
+            if response.status_code == 503:
+                loading = True
+                errors.append(f"{url}: {_detail(response)}")
+                continue
+            if 400 <= response.status_code < 500:
+                metrics.ML_CALLS.labels("ocr", "rejected").inc()
+                raise MLRejected(response.status_code, _detail(response))
+            if response.is_error:
+                self._failed_at[url] = time.monotonic()
+                errors.append(f"{url}: {response.status_code} {_detail(response)}")
+                continue
+            self._failed_at.pop(url, None)
+            metrics.ML_CALLS.labels("ocr", "ok").inc()
+            metrics.ML_SECONDS.labels("ocr").observe(time.perf_counter() - started)
+            body = response.json()
+            return Read(body["text"], body["lines"], body["width"], body["height"])
+        metrics.ML_CALLS.labels("ocr", "loading" if loading else "unavailable").inc()
         message = "; ".join(errors) or "no ML service configured"
         raise MLLoading(message) if loading else MLUnavailable(message)
 

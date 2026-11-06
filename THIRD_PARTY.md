@@ -32,6 +32,15 @@ they are not part of paperus.
 | Snowflake Arctic Embed M/L v2.0 | [Snowflake/snowflake-arctic-embed-m-v2.0](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v2.0), [-l-v2.0](https://huggingface.co/Snowflake/snowflake-arctic-embed-l-v2.0) | Apache-2.0 |
 | GTE multilingual base | [onnx-community/gte-multilingual-base](https://huggingface.co/onnx-community/gte-multilingual-base) (ONNX export of Alibaba-NLP/gte-multilingual-base) | Apache-2.0 |
 | multilingual-e5 small/base/large | [Xenova/multilingual-e5-small](https://huggingface.co/Xenova/multilingual-e5-small), [-base](https://huggingface.co/Xenova/multilingual-e5-base), [-large](https://huggingface.co/Xenova/multilingual-e5-large) (ONNX exports of intfloat/multilingual-e5-*) | MIT |
+| BGE reranker v2 m3 | [onnx-community/bge-reranker-v2-m3-ONNX](https://huggingface.co/onnx-community/bge-reranker-v2-m3-ONNX) (ONNX export of BAAI/bge-reranker-v2-m3) | Apache-2.0 |
+| GTE multilingual reranker base | [onnx-community/gte-multilingual-reranker-base](https://huggingface.co/onnx-community/gte-multilingual-reranker-base) | Apache-2.0 |
+| ms-marco-MiniLM-L-6-v2 | [cross-encoder/ms-marco-MiniLM-L-6-v2](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2) | Apache-2.0 |
+| PP-OCRv6 small (text lines, reading) | [PaddlePaddle/PP-OCRv6_small_det_onnx](https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx), [PaddlePaddle/PP-OCRv6_small_rec_onnx](https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx) | Apache-2.0 |
+
+The OCR steps in `ml/src/paperus_ml/ocr.py` (finding and reading lines)
+follow [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) and
+[RapidOCR](https://github.com/RapidAI/RapidOCR) (both Apache-2.0), written
+anew for paperus.
 
 Metadata comes from doi.org, Crossref and DataCite at runtime, under their
 terms of use.

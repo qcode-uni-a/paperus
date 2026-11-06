@@ -36,6 +36,7 @@ from paperus.models import (
     FileSource,
     Item,
     MetadataSource,
+    OcrStatus,
     TextStatus,
     Version,
     VersionKind,
@@ -61,6 +62,9 @@ class FileOut(BaseModel):
     text_status: TextStatus
     text_error: str | None = None
     """Why reading the text failed (with ``text_status`` "failed")."""
+    ocr_status: OcrStatus | None = None
+    """Its scanned pages (no text layer): waiting for OCR, read, skipped
+    (OCR off), failed; None if it has none."""
     created_at: datetime
     deleted_at: datetime | None
 
@@ -77,6 +81,7 @@ def file_out(file: File) -> FileOut:
         source=FileSource(file.source),
         text_status=TextStatus(file.text_status),
         text_error=file.text_error,
+        ocr_status=OcrStatus(file.ocr_status) if file.ocr_status else None,
         created_at=file.created_at,
         deleted_at=file.deleted_at,
     )

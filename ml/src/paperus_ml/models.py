@@ -13,7 +13,7 @@ Scores are the published retrieval averages of the full-precision models
 from dataclasses import dataclass
 from typing import Literal
 
-Task = Literal["embedding", "rerank"]
+Task = Literal["embedding", "rerank", "ocr"]
 
 SCORES = {
     "en": "Retrieval, English (MTEB eng v2)",
@@ -22,6 +22,17 @@ SCORES = {
 }
 Pooling = Literal["cls", "mean"]
 Kind = Literal["query", "passage"]
+
+
+@dataclass(frozen=True)
+class Part:
+    """A second model a model needs, from its own repository (OCR: the one
+    that finds the text lines), downloaded into a folder of its own."""
+
+    repo: str
+    revision: str
+    onnx_file: str
+    folder: str
 
 
 @dataclass(frozen=True)
@@ -40,6 +51,7 @@ class ModelSpec:
     query_prefix: str = ""
     passage_prefix: str = ""
     task: Task = "embedding"
+    detector: Part | None = None
     # For choosing a model (shown in paperus' administration).
     description: str = ""
     licence: str = ""
@@ -239,6 +251,33 @@ MODELS = {
                 ("de", 48.2),
                 ("multilingual", 49.3),
             ),
+        ),
+        # OCR: PaddleOCR's PP-OCRv6 (small), one model finding the lines and
+        # one reading them; many languages in Latin script and Chinese,
+        # formulas only roughly. Tested on pages of our papers and German
+        # ones, clean and as scans (docs/search.md): 96-100 % of words right.
+        ModelSpec(
+            name="pp-ocrv6-small",
+            repo="PaddlePaddle/PP-OCRv6_small_rec_onnx",
+            revision="b8f84f0b80c529de40b4fbb3544b84fa7233a513",
+            onnx_file="inference.onnx",
+            tokenizer_file="inference.yml",
+            detector=Part(
+                repo="PaddlePaddle/PP-OCRv6_small_det_onnx",
+                revision="28fe5895c24fd108c19eb3e8479f4ab385fbfc62",
+                onnx_file="inference.onnx",
+                folder="det",
+            ),
+            task="ocr",
+            pooling="cls",
+            dimensions=0,
+            max_tokens=0,
+            description=(
+                "Reads scanned pages and photos (OCR); English, German and many "
+                "other languages. About 3 s per page on a CPU."
+            ),
+            licence="Apache-2.0",
+            download_mb=31,
         ),
         # Rerankers: read a query and a passage together and score how well
         # they fit; for reordering the best search hits. Tested on our own

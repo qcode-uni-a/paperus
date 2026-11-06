@@ -1,8 +1,9 @@
 # paperus-ml
 
 Machine learning service of [paperus](https://github.com/qcode-uni-a/paperus):
-text embeddings for search by meaning, with ONNX Runtime on the CPU. Models
-are downloaded from Hugging Face on first use and unloaded when idle.
+text embeddings for search by meaning, reranking of search hits, and OCR of
+scanned pages, with ONNX Runtime on the CPU or an NVIDIA GPU. Models are
+downloaded from Hugging Face on first use and unloaded when idle.
 
 ```sh
 pip install paperus-ml

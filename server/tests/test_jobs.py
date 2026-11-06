@@ -46,7 +46,13 @@ class FakeApp:
 
 def test_job_limits() -> None:
     config = SystemConfig(embedding_model="m", jobs_text=4, jobs_ml=2)
-    assert job_limits(config) == {"text": 4, "ml": 2, "import": 1, "backup": 1}
+    assert job_limits(config) == {
+        "text": 4,
+        "ml": 2,
+        "ocr": 1,
+        "import": 1,
+        "backup": 1,
+    }
 
 
 def test_workers_follow_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:

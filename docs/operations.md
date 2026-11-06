@@ -163,6 +163,17 @@ another name (`arctic-embed-m-v2@fp16`) and a switch between CPU and GPU
 re-embeds the library like a change of model (minutes on a GPU). All
 addresses in `PAPERUS_ML_URLS` should run on the same kind of hardware.
 
+### OCR
+
+Scanned pages (PDF pages without text) and images are read by the ML
+service in the background (Administration → Settings → Machine learning →
+Reading scans; on by default). About 3 s per page on a CPU, one file at a
+time in its own job queue, so embedding is not held up; much faster on a
+GPU. Administration → Jobs shows how many files wait. Files from before
+0.0.11 without any text, and images, are read again by the upgrade;
+scanned pages inside PDFs that had text already are found by "Read all
+files again".
+
 ### Reranking
 
 A reranker reads the question with each of the best 40 hits and puts the

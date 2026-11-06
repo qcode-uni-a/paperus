@@ -119,7 +119,7 @@ editors.
 | Notes written in the app | Markdown | First version |
 | GitLab/GitHub repos (LaTeX/Markdown lecture notes) | Link repo + path; pull on webhook or nightly; index the source text; optionally keep the CI-built PDF | Second step |
 | Overleaf | Via Overleaf's git integration (paid plans, Server Pro), then like a git repo | Second step |
-| Handwritten notes, whiteboard photos | Image + transcription; printed text via server OCR; handwriting via the user's own AI over MCP (no GPU needed); optional server vision model later | Second step |
+| Handwritten notes, whiteboard photos | Image + transcription; printed text via server OCR (done: scanned PDFs and images, see search.md); handwriting via the user's own AI over MCP (no GPU needed); optional server vision model later | Second step |
 | Meeting notes, transcripts | Upload or create via MCP, labelled AI-written if so; Teams/Zoom transcript import | Later |
 
 Meeting notes contain personal data: default visibility to participants, offer

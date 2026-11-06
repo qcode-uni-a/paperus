@@ -219,8 +219,20 @@ class TextStatus(StrEnum):
     PENDING = "pending"
     DONE = "done"
     NO_TEXT = "no_text"
-    """E.g. a scanned PDF without a text layer; OCR later."""
+    """E.g. a scanned PDF without a text layer (see OcrStatus)."""
     UNSUPPORTED = "unsupported"
+    FAILED = "failed"
+
+
+class OcrStatus(StrEnum):
+    """Pages without text (scans) are read by OCR in the ML service;
+    ``None``: the file has none."""
+
+    PENDING = "pending"
+    DONE = "done"
+    """Its scanned pages are read; their text is in the file's passages."""
+    SKIPPED = "skipped"
+    """OCR is switched off (Administration → Settings → Machine learning)."""
     FAILED = "failed"
 
 
@@ -417,9 +429,35 @@ class File(Record, Trashable, Base):
         String(16), server_default=TextStatus.PENDING.value, index=True
     )
     text_error: Mapped[str | None]
+    ocr_status: Mapped[str | None] = mapped_column(String(16), index=True)
 
     version: Mapped[Version] = relationship(back_populates="files")
     blob: Mapped[Blob] = relationship(lazy="joined", innerjoin=True)
+
+
+class OcrPage(Base):
+    """The text OCR read on one page of a file's contents (images: page 0),
+    kept so files are read again without OCR."""
+
+    __tablename__ = "ocr_pages"
+
+    blob_sha256: Mapped[bytes] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="CASCADE"), primary_key=True
+    )
+    page: Mapped[int] = mapped_column(primary_key=True)
+    """From 0."""
+    text: Mapped[str]
+    lines: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """Each line's text, confidence and box (left, top, right, bottom, in
+    pixels of the image that was read)."""
+    width: Mapped[int]
+    height: Mapped[int]
+    model: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class Chunk(Base):

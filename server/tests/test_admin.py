@@ -75,7 +75,9 @@ def test_model_change_needs_ml(admin: TestClient, fake_ml: FakeML) -> None:
 def test_ml_status(admin: TestClient, fake_ml: FakeML) -> None:
     status = admin.get("/api/admin/ml").json()
     assert status["services"] == [{"url": "http://ml", "ok": True, "error": None}]
-    assert [m["name"] for m in status["models"]] == FakeML.MODELS + FakeML.RERANKERS
+    assert [m["name"] for m in status["models"]] == (
+        FakeML.MODELS + FakeML.RERANKERS + FakeML.OCR_MODELS
+    )
     fake_ml.down = True
     status = admin.get("/api/admin/ml").json()
     assert status["services"][0]["ok"] is False

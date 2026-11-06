@@ -2,7 +2,8 @@
 
 ## What is indexed
 
-- Full text of papers and other files, split into chunks.
+- Full text of papers and other files, split into chunks; scanned pages
+  and images by their text read with OCR (below).
 - Notes (Markdown, split by heading or paragraph).
 - Annotations: highlighted text plus the comment, linked to the passage.
 - Optionally tags and collection descriptions.
@@ -128,3 +129,39 @@ the GPU's vectors): without reranking hybrid 0.64 / 0.86 / 0.75, with
 bge-reranker-v2-m3 0.89 / 0.98 / 0.93 (meaning the same); German questions
 3 of 4 first. About 0.6 s per search with reranking, 0.15 s without.
 Adopted as "Automatic" (on with a GPU).
+
+### OCR (#26, 2026-11-06)
+
+Scanned pages have no text layer. Pages of a PDF with fewer than 20
+characters, and images (PNG, JPEG, TIFF, WebP), are rendered at 200 dpi
+and read by the ML service in the background (job queue `ocr`, one file at
+a time); the text is kept per page of the file's contents (`ocr_pages`), so
+reading a file again or a copy of it needs no OCR. The rest of the PDF is
+searchable at once.
+
+Trial: 8 pages of our papers (rendered, so their text layer is the right
+answer) and 3 German pages with umlauts and ß, each clean and as a "scan"
+(tilted 0.8°, blurred, noise, JPEG); share of the page's words read right:
+
+| engine (licence)                              | en clean | en scan | de clean | de scan | CPU per page |
+| --------------------------------------------- | -------- | ------- | -------- | ------- | ------------ |
+| PP-OCRv5 Latin, RapidOCR (Apache-2.0)         | 0.96     | 0.94    | 0.96     | 0.99    | 3.3 s        |
+| PP-OCRv6 small, RapidOCR (Apache-2.0)         | 0.96     | 0.96    | 0.96     | 0.97    | 2.4 s        |
+| PP-OCRv6 medium, RapidOCR (Apache-2.0)        | 0.96     | 0.96    | 0.92     | 0.98    | 8.3 s        |
+| docTR (OnnxTR) fast + PARSeq (Apache-2.0)     | 0.95     | 0.95    | 0.86     | 0.86    | 15.8 s       |
+| docTR (OnnxTR) DBNet + CRNN (Apache-2.0)      | 0.95     | 0.94    | 0.86     | 0.86    | 2.5 s        |
+| PP-OCRv6 small, without the line flipper      | 0.96     | 0.96    | 1.00     | 1.00    | 2.7 s        |
+| **ours**: PP-OCRv6 small in the ML service    | 0.96     | 0.96    | 1.00     | 0.995   | 3.0 s        |
+
+- docTR's standard models drop umlauts. RapidOCR's classifier for upside
+  down lines turned some widely spaced lines over and garbled them; without
+  it German was read without a mistake. Missing English words are mostly
+  in formulas.
+- RapidOCR orders lines top to bottom across the page, mixing the columns
+  of a paper line by line. Ours finds columns (a recursive XY cut on the
+  line boxes, after turning back the page's tilt) and reads them one after
+  the other, so passages stay whole.
+- Adopted: PP-OCRv6 small (31 MB) with PaddlePaddle's settings, our own
+  steps in `ml/src/paperus_ml/ocr.py` (no RapidOCR dependency; the same
+  model handling, CPU or GPU, as the other models). Handwriting is read
+  poorly.

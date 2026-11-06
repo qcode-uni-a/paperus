@@ -24,3 +24,22 @@ def sample_passages(count: int = 48) -> list[str]:
         sentences = [_SENTENCES[(n * 5 + i * 7) % len(_SENTENCES)] for i in range(18)]
         passages.append(f"Section {n + 1}. " + " ".join(sentences))
     return passages
+
+
+def sample_page() -> bytes:
+    """A page of the sample sentences as a PNG (A4 at 200 dpi, two columns
+    like a paper), for measuring OCR speed."""
+    import cv2
+    import numpy as np
+
+    page = np.full((2339, 1654), 255, np.uint8)
+    words = " ".join(_SENTENCES * 4).encode("ascii", "replace").decode().split()
+    for column, left in enumerate((150, 870)):
+        line, y = "", 220
+        for word in words[column * 260 : (column + 1) * 260]:
+            if len(line) + len(word) > 38:
+                cv2.putText(page, line, (left, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 0, 2)
+                line, y = "", y + 42
+            line = f"{line} {word}".strip()
+        cv2.putText(page, line, (left, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, 0, 2)
+    return cv2.imencode(".png", page)[1].tobytes()

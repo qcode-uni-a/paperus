@@ -37,6 +37,10 @@ class SystemConfig(BaseModel):
     "auto" when the ML service runs on a GPU, as on a CPU it takes seconds
     per search."""
     rerank_model: str = "bge-reranker-v2-m3"
+    ocr: bool = True
+    """Read the text of scanned pages and images (OCR), in the background:
+    a few seconds per page on a CPU."""
+    ocr_model: str = "pp-ocrv6-small"
 
     # Server
     public_url: HttpUrl | None = None

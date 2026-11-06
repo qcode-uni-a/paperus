@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from paperus import auth, integrity, metrics, oidc, readable, system, usage
+from paperus import auth, integrity, metrics, ocr, oidc, readable, system, usage
 from paperus.api.auth import OIDC_CALLBACK, public_base
 from paperus.api.deps import DB, CurrentUser, request_token
 from paperus.jobs import (
@@ -15,6 +15,7 @@ from paperus.jobs import (
     queue_empty_trash,
     queue_integrity_check,
     queue_ml_configuration,
+    queue_ocr_sweep,
     queue_readable_copy,
     queue_text_sweep,
     queue_tidy,
@@ -95,6 +96,8 @@ class Stats(BaseModel):
     files_pending: int
     files_failed: int
     """Files whose text (and, for uploads, metadata) is still being read."""
+    files_ocr: int = 0
+    """Files whose scanned pages wait for OCR."""
     chunks: int
     """Passages searchable by meaning (reference lists are left out)."""
     embedded: int
@@ -133,7 +136,8 @@ def set_config(
         current.rerank,
         current.rerank_model,
     )
-    if model_changed or (rerank_changed and body.rerank != "off"):
+    ocr_model_changed = body.ocr and body.ocr_model != current.ocr_model
+    if model_changed or (rerank_changed and body.rerank != "off") or ocr_model_changed:
         try:
             known = [(m.name, m.task) for m in _models(_ml(request))]
         except (MLUnavailable, MLRejected) as error:
@@ -148,11 +152,19 @@ def set_config(
             raise HTTPException(
                 422, f"the ML service has no reranker {body.rerank_model!r}"
             )
+        if ocr_model_changed and (body.ocr_model, "ocr") not in known:
+            raise HTTPException(
+                422, f"the ML service has no OCR model {body.ocr_model!r}"
+            )
+    if body.ocr != current.ocr:
+        ocr.switch(db, body.ocr)
     system.save_config(db, body)
     db.commit()
     system.apply(body, request.app.state.http)
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
+    if body.ocr and not current.ocr:
+        queue_ocr_sweep(request.app.state.jobs)
     copy = ("copy_enabled", "copy_template", "copy_links")
     if body.copy_enabled and any(
         getattr(body, name) != getattr(current, name) for name in copy
@@ -217,6 +229,7 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
         files=figures.files,
         files_pending=figures.files_pending,
         files_failed=figures.files_failed,
+        files_ocr=figures.files_ocr,
         chunks=figures.chunks,
         embedded=figures.embedded,
         embedding_model=figures.embedding_model,
@@ -229,8 +242,8 @@ def stats(request: Request, db: DB, admin: Admin) -> Stats:
 def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     """Start a sweep now: ``embeddings`` (embed what is missing), ``text``
     (read files still pending), ``text-failed`` (try failed files again),
-    ``text-all`` (read every file again),
-    ``trash`` (delete what is older than the trash days), ``integrity``
+    ``text-all`` (read every file again), ``ocr`` (read scans waiting
+    for OCR), ``trash`` (delete what is older than the trash days), ``integrity``
     (check stored contents), ``integrity-deep`` (also their SHA-256) or
     ``integrity-clean`` (check and remove unused stored contents), ``copy``
     (update the readable copy), ``copy-remove`` (delete it) or ``tidy``
@@ -239,6 +252,7 @@ def run_job(job: str, request: Request, db: DB, admin: Admin) -> dict[str, Any]:
     sweeps = {
         "embeddings": queue_embedding_sweep,
         "text": queue_text_sweep,
+        "ocr": queue_ocr_sweep,
         "trash": queue_empty_trash,
         "integrity": queue_integrity_check,
         "integrity-deep": lambda app: queue_integrity_check(app, deep=True),

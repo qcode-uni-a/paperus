@@ -1,8 +1,10 @@
 """HTTP API of paperus-ml.
 
 ``POST /embed`` with ``{"model": "bge-m3", "kind": "passage", "texts": [...]}``
-returns one L2-normalized vector per text. The caller (paperus) names the
-model in every request, so this service needs no model configuration.
+returns one L2-normalized vector per text; ``POST /rerank`` scores passages
+for a query; ``POST /ocr/{model}`` with an image reads its text. The caller
+(paperus) names the model in every request, so this service needs no model
+configuration.
 """
 
 import asyncio
@@ -15,19 +17,28 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from paperus_ml import metrics
 from paperus_ml.config import Settings
 from paperus_ml.encoder import Encoder
-from paperus_ml.manager import ModelFailed, ModelLoading, ModelManager, UnknownModel
+from paperus_ml.manager import (
+    Model,
+    ModelFailed,
+    ModelLoading,
+    ModelManager,
+    UnknownModel,
+)
 from paperus_ml.models import MODELS, SCORES, Kind
+from paperus_ml.ocr import NotAnImage, Reader
 from paperus_ml.rerank import Reranker
-from paperus_ml.samples import sample_passages
+from paperus_ml.samples import sample_page, sample_passages
 
 MAX_TEXTS = 256
+MAX_IMAGE_BYTES = 64 * 1024 * 1024
 UNLOAD_CHECK_SECONDS = 30
+OCR_SPEED_PAGES = 3
 
 
 class EmbedRequest(BaseModel):
@@ -58,6 +69,24 @@ class RerankResponse(BaseModel):
     scores: list[float]
     """One per passage, in their order: higher fits better (only the order
     means something)."""
+
+
+class OcrLine(BaseModel):
+    text: str
+    score: float
+    """How sure the model is (0 to 1)."""
+    box: tuple[int, int, int, int]
+    """Left, top, right, bottom in pixels of the image."""
+
+
+class OcrResponse(BaseModel):
+    model: str
+    text: str
+    """The page's text in reading order (columns one after the other); a
+    blank line between blocks."""
+    lines: list[OcrLine]
+    width: int
+    height: int
 
 
 class ModelInfo(BaseModel):
@@ -229,6 +258,20 @@ def create_app(
         model = _model(name)
         passages = sample_passages()
         with model.running:
+            if isinstance(model, Reader):
+                # Pages instead of passages.
+                page = sample_page()
+                model.read(page)
+                started = time.monotonic()
+                for _ in range(OCR_SPEED_PAGES):
+                    model.read(page)
+                seconds = time.monotonic() - started
+                return Speed(
+                    model=name,
+                    passages=OCR_SPEED_PAGES,
+                    seconds=round(seconds, 2),
+                    passages_per_second=round(OCR_SPEED_PAGES / max(seconds, 1e-6), 2),
+                )
             if isinstance(model, Reranker):
                 # Search hits: one query against all passages.
                 model.score("what did the measurements show", passages[:2])
@@ -246,7 +289,7 @@ def create_app(
             passages_per_second=round(len(passages) / max(seconds, 1e-6), 1),
         )
 
-    def _model(name: str) -> Encoder | Reranker:
+    def _model(name: str) -> Model:
         try:
             return models.get(name, wait=settings.load_wait)
         except UnknownModel as error:
@@ -297,5 +340,38 @@ def create_app(
         metrics.REQUESTS.labels(body.model, "rerank", "ok").inc()
         metrics.TEXTS.labels(body.model, "rerank").inc(len(body.passages))
         return RerankResponse(model=body.model, scores=scores)
+
+    @app.post("/ocr/{name}", dependencies=[Depends(check_token)])
+    async def ocr(name: str, request: Request) -> OcrResponse:
+        """The text in the image sent as the request's body (PNG, JPEG,
+        TIFF, WebP; a page at 200-300 dpi reads best). One page per
+        request; a few seconds each on a CPU."""
+        data = await request.body()
+        if not data or len(data) > MAX_IMAGE_BYTES:
+            raise HTTPException(413 if data else 422, "send one image of up to 64 MB")
+        try:
+            model = await asyncio.to_thread(_model, name)
+        except HTTPException as error:
+            outcome = "loading" if error.status_code == 503 else "error"
+            metrics.REQUESTS.labels(name, "ocr", outcome).inc()
+            raise
+        if not isinstance(model, Reader):
+            raise HTTPException(422, f"{name!r} is not an OCR model")
+        try:
+            page = await asyncio.to_thread(model.read, data)
+        except NotAnImage as error:
+            raise HTTPException(422, str(error)) from error
+        metrics.REQUESTS.labels(name, "ocr", "ok").inc()
+        metrics.TEXTS.labels(name, "ocr").inc()
+        return OcrResponse(
+            model=name,
+            text=page.text,
+            lines=[
+                OcrLine(text=line.text, score=round(line.score, 3), box=line.box)
+                for line in page.lines
+            ],
+            width=page.width,
+            height=page.height,
+        )
 
     return app

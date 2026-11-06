@@ -1,11 +1,11 @@
 [project]
 name = "paperus-ml"
 version = "0.0.10"
-description = "Machine learning service of paperus: text embeddings (later reranking, OCR)"
+description = "Machine learning service of paperus: text embeddings, reranking and OCR"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [{ name = "paperus contributors" }]
-keywords = ["embeddings", "onnx", "semantic search", "self-hosted"]
+keywords = ["embeddings", "onnx", "ocr", "semantic search", "self-hosted"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
@@ -18,8 +18,10 @@ dependencies = [
     "huggingface-hub>=2.4.0",
     "numpy>=2.5.4",
     "onnxruntime>=1.31.1",
+    "opencv-python-headless>=5.0.0.93",
     "prometheus-client>=0.26.0",
     "pydantic-settings>=2.16.2",
+    "pyyaml>=6.0.3",
     "tokenizers>=0.23.3",
     "uvicorn[standard]>=0.54.0",
 ]

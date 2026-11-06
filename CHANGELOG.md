@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **OCR** (#26): scanned PDFs, scanned pages inside PDFs, and images (PNG,
+  JPEG, TIFF, WebP) are read in the background by the ML service, so they
+  can be searched and AI assistants can read them. Columns are read one
+  after the other, also on slightly tilted scans. PP-OCRv6 (Apache-2.0,
+  31 MB): on our test pages 96 % of English and all German words right,
+  about 3 s per page on a CPU. Administration → Settings → Machine learning
+  → Reading scans (on by default); Jobs shows what waits; each file says
+  whether its scanned pages are read. The upgrade reads files without text
+  and images again.
 - **Browser extension**: one click saves an open PDF too (also in
   Firefox's PDF viewer, which asks once per website); paperus reads its
   details from the file. A right click on the button saves to another

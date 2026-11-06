@@ -28,6 +28,7 @@ from paperus.models import (
     ImportStatus,
     Item,
     Note,
+    OcrStatus,
     TextStatus,
     User,
 )
@@ -72,6 +73,7 @@ class Figures:
     files: int
     files_pending: int
     files_failed: int
+    files_ocr: int
     notes: int
     users: int
     groups: int
@@ -120,6 +122,11 @@ def library_figures(db: Session, settings: Settings) -> Figures:
             select(count)
             .select_from(File)
             .where(File.text_status == TextStatus.FAILED, File.deleted_at.is_(None))
+        ),
+        files_ocr=number(
+            select(count)
+            .select_from(File)
+            .where(File.ocr_status == OcrStatus.PENDING, File.deleted_at.is_(None))
         ),
         notes=number(select(count).select_from(Note).where(Note.deleted_at.is_(None))),
         users=number(
