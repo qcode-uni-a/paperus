@@ -71,10 +71,18 @@
 		grid-template-columns: minmax(0, 1fr);
 		gap: 4px;
 		overflow-wrap: anywhere;
-		transition: background-color 0.25s;
+		transition: outline-color 0.25s;
+		outline: 1.5px solid transparent;
+		outline-offset: -1.5px;
+		border-radius: 12px;
 	}
+	/* As the merge window marks what stays: a green outline, with room
+	   inside (the text stays where it was). */
 	li.done {
-		background: color-mix(in srgb, var(--success) 10%, transparent);
+		margin-inline: -12px;
+		padding-inline: 12px;
+		outline-color: var(--success);
+		border-bottom-color: transparent;
 	}
 	.note {
 		color: var(--muted);

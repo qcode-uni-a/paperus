@@ -258,10 +258,7 @@
 		{#snippet actions()}
 			<div class="actions">
 				{#if saved[paper.item.id]}
-					<span class="done" role="status"
-						><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg
-						>PDF saved</span
-					>
+					<span class="done" role="status"><b aria-hidden="true">✓</b> PDF saved</span>
 				{:else if section === null}
 					{#if writable(paper)}
 						<button onclick={() => wanted(paper, true)}>Needs a file after all</button>
@@ -514,35 +511,28 @@
 	.saved {
 		color: var(--success);
 	}
+	/* The merge window's "stays" chip: a green outline and mark. */
 	.done {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		min-height: 38px;
-		color: var(--success);
+		display: inline-block;
+		padding: 0 10px;
+		border: 1.5px solid var(--success);
+		border-radius: 999px;
+		line-height: 1.8;
 		font-weight: 600;
+		animation: pop 0.25s ease-out both;
 	}
-	.done svg {
-		width: 20px;
-		height: 20px;
-		fill: none;
-		stroke: currentColor;
-		stroke-width: 2.5;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-		stroke-dasharray: 24;
-		animation: tick 0.35s ease-out both;
+	.done b {
+		margin-right: 2px;
+		color: var(--success);
 	}
-	@keyframes tick {
+	@keyframes pop {
 		from {
-			stroke-dashoffset: 24;
-		}
-		to {
-			stroke-dashoffset: 0;
+			transform: scale(0.85);
+			opacity: 0;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.done svg {
+		.done {
 			animation: none;
 		}
 	}
