@@ -11,6 +11,7 @@
 	import type { MissingPaper } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { packUp } from '#lib/transitions.ts';
 	import { libraryById, loadOrganize } from '#lib/organize.svelte.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
@@ -49,6 +50,11 @@
 			const data = event.data;
 			if (data?.type === 'paperus:getPdfsProgress') {
 				fetching = { done: data.done, total: data.total };
+				// Each paper as it is done: saved ones are packed up at once.
+				if (typeof data.item_id === 'string') {
+					if (data.ok) markSaved(data.item_id);
+					else if (data.reason) problems[data.item_id] = data.reason;
+				}
 			} else if (data?.type === 'paperus:getPdfsDone') {
 				fetching = null;
 				finished(data);
@@ -75,7 +81,6 @@
 		failed: { item_id: string; reason: string; cause?: Cause }[];
 	}) {
 		for (const { item_id, reason } of result.failed) problems[item_id] = reason;
-		got += result.saved;
 		const counts = new Map<Cause, number>();
 		for (const { cause } of result.failed) {
 			counts.set(cause ?? 'error', (counts.get(cause ?? 'error') ?? 0) + 1);
@@ -88,8 +93,11 @@
 				? `${why.join(', ')}. The reason is shown with each paper.`
 				: 'All saved with the browser extension.'
 		});
-		load('file');
-		load('journal');
+		// Once the last rows are packed up: the lists as the server has them.
+		setTimeout(() => {
+			load('file');
+			load('journal');
+		}, SHOWN_SAVED_MS + 900);
 	}
 
 	/** Ask the extension to get these papers' PDFs at their publishers. */
@@ -148,12 +156,31 @@
 	}
 
 	function settled(paper: MissingPaper) {
+		gone(paper.item.id);
+	}
+
+	function gone(itemId: string) {
 		for (const list of [lists.file, lists.journal, hidden]) {
 			if (!list) continue;
 			const before = list.papers.length;
-			list.papers = list.papers.filter((p) => p.item.id !== paper.item.id);
+			list.papers = list.papers.filter((p) => p.item.id !== itemId);
 			list.total -= before - list.papers.length;
 		}
+	}
+
+	// A paper just given its PDF: shown as saved for a moment, then packed
+	// up and gone from the list.
+	const SHOWN_SAVED_MS = 900;
+	let saved = $state<Record<string, boolean>>({});
+	function markSaved(itemId: string, then?: () => void) {
+		if (saved[itemId]) return;
+		saved[itemId] = true;
+		got += 1;
+		setTimeout(() => {
+			gone(itemId);
+			delete saved[itemId];
+			then?.();
+		}, SHOWN_SAVED_MS);
 	}
 
 	async function download(paper: MissingPaper, section: Section) {
@@ -169,10 +196,10 @@
 			paper.tried_at = new Date().toISOString();
 			return;
 		}
-		got += 1;
-		settled(paper);
-		// A paper's arXiv version may now leave only its journal's file missing.
-		if (section === 'file') load('journal');
+		// A paper's arXiv version may then leave only its journal's file missing.
+		markSaved(paper.item.id, () => {
+			if (section === 'file') load('journal');
+		});
 	}
 
 	async function upload(paper: MissingPaper, section: Section, files: FileList | null) {
@@ -192,8 +219,7 @@
 			problems[paper.item.id] = errorMessage(error);
 			return;
 		}
-		got += 1;
-		settled(paper);
+		markSaved(paper.item.id);
 	}
 
 	async function wanted(paper: MissingPaper, want: boolean) {
@@ -228,10 +254,15 @@
 
 {#snippet row(paper: MissingPaper, section: Section | null)}
 	{@const link = publisherLink(paper)}
-	<ItemRow item={paper.item}>
+	<ItemRow item={paper.item} leave={packUp} done={!!saved[paper.item.id]}>
 		{#snippet actions()}
 			<div class="actions">
-				{#if section === null}
+				{#if saved[paper.item.id]}
+					<span class="done" role="status"
+						><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg
+						>PDF saved</span
+					>
+				{:else if section === null}
 					{#if writable(paper)}
 						<button onclick={() => wanted(paper, true)}>Needs a file after all</button>
 					{/if}
@@ -482,6 +513,38 @@
 	}
 	.saved {
 		color: var(--success);
+	}
+	.done {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 38px;
+		color: var(--success);
+		font-weight: 600;
+	}
+	.done svg {
+		width: 20px;
+		height: 20px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-dasharray: 24;
+		animation: tick 0.35s ease-out both;
+	}
+	@keyframes tick {
+		from {
+			stroke-dashoffset: 24;
+		}
+		to {
+			stroke-dashoffset: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.done svg {
+			animation: none;
+		}
 	}
 	.extension {
 		display: grid;

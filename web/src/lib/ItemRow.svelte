@@ -8,14 +8,30 @@
 	import FileIcon from '#lib/FileIcon.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import StarButton from '#lib/StarButton.svelte';
+	import { none } from '#lib/transitions.ts';
+	import type { TransitionConfig } from 'svelte/transition';
 
-	/** ``note``: a line above the title, e.g. why it is in a list. */
-	let { item, note, actions }: { item: Item; note?: string; actions?: Snippet } = $props();
+	/** ``note``: a line above the title, e.g. why it is in a list;
+	 * ``leave``: how the row goes when it leaves its list; ``done``: shown
+	 * as just done (e.g. its PDF saved), before it leaves. */
+	let {
+		item,
+		note,
+		actions,
+		leave = none,
+		done = false
+	}: {
+		item: Item;
+		note?: string;
+		actions?: Snippet;
+		leave?: (node: Element) => TransitionConfig;
+		done?: boolean;
+	} = $props();
 
 	const authors = $derived(shortAuthors(item.authors));
 </script>
 
-<li>
+<li out:leave class:done>
 	<span class="corner"
 		><FileIcon files={item.files ?? []} />{#if isShared(item.library_id)}<SharedIcon
 				owner={item.library_id}
@@ -55,6 +71,10 @@
 		grid-template-columns: minmax(0, 1fr);
 		gap: 4px;
 		overflow-wrap: anywhere;
+		transition: background-color 0.25s;
+	}
+	li.done {
+		background: color-mix(in srgb, var(--success) 10%, transparent);
 	}
 	.note {
 		color: var(--muted);

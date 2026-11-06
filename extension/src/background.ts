@@ -459,7 +459,15 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
 		const problem = await getOne(paper);
 		if (problem) failed.push({ item_id: paper.item_id, ...problem });
 		else saved++;
-		await report({ type: 'getPdfsProgress', done: index + 1, total: papers.length, saved });
+		await report({
+			type: 'getPdfsProgress',
+			done: index + 1,
+			total: papers.length,
+			saved,
+			item_id: paper.item_id,
+			ok: problem === null,
+			...(problem ?? {})
+		});
 	}
 	await report({ type: 'getPdfsDone', total: papers.length, saved, failed });
 }

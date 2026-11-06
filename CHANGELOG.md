@@ -19,6 +19,9 @@
   the extension asks once for access to publisher sites. Without the
   extension the page says how to get it. The one-click save also says
   when a publisher showed a robot check or a login instead of the PDF.
+  Papers that get their PDF show "PDF saved" for a moment, then are packed
+  up and leave the list (as each one is done, also while the extension
+  works through many).
 - Administration → Server → Contact email says that Unpaywall answers only
   with one.
 - **Open-access copies by themselves** (Administration → Settings →
