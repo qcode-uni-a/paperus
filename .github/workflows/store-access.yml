@@ -1,0 +1,59 @@
+name: Check store access
+
+# Run by hand (Actions → Check store access → Run workflow) after setting up
+# or renewing the keys for the extension stores: only reads, uploads nothing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firefox:
+    name: addons.mozilla.org
+    runs-on: ubuntu-latest
+    environment: firefox
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      # A signed request for one's own profile, which needs the API key.
+      - run: |
+          node -e '
+            const { createHmac, randomUUID } = require("node:crypto");
+            const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+            const now = Math.floor(Date.now() / 1000);
+            const body = b64({ alg: "HS256", typ: "JWT" }) + "." +
+              b64({ iss: process.env.ISSUER, jti: randomUUID(), iat: now, exp: now + 60 });
+            const signature = createHmac("sha256", process.env.SECRET).update(body).digest("base64url");
+            fetch("https://addons.mozilla.org/api/v5/accounts/profile/", {
+              headers: { Authorization: `JWT ${body}.${signature}` }
+            }).then(async (r) => {
+              const data = await r.json();
+              console.log(r.status, r.ok ? `signed in as ${data.name || data.username}` : data);
+              process.exit(r.ok ? 0 : 1);
+            });
+          '
+        env:
+          ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          SECRET: ${{ secrets.AMO_JWT_SECRET }}
+
+  chrome:
+    name: Chrome Web Store
+    runs-on: ubuntu-latest
+    environment: chrome
+    steps:
+      - id: google
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.CHROME_SERVICE_ACCOUNT_KEY }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          create_credentials_file: false
+      - run: >
+          curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN"
+          "https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER/items/$ITEM:fetchStatus"
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+          PUBLISHER: ${{ vars.CHROME_PUBLISHER_ID }}
+          ITEM: ${{ vars.CHROME_ITEM_ID }}
