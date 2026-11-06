@@ -11,7 +11,7 @@ plan, so the two never disagree.
 """
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from typing import Literal
 
@@ -50,6 +50,8 @@ class Step:
     reason: str | None = None
     """Why it stays behind, or what it already matches."""
     apply: Callable[[], None] | None = None
+    id: uuid.UUID | None = None
+    """The version, file, tag, collection or note: for leaving it behind."""
 
 
 def likely_duplicates(db: Session, access: Access, item: Item) -> list[Item]:
@@ -134,6 +136,7 @@ def plan_merge(
                     "move" if writable else "stays",
                     None if writable else not_yours,
                     (lambda v=version: _move_version(v, target)) if writable else None,
+                    version.id,
                 )
             )
             # Its files go along with it.
@@ -143,17 +146,26 @@ def plan_merge(
                     f.filename,
                     "move" if writable else "stays",
                     None if writable else not_yours,
+                    id=f.id,
                 )
                 for f in files
             )
             continue
         steps.append(
-            Step("version", _version_name(version), "already", "the same version")
+            Step(
+                "version",
+                _version_name(version),
+                "already",
+                "the same version",
+                id=version.id,
+            )
         )
         have = {f.blob_sha256 for f in same.files if f.deleted_at is None}
         for file in files:
             if file.blob_sha256 in have:
-                steps.append(Step("file", file.filename, "already", "the same file"))
+                steps.append(
+                    Step("file", file.filename, "already", "the same file", id=file.id)
+                )
             elif writable:
                 steps.append(
                     Step(
@@ -161,10 +173,13 @@ def plan_merge(
                         file.filename,
                         "move",
                         apply=lambda f=file, to=same: _move_file(f, to),
+                        id=file.id,
                     )
                 )
             else:
-                steps.append(Step("file", file.filename, "stays", not_yours))
+                steps.append(
+                    Step("file", file.filename, "stays", not_yours, id=file.id)
+                )
 
     tagged = {link.tag_id for link in target.tag_links}
     for link in source.tag_links:
@@ -172,7 +187,7 @@ def plan_merge(
         if not access.can_read(tag.library_id):
             continue  # someone else's private tag
         if link.tag_id in tagged:
-            steps.append(Step("tag", tag.name, "already"))
+            steps.append(Step("tag", tag.name, "already", id=tag.id))
         elif access.may_tag(tag.library_id, target):
             steps.append(
                 Step(
@@ -182,6 +197,7 @@ def plan_merge(
                     apply=lambda t=tag, s=link.source: target.tag_links.append(
                         ItemTag(tag_id=t.id, tag=t, source=s, added_by=access.user.id)
                     ),
+                    id=tag.id,
                 )
             )
         else:
@@ -191,6 +207,7 @@ def plan_merge(
                     tag.name,
                     "stays",
                     "a group's tags go only on papers you may change",
+                    id=tag.id,
                 )
             )
     held = {link.collection_id for link in target.collection_links}
@@ -199,7 +216,9 @@ def plan_merge(
         if not access.can_read(collection.library_id):
             continue
         if link.collection_id in held:
-            steps.append(Step("collection", collection.name, "already"))
+            steps.append(
+                Step("collection", collection.name, "already", id=collection.id)
+            )
         elif not access.can_write(collection.library_id):
             steps.append(
                 Step(
@@ -207,6 +226,7 @@ def plan_merge(
                     collection.name,
                     "stays",
                     "you may not change this collection",
+                    id=collection.id,
                 )
             )
         elif not access.may_hold(collection.library_id, target):
@@ -216,6 +236,7 @@ def plan_merge(
                     collection.name,
                     "stays",
                     "a group's collection takes only that group's papers",
+                    id=collection.id,
                 )
             )
         else:
@@ -227,6 +248,7 @@ def plan_merge(
                     apply=lambda c=collection: target.collection_links.append(
                         CollectionItem(collection_id=c.id, added_by=access.user.id)
                     ),
+                    id=collection.id,
                 )
             )
     if db is not None:
@@ -245,19 +267,28 @@ def plan_merge(
         ):
             name = note.title or "Untitled note"
             steps.append(
-                Step("note", name, "already" if note.id in on_target else "move")
+                Step(
+                    "note",
+                    name,
+                    "already" if note.id in on_target else "move",
+                    id=note.id,
+                )
             )
     return steps
 
 
-def _move_notes_and_stars(db: Session, source: Item, target: Item) -> None:
+def _move_notes_and_stars(
+    db: Session, source: Item, target: Item, leave: Collection[uuid.UUID] = ()
+) -> None:
     """Notes about the paper are about the one that stays (everyone's,
-    whoever can see them), and everyone's star moves along."""
+    whoever can see them; those in ``leave`` stay with the paper in the
+    trash), and everyone's star moves along."""
     db.flush()
     db.execute(
         update(NoteItem)
         .where(
             NoteItem.item_id == source.id,
+            NoteItem.note_id.not_in(list(leave)),
             NoteItem.note_id.not_in(
                 select(NoteItem.note_id).where(NoteItem.item_id == target.id)
             ),
@@ -265,7 +296,11 @@ def _move_notes_and_stars(db: Session, source: Item, target: Item) -> None:
         .values(item_id=target.id)
         .execution_options(synchronize_session=False)
     )
-    db.execute(delete(NoteItem).where(NoteItem.item_id == source.id))
+    db.execute(
+        delete(NoteItem).where(
+            NoteItem.item_id == source.id, NoteItem.note_id.not_in(list(leave))
+        )
+    )
     db.execute(
         insert(Favourite)
         .from_select(
@@ -281,14 +316,70 @@ def _move_notes_and_stars(db: Session, source: Item, target: Item) -> None:
     db.expire(target, ["favourites"])
 
 
-def merge_items(db: Session, access: Access, source: Item, target: Item) -> list[Step]:
+def _drop(access: Access, target: Item, drop: Collection[uuid.UUID]) -> None:
+    """Remove these tags, collections (the paper from them) and files (to the
+    trash) from the paper that stays, as chosen when merging."""
+    for thing in drop:
+        tag = next((link for link in target.tag_links if link.tag_id == thing), None)
+        collection = next(
+            (link for link in target.collection_links if link.collection_id == thing),
+            None,
+        )
+        file = next(
+            (
+                f
+                for v in target.versions
+                for f in v.files
+                if f.id == thing and f.deleted_at is None
+            ),
+            None,
+        )
+        if tag is not None:
+            if not access.may_tag(tag.tag.library_id, target):
+                raise CannotMerge("you may not change this paper's tags")
+            target.tag_links.remove(tag)
+        elif collection is not None:
+            if not access.can_write(collection.collection.library_id):
+                raise CannotMerge("you may not change this collection")
+            target.collection_links.remove(collection)
+        elif file is not None:
+            if not access.can_write_item(target):
+                raise CannotMerge("you may not change the other paper")
+            library.trash(file, access.user.id)
+        else:
+            raise CannotMerge("not a tag, collection or file of the other paper")
+
+
+def merge_items(
+    db: Session,
+    access: Access,
+    source: Item,
+    target: Item,
+    *,
+    leave: Collection[uuid.UUID] = (),
+    drop: Collection[uuid.UUID] = (),
+) -> list[Step]:
     """Merge ``source`` into ``target`` as planned and put ``source`` in the
-    trash; returns the plan carried out."""
+    trash; returns the plan carried out. ``leave``: versions, files, tags,
+    collections and notes of ``source`` not to take over (they go to the
+    trash with it); ``drop``: tags, collections and files to remove from
+    ``target`` at the same time."""
+    _drop(access, target, drop)
     steps = plan_merge(access, source, target, db)
+    left: set[uuid.UUID] = set()
     for step in steps:
-        if step.apply is not None:
+        if step.id is not None and step.id in leave and step.action == "move":
+            step.action = "stays"
+            step.reason = "left behind"
+            left.add(step.id)
+        elif step.apply is not None:
             step.apply()
-    _move_notes_and_stars(db, source, target)
+    # Files left behind of a version that moved over: to the trash there.
+    for version in target.versions:
+        for file in version.files:
+            if file.id in left and file.deleted_at is None:
+                library.trash(file, access.user.id)
+    _move_notes_and_stars(db, source, target, left)
     db.flush()
     library.refresh_item(target)
     library.trash(source, access.user.id)

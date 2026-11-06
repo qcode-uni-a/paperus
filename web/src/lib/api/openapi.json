@@ -7527,6 +7527,24 @@
             "type": "string",
             "format": "uuid",
             "title": "Into"
+          },
+          "leave": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Leave"
+          },
+          "drop": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Drop"
           }
         },
         "type": "object",
@@ -7543,6 +7561,18 @@
             },
             "type": "array",
             "title": "Steps"
+          },
+          "shown_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shown Version Id"
           },
           "item": {
             "$ref": "#/components/schemas/ItemDetail"
@@ -7563,6 +7593,18 @@
             },
             "type": "array",
             "title": "Steps"
+          },
+          "shown_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shown Version Id"
           }
         },
         "type": "object",
@@ -7573,6 +7615,18 @@
       },
       "MergeStep": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -7611,6 +7665,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "kind",
           "name",
           "action",

@@ -1,6 +1,7 @@
 """Items, versions and identifiers: the rules that keep them consistent."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -47,12 +48,18 @@ class IdentifierTaken(Exception):
 
 
 def preferred_version(item: Item) -> Version | None:
-    for version in item.versions:
+    return preferred_of(item.versions)
+
+
+def preferred_of(versions: Sequence[Version]) -> Version | None:
+    """The version whose details are shown: the pinned one (the first if
+    several), else published before preprint before others, newest first."""
+    for version in versions:
         if version.pinned:
             return version
-    if not item.versions:
+    if not versions:
         return None
-    newest_first = sorted(item.versions, key=lambda v: v.id, reverse=True)
+    newest_first = sorted(versions, key=lambda v: v.id, reverse=True)
     return min(newest_first, key=lambda v: _RANK[v.kind])
 
 

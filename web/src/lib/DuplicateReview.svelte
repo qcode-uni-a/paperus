@@ -2,7 +2,13 @@
 	import { mdiArrowLeftBold, mdiClose } from '@mdi/js';
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
-	import { errorMessage, markDifferent, mergeItem, previewMerge } from '#lib/api/client.ts';
+	import {
+		errorMessage,
+		markDifferent,
+		mergeItem,
+		previewMerge,
+		trashItem
+	} from '#lib/api/client.ts';
 	import type { DuplicateOut, ItemOut, MergeStep } from '#lib/api/generated/types.gen.ts';
 	import { fullName, typeName } from '#lib/format.ts';
 	import Icon from '#lib/Icon.svelte';
@@ -27,6 +33,8 @@
 	/** The other paper kept instead of the recommended one. */
 	let swapped = $state(false);
 	let steps = $state<MergeStep[] | null>(null);
+	/** The version whose details the paper shows after merging. */
+	let shownVersion = $state<string | null>(null);
 	let busy = $state(false);
 	let changed = false;
 
@@ -45,7 +53,9 @@
 		steps = null;
 		if (!from || !into || !pair?.can_merge) return;
 		previewMerge({ path: { item_id: from.id }, query: { into: into.id } }).then(({ data }) => {
-			if (away?.id === from.id && keep?.id === into.id) steps = data?.steps ?? [];
+			if (away?.id !== from.id || keep?.id !== into.id) return;
+			steps = data?.steps ?? [];
+			shownVersion = data?.shown_version_id ?? null;
 		});
 	});
 
@@ -67,7 +77,10 @@
 	async function merge() {
 		if (!keep || !away || busy) return;
 		busy = true;
-		const { error } = await mergeItem({ path: { item_id: away.id }, body: { into: keep.id } });
+		const { error } = await mergeItem({
+			path: { item_id: away.id },
+			body: { into: keep.id, leave, drop }
+		});
 		busy = false;
 		if (error) {
 			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
@@ -75,6 +88,20 @@
 		}
 		notify({ kind: 'success', title: 'Merged', text: `“${away.title}” is in the trash.` });
 		await loadOrganize();
+		done();
+	}
+
+	/** No merging: the other paper simply goes to the trash. */
+	async function trashOther() {
+		if (!away || busy) return;
+		busy = true;
+		const { error } = await trashItem({ path: { item_id: away.id } });
+		busy = false;
+		if (error) {
+			notify({ kind: 'warning', title: 'Not moved to the trash', text: errorMessage(error) });
+			return;
+		}
+		notify({ kind: 'success', title: 'In the trash', text: `“${away.title}”, not merged.` });
 		done();
 	}
 
@@ -96,6 +123,7 @@
 			m: () => pair?.can_merge && merge(),
 			s: () => (swapped = !swapped),
 			n: () => different(),
+			t: () => trashOther(),
 			ArrowRight: () => next(),
 			ArrowLeft: () => {
 				swapped = false;
@@ -109,63 +137,106 @@
 		}
 	}
 
-	const collectionNames = (item: ItemOut): string[] =>
-		item.collection_ids
-			.map((id) => organize.collections.find((c) => c.id === id)?.name)
-			.filter((name): name is string => Boolean(name));
-
 	/** What becomes of a value when merging: on the kept paper it stays; on
 	 * the other it moves over, is there already, or goes to the trash with
 	 * the paper. Plain: not known yet. */
 	type Fate = 'stays' | 'moves' | 'same' | 'goes' | 'plain';
-	type Chip = { text: string; fate: Fate; why?: string };
+	type Chip = { text: string; fate: Fate; why?: string; toggle?: () => void };
 	const FATE: Record<Fate, { mark: string; words: string }> = {
 		stays: { mark: '✓', words: 'stays' },
 		moves: { mark: '←', words: 'moves to the kept paper' },
 		same: { mark: '=', words: 'there already' },
-		goes: { mark: '✕', words: 'goes to the trash with the paper' },
+		goes: { mark: '✕', words: 'goes to the trash' },
 		plain: { mark: '', words: '' }
-	};
-
-	const identifierText = (i: { scheme: string; value: string }) =>
-		`${i.scheme.toUpperCase()} ${i.value}`;
-
-	/** A paper's details, each with its label, to compare line by line. */
-	function details(item: ItemOut): [string, string[]][] {
-		return [
-			['Authors', item.authors.length ? [item.authors.map(fullName).join(', ')] : []],
-			['Year', item.year ? [String(item.year)] : []],
-			['Published in', item.container_title ? [item.container_title] : []],
-			['Type', [typeName(item.type)]],
-			['Identifiers', item.identifiers.map(identifierText)],
-			['Files', (item.files ?? []).map((f) => f.filename)],
-			['Tags', item.tags.map((t) => t.name)],
-			['Collections', collectionNames(item)],
-			['Owner', [libraryName(item.library_id)]]
-		];
-	}
-	// Rows whose things merging moves one by one: from the merge's own plan.
-	const PLANNED: Record<string, string> = {
-		Files: 'file',
-		Tags: 'tag',
-		Collections: 'collection',
-		Notes: 'note'
 	};
 	const FROM_STEP: Record<string, Fate> = { move: 'moves', already: 'same', stays: 'goes' };
 
-	function fateOf(label: string, text: string, onKept: string[]): Chip {
-		if (!steps) return { text, fate: 'plain' };
-		if (label === 'Identifiers') {
-			// It goes along with its version.
-			const id = text.replace(/^(\S+) /, (_, scheme: string) => `${scheme.toLowerCase()} `);
-			const version = steps.find((s) => s.kind === 'version' && s.name.includes(id));
-			if (version)
-				return { text, fate: FROM_STEP[version.action], why: version.reason ?? undefined };
+	/** The person's choices for this pair: what of the other paper not to
+	 * take over, and what to remove from the kept one. */
+	let leave = $state<string[]>([]);
+	let drop = $state<string[]>([]);
+	$effect(() => {
+		void keep?.id;
+		void away?.id;
+		leave = [];
+		drop = [];
+	});
+	const flip = (list: string[], id: string) =>
+		list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+
+	/** Files that move along with their version (they follow it in the plan). */
+	const versionOf = $derived.by(() => {
+		const found = new Map<string, string>();
+		let version: MergeStep | null = null;
+		for (const step of steps ?? []) {
+			if (step.kind === 'version') version = step;
+			else if (step.kind === 'file' && step.id && version?.action === 'move' && version.id) {
+				found.set(step.id, version.id);
+			}
 		}
+		return found;
+	});
+	const versionsMoving = $derived(
+		(steps ?? []).some((s) => s.kind === 'version' && s.action === 'move' && !leave.includes(s.id!))
+	);
+
+	/** The other paper's version will be the one shown (it ranks first:
+	 * pinned, or published before preprint) unless it is left out. */
+	const otherShown = $derived(
+		Boolean(
+			shownVersion &&
+			!leave.includes(shownVersion) &&
+			(steps ?? []).some(
+				(s) => s.kind === 'version' && s.id === shownVersion && s.action === 'move'
+			)
+		)
+	);
+
+	/** A step of the plan as a chip: what moves over can be left out. */
+	function planned(step: MergeStep): Chip {
+		const chip: Chip = {
+			text: step.name,
+			fate: FROM_STEP[step.action],
+			why: step.reason ?? undefined
+		};
+		const version = step.id ? versionOf.get(step.id) : undefined;
+		if (version && leave.includes(version)) {
+			return { ...chip, fate: 'goes', why: 'its version stays with the other paper' };
+		}
+		if (step.action === 'already' && step.id && drop.includes(step.id)) {
+			return { ...chip, fate: 'goes', why: 'removed from the kept paper too' };
+		}
+		if (step.action !== 'move' || !step.id) return chip;
+		const id = step.id;
+		const left = leave.includes(id);
+		return {
+			...chip,
+			fate: left ? 'goes' : 'moves',
+			why: left ? 'left out' : undefined,
+			toggle: () => (leave = flip(leave, id))
+		};
+	}
+
+	/** One of the kept paper's tags, collections or files: can be removed. */
+	function own(text: string, id: string, what: string): Chip {
+		const dropped = drop.includes(id);
+		return {
+			text,
+			fate: dropped ? 'goes' : 'stays',
+			why: dropped ? what : undefined,
+			toggle: () => (drop = flip(drop, id))
+		};
+	}
+
+	/** One of the other paper's details: stays with its version if that
+	 * moves over (the kept paper's details are the ones shown). */
+	function detail(text: string, onKept: string[], owner = false): Chip {
+		if (!steps) return { text, fate: 'plain' };
 		if (onKept.includes(text)) return { text, fate: 'same' };
-		// Kept with its version when that moves over (the kept paper's
-		// details are the ones shown); otherwise gone with the paper.
-		if (label !== 'Owner' && steps.some((s) => s.kind === 'version' && s.action === 'move')) {
+		if (!owner && otherShown) {
+			return { text, fate: 'moves', why: 'shown after merging: its version comes first' };
+		}
+		if (!owner && versionsMoving) {
 			return {
 				text,
 				fate: 'moves',
@@ -175,53 +246,104 @@
 		return { text, fate: 'goes', why: 'the kept paper’s details are used' };
 	}
 
+	/** An identifier goes where its version goes. */
+	function identifier(text: string, scheme: string, value: string): Chip {
+		const version = (steps ?? []).find(
+			(s) => s.kind === 'version' && s.name.includes(`${scheme} ${value}`)
+		);
+		if (!steps || !version) return { text, fate: 'plain' };
+		return { ...planned(version), text };
+	}
+
 	const rows = $derived.by(() => {
 		if (!keep || !away) return [];
-		const left = details(keep);
-		const right = new Map(details(away));
-		const result = left.map(([label, values]) => {
-			const theirs = right.get(label) ?? [];
-			const kind = PLANNED[label];
-			const planned = kind && steps ? steps.filter((s) => s.kind === kind) : null;
-			return {
-				label,
-				left: values.map((text): Chip => ({ text, fate: 'stays' })),
-				right: planned
-					? planned.map((s): Chip => ({
-							text: s.name,
-							fate: FROM_STEP[s.action],
-							why: s.reason ?? undefined
-						}))
-					: theirs.map((text) => fateOf(label, text, values))
-			};
+		const k = keep;
+		const a = away;
+		const plan = (kind: string) => (steps ?? []).filter((s) => s.kind === kind).map(planned);
+		const names = (item: ItemOut) =>
+			item.collection_ids.map((id) => ({
+				id,
+				name: organize.collections.find((c) => c.id === id)?.name ?? ''
+			}));
+		const shown = (item: ItemOut): Record<string, string[]> => ({
+			Authors: item.authors.length ? [item.authors.map(fullName).join(', ')] : [],
+			Year: item.year ? [String(item.year)] : [],
+			'Published in': item.container_title ? [item.container_title] : [],
+			Type: [typeName(item.type)]
 		});
-		// Notes are only known from the plan (the kept paper's are not listed).
+		const mine = shown(k);
+		const theirs = shown(a);
+		const stays = (text: string): Chip => ({ text, fate: 'stays' });
 		const notes = (steps ?? []).filter((s) => s.kind === 'note');
-		if (notes.length) {
-			result.push({
-				label: 'Notes',
-				left: notes
-					.filter((s) => s.action === 'already')
-					.map((s): Chip => ({ text: s.name, fate: 'stays' })),
-				right: notes.map((s): Chip => ({ text: s.name, fate: FROM_STEP[s.action] }))
-			});
-		}
-		return result;
+		return [
+			...Object.keys(mine).map((label) => ({
+				label,
+				left: mine[label].map(stays),
+				right: theirs[label].map((text) => detail(text, mine[label]))
+			})),
+			{
+				label: 'Identifiers',
+				left: k.identifiers.map((i) => stays(`${i.scheme.toUpperCase()} ${i.value}`)),
+				right: a.identifiers.map((i) =>
+					identifier(`${i.scheme.toUpperCase()} ${i.value}`, i.scheme, i.value)
+				)
+			},
+			{
+				label: 'Files',
+				left: (k.files ?? []).map((f) => own(f.filename, f.id, 'goes to the trash')),
+				right: steps ? plan('file') : (a.files ?? []).map((f) => detail(f.filename, []))
+			},
+			{
+				label: 'Tags',
+				left: k.tags.map((t) => own(t.name, t.id, 'removed from the paper')),
+				right: steps ? plan('tag') : a.tags.map((t) => detail(t.name, []))
+			},
+			{
+				label: 'Collections',
+				left: names(k).map((c) => own(c.name, c.id, 'removed from the collection')),
+				right: steps ? plan('collection') : names(a).map((c) => detail(c.name, []))
+			},
+			// Notes only from the plan (the kept paper's are not listed).
+			...(notes.length
+				? [
+						{
+							label: 'Notes',
+							left: notes.filter((s) => s.action === 'already').map((s) => stays(s.name)),
+							right: notes.map(planned)
+						}
+					]
+				: []),
+			{
+				label: 'Owner',
+				left: [stays(libraryName(k.library_id))],
+				right: [detail(libraryName(a.library_id), [libraryName(k.library_id)], true)]
+			}
+		];
 	});
+	const choosable = $derived(rows.some((r) => [...r.left, ...r.right].some((c) => c.toggle)));
 </script>
 
 {#snippet chips(list: Chip[])}
 	{#if list.length === 0}<span class="muted">none</span>{/if}
 	{#each list as chip, i (i)}
 		{@const fate = FATE[chip.fate]}
-		<span
-			class="chip {chip.fate}"
-			title={[fate.words, chip.why].filter(Boolean).join(': ') || undefined}
-			>{#if fate.mark}<b aria-hidden="true">{fate.mark}</b>
-			{/if}{chip.text}{#if fate.words}<span class="visually-hidden"
-					>({fate.words}{chip.why ? `: ${chip.why}` : ''})</span
-				>{/if}</span
-		>
+		{@const title = [fate.words, chip.why].filter(Boolean).join(': ')}
+		{#if chip.toggle}
+			<button
+				type="button"
+				class="chip {chip.fate}"
+				title="{title}. Click to {chip.fate === 'goes' ? 'keep it' : 'let it go'}."
+				onclick={chip.toggle}
+				disabled={busy}
+				><b aria-hidden="true">{fate.mark}</b>
+				{chip.text}<span class="visually-hidden">({title})</span></button
+			>
+		{:else}
+			<span class="chip {chip.fate}" title={title || undefined}
+				>{#if fate.mark}<b aria-hidden="true">{fate.mark}</b>
+				{/if}{chip.text}{#if title}<span class="visually-hidden">({title})</span>{/if}</span
+			>
+		{/if}
 	{/each}
 {/snippet}
 
@@ -276,15 +398,6 @@
 
 		{#if !pair.can_merge}
 			<p class="warn">Cannot merge: {pair.why.join(', ')}.</p>
-		{:else}
-			<p class="legend">
-				{#each ['stays', 'moves', 'same', 'goes'] as const as fate (fate)}
-					<span class="chip {fate}"
-						><b aria-hidden="true">{FATE[fate].mark}</b> {FATE[fate].words}</span
-					>
-				{/each}
-				{#if steps === null}<span class="muted">Working it out…</span>{/if}
-			</p>
 		{/if}
 
 		<table class="compare">
@@ -305,16 +418,32 @@
 				{/each}
 			</tbody>
 		</table>
-		{#if pair.can_merge && !swapped && pair.why.length}<p class="muted why">
+		<p class="legend muted">
+			{#each ['stays', 'moves', 'same', 'goes'] as const as fate (fate)}
+				<span><b class={fate} aria-hidden="true">{FATE[fate].mark}</b> {FATE[fate].words}</span>
+			{/each}
+			{#if steps === null && pair.can_merge}<span>Working it out…</span>{/if}
+		</p>
+		{#if otherShown}<p class="muted hint">
+				After merging, the paper shows the other one’s details: its version comes first (a pinned or
+				published version before a preprint, else the newer one). The kept paper’s details stay with
+				its own version.
+			</p>{/if}
+		{#if choosable}<p class="muted hint">
+				Click a file, tag, collection or note to keep it or let it go.
+			</p>{/if}
+		{#if pair.can_merge && !swapped && pair.why.length}<p class="muted hint">
 				Suggested to keep the left one because it {pair.why.join(', ')}.
 			</p>{/if}
 
 		<footer>
 			<div class="keys muted">
-				<kbd>M</kbd> merge <kbd>S</kbd> swap <kbd>N</kbd> not the same <kbd>→</kbd> skip
+				<kbd>M</kbd> merge <kbd>S</kbd> swap <kbd>N</kbd> not the same <kbd>T</kbd> trash the other
+				<kbd>→</kbd> skip
 			</div>
 			<div class="buttons">
 				<button onclick={different} disabled={busy}>Not the same paper</button>
+				<button onclick={trashOther} disabled={busy}>Trash the other one</button>
 				<button onclick={() => (swapped = !swapped)} disabled={busy}>Keep the other one</button>
 				<button onclick={next} disabled={busy}>Skip</button>
 				<button
@@ -492,15 +621,37 @@
 	.chip.goes b {
 		color: var(--danger);
 	}
+	button.chip {
+		font: inherit;
+		color: inherit;
+		background: none;
+		cursor: pointer;
+	}
+	button.chip:hover {
+		background: var(--rail);
+	}
+	button.chip.goes {
+		text-decoration: line-through;
+		text-decoration-color: var(--danger);
+	}
 	.legend {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
-		gap: 4px 8px;
-		margin: 14px 0 0;
+		gap: 2px 14px;
+		margin: 0 0 4px;
 		font-size: var(--step--1);
 	}
-	.why {
+	.legend b {
+		font-weight: 700;
+	}
+	.legend .stays,
+	.legend .moves {
+		color: var(--success);
+	}
+	.legend .goes {
+		color: var(--danger);
+	}
+	.hint {
 		margin: 0;
 		font-size: var(--step--1);
 	}

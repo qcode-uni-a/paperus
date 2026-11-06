@@ -729,9 +729,17 @@ def list_duplicates(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[I
 class MergeInto(BaseModel):
     into: uuid.UUID
     """The paper that stays; this one goes to the trash."""
+    leave: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    """Versions, files, tags, collections and notes of this paper (ids from
+    the preview) not to take over: they go to the trash with it."""
+    drop: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    """Tags, collections and files of the paper that stays to remove from it
+    at the same time (files to the trash)."""
 
 
 class MergeStep(BaseModel):
+    id: uuid.UUID | None
+    """The version, file, tag, collection or note (for ``leave``)."""
     kind: merge.Kind
     name: str
     action: merge.Action
@@ -742,6 +750,10 @@ class MergeStep(BaseModel):
 
 class MergePreview(BaseModel):
     steps: list[MergeStep]
+    shown_version_id: uuid.UUID | None = None
+    """The version whose details the paper shows after merging (if every
+    version that can move over does): one of the other paper's if it ranks
+    first (pinned, then published before preprint)."""
 
 
 class MergeOut(MergePreview):
@@ -751,7 +763,7 @@ class MergeOut(MergePreview):
 
 def _steps(steps: list[merge.Step]) -> list[MergeStep]:
     return [
-        MergeStep(kind=s.kind, name=s.name, action=s.action, reason=s.reason)
+        MergeStep(id=s.id, kind=s.kind, name=s.name, action=s.action, reason=s.reason)
         for s in steps
     ]
 
@@ -767,9 +779,16 @@ def preview_merge(
     source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     target = get_readable_item(db, access, into, allow_trashed=False)
     try:
-        return MergePreview(steps=_steps(merge.plan_merge(access, source, target, db)))
+        steps = merge.plan_merge(access, source, target, db)
     except merge.CannotMerge as error:
         raise HTTPException(409, str(error)) from error
+    moving = {s.id for s in steps if s.kind == "version" and s.action == "move"}
+    shown = library.preferred_of(
+        [*target.versions, *(v for v in source.versions if v.id in moving)]
+    )
+    return MergePreview(
+        steps=_steps(steps), shown_version_id=shown.id if shown else None
+    )
 
 
 @router.post("/api/items/{item_id}/merge")
@@ -786,7 +805,9 @@ def merge_item(
     source = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
     target = get_readable_item(db, access, body.into, allow_trashed=False)
     try:
-        steps = merge.merge_items(db, access, source, target)
+        steps = merge.merge_items(
+            db, access, source, target, leave=set(body.leave), drop=set(body.drop)
+        )
     except merge.CannotMerge as error:
         raise HTTPException(409, str(error)) from error
     db.commit()

@@ -1293,6 +1293,14 @@ export type MergeInto = {
      * Into
      */
     into: string;
+    /**
+     * Leave
+     */
+    leave?: Array<string>;
+    /**
+     * Drop
+     */
+    drop?: Array<string>;
 };
 
 /**
@@ -1303,6 +1311,10 @@ export type MergeOut = {
      * Steps
      */
     steps: Array<MergeStep>;
+    /**
+     * Shown Version Id
+     */
+    shown_version_id?: string | null;
     item: ItemDetail;
 };
 
@@ -1314,12 +1326,20 @@ export type MergePreview = {
      * Steps
      */
     steps: Array<MergeStep>;
+    /**
+     * Shown Version Id
+     */
+    shown_version_id?: string | null;
 };
 
 /**
  * MergeStep
  */
 export type MergeStep = {
+    /**
+     * Id
+     */
+    id: string | null;
     /**
      * Kind
      */

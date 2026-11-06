@@ -10,6 +10,14 @@
   and for what moves over from the other one (all its files, tags,
   collections, notes, and its version with its details), grey for what is
   there already, red for what goes to the trash with the paper.
+  - **Choose what to keep**: a click on a file, tag, collection or note
+    leaves it out of the merge, or removes it from the kept paper (a file
+    to the trash), all in the same step as the merge
+    (`POST /api/items/{id}/merge` with `leave` and `drop`).
+  - **Trash the other one** (`T`): no merging, the other paper only goes
+    to the trash.
+  - It says when the paper will show the other one's details after
+    merging (its version comes first, e.g. published before preprint).
 - **Browser extension in the stores**: listed on addons.mozilla.org
   (Firefox 140 or later, and Firefox for Android 142 or later); handed in
   at the Chrome Web Store. Firefox asks at install whether it may send the

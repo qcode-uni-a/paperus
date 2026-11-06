@@ -4,7 +4,7 @@ import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from paperus.models import File, Item, MetadataSource, TextStatus, Version
@@ -163,6 +163,9 @@ def test_merging_keeps_notes_and_stars(client: TestClient, db: Session) -> None:
     both = ada.note("Comparison", items=[away, keep])
     ada.put(f"/api/items/{away}/favourite")
     preview = ada.get(f"/api/items/{away}/merge-preview", params={"into": keep}).json()
+    # The newer version (both are "other") is shown after merging.
+    versions = [s["id"] for s in preview["steps"] if s["kind"] == "version"]
+    assert preview["shown_version_id"] == versions[0]
     notes = {s["name"]: s["action"] for s in preview["steps"] if s["kind"] == "note"}
     assert notes == {"Comparison": "already", "Reading notes": "move"}
     assert ada.post(f"/api/items/{away}/merge", json={"into": keep}).status_code == 200
@@ -218,3 +221,56 @@ def test_same_title_by_other_authors_is_no_duplicate(
     pairs = ada.get("/api/duplicates").json()
     found = [{p["keep"]["id"], p["merge"]["id"]} for p in pairs]
     assert sorted(found, key=sorted) == sorted([same, anonymous], key=sorted)
+
+
+def test_merging_with_choices(client: TestClient, db: Session) -> None:
+    """What to take over and what to drop from the kept paper, chosen in the
+    review: all of it in the same step as the merge."""
+    ada = Person(client, db, "ada")
+    keep = paper(ada, "Storms over the Alps")
+    away = paper(ada, "Storms over the Alps.")
+
+    def upload(item: str, name: str, data: bytes, kind: str) -> str:
+        response = ada.post(
+            f"/api/items/{item}/files", files={"upload": (name, data, kind)}
+        )
+        assert response.status_code == 201, response.text
+        file_id: str = response.json()["id"]
+        return file_id
+
+    old_scan = upload(keep, "old.pdf", PDF, "application/pdf")
+    pdf = upload(away, "storms.pdf", PDF + b"other", "application/pdf")
+    snapshot = upload(away, "snapshot.html", b"<p>Storms</p>", "text/html")
+    for item, name in ((keep, "Alps"), (keep, "unread"), (away, "Storms"), (away, "x")):
+        ada.post(f"/api/items/{item}/tags", json={"name": name})
+    note = ada.note("Draft thoughts", items=[away])
+    steps = ada.get(f"/api/items/{away}/merge-preview", params={"into": keep}).json()
+    ids = {s["name"]: s["id"] for s in steps["steps"]}
+    tags = {t["name"]: t["id"] for t in ada.get("/api/tags").json()}
+
+    # Only the kept paper's own things can be dropped.
+    wrong = {"into": keep, "drop": [pdf]}
+    assert ada.post(f"/api/items/{away}/merge", json=wrong).status_code == 409
+
+    choices = {
+        "into": keep,
+        "leave": [ids["snapshot.html"], ids["x"], ids["Draft thoughts"]],
+        "drop": [tags["unread"], old_scan],
+    }
+    response = ada.post(f"/api/items/{away}/merge", json=choices)
+    assert response.status_code == 200, response.text
+    kept = ada.get(f"/api/items/{keep}").json()
+    assert {t["name"] for t in kept["tags"]} == {"Alps", "Storms"}
+    live = {
+        f["filename"]
+        for v in kept["versions"]
+        for f in v["files"]
+        if f["deleted_at"] is None
+    }
+    assert live == {"storms.pdf"}
+    # Left behind and dropped files are in the trash, restorable.
+    trashed = db.scalars(select(File).where(File.deleted_at.is_not(None))).all()
+    assert {str(f.id) for f in trashed} == {snapshot, old_scan}
+    assert note["id"] not in {
+        n["id"] for n in ada.get(f"/api/notes?item={keep}").json()
+    }
