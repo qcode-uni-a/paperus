@@ -1,4 +1,4 @@
-import { call, type Library, saveSettings, settings } from './paperus';
+import { type Api, call, saveSettings, settings } from './paperus';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const message = (text: string) => ($('message').textContent = text);
@@ -14,7 +14,7 @@ async function show(): Promise<void> {
 	const owner = $<HTMLSelectElement>('owner');
 	owner.replaceChildren(new Option('My default owner (set in paperus)', ''));
 	try {
-		const { data } = await call<Library[]>('/api/libraries');
+		const { data } = await call<Api.ListLibrariesData, Api.ListLibrariesResponse>('/api/libraries');
 		for (const library of (data ?? []).filter((l) => l.writable)) {
 			owner.append(new Option(library.name, library.id, false, library.id === config.owner));
 		}

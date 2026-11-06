@@ -37,7 +37,7 @@ repos:
         name: tsc (extension)
         entry: npm --prefix extension run check
         language: system
-        files: ^extension/
+        files: ^(extension/|web/src/lib/api/generated/)
         pass_filenames: false
       - id: prettier
         name: prettier (web)

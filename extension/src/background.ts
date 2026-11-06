@@ -1,7 +1,7 @@
 /** One click on the toolbar button saves the page's paper to paperus, with
  * its PDF (fetched in the page, with the reader's own access). */
 import { fetchPdf, type PageInfo, readPage, showNote } from './page';
-import { call, type Item, type Library, PaperusError, saveSettings, settings } from './paperus';
+import { type Api, call, PaperusError, saveSettings, settings } from './paperus';
 
 const MAX_BYTES = 512 * 1024 * 1024;
 
@@ -69,13 +69,12 @@ async function save(
 	const config = await settings();
 	const owner = config?.owner ? { library_id: config.owner } : {};
 	const doi = page.doi ?? (page.arxiv ? `10.48550/arXiv.${page.arxiv}` : null);
-	let added = doi ? await call<Item>('/api/items', { method: 'POST', json: { doi, ...owner } }).catch(() => null) : null;
+	const addItem = (json: Api.ItemIn) =>
+		call<Api.AddItemData, Api.AddItemResponse>('/api/items', { method: 'POST', json });
+	let added = doi ? await addItem({ doi, ...owner }).catch(() => null) : null;
 	if (!added || added.status >= 400) {
 		if (!page.title) throw new PaperusError('This page names no paper (no DOI, arXiv ID or title).');
-		added = await call<Item>('/api/items', {
-			method: 'POST',
-			json: { metadata: csl(page), identifiers: identifiers(page), ...owner }
-		});
+		added = await addItem({ metadata: csl(page), identifiers: identifiers(page), ...owner });
 	}
 	const item = added.data;
 	const known = added.status === 200;
@@ -86,13 +85,17 @@ async function save(
 		const bytes = Uint8Array.from(atob(pdf.base64), (c) => c.charCodeAt(0));
 		const digest = await crypto.subtle.digest('SHA-256', bytes);
 		const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-		const existing = await call(`/api/uploads/${sha}`);
+		const existing = await call<Api.FindUploadData>('/api/uploads/{sha256}', { path: { sha256: sha } });
 		if (existing.status === 200) {
 			fileNote = ' The PDF is there already.';
 		} else {
 			const form = new FormData();
 			form.append('upload', new Blob([bytes], { type: 'application/pdf' }), filename(page));
-			await call(`/api/items/${item.id}/files`, { method: 'POST', body: form });
+			await call<Api.UploadToItemData>('/api/items/{item_id}/files', {
+				method: 'POST',
+				path: { item_id: item.id },
+				form
+			});
 			fileNote = ' With its PDF.';
 		}
 	}
@@ -104,8 +107,8 @@ async function save(
 	};
 }
 
-function identifiers(page: Partial<PageInfo>): { scheme: string; value: string }[] {
-	const found = [];
+function identifiers(page: Partial<PageInfo>): Api.IdentifierIn[] {
+	const found: Api.IdentifierIn[] = [];
 	if (page.doi) found.push({ scheme: 'doi', value: page.doi });
 	if (page.arxiv) found.push({ scheme: 'arxiv', value: page.arxiv });
 	return found;
@@ -165,7 +168,7 @@ async function arxivPdf(id: string): Promise<{ base64: string; size: number } | 
 /** For the buttons on arXiv: which of these papers one has. */
 async function lookup(ids: string[]): Promise<Record<string, string | null>> {
 	if (!(await settings()) || ids.length === 0) return {};
-	const { data } = await call<Record<string, string | null>>('/api/items/lookup', {
+	const { data } = await call<Api.LookupItemsData, Api.LookupItemsResponse>('/api/items/lookup', {
 		query: { id: ids.map((id) => `arxiv:${id}`) }
 	});
 	return Object.fromEntries(ids.map((id) => [id, data[`arxiv:${id}`] ?? null]));
@@ -196,7 +199,7 @@ async function connect(server: string): Promise<{ ok: boolean; text: string }> {
 		).catch(() => null);
 		if (token) {
 			await saveSettings({ server: base, token });
-			const { data } = await call<Library[]>('/api/libraries');
+			const { data } = await call<Api.ListLibrariesData, Api.ListLibrariesResponse>('/api/libraries');
 			const writable = (data ?? []).filter((l) => l.writable);
 			await inPage(tabId, () => {
 				const mark = document.querySelector<HTMLElement>('[data-paperus-extension-token]');
