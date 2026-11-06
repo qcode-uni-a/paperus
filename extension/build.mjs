@@ -50,7 +50,15 @@ const browsers = {
 		...base,
 		background: { scripts: ['background.js'], type: 'module' },
 		browser_specific_settings: {
-			gecko: { id: 'paperus@qcode-uni-a.github.io', strict_min_version: '128.0' }
+			gecko: {
+				id: 'paperus@qcode-uni-a.github.io',
+				// 140: Firefox's own consent dialog for the data below.
+				strict_min_version: '140.0',
+				// Sent to the person's own paperus only: the page's address and
+				// details, its PDF, and the arXiv IDs on arXiv pages (to mark the
+				// papers one has).
+				data_collection_permissions: { required: ['browsingActivity', 'websiteContent'] }
+			}
 		}
 	}
 };

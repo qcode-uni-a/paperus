@@ -147,13 +147,14 @@ jobs:
             found { print }
           ' CHANGELOG.md > notes.md
           test -s notes.md || echo "See CHANGELOG.md." > notes.md
-      # The browser extension, to load unpacked until it is in the stores.
+      # The browser extension (to load unpacked, or hand in at the stores)
+      # and its source, which Firefox's review needs.
       - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: npm
           cache-dependency-path: extension/package-lock.json
-      - run: npm ci && npm run build
+      - run: npm ci && npm run build && npm run source
         working-directory: extension
       - run: >
           gh release create "$GITHUB_REF_NAME" --title "paperus $GITHUB_REF_NAME"

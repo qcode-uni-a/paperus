@@ -20,9 +20,9 @@ release, or build it (below).
 
 - **Chrome, Edge, Brave**: unzip; open `chrome://extensions`, switch on
   Developer mode, "Load unpacked", choose the folder.
-- **Firefox**: open `about:debugging#/runtime/this-firefox`, "Load Temporary
-  Add-on…", choose the zip (until Firefox restarts; a signed version comes
-  with the store).
+- **Firefox** (140 or later): open `about:debugging#/runtime/this-firefox`,
+  "Load Temporary Add-on…", choose the zip (until Firefox restarts; a signed
+  version comes with the store).
 
 Then open the extension's settings (it opens by itself on the first click),
 enter your paperus address and click Connect; confirm in the paperus tab.
@@ -35,6 +35,11 @@ npm ci
 npm run check   # TypeScript
 npm run build   # dist/chrome, dist/firefox and their zips
 ```
+
+Building needs Node.js (22 or later; CI uses 26) and `python3` (for the
+zips). The output is not minified: `dist/firefox` is what is handed in at
+addons.mozilla.org, `npm run source` packs the source (what git has) for
+the review. What it sends and keeps: `PRIVACY.md`.
 
 `src/background.ts` handles the button and the calls to paperus,
 `src/page.ts` runs inside the web page (details, PDF, the note),
