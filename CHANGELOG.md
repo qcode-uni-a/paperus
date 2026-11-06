@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.0.11 (2026-11-07)
+
+Search finds more: scanned pages are read (OCR), a reranker puts the best
+hits first, and the ML service runs on NVIDIA GPUs. Papers without PDFs
+get them (open copies by the server, the rest with the browser
+extension), smart collections fill themselves, and AI assistants can tidy
+the library.
 
 - **Tidying with AI assistants** (MCP): the Manage pages as tools.
   `library_checkup` says what needs looking at; duplicates (list, merge,
