@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Daily backups from the start**: a new server (or one where backups were
+  never set up) backs up its database every night at 03:00 UTC and keeps
+  the newest 7; the files (PDFs) are added under Administration → Backups.
+
 - **Getting started** on the library page: the first steps, each ticked
   off once done (a paper added, a library imported, the browser extension
   connected, an AI assistant connected), and for administrators what the

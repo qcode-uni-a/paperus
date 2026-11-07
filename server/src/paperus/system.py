@@ -216,12 +216,14 @@ BACKUPS_KEY = "backups"
 class BackupConfig(BaseModel):
     """When backups run on their own (checked every hour by the worker)."""
 
-    schedule: Literal["off", "daily", "weekly"] = "off"
-    """Weekly backups run on Mondays."""
+    schedule: Literal["off", "daily", "weekly"] = "daily"
+    """Weekly backups run on Mondays. Daily from the start, so a new server
+    is never without one."""
     hour: int = Field(3, ge=0, le=23)
     """At which hour (UTC)."""
-    with_files: bool = True
-    """Also back up the files (only new ones are copied each time)."""
+    with_files: bool = False
+    """Also back up the files (only new ones are copied each time); by
+    default the database only, which is small."""
     keep: int = Field(7, ge=1, le=365)
     """How many backups to keep; older ones are removed."""
 

@@ -66,7 +66,7 @@
 					{
 						done: steps.server.backups,
 						title: 'Turn on backups',
-						text: 'They are off until you choose when they run.',
+						text: 'They are switched off: nothing is backed up on its own.',
 						links: [[resolve('/admin/backups'), 'Backups']]
 					},
 					{

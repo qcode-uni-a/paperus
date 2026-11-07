@@ -55,8 +55,9 @@ def test_a_persons_steps(client: TestClient, db: Session) -> None:
 def test_the_servers_steps(client: TestClient, db: Session, fake_ml: FakeML) -> None:
     root = Person(client, db, "root", admin=True)
     server = root.get("/api/me/getting-started").json()["server"]
+    # Daily backups (of the database) from the start.
     assert server == {
-        "backups": False,
+        "backups": True,
         "contact_email": False,
         "search": True,
         "people": False,
@@ -64,7 +65,7 @@ def test_the_servers_steps(client: TestClient, db: Session, fake_ml: FakeML) -> 
 
     response = root.put(
         "/api/admin/backups/config",
-        json={"schedule": "daily", "hour": 3, "with_files": True, "keep": 7},
+        json={"schedule": "off", "hour": 3, "with_files": False, "keep": 7},
     )
     assert response.status_code == 200, response.text
     config = root.get("/api/admin/config").json()
@@ -76,7 +77,7 @@ def test_the_servers_steps(client: TestClient, db: Session, fake_ml: FakeML) -> 
     fake_ml.down = True
     server = root.get("/api/me/getting-started").json()["server"]
     assert server == {
-        "backups": True,
+        "backups": False,
         "contact_email": True,
         "search": False,
         "people": True,

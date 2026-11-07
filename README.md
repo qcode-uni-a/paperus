@@ -55,7 +55,8 @@ Just trying it out, without HTTPS? Open `http://localhost:8000` on the same
 machine; from another computer on the network, set `COOKIE_SECURE=false` in
 `.env` first (the login cookie is otherwise sent over HTTPS only).
 
-Back up from Administration → Backups (now, or daily or weekly), into
+Backups of the database run every night from the start; add the files (the
+PDFs), or change when, under Administration → Backups. They go into
 `BACKUP_LOCATION` on another disk; restoring is described in
 [operations](docs/operations.md#backups). To update, change `PAPERUS_VERSION`
 or pull `release` again, then `docker compose up -d`.

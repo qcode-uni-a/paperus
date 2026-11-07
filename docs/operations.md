@@ -228,7 +228,8 @@ its schedule.
 ## Backups
 
 Administration → Backups writes backups now or on a schedule (daily or
-weekly, at a chosen hour, keeping the newest N), into `BACKUP_LOCATION`;
+weekly, at a chosen hour, keeping the newest N; by default daily at 03:00
+UTC, the database only, the newest 7), into `BACKUP_LOCATION`;
 put that on another disk or a network share. Each backup is a folder with
 every table (compressed, with checksums) and a manifest naming the paperus
 version and database migration. With "files", the files are copied too:

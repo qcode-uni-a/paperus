@@ -5867,7 +5867,7 @@
               "weekly"
             ],
             "title": "Schedule",
-            "default": "off"
+            "default": "daily"
           },
           "hour": {
             "type": "integer",
@@ -5879,7 +5879,7 @@
           "with_files": {
             "type": "boolean",
             "title": "With Files",
-            "default": true
+            "default": false
           },
           "keep": {
             "type": "integer",

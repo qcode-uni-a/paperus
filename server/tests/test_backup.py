@@ -193,7 +193,7 @@ def test_schedule() -> None:
 def test_backup_api(admin: TestClient, settings: Settings) -> None:
     listed = admin.get("/api/admin/backups").json()
     assert listed["backups"] == []
-    assert listed["config"]["schedule"] == "off"
+    assert listed["config"]["schedule"] == "daily"
     config = {"schedule": "daily", "hour": 2, "with_files": False, "keep": 3}
     assert admin.put("/api/admin/backups/config", json=config).json() == config
     assert admin.get("/api/admin/backups").json()["config"] == config

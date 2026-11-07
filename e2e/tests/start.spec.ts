@@ -47,6 +47,10 @@ test('the administrator sees what the server still needs', async ({ page }) => {
 	await expect(
 		steps.getByRole('listitem').filter({ hasText: 'Start the machine learning service' })
 	).toContainText('search finds words only');
-	await steps.getByRole('link', { name: 'Backups' }).click();
-	await expect(page).toHaveURL(/\/admin\/backups$/);
+	// Backups run daily from the start.
+	await expect(
+		steps.getByRole('listitem').filter({ hasText: 'Turn on backups' }).getByRole('img')
+	).toHaveAccessibleName('Done');
+	await steps.getByRole('link', { name: 'Server settings' }).click();
+	await expect(page).toHaveURL(/\/admin\/settings\?open=server$/);
 });
