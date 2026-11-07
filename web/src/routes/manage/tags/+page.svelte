@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { deleteTag, errorMessage } from '#lib/api/client.ts';
+	import { deleteTag, errorMessage, removeKeywords } from '#lib/api/client.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 	import IconButton from '#lib/IconButton.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import {
@@ -29,14 +30,25 @@
 
 	const writable = (tag: Tag) => libraryById(tag.library_id)?.writable ?? false;
 
+	/** Only the papers' keywords (from their details on import: arXiv
+	 * categories, a publisher's subjects), put on by no one: hidden unless
+	 * asked for. */
+	const keyword = (tag: Tag) =>
+		tag.count > 0 && !tag.sources.manual && !tag.sources.ai && !!tag.sources.automatic;
+	let showKeywords = $state(false);
+	const keywordCount = $derived(organize.tags.filter(keyword).length);
+	/** Keywords on papers that this person may take off. */
+	const removable = $derived(organize.tags.some((tag) => tag.sources.automatic && writable(tag)));
+
 	let owner = $state('');
 	const shown = $derived.by(() => {
 		const words = filter.trim().toLowerCase();
 		const matching = organize.tags.filter(
 			(tag) =>
-				((!owner || tag.library_id === owner) && !words) ||
-				tag.name.toLowerCase().includes(words) ||
-				(tag.description ?? '').toLowerCase().includes(words)
+				(showKeywords || !keyword(tag)) &&
+				(((!owner || tag.library_id === owner) && !words) ||
+					tag.name.toLowerCase().includes(words) ||
+					(tag.description ?? '').toLowerCase().includes(words))
 		);
 		const key = (tag: Tag): string | number =>
 			sort === 'name' ? tag.name.toLowerCase() : sort === 'count' ? tag.count : (tag[sort] ?? '');
@@ -87,10 +99,30 @@
 		await loadOrganize();
 	}
 
+	async function removeAllKeywords() {
+		if (
+			!confirm(
+				'Take the keywords off every paper? They came with the papers’ details on import (arXiv categories, publishers’ subjects, authors’ keywords), not from anyone here. Tags put on by hand stay, also where they were keywords before.'
+			)
+		)
+			return;
+		const { data, error: failure } = await removeKeywords();
+		if (!data) {
+			error = errorMessage(failure);
+			return;
+		}
+		notify({
+			kind: 'success',
+			title: 'Keywords removed',
+			text: `Taken off papers ${data.links} ${data.links === 1 ? 'time' : 'times'}; ${data.tags} no longer used.`
+		});
+		await loadOrganize();
+	}
+
 	function sources(tag: Tag): string {
 		const parts = [
 			['by hand', tag.sources.manual],
-			['automatically', tag.sources.automatic],
+			['as keyword', tag.sources.automatic],
 			['by AI', tag.sources.ai]
 		] as const;
 		const given = parts.filter(([, n]) => n);
@@ -108,7 +140,10 @@
 			<p class="muted">
 				{organize.tags.length}
 				{organize.tags.length === 1 ? 'tag' : 'tags'} on {used}
-				{used === 1 ? 'item' : 'items'}{unused ? `; ${unused} not used` : ''}.
+				{used === 1 ? 'item' : 'items'}{unused ? `; ${unused} not used` : ''}{keywordCount &&
+				!showKeywords
+					? `; ${keywordCount} keywords, not shown`
+					: ''}.
 			</p>
 		{/if}
 	</div>
@@ -134,6 +169,16 @@
 					<option value={library.id}>{libraryName(library.id)}</option>
 				{/each}
 			</select>
+		{/if}
+
+		{#if keywordCount}
+			<label class="show-keywords">
+				<input type="checkbox" bind:checked={showKeywords} />
+				Show keywords ({keywordCount})
+			</label>
+		{/if}
+		{#if removable}
+			<button onclick={removeAllKeywords}>Remove all keywords</button>
 		{/if}
 
 		{#if selected.length}
@@ -217,7 +262,13 @@
 					</td>
 				</tr>
 			{:else}
-				<tr><td colspan="7" class="muted none">No tag matches “{filter}”.</td></tr>
+				<tr
+					><td colspan="7" class="muted none"
+						>{filter.trim()
+							? `No tag matches “${filter}”.`
+							: 'All of these are keywords: tick “Show keywords” to see them.'}</td
+					></tr
+				>
 			{/each}
 		</tbody>
 	</table>
@@ -262,7 +313,7 @@
 		gap: 12px;
 		margin-bottom: 12px;
 	}
-	.tools input {
+	.tools input[type='search'] {
 		flex: 1;
 		min-width: 200px;
 		max-width: 360px;
@@ -377,5 +428,16 @@
 		.wide {
 			display: none;
 		}
+	}
+	.show-keywords {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		white-space: nowrap;
+	}
+	.show-keywords input {
+		width: auto;
+		flex: none;
+		margin: 0;
 	}
 </style>

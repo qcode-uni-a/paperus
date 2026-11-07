@@ -49,6 +49,7 @@ from paperus.models import (
     Note,
     NoteItem,
     Tag,
+    TagSource,
     User,
 )
 from paperus.similar import similar_items
@@ -581,17 +582,26 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
 
     @mcp.tool(annotations=READ)
     def list_tags(ctx: Context) -> CallToolResult:
-        """The tags the person can see (their own and their groups')."""
+        """The tags the person can see (their own and their groups').
+        `keyword`: only one of the papers' keywords (from their details on
+        import: arXiv categories, a publisher's subjects, the authors'
+        keywords), not put on by a person."""
         with acting(ctx, Scope.PAPERS_READ) as (db, access, _):
             # Counted over the papers this person sees (not in the trash).
             seen = (
-                select(ItemTag.tag_id, ItemTag.item_id)
+                select(ItemTag.tag_id, ItemTag.item_id, ItemTag.source)
                 .join(Item, Item.id == ItemTag.item_id)
                 .where(Item.deleted_at.is_(None), access.item_filter())
                 .subquery()
             )
             rows = db.execute(
-                select(Tag, func.count(seen.c.item_id))
+                select(
+                    Tag,
+                    func.count(seen.c.item_id),
+                    func.count(seen.c.item_id).filter(
+                        seen.c.source != TagSource.AUTOMATIC
+                    ),
+                )
                 .outerjoin(seen, seen.c.tag_id == Tag.id)
                 .where(Tag.library_id.in_(access.readable))
                 .group_by(Tag.id)
@@ -604,8 +614,9 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                         "papers": count,
                         "description": tag.description,
                         "shared_with": _group_name(db, access, tag.library_id),
+                        "keyword": count > 0 and not by_hand,
                     }
-                    for tag, count in rows
+                    for tag, count, by_hand in rows
                 ]
             )
 

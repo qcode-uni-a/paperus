@@ -176,8 +176,19 @@ Decided 2026-11-05; built in steps (see the changelog).
 | BibTeX / BibLaTeX (`.bib`, or a zip with the files) | JabRef, Zotero, Mendeley, most others | Papers, citation keys, `file` links, keywords as tags, JabRef groups as collections, `annote`/`comment` as notes |
 | RIS (`.ris`) | Mendeley, EndNote, Citavi, publishers | Papers, keywords as tags, notes, file links |
 | CSL-JSON | Zotero, Pandoc | Papers (metadata only) |
+| LaTeX reference list: arXiv source (`.tar.gz`, or by arXiv ID), `.bbl`, zip of a LaTeX project | arXiv, BibTeX/biber, Overleaf | The paper's references, looked up by DOI/arXiv ID (else found on Crossref), in a collection named after the paper |
 
 Mendeley's exports do not include its collections.
+
+What came with a paper's details rather than from a person (Zotero's
+"automatic tags": arXiv categories, a publisher's subjects; Mendeley's
+author keywords, i.e. its `keywords` beyond `mendeley-tags`) is imported
+as the paper's *keywords*, kept apart from tags: shown on a line of their
+own on its page, left out of the tag list and the library's rows unless
+asked for; + makes one a tag, and Manage → Tags → Remove all keywords
+takes them all off. Importing an export again sorts the keywords an
+earlier import took as tags. (Stored as tags with the source
+"automatic".)
 
 - **How**: upload the file (or a zip with it and the files) in the browser
   and choose the owner (oneself or a group); the import runs as a job with
@@ -198,6 +209,23 @@ Mendeley's exports do not include its collections.
   search; a missing file is listed in the report, not an error.
 - **Report** at the end: how many papers were added, found already, and
   which files or entries could not be read.
+- **References of a LaTeX paper** (`paperus.importing.bbl`, `references`):
+  from an arXiv source (uploaded, or fetched by arXiv ID or link with one
+  request to `arxiv.org/e-print/`), a zip of a LaTeX project, or a `.bbl`
+  alone. The `.bbl` is preferred: it is exactly the list the paper prints,
+  while a `.bib` beside it often holds many more entries; without one, a
+  `thebibliography` in the `.tex`, else the `.bib` limited to the keys the
+  `.tex` cites. Read are BibLaTeX's `.bbl` (fields), REVTeX/natbib styles
+  (`\bibinfo` fields) and plain styles (free text: DOIs, arXiv IDs, links).
+  A reference with a DOI or arXiv ID gets its details from the registry as
+  a paper added by DOI does; one without is searched on Crossref
+  (`query.bibliographic`) and taken only if Crossref's score is at least 60
+  (right matches scored 85-109, wrong ones 20-32 on real references), its
+  first author is in the reference, and its title (or, in styles without
+  titles, year, volume and first page) too. References with fields and a
+  title are kept as they are when not found; free text without identifier
+  is not added but listed in the report ("Not recognised: …"). Archives are
+  read in memory, never unpacked to disk, with limits on members and size.
 - **Zotero RDF** is read as an RDF graph (rdflib), so the XML layout does
   not matter; checked against a hand-made sample in Zotero's layout, still
   to be checked against a real export.

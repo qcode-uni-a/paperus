@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { listImports } from '#lib/api/client.ts';
+	import { errorMessage, importArxiv, listImports } from '#lib/api/client.ts';
 	import type { ImportOut } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
 	import { watchImport } from '#lib/processing.svelte.ts';
@@ -32,6 +32,11 @@
 		{
 			name: 'EndNote, Citavi, others',
 			steps: 'Export as RIS (.ris) or BibTeX (.bib) and choose the file here.'
+		},
+		{
+			name: 'arXiv (the references of a paper)',
+			steps:
+				'Type its arXiv ID or link under “Import the references of an arXiv paper”. Or choose a LaTeX source yourself: the .tar.gz from arXiv (“TeX Source”), a zip of a LaTeX project, or a .bbl file. The papers it cites come into a collection named after it; references that cannot be recognised are listed in the report.'
 		}
 	];
 
@@ -104,6 +109,38 @@
 		};
 	});
 
+	let arxiv = $state('');
+	let fetching = $state(false);
+	let arxivError = $state('');
+
+	/** The server downloads the paper's source from arXiv and imports it. */
+	async function startArxiv(event: SubmitEvent) {
+		event.preventDefault();
+		if (!arxiv.trim()) return;
+		arxivError = '';
+		fetching = true;
+		const { data, error: failed } = await importArxiv({
+			body: { arxiv_id: arxiv.trim(), library_id: owner || null }
+		});
+		fetching = false;
+		if (!data) {
+			arxivError = `Could not start: ${errorMessage(failed)}`;
+			return;
+		}
+		started(data);
+		arxiv = '';
+	}
+
+	function started(record: ImportOut) {
+		watchImport(record.id, record.filename);
+		notify({
+			kind: 'info',
+			title: 'Import started',
+			text: 'It runs in the background: you can leave this page; you get a message when it is done.'
+		});
+		load();
+	}
+
 	/** With XMLHttpRequest, for the upload's progress (exports with PDFs are big). */
 	function start(event: SubmitEvent) {
 		event.preventDefault();
@@ -121,15 +158,8 @@
 		request.onload = () => {
 			sending = null;
 			if (request.status === 201) {
-				const started = request.response as ImportOut;
-				watchImport(started.id, started.filename);
-				notify({
-					kind: 'info',
-					title: 'Import started',
-					text: 'It runs in the background: you can leave this page; you get a message when it is done.'
-				});
+				started(request.response as ImportOut);
 				file = null;
-				load();
 			} else {
 				error =
 					request.status === 413
@@ -160,31 +190,7 @@
 </p>
 
 <div class="layout">
-	<form onsubmit={start}>
-		<label
-			class="drop"
-			class:chosen={file}
-			class:over
-			ondragover={(event) => {
-				event.preventDefault();
-				over = true;
-			}}
-			ondragleave={() => (over = false)}
-			ondrop={dropped}
-		>
-			<input
-				type="file"
-				accept=".rdf,.bib,.bibtex,.ris,.json,.zip,application/zip"
-				onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
-			/>
-			<strong>{file ? file.name : 'Choose or drop the export'}</strong>
-			<span class="muted"
-				>{file
-					? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-					: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files. A folder: zip it first.'}</span
-			>
-		</label>
-		{#if dropProblem}<p class="error" role="alert">{dropProblem}</p>{/if}
+	<div class="forms">
 		{#if writableLibraries().length > 1}
 			<label class="owner"
 				>New papers belong to
@@ -195,13 +201,59 @@
 				</select>
 			</label>
 		{/if}
-		{#if sending !== null}
-			<progress value={sending} max="1"></progress>
-			<span class="muted">Uploading… {Math.round(sending * 100)} %</span>
-		{/if}
-		{#if error}<p class="error">{error}</p>{/if}
-		<div><button class="primary" disabled={!file || sending !== null}>Import</button></div>
-	</form>
+		<form onsubmit={start}>
+			<label
+				class="drop"
+				class:chosen={file}
+				class:over
+				ondragover={(event) => {
+					event.preventDefault();
+					over = true;
+				}}
+				ondragleave={() => (over = false)}
+				ondrop={dropped}
+			>
+				<input
+					type="file"
+					accept=".rdf,.bib,.bibtex,.ris,.json,.zip,.bbl,.tex,.gz,.tgz,.tar,application/zip,application/gzip"
+					onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
+				/>
+				<strong>{file ? file.name : 'Choose or drop the export'}</strong>
+				<span class="muted"
+					>{file
+						? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+						: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files; or a LaTeX source (.tar.gz, .bbl) for its references. A folder: zip it first.'}</span
+				>
+			</label>
+			{#if dropProblem}<p class="error" role="alert">{dropProblem}</p>{/if}
+			{#if sending !== null}
+				<progress value={sending} max="1"></progress>
+				<span class="muted">Uploading… {Math.round(sending * 100)} %</span>
+			{/if}
+			{#if error}<p class="error">{error}</p>{/if}
+			<div><button class="primary" disabled={!file || sending !== null}>Import</button></div>
+		</form>
+
+		<form class="arxiv" onsubmit={startArxiv}>
+			<h2>Import the references of an arXiv paper</h2>
+			<p class="muted">
+				paperus downloads the paper's LaTeX source from arXiv and adds the papers it cites, in a
+				collection named after the paper.
+			</p>
+			<div class="row">
+				<input
+					type="text"
+					bind:value={arxiv}
+					placeholder="2401.12345 or https://arxiv.org/abs/2401.12345"
+					aria-label="arXiv ID or link"
+				/>
+				<button disabled={!arxiv.trim() || fetching}>
+					{fetching ? 'Downloading…' : 'Import references'}
+				</button>
+			</div>
+			{#if arxivError}<p class="error">{arxivError}</p>{/if}
+		</form>
+	</div>
 
 	<aside>
 		<h2>How to export</h2>
@@ -287,9 +339,28 @@
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
+	.forms,
 	form {
 		display: grid;
 		gap: 14px;
+	}
+	.forms {
+		gap: 24px;
+	}
+	.arxiv h2 {
+		margin: 0;
+	}
+	.arxiv p {
+		margin: 0;
+	}
+	.row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
+	.row input {
+		flex: 1 1 16rem;
+		min-width: 0;
 	}
 	.drop {
 		position: relative;

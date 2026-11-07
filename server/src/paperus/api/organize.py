@@ -37,7 +37,8 @@ class TagOut(BaseModel):
     count: int
     """Items with this tag (not in the trash)."""
     sources: dict[TagSource, int]
-    """Of those, how many were tagged by hand, automatically or by AI."""
+    """Of those, how many were tagged by hand, by AI, or ("automatic") are
+    the paper's keywords, from its details."""
     created_at: datetime
     last_used: datetime | None
     """When the tag was last put on an item."""
@@ -339,6 +340,57 @@ def change_tag(
         tag.description = (body.description or "").strip() or None
     db.commit()
     return next(t for t in list_tags(db, access) if t.id == tag.id)
+
+
+class RemovedTags(BaseModel):
+    links: int
+    """Keywords taken off papers (one per keyword and paper)."""
+    tags: int
+    """Tags deleted, as they were then on no paper."""
+
+
+@router.post("/api/tags/remove-keywords")
+def remove_keywords(db: DB, access: CurrentAccess) -> RemovedTags:
+    """Take the keywords (from the papers' details on import: arXiv
+    categories, a publisher's subjects, the authors' keywords) off every
+    paper, in the libraries the person may change; tags then on no paper
+    are deleted. Tags put on by hand stay."""
+    writable = [
+        library_id for library_id in access.readable if access.can_write(library_id)
+    ]
+    tag_ids = set(
+        db.scalars(
+            select(ItemTag.tag_id)
+            .join(Tag, Tag.id == ItemTag.tag_id)
+            .where(ItemTag.source == TagSource.AUTOMATIC, Tag.library_id.in_(writable))
+        )
+    )
+    links = 0
+    for item in db.scalars(
+        select(Item)
+        .join(ItemTag)
+        .where(ItemTag.tag_id.in_(tag_ids), ItemTag.source == TagSource.AUTOMATIC)
+    ).unique():
+        kept = [
+            link
+            for link in item.tag_links
+            if not (link.tag_id in tag_ids and link.source == TagSource.AUTOMATIC)
+        ]
+        links += len(item.tag_links) - len(kept)
+        item.tag_links = kept
+    db.flush()
+    unused = list(
+        db.scalars(
+            select(Tag).where(
+                Tag.id.in_(tag_ids),
+                ~select(ItemTag.tag_id).where(ItemTag.tag_id == Tag.id).exists(),
+            )
+        )
+    )
+    for tag in unused:
+        db.delete(tag)
+    db.commit()
+    return RemovedTags(links=links, tags=len(unused))
 
 
 @router.delete("/api/tags/{tag_id}", status_code=204)

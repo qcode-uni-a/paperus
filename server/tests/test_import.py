@@ -429,7 +429,9 @@ def test_zotero_rdf() -> None:
     assert article.csl["note"] == "Read twice."
     assert article.csl["accessed"] == {"date-parts": [[2026, 1, 5]]}
     assert article.identifiers == [(Scheme.DOI, "10.1234/radar")]
-    assert article.tags == ["Weather", "radar"]  # automatic tags too
+    assert article.tags == ["radar"]
+    # Zotero's automatic tags (from the metadata) are kept apart, as keywords.
+    assert article.keywords == ["Weather"]
     assert article.collections == [("Thesis", "Chapter 1")]
     assert article.notes == [
         "# Reading notes\n\nThe **gaps** are below the beam.\n\n- one\n- two"

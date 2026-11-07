@@ -25,6 +25,7 @@ from paperus.db import make_engine, make_sessionmaker
 from paperus.evaluate import evaluate, load_questions, report
 from paperus.importing.run import run_import
 from paperus.jobs import make_job_app, queue_text_extraction, run_worker
+from paperus.metadata import make_http_client
 from paperus.migrate import migrate
 from paperus.ml import make_ml_client
 from paperus.models import Group, Import, ImportStatus, User
@@ -268,6 +269,7 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 path=path,
                 max_file_bytes=max_upload_bytes(db, settings),
                 file_added=lambda file_id: queue_text_extraction(jobs, file_id),
+                http=make_http_client(settings),
             )
             # The import updated the record (it ends failed or done).
             if record.status != ImportStatus.DONE:

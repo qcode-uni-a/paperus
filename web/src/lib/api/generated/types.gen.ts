@@ -5,6 +5,20 @@ export type ClientOptions = {
 };
 
 /**
+ * ArxivImportIn
+ */
+export type ArxivImportIn = {
+    /**
+     * Arxiv Id
+     */
+    arxiv_id: string;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
  * Authentication
  */
 export type Authentication = {
@@ -2169,6 +2183,20 @@ export type Redirect = {
      * Redirect
      */
     redirect: string;
+};
+
+/**
+ * RemovedTags
+ */
+export type RemovedTags = {
+    /**
+     * Links
+     */
+    links: number;
+    /**
+     * Tags
+     */
+    tags: number;
 };
 
 /**
@@ -4989,6 +5017,31 @@ export type StartImportResponses = {
 
 export type StartImportResponse = StartImportResponses[keyof StartImportResponses];
 
+export type ImportArxivData = {
+    body: ArxivImportIn;
+    path?: never;
+    query?: never;
+    url: '/api/imports/arxiv';
+};
+
+export type ImportArxivErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportArxivError = ImportArxivErrors[keyof ImportArxivErrors];
+
+export type ImportArxivResponses = {
+    /**
+     * Successful Response
+     */
+    201: ImportOut;
+};
+
+export type ImportArxivResponse = ImportArxivResponses[keyof ImportArxivResponses];
+
 export type GetImportData = {
     body?: never;
     path: {
@@ -5729,6 +5782,22 @@ export type ChangeTagResponses = {
 };
 
 export type ChangeTagResponse = ChangeTagResponses[keyof ChangeTagResponses];
+
+export type RemoveKeywordsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/tags/remove-keywords';
+};
+
+export type RemoveKeywordsResponses = {
+    /**
+     * Successful Response
+     */
+    200: RemovedTags;
+};
+
+export type RemoveKeywordsResponse = RemoveKeywordsResponses[keyof RemoveKeywordsResponses];
 
 export type ListCollectionsData = {
     body?: never;

@@ -49,7 +49,9 @@
 			>{/if}
 		<span class="badge">{typeName(item.type)}</span>
 
-		{#each item.tags as tag (tag.id)}<span class="tag" data-tag-color={tag.color}>{tag.name}</span
+		{#each item.tags.filter((t) => t.source !== 'automatic') as tag (tag.id)}<span
+				class="tag"
+				data-tag-color={tag.color}>{tag.name}</span
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
 	</p>

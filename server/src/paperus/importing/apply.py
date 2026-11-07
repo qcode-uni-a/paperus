@@ -36,6 +36,7 @@ from paperus.models import (
     MetadataSource,
     Note,
     NoteItem,
+    TagSource,
     Version,
     VersionKind,
 )
@@ -285,7 +286,7 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
             kind=_kind(paper),
             label=None,
             csl=paper.csl,
-            source=MetadataSource.IMPORT,
+            source=MetadataSource.LOOKUP if paper.looked_up else MetadataSource.IMPORT,
             identifiers=paper.identifiers,
             added_by=access.user.id,
         )
@@ -300,14 +301,8 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
 
     if access.can_write_item(item):
         _attach_files(run, item, stored)
-    for name in paper.tags:
-        if access.may_tag(run.owner, item):
-            try:
-                organize.tag_item(
-                    db, item, name[:100], library_id=run.owner, user_id=access.user.id
-                )
-            except ValueError:
-                continue
+    if access.may_tag(run.owner, item):
+        _tag(run, item, paper)
     for path in paper.collections:
         collection = _collection(run, path)
         if access.may_hold(collection.library_id, item) and not any(
@@ -320,6 +315,38 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
         note = notes.create(db, run.owner, text, access.user.id)
         note.item_links.append(NoteItem(item_id=item.id, added_by=access.user.id))
         run.report.notes += 1
+
+
+def _tag(run: _Run, item: Item, paper: ExportedPaper) -> None:
+    """The person's tags, and the paper's keywords (from its details) kept
+    apart; an import again sorts keywords an earlier import took as tags."""
+    access = run.access
+    own = {name.casefold() for name in paper.tags}
+    tagged = [(name, TagSource.MANUAL) for name in paper.tags] + [
+        (name, TagSource.AUTOMATIC)
+        for name in paper.keywords
+        if name.casefold() not in own
+    ]
+    for name, source in tagged:
+        try:
+            tag = organize.tag_item(
+                run.db,
+                item,
+                name[:100],
+                library_id=run.owner,
+                source=source,
+                user_id=access.user.id,
+            )
+        except ValueError:
+            continue
+        if source == TagSource.AUTOMATIC:
+            for link in item.tag_links:
+                if (
+                    link.tag_id == tag.id
+                    and link.source == TagSource.MANUAL
+                    and link.added_by == access.user.id
+                ):
+                    link.source = TagSource.AUTOMATIC
 
 
 def _has_note(run: _Run, item: Item, text: str) -> bool:

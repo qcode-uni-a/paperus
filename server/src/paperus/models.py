@@ -329,7 +329,8 @@ class TagSource(StrEnum):
 
     MANUAL = "manual"
     AUTOMATIC = "automatic"
-    """From metadata, e.g. a registry's subjects."""
+    """From the paper's details (arXiv categories, a publisher's subjects,
+    the authors' keywords); shown as its keywords, apart from tags."""
     AI = "ai"
     """Suggested by an AI assistant (shown apart until accepted)."""
 

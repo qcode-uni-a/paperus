@@ -84,10 +84,14 @@ def tag_item(
         tag = Tag(library_id=library_id, name=clean_name(name), change=0)
         db.add(tag)
         db.flush()
-    if not any(link.tag_id == tag.id for link in item.tag_links):
+    link = next((link for link in item.tag_links if link.tag_id == tag.id), None)
+    if link is None:
         item.tag_links.append(
             ItemTag(tag_id=tag.id, tag=tag, source=source, added_by=user_id)
         )
+    elif source == TagSource.MANUAL and link.source != TagSource.MANUAL:
+        # Put on by hand: the person's own now (no longer automatic).
+        link.source = TagSource.MANUAL
     return tag
 
 

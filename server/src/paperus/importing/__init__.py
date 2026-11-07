@@ -25,11 +25,18 @@ class ExportedPaper:
     csl: dict[str, Any]
     identifiers: list[tuple[Scheme, str]] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
+    """Set by the person."""
+    keywords: list[str] = field(default_factory=list)
+    """What came with the paper's details, not from the person (Zotero's
+    automatic tags: arXiv categories, a publisher's subjects; the authors'
+    keywords): kept apart from their tags, as keywords."""
     collections: list[tuple[str, ...]] = field(default_factory=list)
     """Paths of collection names, from the top down."""
     notes: list[str] = field(default_factory=list)
     """Markdown."""
     files: list[ExportedFile] = field(default_factory=list)
+    looked_up: bool = False
+    """The metadata came from a registry (doi.org), not the export."""
     source_key: str = ""
     """The entry's key in the export, for messages."""
 

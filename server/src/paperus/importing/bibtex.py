@@ -1,7 +1,9 @@
 """BibTeX and BibLaTeX (JabRef, Zotero, Mendeley, …) into the common form.
 
 JabRef's groups (``@Comment{jabref-meta: grouping: …}`` and the ``groups``
-field) become collections, ``keywords`` tags, ``annote``/``comment`` notes,
+field) become collections, ``keywords`` tags (from Mendeley, its
+``mendeley-tags``, the authors' keywords kept apart as keywords),
+``annote``/``comment`` notes,
 ``file`` links files; the entry key is kept as the citation key.
 """
 
@@ -218,10 +220,20 @@ def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> Export
     found_doi = next((v for s, v in identifiers if s == Scheme.DOI), None)
     if found_doi or doi:
         csl["DOI"] = found_doi or doi
+    keywords = split_keywords(get("keywords") or "")
+    tags = keywords
+    automatic: list[str] = []
+    if "mendeley-tags" in fields:
+        # Mendeley writes the person's tags here, and in ``keywords`` also
+        # the authors' keywords.
+        tags = split_keywords(get("mendeley-tags") or "")
+        own = {tag.casefold() for tag in tags}
+        automatic = [word for word in keywords if word.casefold() not in own]
     paper = ExportedPaper(
         csl=csl,
         identifiers=identifiers,
-        tags=split_keywords(get("keywords") or ""),
+        tags=tags,
+        keywords=automatic,
         notes=[note for note in (get("annote"), get("comment")) if note],
         files=_files(fields.get("file", "")),
         source_key=key,

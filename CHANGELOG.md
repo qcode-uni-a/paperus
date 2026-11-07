@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **Keywords kept apart from tags**: what came with a paper's details
+  (Zotero's automatic tags such as arXiv categories and publishers'
+  subjects; Mendeley's author keywords) is imported as the paper's
+  keywords: on a line of their own on its page (+ makes one a tag), not in
+  the tag list or the library's rows unless asked for, and removable all
+  at once under Manage → Tags. Import the same Zotero export again to sort
+  the tags of an earlier import. AI assistants see which are keywords.
+
+- **Import the references of a paper**: give an arXiv ID or link on the
+  import page, or upload an arXiv source (`.tar.gz`), a zip of a LaTeX
+  project or a `.bbl` file. The references come into a collection named
+  after the paper, with their details looked up by DOI or arXiv ID (or
+  found on Crossref when certain); those that could not be recognised are
+  listed in the import's report.
+
 - **GPU check** for administrators: Getting started (and Administration →
   Settings → Machine learning) names the GPU the ML service runs on, or,
   on the CPU, whether the machine has a suitable NVIDIA card and what to

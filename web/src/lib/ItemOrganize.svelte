@@ -61,6 +61,9 @@
 		return own !== undefined && libraryId === own.id && item.library_id !== own.id;
 	}
 
+	/** The paper's keywords: from its details on import, not by a person. */
+	const keywords = $derived(item.tags.filter((t) => t.source === 'automatic'));
+
 	async function done(result: { error?: unknown }) {
 		error = result.error ? errorMessage(result.error) : '';
 		await Promise.all([loadOrganize(), onchange()]);
@@ -103,7 +106,7 @@
 <div class="organize">
 	<div class="line">
 		<span class="label">Tags</span>
-		{#each item.tags as tag (tag.id)}
+		{#each item.tags.filter((t) => t.source !== 'automatic') as tag (tag.id)}
 			{@const library = tagLibraryOf(tag.id)}
 			<span class="chip" data-tag-color={tag.color}>
 				{#if isPrivate(library)}{@render lock()}{/if}
@@ -141,6 +144,39 @@
 			{@render plus('Add a tag', () => (tagging = true))}
 		{/if}
 	</div>
+
+	{#if keywords.length}
+		<div
+			class="line"
+			title="Came with the paper’s details (arXiv categories, a publisher’s subjects, the authors’ keywords), not from anyone here"
+		>
+			<span class="label">Keywords</span>
+			{#each keywords as tag (tag.id)}
+				{@const library = tagLibraryOf(tag.id)}
+				<span class="chip keyword">
+					<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
+					{#if mayTag(library)}
+						<button
+							onclick={async () =>
+								done(
+									await addTag({
+										path: { item_id: item.id },
+										body: { name: tag.name, library_id: library }
+									})
+								)}
+							title="Make it one of the paper’s tags"
+							aria-label="Make {tag.name} one of the paper’s tags">+</button
+						>
+						<button
+							onclick={async () =>
+								done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}
+							aria-label="Remove tag {tag.name}">×</button
+						>
+					{/if}
+				</span>
+			{/each}
+		</div>
+	{/if}
 
 	<div class="line">
 		<span class="label">Collections</span>
@@ -291,5 +327,10 @@
 	}
 	.error {
 		margin: 0;
+	}
+	.chip.keyword {
+		border: 1px dashed var(--rule);
+		background: none;
+		color: var(--muted);
 	}
 </style>

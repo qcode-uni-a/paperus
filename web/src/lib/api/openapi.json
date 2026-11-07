@@ -3047,13 +3047,55 @@
           "imports"
         ],
         "summary": "Start Import",
-        "description": "Import an export: BibTeX, RIS or CSL-JSON, alone or zipped with its\nfiles. Everything new belongs to ``library_id`` (default: the person's\ndefault owner). Runs in the background; poll ``GET /api/imports/{id}``.",
+        "description": "Import an export: BibTeX, RIS or CSL-JSON, alone or zipped with its\nfiles, or a LaTeX source (.tar.gz, .bbl) for its references. Everything\nnew belongs to ``library_id`` (default: the person's default owner).\nRuns in the background; poll ``GET /api/imports/{id}``.",
         "operationId": "start_import",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_start_import"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/arxiv": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Import Arxiv",
+        "description": "Import the references of an arXiv paper: its LaTeX source is\ndownloaded from arXiv (one request) and imported as an upload would be,\ninto a collection named after the paper.",
+        "operationId": "import_arxiv",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArxivImportIn"
               }
             }
           },
@@ -4194,6 +4236,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/remove-keywords": {
+      "post": {
+        "tags": [
+          "organize"
+        ],
+        "summary": "Remove Keywords",
+        "description": "Take the keywords (from the papers' details on import: arXiv\ncategories, a publisher's subjects, the authors' keywords) off every\npaper, in the libraries the person may change; tags then on no paper\nare deleted. Tags put on by hand stay.",
+        "operationId": "remove_keywords",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedTags"
                 }
               }
             }
@@ -5824,6 +5888,31 @@
   },
   "components": {
     "schemas": {
+      "ArxivImportIn": {
+        "properties": {
+          "arxiv_id": {
+            "type": "string",
+            "title": "Arxiv Id"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "arxiv_id"
+        ],
+        "title": "ArxivImportIn"
+      },
       "Authentication": {
         "properties": {
           "redirect_uri": {
@@ -9657,6 +9746,24 @@
           "redirect"
         ],
         "title": "Redirect"
+      },
+      "RemovedTags": {
+        "properties": {
+          "links": {
+            "type": "integer",
+            "title": "Links"
+          },
+          "tags": {
+            "type": "integer",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "links",
+          "tags"
+        ],
+        "title": "RemovedTags"
       },
       "Report": {
         "properties": {

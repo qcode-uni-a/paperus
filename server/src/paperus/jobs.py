@@ -664,6 +664,7 @@ def import_library(job: JobContext, import_id: str) -> None:
                 path=path,
                 max_file_bytes=max_upload_bytes(db, context.settings),
                 file_added=lambda file_id: queue_text_extraction(job.app, file_id),
+                http=context.http,
             )
 
 

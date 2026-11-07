@@ -287,10 +287,12 @@ class _Reader:
         if "\n".join(note_lines).strip():
             csl["note"] = "\n".join(note_lines).strip()
 
+        tags, automatic = self._tags(subject)
         return ExportedPaper(
             csl=csl,
             identifiers=found,
-            tags=self._tags(subject),
+            tags=tags,
+            keywords=automatic,
             notes=[
                 text
                 for note in sorted(g.objects(subject, DCTERMS.isReferencedBy), key=str)
@@ -323,10 +325,12 @@ class _Reader:
         csl["title"] = title or "(untitled)"
         if url:
             csl["URL"] = url
+        tags, automatic = self._tags(subject)
         return ExportedPaper(
             csl=csl,
             identifiers=found,
-            tags=self._tags(subject),
+            tags=tags,
+            keywords=automatic,
             notes=[
                 text
                 for note in sorted(
@@ -411,16 +415,20 @@ class _Reader:
                 return {"date-parts": [[int(year.group())]], "raw": text}
         return parsed
 
-    def _tags(self, subject: Node) -> list[str]:
+    def _tags(self, subject: Node) -> tuple[list[str], list[str]]:
+        """The person's tags, and Zotero's automatic ones (from the paper's
+        metadata: arXiv categories, a publisher's subjects)."""
         tags: list[str] = []
+        automatic: list[str] = []
         for value in self.g.objects(subject, DC.subject):
             if isinstance(value, Literal):
                 tags.append(str(value).strip())
             elif (value, RDF.type, Z.AutomaticTag) in self.g:
-                tag = self.text(value, RDF.value)
-                if tag:
-                    tags.append(tag)
-        return sorted(dict.fromkeys(t for t in tags if t))
+                automatic.append(self.text(value, RDF.value) or "")
+        return (
+            sorted(dict.fromkeys(t for t in tags if t)),
+            sorted(dict.fromkeys(t for t in automatic if t)),
+        )
 
     def note_text(self, note: Node) -> str | None:
         html = self.text(note, RDF.value)
