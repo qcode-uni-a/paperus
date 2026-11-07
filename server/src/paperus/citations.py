@@ -266,9 +266,7 @@ def _protect(text: str) -> str:
             return word
         if match.start() == 0 and not any(c.isupper() for c in word[1:]):
             return word
-        before = text[match.start() - 1] if match.start() else ""
-        if before == "\\":  # a LaTeX command from the escaping
-            return word
+        # (The escaping's LaTeX commands, \textbar and others, are lower case.)
         return "{" + word + "}"
 
     return _WORD.sub(brace, text)

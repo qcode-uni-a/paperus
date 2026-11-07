@@ -44,7 +44,9 @@
 	// yet, and whether they go along or leave the collection.
 	let missing = $state<number | null>(null);
 	let addPapers = $state(true);
-	const moving = $derived(collection !== null && library !== collection.library_id);
+	const moving = $derived(
+		collection !== null && library !== '' && library !== collection.library_id
+	);
 	const toGroup = $derived(libraryById(library)?.kind === 'group');
 
 	$effect(() => {

@@ -240,6 +240,6 @@ def serve(port: int, sessions: sessionmaker[Session], settings: Settings) -> Non
     if _started:
         return
     REGISTRY.register(LibraryCollector(sessions, settings))
-    start_http_server(port)
+    start_http_server(port, registry=REGISTRY)
     _started = True
     log.info("Prometheus metrics on port %d", port)

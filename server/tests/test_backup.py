@@ -30,7 +30,8 @@ PDF = b"%PDF-1.7\n" + b"x" * 4000 + b"\n%%EOF\n"
 
 @pytest.fixture
 def restore_url(database_url: str) -> Iterator[str]:
-    url = make_url(database_url).set(database="paperus_test_restore")
+    url = make_url(database_url)
+    url = url.set(database=f"{url.database}_restore")
     rendered = url.render_as_string(hide_password=False)
     _recreate_database(rendered)
     yield rendered
@@ -204,6 +205,14 @@ def test_backup_api(admin: TestClient, settings: Settings) -> None:
     assert admin.delete("/api/admin/backups/nope").status_code == 404
 
 
+def test_deleting_a_backup(
+    admin: TestClient, engine: Engine, blobs: BlobStore, settings: Settings
+) -> None:
+    backup = create_backup(engine, blobs, settings.backup_path, with_files=False)
+    assert admin.delete(f"/api/admin/backups/{backup.name}").status_code == 204
+    assert admin.get("/api/admin/backups").json()["backups"] == []
+
+
 def test_backup_api_is_for_admins(logged_in: TestClient) -> None:
     assert logged_in.get("/api/admin/backups").status_code == 403
     assert logged_in.post("/api/admin/backups", json={}).status_code == 403
@@ -241,3 +250,95 @@ def test_check_before_restoring(
         files={"upload": ("later.pdf", PDF + b"later", "application/pdf")},
     )
     assert check_restore(blobs, root, only_db.name).extra == 1
+
+
+def test_odd_folders_and_backups(
+    logged_in: TestClient,
+    engine: Engine,
+    blobs: BlobStore,
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "backups"
+    assert prune(root / "nowhere", keep=1) == []
+    good = create_backup(engine, blobs, root, with_files=False)
+    # Left by an interrupted backup: removed.
+    (root / "2026-01-01T00-00-00Z.partial" / "tables").mkdir(parents=True)
+    # Not a manifest paperus wrote: left out.
+    (root / "2026-01-02T00-00-00Z").mkdir()
+    (root / "2026-01-02T00-00-00Z" / "manifest.json").write_text("{}")
+    assert [m.name for m in list_backups(root)] == [good.name]
+    assert prune(root, keep=1) == []
+    assert not (root / "2026-01-01T00-00-00Z.partial").exists()
+
+    with pytest.raises(BackupError, match="no backup"):
+        check_restore(blobs, root, "2026-01-03T00-00-00Z")
+    manifest = root / good.name / "manifest.json"
+    manifest.write_text(manifest.read_text().replace('"format": 1', '"format": 2'))
+    settings = Settings(database_url=str(engine.url), storage_path=tmp_path / "x")
+    with pytest.raises(BackupError, match="format 2"):
+        restore_backup(settings, engine, blobs, root, good.name, replace=True)
+
+
+def test_no_backup_of_a_database_without_schema(
+    restore_url: str, blobs: BlobStore, tmp_path: Path
+) -> None:
+    empty = make_engine(restore_url)
+    try:
+        with empty.begin() as connection:
+            connection.execute(text("CREATE TABLE alembic_version (version_num text)"))
+        with pytest.raises(BackupError, match="no schema"):
+            create_backup(empty, blobs, tmp_path / "backups", with_files=False)
+    finally:
+        empty.dispose()
+    # Nothing half-written is left.
+    assert list((tmp_path / "backups").iterdir()) == []
+
+
+def test_check_leaves_out_what_is_in_the_trash(
+    logged_in: TestClient, engine: Engine, blobs: BlobStore, tmp_path: Path
+) -> None:
+    fill(logged_in)
+    for title in ("In the trash", "File in the trash"):
+        item = logged_in.post("/api/items", json={"metadata": {"title": title}})
+        logged_in.post(
+            f"/api/items/{item.json()['id']}/files",
+            files={"upload": ("p.pdf", PDF + title.encode(), "application/pdf")},
+        )
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE items SET deleted_at = now() WHERE title = 'In the trash'")
+        )
+        connection.execute(
+            text(
+                "UPDATE files SET deleted_at = now() FROM versions, items"
+                " WHERE files.version_id = versions.id"
+                " AND versions.item_id = items.id AND items.title = 'File in the trash'"
+            )
+        )
+    root = tmp_path / "backups"
+    backup = create_backup(engine, blobs, root, with_files=False)
+    check = check_restore(FilesystemStore(tmp_path / "empty"), root, backup.name)
+    assert (check.needed, check.missing, check.affected) == (1, 1, ["Kept safe"])
+
+
+def test_restore_without_a_file_the_backup_lost(
+    logged_in: TestClient,
+    engine: Engine,
+    blobs: BlobStore,
+    tmp_path: Path,
+    restore_url: str,
+) -> None:
+    fill(logged_in)
+    root = tmp_path / "backups"
+    backup = create_backup(engine, blobs, root, with_files=True)
+    for path in (root / "files").rglob("*"):
+        if path.is_file():
+            path.unlink()
+    store = FilesystemStore(tmp_path / "restored-files")
+    settings = Settings(database_url=restore_url, storage_path=store.root)
+    restored = make_engine(restore_url)
+    try:
+        restore_backup(settings, restored, store, root, backup.name, replace=False)
+    finally:
+        restored.dispose()
+    assert list(store.iter_stored()) == []

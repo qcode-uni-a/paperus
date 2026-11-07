@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from paperus import missing
 from paperus.app import create_app
 from paperus.config import Settings
+from paperus.identifiers import Scheme
+from paperus.models import Identifier, Item, Version, VersionKind
 from tests.conftest import FakeDOIRegistry, FakeML
 from tests.pdfs import make_pdf
 from tests.people import Person
@@ -67,7 +69,13 @@ class FakeWeb:
                     "version": "publishedVersion",
                 },
             ]
-            return httpx2.Response(200, json={"oa_locations": locations})
+            best = {
+                "url_for_pdf": "https://journal.example.org/paper.pdf",
+                "version": "publishedVersion",
+            }
+            return httpx2.Response(
+                200, json={"oa_locations": locations, "best_oa_location": best}
+            )
         if request.url.host == "journal.example.org":
             return httpx2.Response(200, content=JOURNAL)
         return httpx2.Response(404)
@@ -268,3 +276,42 @@ def test_the_journals_open_copy_comes_first(
     assert [f["id"] for f in kinds["published"]["files"]] == [file["id"]]
     assert kinds["preprint"]["files"] == []
     assert listed(ada)["counts"] == {"file": 0, "journal": 0}
+
+
+def test_the_arxiv_version_unknown_at_doi_org(
+    site: TestClient, db: Session, doi_registry: FakeDOIRegistry, web: FakeWeb
+) -> None:
+    published(doi_registry)
+    del doi_registry.records[f"10.48550/arxiv.{ARXIV}"]
+    web.on_arxiv[PUBLISHED] = ARXIV
+    ada = Person(site, db, "ada")
+    paper = ada.post("/api/items", json={"doi": PUBLISHED}).json()
+    # OpenAlex knows its arXiv version, doi.org does not: no copy from there.
+    assert ada.post(f"/api/items/{paper['id']}/open-access").status_code == 409
+    detail = ada.get(f"/api/items/{paper['id']}").json()
+    assert [v["kind"] for v in detail["versions"]] == ["published"]
+
+
+def test_a_preprint_by_its_doi_through_unpaywall(
+    site: TestClient, db: Session, doi_registry: FakeDOIRegistry
+) -> None:
+    doi = "10.21203/rs.3.rs-1/v1"
+    doi_registry.records[doi] = {"type": "posted-content", "title": "A preprint"}
+    root = Person(site, db, "root", admin=True)
+    config = root.get("/api/admin/config").json()
+    root.put("/api/admin/config", {**config, "contact_email": "lab@example.org"})
+    ada = Person(site, db, "ada")
+    paper = ada.post("/api/items", json={"doi": doi}).json()
+    response = ada.post(f"/api/items/{paper['id']}/open-access")
+    assert response.status_code == 200, response.text
+    # Named by its DOI, without the characters file systems refuse.
+    assert response.json()["filename"] == "10.21203_rs.3.rs-1_v1.pdf"
+
+
+def test_a_journal_version_known_only_by_its_arxiv_doi() -> None:
+    arxiv_doi = Identifier(scheme=Scheme.DOI, value=f"10.48550/arxiv.{ARXIV}")
+    version = Version(kind=VersionKind.PUBLISHED, identifiers=[arxiv_doi])
+    item = Item(title="Phonon-coupled", versions=[version])
+    assert missing.journal_version(item) is version
+    # No journal DOI to ask for the journal's copy with.
+    assert missing.journal_doi(item) is None

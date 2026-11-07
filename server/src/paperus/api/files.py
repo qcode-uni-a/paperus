@@ -140,8 +140,6 @@ def _add_file(
     db: DB,
     user_id: uuid.UUID,
 ) -> FileOut:
-    if version.item.deleted_at is not None:
-        raise HTTPException(409, "item is in the trash")
     file = File(
         version=version,
         blob_sha256=stored.sha256,

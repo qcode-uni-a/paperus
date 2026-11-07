@@ -9,7 +9,6 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -331,13 +330,6 @@ def add_or_find(
             added_by=access.user.id,
         )
         db.commit()
-    except IntegrityError:
-        # Someone added the same identifier meanwhile.
-        db.rollback()
-        known = library.find_identifier(db, access.readable, identifiers)
-        if known is None:
-            raise
-        return known.version.item, False
     except library.IdentifierTaken as error:
         # Added meanwhile; the lookup above missed it.
         raise _identifier_conflict(error) from error
@@ -414,10 +406,8 @@ def add_version(
         )
         db.commit()
     except library.IdentifierTaken as error:
+        # Added meanwhile; the lookup above missed it.
         raise _identifier_conflict(error) from error
-    except IntegrityError as error:
-        db.rollback()
-        raise HTTPException(409, "identifier was added meanwhile") from error
     db.refresh(item)
     return item_detail(item, access, response)
 

@@ -282,3 +282,45 @@ def test_merging_with_choices(client: TestClient, db: Session) -> None:
     assert note["id"] not in {
         n["id"] for n in ada.get(f"/api/notes?item={keep}").json()
     }
+
+
+def test_what_speaks_for_keeping_a_paper(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    # The published version beats a paper in a collection with a note.
+    published = ada.post(
+        "/api/items",
+        json={
+            "metadata": {"title": "Diffusion of rain in the Alps"},
+            "kind": "published",
+            "identifiers": [{"scheme": "doi", "value": "10.1234/rain"}],
+        },
+    ).json()["id"]
+    organised = paper(ada, "Diffusion of Rain in the Alps!")
+    shelf = ada.post("/api/collections", json={"name": "Shelf"}).json()["id"]
+    ada.post(f"/api/collections/{shelf}/items", json={"item_ids": [organised]})
+    ada.note("Read it.", items=[organised])
+    # Details guessed from a file count against a paper.
+    name = "Gauge principle in two-level systems.pdf"
+    guessed = ada.post(
+        "/api/uploads", files={"upload": (name, PDF, "application/pdf")}
+    ).json()["item_id"]
+    typed = paper(ada, "Gauge principle in two-level systems")
+    by_title = {frozenset((p["keep"]["id"], p["merge"]["id"])): p for p in pairs(ada)}
+    rain = by_title[frozenset((published, organised))]
+    assert (rain["keep"]["id"], rain["why"]) == (
+        published,
+        ["has the published version"],
+    )
+    gauge = by_title[frozenset((guessed, typed))]
+    assert (gauge["keep"]["id"], gauge["why"]) == (typed, ["added first"])
+    # A reader of the group may change neither of its papers.
+    for title in ("Clouds over the Alps", "Clouds over the Alps."):
+        paper(ada, title, chair["library_id"])
+    [clouds] = pairs(bob)
+    assert (clouds["can_merge"], clouds["why"]) == (
+        False,
+        ["you may not change either (reader)"],
+    )

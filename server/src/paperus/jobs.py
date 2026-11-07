@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
 from procrastinate.exceptions import AlreadyEnqueued
+from procrastinate.types import JSONValue
 from sqlalchemy import Engine, func, make_url, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -65,6 +66,29 @@ def _worker_context() -> WorkerContext:
     if _context is None:
         raise RuntimeError("worker context not set; start with `paperus worker`")
     return _context
+
+
+def _queue(
+    app: App,
+    task: str,
+    lock: str,
+    priority: int | None = None,
+    **arguments: JSONValue,
+) -> bool:
+    """Queue a job, unless one with the same lock is queued already; whether
+    it was queued.
+
+    By task name through ``app``: the blueprint's task objects are shared
+    between apps (e.g. in tests).
+    """
+    deferrer = app.configure_task(
+        f"paperus:{task}", queueing_lock=lock, priority=priority
+    )
+    try:
+        deferrer.defer(**arguments)
+    except AlreadyEnqueued:
+        return False
+    return True
 
 
 @tasks.task(name="extract_text", queue="text", retry=2, pass_context=True)
@@ -118,16 +142,12 @@ def queue_pending_ocr(job: JobContext, timestamp: int) -> None:
 
 
 def queue_ocr(app: App, file_id: uuid.UUID) -> None:
-    task = app.configure_task("paperus:ocr_file", queueing_lock=f"ocr-{file_id}")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(file_id=str(file_id))
+    _queue(app, "ocr_file", f"ocr-{file_id}", file_id=str(file_id))
 
 
 def queue_ocr_sweep(app: App) -> None:
     """Look for scans waiting for OCR now (e.g. after switching it on)."""
-    task = app.configure_task("paperus:queue_pending_ocr", queueing_lock="ocr-sweep")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "queue_pending_ocr", "ocr-sweep", timestamp=0)
 
 
 # The ML service may be down or busy (model download): retry for about half
@@ -192,32 +212,20 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
 
 def queue_embedding_sweep(app: App) -> None:
     """Look for missing embeddings now (e.g. after the model changed)."""
-    task = app.configure_task(
-        "paperus:queue_missing_embeddings", queueing_lock="embedding-sweep"
-    )
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "queue_missing_embeddings", "embedding-sweep", timestamp=0)
 
 
 def queue_text_sweep(app: App) -> None:
     """Look for files whose text is still pending now."""
-    task = app.configure_task("paperus:queue_pending_files", queueing_lock="sweep")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "queue_pending_files", "sweep", timestamp=0)
 
 
 def queue_note_embedding(app: App, note_id: uuid.UUID) -> None:
-    task = app.configure_task(
-        "paperus:embed_note", queueing_lock=f"embed-note-{note_id}"
-    )
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(note_id=str(note_id))
+    _queue(app, "embed_note", f"embed-note-{note_id}", note_id=str(note_id))
 
 
 def queue_embedding(app: App, file_id: uuid.UUID) -> None:
-    task = app.configure_task("paperus:embed_file", queueing_lock=f"embed-{file_id}")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(file_id=str(file_id))
+    _queue(app, "embed_file", f"embed-{file_id}", file_id=str(file_id))
 
 
 @tasks.periodic(cron="*/5 * * * *")
@@ -264,15 +272,14 @@ def fetch_open_access(
 def queue_open_access(
     app: App, item_id: uuid.UUID, user_id: uuid.UUID | None, section: str = "file"
 ) -> None:
-    task = app.configure_task(
-        "paperus:fetch_open_access", queueing_lock=f"open-access-{item_id}"
+    _queue(
+        app,
+        "fetch_open_access",
+        f"open-access-{item_id}",
+        item_id=str(item_id),
+        user_id=str(user_id) if user_id else None,
+        section=section,
     )
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(
-            item_id=str(item_id),
-            user_id=str(user_id) if user_id else None,
-            section=section,
-        )
 
 
 # Preprints' published versions (Administration → Settings → Server).
@@ -307,11 +314,7 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
 
 
 def queue_published_check(app: App) -> None:
-    task = app.configure_task(
-        "paperus:find_published_versions", queueing_lock="find-published"
-    )
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "find_published_versions", "find-published", timestamp=0)
 
 
 # Administration → Settings → Server: open-access copies by themselves.
@@ -344,14 +347,8 @@ def queue_open_access_sweep(job: JobContext, timestamp: int) -> None:
 
 
 def queue_text_extraction(app: App, file_id: uuid.UUID) -> None:
-    """Queue extraction for a file, unless it is queued already.
-
-    By task name through ``app``: the blueprint's task objects are shared
-    between apps (e.g. in tests).
-    """
-    task = app.configure_task("paperus:extract_text", queueing_lock=str(file_id))
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(file_id=str(file_id))
+    """Queue extraction for a file, unless it is queued already."""
+    _queue(app, "extract_text", str(file_id), file_id=str(file_id))
 
 
 def conninfo(database_url: str) -> str:
@@ -498,11 +495,7 @@ def send_ml_config(db: Session, settings: Settings, ml: MLClient) -> None:
 
 def queue_ml_configuration(app: App) -> None:
     """Send the ML settings soon (e.g. when the server starts)."""
-    task = app.configure_task(
-        "paperus:configure_ml", queueing_lock="configure-ml", priority=100
-    )
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "configure_ml", "configure-ml", priority=100, timestamp=0)
 
 
 @tasks.periodic(cron="30 * * * *")
@@ -585,9 +578,7 @@ async def tidy(job: JobContext, timestamp: int) -> None:
 
 
 def queue_tidy(app: App) -> None:
-    task = app.configure_task("paperus:tidy", queueing_lock="tidy")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "tidy", "tidy", timestamp=0)
 
 
 @tasks.periodic(cron="45 * * * *")
@@ -637,23 +628,17 @@ def nightly_readable_copy(timestamp: int) -> None:
 
 
 def queue_readable_copy(app: App, *, remove: bool = False) -> None:
-    task = app.configure_task("paperus:readable_copy", queueing_lock="readable-copy")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(remove=remove)
+    _queue(app, "readable_copy", "readable-copy", remove=remove)
 
 
 def queue_integrity_check(
     app: App, *, deep: bool = False, remove_unused: bool = False
 ) -> None:
-    task = app.configure_task("paperus:check_integrity", queueing_lock="integrity")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(deep=deep, remove_unused=remove_unused)
+    _queue(app, "check_integrity", "integrity", deep=deep, remove_unused=remove_unused)
 
 
 def queue_empty_trash(app: App) -> None:
-    task = app.configure_task("paperus:empty_trash", queueing_lock="empty-trash")
-    with contextlib.suppress(AlreadyEnqueued):
-        task.defer(timestamp=0)
+    _queue(app, "empty_trash", "empty-trash", timestamp=0)
 
 
 @tasks.task(name="import_library", queue="import", pass_context=True)
@@ -715,9 +700,4 @@ def scheduled_backup(job: JobContext, timestamp: int) -> None:
 
 def queue_backup(app: App, *, with_files: bool) -> bool:
     """Queue a backup; False if one is queued or running already."""
-    task = app.configure_task("paperus:backup", queueing_lock="backup")
-    try:
-        task.defer(with_files=with_files)
-    except AlreadyEnqueued:
-        return False
-    return True
+    return _queue(app, "backup", "backup", with_files=with_files)

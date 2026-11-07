@@ -289,16 +289,12 @@ def add_tag(
     if not access.may_tag(library_id, item):
         raise Forbidden("you may not change this item's tags")
     try:
-        known = organize.find_tag(db, library_id, body.name)
-    except ValueError as error:
-        raise HTTPException(422, str(error)) from error
-    if known is None:
-        access.require_write(library_id)  # new tags of a group: members
-    try:
+        if organize.find_tag(db, library_id, body.name) is None:
+            access.require_write(library_id)  # new tags of a group: members
         organize.tag_item(
             db, item, body.name, library_id=library_id, user_id=access.user.id
         )
-    except ValueError as error:
+    except ValueError as error:  # an empty name
         raise HTTPException(422, str(error)) from error
     db.commit()
     return item_tags(item, access)

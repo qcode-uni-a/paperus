@@ -11,7 +11,7 @@ import uvicorn
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from paperus.access import Access, Forbidden, NotVisible
+from paperus.access import Access
 from paperus.auth import create_user
 from paperus.backup import (
     BackupError,
@@ -213,12 +213,7 @@ def backup_command(args: argparse.Namespace) -> int:
                     print("Nothing changed.")
                     return 1
             restore_backup(
-                settings,
-                engine,
-                make_blob_store(settings),
-                root,
-                args.name,
-                replace=args.replace,
+                settings, engine, blobs, root, args.name, replace=args.replace
             )
             print(f"Restored {args.name}. Start paperus again.")
     except BackupError as error:
@@ -245,6 +240,7 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 print(f"No user {username!r}.", file=sys.stderr)
                 return 1
             access = Access.of(db, user)
+            # In person (not through a token): never refused.
             owner = access.target_library(None)
             if group is not None:
                 # Group names repeat in different places: look among theirs.
@@ -265,7 +261,6 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
             )
             db.add(record)
             db.commit()
-            record_id = record.id
             run_import(
                 db,
                 make_blob_store(settings),
@@ -274,11 +269,11 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 max_file_bytes=max_upload_bytes(db, settings),
                 file_added=lambda file_id: queue_text_extraction(jobs, file_id),
             )
-            done = db.get(Import, record_id)
-            if done is None or done.status != ImportStatus.DONE:
-                print(done.error if done else "The import failed.", file=sys.stderr)
+            # The import updated the record (it ends failed or done).
+            if record.status != ImportStatus.DONE:
+                print(record.error, file=sys.stderr)
                 return 1
-            report = done.report or {}
+            report = record.report or {}
             print(
                 f"{report.get('papers', 0)} papers: {report.get('added', 0)} added, "
                 f"{report.get('found', 0)} already there; {report.get('files', 0)} "
@@ -289,9 +284,6 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 print(f"Missing file: {missing}")
             for problem in report.get("problems", []):
                 print(f"Problem: {problem}")
-    except (Forbidden, NotVisible) as error:
-        print(error, file=sys.stderr)
-        return 1
     finally:
         engine.dispose()
     return 0

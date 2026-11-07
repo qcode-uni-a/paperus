@@ -104,54 +104,14 @@ class MLClient:
     ) -> Embedded:
         """One vector per text, and what to store them as (see
         ``vectors_name``)."""
-        started = time.perf_counter()
-        try:
-            vectors = self._embed(texts, model=model, kind=kind, timeout=timeout)
-        except MLLoading:
-            metrics.ML_CALLS.labels("embed", "loading").inc()
-            raise
-        except MLRejected:
-            metrics.ML_CALLS.labels("embed", "rejected").inc()
-            raise
-        except MLUnavailable:
-            metrics.ML_CALLS.labels("embed", "unavailable").inc()
-            raise
-        metrics.ML_CALLS.labels("embed", "ok").inc()
-        metrics.ML_SECONDS.labels("embed").observe(time.perf_counter() - started)
-        return vectors
-
-    def _embed(
-        self, texts: list[str], *, model: str, kind: Kind, timeout: float | None
-    ) -> Embedded:
-        errors = []
-        loading = False
-        for url in self._ordered_urls():
-            try:
-                response = self.http.post(
-                    f"{url}/embed",
-                    json={"model": model, "kind": kind, "texts": texts},
-                    timeout=timeout or httpx2.USE_CLIENT_DEFAULT,
-                )
-            except httpx2.HTTPError as error:
-                self._failed_at[url] = time.monotonic()
-                errors.append(f"{url}: {error}")
-                continue
-            if response.status_code == 503:  # loading the model: not broken
-                loading = True
-                errors.append(f"{url}: {_detail(response)}")
-                continue
-            if 400 <= response.status_code < 500:
-                raise MLRejected(response.status_code, _detail(response))
-            if response.is_error:
-                self._failed_at[url] = time.monotonic()
-                errors.append(f"{url}: {response.status_code} {_detail(response)}")
-                continue
-            self._failed_at.pop(url, None)
-            body = response.json()
-            # Services before 0.0.11 do not say: their vectors are the model's.
-            return Embedded(body.get("vectors") or model, body["embeddings"])
-        message = "; ".join(errors) or "no ML service configured"
-        raise MLLoading(message) if loading else MLUnavailable(message)
+        body = self._post(
+            "embed",
+            "/embed",
+            json={"model": model, "kind": kind, "texts": texts},
+            timeout=timeout,
+        ).json()
+        # Services before 0.0.11 do not say: their vectors are the model's.
+        return Embedded(body.get("vectors") or model, body["embeddings"])
 
     def status(self) -> list[tuple[str, str | None]]:
         """Each address with None if it answers, else the error."""
@@ -170,50 +130,55 @@ class MLClient:
         """How well each passage answers the query (higher fits better), from
         the first service that answers; raises MLUnavailable, MLLoading or
         MLRejected."""
-        errors = []
-        loading = False
-        for url in self._ordered_urls():
-            try:
-                response = self.http.post(
-                    f"{url}/rerank",
-                    json={"model": model, "query": query, "passages": passages},
-                    timeout=timeout,
-                )
-            except httpx2.HTTPError as error:
-                self._failed_at[url] = time.monotonic()
-                errors.append(f"{url}: {error}")
-                continue
-            if response.status_code == 503:
-                loading = True
-                errors.append(f"{url}: {_detail(response)}")
-                continue
-            if 400 <= response.status_code < 500:
-                metrics.ML_CALLS.labels("rerank", "rejected").inc()
-                raise MLRejected(response.status_code, _detail(response))
-            if response.is_error:
-                errors.append(f"{url}: {response.status_code} {_detail(response)}")
-                continue
-            metrics.ML_CALLS.labels("rerank", "ok").inc()
-            scores: list[float] = response.json()["scores"]
-            return scores
-        metrics.ML_CALLS.labels("rerank", "loading" if loading else "unavailable").inc()
-        message = "; ".join(errors) or "no ML service configured"
-        raise MLLoading(message) if loading else MLUnavailable(message)
+        response = self._post(
+            "rerank",
+            "/rerank",
+            json={"model": model, "query": query, "passages": passages},
+            timeout=timeout,
+            # Search times the reranking itself, with its fallback.
+            timed=False,
+        )
+        scores: list[float] = response.json()["scores"]
+        return scores
 
     def ocr(self, image: bytes, *, model: str, timeout: float = 300) -> Read:
         """The text in an image (PNG, JPEG, …), from the first service that
         answers; raises MLUnavailable, MLLoading or MLRejected (e.g. not an
         image)."""
+        body = self._post(
+            "ocr",
+            f"/ocr/{model}",
+            content=image,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=timeout,
+        ).json()
+        return Read(body["text"], body["lines"], body["width"], body["height"])
+
+    def _post(
+        self,
+        operation: str,
+        path: str,
+        *,
+        timeout: float | None,
+        timed: bool = True,
+        json: object = None,
+        content: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx2.Response:
+        """The answer of the first service that gives one, counted in the
+        metrics; raises MLUnavailable, MLLoading (a service is loading the
+        model: not broken) or MLRejected (not worth asking another)."""
         errors = []
         loading = False
         started = time.perf_counter()
         for url in self._ordered_urls():
             try:
                 response = self.http.post(
-                    f"{url}/ocr/{model}",
-                    content=image,
-                    headers={"Content-Type": "application/octet-stream"},
-                    timeout=timeout,
+                    f"{url}{path}",
+                    json=json,
+                    content=content,
+                    headers=headers,
+                    timeout=timeout or httpx2.USE_CLIENT_DEFAULT,
                 )
             except httpx2.HTTPError as error:
                 self._failed_at[url] = time.monotonic()
@@ -224,18 +189,20 @@ class MLClient:
                 errors.append(f"{url}: {_detail(response)}")
                 continue
             if 400 <= response.status_code < 500:
-                metrics.ML_CALLS.labels("ocr", "rejected").inc()
+                metrics.ML_CALLS.labels(operation, "rejected").inc()
                 raise MLRejected(response.status_code, _detail(response))
             if response.is_error:
                 self._failed_at[url] = time.monotonic()
                 errors.append(f"{url}: {response.status_code} {_detail(response)}")
                 continue
             self._failed_at.pop(url, None)
-            metrics.ML_CALLS.labels("ocr", "ok").inc()
-            metrics.ML_SECONDS.labels("ocr").observe(time.perf_counter() - started)
-            body = response.json()
-            return Read(body["text"], body["lines"], body["width"], body["height"])
-        metrics.ML_CALLS.labels("ocr", "loading" if loading else "unavailable").inc()
+            metrics.ML_CALLS.labels(operation, "ok").inc()
+            if timed:
+                elapsed = time.perf_counter() - started
+                metrics.ML_SECONDS.labels(operation).observe(elapsed)
+            return response
+        outcome = "loading" if loading else "unavailable"
+        metrics.ML_CALLS.labels(operation, outcome).inc()
         message = "; ".join(errors) or "no ML service configured"
         raise MLLoading(message) if loading else MLUnavailable(message)
 

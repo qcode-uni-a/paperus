@@ -171,14 +171,10 @@ def _safe(name: str) -> str:
 
 
 def _filename(item: Item) -> str:
-    for version in item.versions:
-        for identifier in version.identifiers:
-            if identifier.scheme == Scheme.ARXIV:
-                return f"arXiv {identifier.value}.pdf"
-    for version in item.versions:
-        for identifier in version.identifiers:
-            if identifier.scheme == Scheme.DOI:
-                return _safe(identifier.value) + ".pdf"
+    if arxiv := _identifiers(item, Scheme.ARXIV):
+        return f"arXiv {arxiv[0]}.pdf"
+    if dois := _identifiers(item, Scheme.DOI):
+        return _safe(dois[0]) + ".pdf"
     return "paper.pdf"
 
 

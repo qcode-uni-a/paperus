@@ -113,15 +113,12 @@ def open_export(path: Path, name: str) -> Generator[tuple[str, str, FileSource]]
                 raise NotAnExport("No .rdf, .bib, .ris or .json file in the zip.")
             # The shallowest one: the export itself, not a file attached to a paper.
             chosen = min(exports, key=lambda n: n.count("/"))
-            # The size the zip says, checked before unpacking (and while).
+            # The size the zip says, checked before unpacking; zipfile
+            # unpacks no more than that (a zip lying about it fails).
             size = archive.getinfo(chosen).file_size
             if size > MAX_EXPORT_BYTES:
                 raise _too_large(size)
-            with archive.open(chosen) as stream:
-                data = stream.read(MAX_EXPORT_BYTES + 1)
-            if len(data) > MAX_EXPORT_BYTES:
-                raise _too_large(len(data))
-            text = _decode(data)
+            text = _decode(archive.read(chosen))
             yield _guess(chosen, text), text, ZipFiles(archive)
         return
     if path.stat().st_size > MAX_EXPORT_BYTES:

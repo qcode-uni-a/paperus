@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import ColumnElement, delete, exists, func, select
+from sqlalchemy import ColumnElement, delete, exists, select
 from sqlalchemy.orm import Session
 
 from paperus.models import (
@@ -104,18 +104,3 @@ def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
                 "could not delete stored contents %s", sha256.hex(), exc_info=True
             )
     return len(orphans), sum(size or 0 for _, size in orphans)
-
-
-def in_trash(db: Session, libraries: list[uuid.UUID]) -> int:
-    """Papers and notes in the trash of these libraries."""
-    items = db.scalar(
-        select(func.count()).where(
-            Item.deleted_at.is_not(None), Item.library_id.in_(libraries)
-        )
-    )
-    notes = db.scalar(
-        select(func.count()).where(
-            Note.deleted_at.is_not(None), Note.library_id.in_(libraries)
-        )
-    )
-    return (items or 0) + (notes or 0)

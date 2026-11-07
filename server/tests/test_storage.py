@@ -2,10 +2,13 @@
 
 import hashlib
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import boto3
 import pytest
+from botocore.exceptions import ClientError
+from botocore.stub import Stubber
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from moto import mock_aws
@@ -114,3 +117,44 @@ def test_api_with_s3(
         response.headers["content-disposition"]
         == "inline; filename*=utf-8''%C3%A4%20b.pdf"
     )
+
+
+def test_listing_what_is_stored(store: BlobStore) -> None:
+    stored = store.put([CONTENT], max_size=10_000)
+    # Not a SHA-256 (64 characters, but not hex): left out.
+    odd = "z" * 64
+    if isinstance(store, FilesystemStore):
+        folder = store.root / "blobs" / "zz" / "zz"
+        folder.mkdir(parents=True)
+        (folder / odd).write_bytes(b"?")
+    else:
+        assert isinstance(store, S3Store)
+        store.client.put_object(
+            Bucket="papers", Key=f"lib/blobs/zz/zz/{odd}", Body=b"?"
+        )
+    [(sha256, written, size)] = store.iter_stored()
+    assert (sha256, size) == (stored.sha256, len(CONTENT))
+    assert abs(datetime.now(UTC) - written) < timedelta(minutes=1)
+
+
+def test_s3_errors_other_than_missing(s3_bucket: str, tmp_path: Path) -> None:
+    client = boto3.client("s3", region_name="us-east-1")
+    store = S3Store(client, s3_bucket, temp_dir=tmp_path)
+    with Stubber(client) as stub:
+        stub.add_client_error("head_object", "AccessDenied", http_status_code=403)
+        with pytest.raises(ClientError):
+            store.exists(hashlib.sha256(CONTENT).digest())
+
+
+def test_make_s3_store(s3_bucket: str, tmp_path: Path) -> None:
+    settings = Settings(
+        storage_backend="s3",
+        s3_bucket=s3_bucket,
+        s3_prefix="lib",
+        s3_region="us-east-1",
+        temp_path=tmp_path,
+    )
+    store = make_blob_store(settings)
+    assert isinstance(store, S3Store) and store.prefix == "lib/"
+    stored = store.put([CONTENT], max_size=10_000)
+    assert store.exists(stored.sha256)

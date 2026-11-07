@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -125,3 +126,26 @@ def test_hints_are_remembered(client: TestClient, db: Session) -> None:
     client.put("/api/auth/hints/first-owner")
     assert client.get("/api/auth/me").json()["seen_hints"] == ["first-owner"]
     assert client.put("/api/auth/hints/Not%20a%20hint").status_code == 422
+
+
+def test_old_password_hashes_are_renewed(client: TestClient, db: Session) -> None:
+    """Hashed with weaker settings than today's: renewed on the next login."""
+    weak = PasswordHasher(time_cost=1, memory_cost=8192).hash("secret")
+    user = create_user(db, "ada", "unused")
+    user.password_hash = weak
+    db.commit()
+    login(client)
+    db.refresh(user)
+    assert user.password_hash != weak
+    assert not PasswordHasher().check_needs_rehash(user.password_hash)
+    assert verify_password(user.password_hash, "secret")
+
+
+def test_deactivated_people_cannot_log_in(client: TestClient, db: Session) -> None:
+    user = create_user(db, "ada", "secret")
+    user.deactivated_at = datetime.now(UTC)
+    db.commit()
+    response = client.post(
+        "/api/auth/login", json={"username": "ada", "password": "secret"}
+    )
+    assert response.status_code == 401

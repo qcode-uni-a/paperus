@@ -48,3 +48,26 @@ def test_check(client: TestClient, db: Session, blobs: BlobStore) -> None:
     report = root.get("/api/admin/integrity").json()
     assert report["removed"] == 1 and report["missing"] == 1
     assert root.post("/api/admin/jobs/integrity-deep").status_code == 202
+
+
+def test_unreadable_contents_count_as_damaged(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    assert isinstance(blobs, FilesystemStore)
+    # Nothing stored yet: nothing wrong.
+    empty = integrity.check(db, blobs, deep=True)
+    assert (empty.contents, empty.problems) == (0, [])
+    root = Person(client, db, "root", admin=True)
+    item = root.add("Locked")
+    file = root.post(
+        f"/api/items/{item['id']}/files",
+        files={"upload": ("p.pdf", PDF, "application/pdf")},
+    ).json()
+    path = blobs.path(bytes.fromhex(file["sha256"]))
+    path.chmod(0)
+    try:
+        report = integrity.check(db, blobs, deep=True)
+    finally:
+        path.chmod(0o644)
+    assert (report.missing, report.damaged) == (0, 1)
+    assert [p.title for p in report.problems] == ["Locked"]

@@ -5,7 +5,7 @@ defaults; values saved here override them.
 
 import logging
 import uuid
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import httpx2
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
@@ -103,6 +103,8 @@ class SystemConfig(BaseModel):
     """The claim that becomes the username (e.g. preferred_username, email);
     an existing account of that name is linked on its first login."""
     oidc_create_accounts: bool = True
+    """Create an account on someone's first OIDC login; off: only
+    people an administrator added beforehand."""
 
     # Readable copy (storage template)
     copy_enabled: bool = False
@@ -118,8 +120,6 @@ class SystemConfig(BaseModel):
     new_user_groups: list[Joining] = Field(default_factory=list, max_length=20)
     """Groups new accounts join (made by an administrator or on a first
     OIDC login)."""
-    """Create an account on someone's first OIDC login; off: only
-    people an administrator added beforehand."""
 
     @field_validator("copy_template")
     @classmethod
@@ -164,13 +164,16 @@ def max_upload_bytes(db: Session, settings: Settings) -> int:
     return int(chosen) * 2**20 if chosen else settings.max_upload_bytes
 
 
-def save_config(db: Session, config: SystemConfig) -> None:
-    value = config.model_dump(mode="json")
+def _save(db: Session, key: str, value: dict[str, Any]) -> None:
     db.execute(
         insert(SystemSetting)
-        .values(key=KEY, value=value)
+        .values(key=key, value=value)
         .on_conflict_do_update(index_elements=["key"], set_={"value": value})
     )
+
+
+def save_config(db: Session, config: SystemConfig) -> None:
+    _save(db, KEY, config.model_dump(mode="json"))
 
 
 OIDC_SECRET_KEY = "oidc_secret"
@@ -187,12 +190,7 @@ def oidc_secret(db: Session, settings: Settings) -> str | None:
 
 
 def save_oidc_secret(db: Session, secret: str | None) -> None:
-    value = {"secret": secret}
-    db.execute(
-        insert(SystemSetting)
-        .values(key=OIDC_SECRET_KEY, value=value)
-        .on_conflict_do_update(index_elements=["key"], set_={"value": value})
-    )
+    _save(db, OIDC_SECRET_KEY, {"secret": secret})
 
 
 VECTORS_KEY = "vectors"
@@ -209,12 +207,7 @@ def vectors_in_use(db: Session, model: str) -> str:
 
 def save_vectors_in_use(db: Session, model: str, vectors: str) -> None:
     row = db.get(SystemSetting, VECTORS_KEY)
-    value = {**(row.value if row else {}), model: vectors}
-    db.execute(
-        insert(SystemSetting)
-        .values(key=VECTORS_KEY, value=value)
-        .on_conflict_do_update(index_elements=["key"], set_={"value": value})
-    )
+    _save(db, VECTORS_KEY, {**(row.value if row else {}), model: vectors})
 
 
 BACKUPS_KEY = "backups"
@@ -239,12 +232,7 @@ def load_backup_config(db: Session) -> BackupConfig:
 
 
 def save_backup_config(db: Session, config: BackupConfig) -> None:
-    value = config.model_dump()
-    db.execute(
-        insert(SystemSetting)
-        .values(key=BACKUPS_KEY, value=value)
-        .on_conflict_do_update(index_elements=["key"], set_={"value": value})
-    )
+    _save(db, BACKUPS_KEY, config.model_dump())
 
 
 def apply(config: SystemConfig, http: httpx2.Client) -> None:

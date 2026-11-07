@@ -11,9 +11,11 @@ from paperus.identifiers import Scheme
 from paperus.identify import (
     find_identifiers,
     identifiers_in_filename,
+    identify,
     plausible_title,
     title_appears,
 )
+from paperus.models import File
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
@@ -291,3 +293,75 @@ def test_arxiv_id_from_filename(
     item = get_item(logged_in, uploaded["item_id"])
     assert item["title"] == "Drought indices for Bavarian rivers"
     assert {"scheme": "arxiv", "value": "2101.00001"} in item["identifiers"]
+
+
+def test_odd_identifiers_in_text() -> None:
+    # Cut off at punctuation, or a letter only case-insensitive matching
+    # takes for "s": no identifier.
+    assert find_identifiers("doi 10.1234/) and arXiv:\u017folv-int/9901001") == []
+    assert not title_appears("A b", "A b")
+
+
+def test_only_uploaded_pdfs_with_text_are_identified(
+    db: Session, blobs: BlobStore, doi_registry: FakeDOIRegistry
+) -> None:
+    http = httpx2.Client(transport=httpx2.MockTransport(doi_registry))
+    identify(db, blobs, http, uuid.uuid4())  # gone: nothing to do
+    assert doi_registry.requests == []
+
+
+def test_a_file_without_uploader(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+) -> None:
+    """Files fetched by paperus itself (no uploader) are looked up in their
+    own library only."""
+    doi_registry.records[DOI] = CSL
+    uploaded = upload(logged_in, make_pdf([FIRST_PAGE]))
+    file = db.get(File, uuid.UUID(uploaded["file"]["id"]))
+    assert file is not None
+    file.uploaded_by = None
+    db.commit()
+    run_job(db, blobs, doi_registry, uploaded["file"]["id"])
+    assert get_item(logged_in, uploaded["item_id"])["title"] == CSL["title"]
+
+
+def test_a_known_paper_in_the_trash_is_not_joined(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+) -> None:
+    doi_registry.records[DOI] = CSL
+    existing = logged_in.post("/api/items", json={"doi": DOI}).json()
+    logged_in.delete(f"/api/items/{existing['id']}")
+    uploaded = upload(logged_in, make_pdf([FIRST_PAGE]))
+    run_job(db, blobs, doi_registry, uploaded["file"]["id"])
+    db.expire_all()
+    # The upload stays as it was; the trash is not where it goes.
+    item = get_item(logged_in, uploaded["item_id"])
+    assert (item["title"], item["deleted_at"]) == ("scan_0042", None)
+
+
+def test_a_known_paper_with_the_same_file(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+) -> None:
+    doi_registry.records[DOI] = CSL
+    content = make_pdf([FIRST_PAGE])
+    uploaded = upload(logged_in, content)
+    existing = logged_in.post("/api/items", json={"doi": DOI}).json()
+    added = logged_in.post(
+        f"/api/items/{existing['id']}/files",
+        files={"upload": ("drought.pdf", content, "application/pdf")},
+    )
+    assert added.status_code == 201, added.text
+    run_job(db, blobs, doi_registry, uploaded["file"]["id"])
+    db.expire_all()
+    assert logged_in.get(f"/api/items/{uploaded['item_id']}").status_code == 404
+    [file] = get_item(logged_in, existing["id"])["versions"][0]["files"]
+    assert file["id"] == added.json()["id"]

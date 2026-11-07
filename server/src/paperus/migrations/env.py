@@ -9,7 +9,8 @@ from paperus.db import make_engine
 from paperus.models import Base
 
 if context.config.config_file_name is not None:
-    fileConfig(context.config.config_file_name)
+    # Keep paperus's own loggers (the tests migrate in their process).
+    fileConfig(context.config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

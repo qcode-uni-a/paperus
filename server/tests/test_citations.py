@@ -154,3 +154,38 @@ def test_odd_metadata_and_keys(client: TestClient, db: Session) -> None:
     assert "month =" not in text  # month 0 is no month
     assert "@misc{dup,\n" in text and "@misc{dup-1,\n" in text
     assert ada.get("/api/citations", params={"format": "csl-json"}).status_code == 200
+
+
+def test_theses_reports_and_odd_shapes(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    thesis = add(
+        ada,
+        {
+            "type": "thesis",
+            "genre": "Master's thesis",
+            "title": "Engines",
+            "publisher": "Uni",
+            "author": "Ada Lovelace",
+            "issued": {"date-parts": [[1843, "March"]]},
+        },
+    )
+    report = add(
+        ada,
+        {
+            "type": "report",
+            "genre": "Technical report",
+            "title": "Rain",
+            "publisher": "Weather Office",
+            "ISBN": [],
+        },
+    )
+    text = ada.get("/api/citations", params={"item": [thesis, report]}).text
+    assert "@mastersthesis{" in text
+    assert "\tschool = {Uni},\n" in text
+    assert "\tauthor = {{Ada Lovelace}},\n" in text
+    assert "month =" not in text  # "March" is no month number
+    assert "\tyear = {1843},\n" in text
+    assert "@techreport{" in text
+    assert "\tinstitution = {Weather Office},\n" in text
+    assert "\ttype = {Technical report},\n" in text
+    assert "isbn" not in text

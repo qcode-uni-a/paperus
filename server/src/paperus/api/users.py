@@ -14,7 +14,7 @@ from paperus.api.admin import Admin
 from paperus.api.auth import check_password_length
 from paperus.api.deps import DB
 from paperus.avatars import avatar_url
-from paperus.models import Group, Item, Library, Membership, User
+from paperus.models import Item, Library, Membership, User
 from paperus.system import load_config
 
 router = APIRouter(prefix="/api/admin/users", tags=["users"])
@@ -180,10 +180,8 @@ class HandOver(BaseModel):
 
 
 def _own_library(db: DB, user: User) -> uuid.UUID:
-    library = db.scalar(select(Library.id).where(Library.user_id == user.id))
-    if library is None:
-        raise HTTPException(404, "the person has no library")
-    return library
+    # Everyone has one (``auth.create_user``).
+    return db.scalars(select(Library.id).where(Library.user_id == user.id)).one()
 
 
 @router.post("/{user_id}/hand-over")
@@ -198,9 +196,10 @@ def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Priva
     if (body.group_id is None) == (body.user_id is None):
         raise HTTPException(422, "name a group or a person")
     if body.group_id is not None:
-        if db.get(Group, body.group_id) is None:
-            raise HTTPException(404, "group not found")
+        # Every group has a library.
         target = db.scalar(select(Library.id).where(Library.group_id == body.group_id))
+        if target is None:
+            raise HTTPException(404, "group not found")
     else:
         receiver = db.get(User, body.user_id)
         if (
@@ -210,8 +209,6 @@ def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Priva
         ):
             raise HTTPException(422, "hand over to another active person")
         target = _own_library(db, receiver)
-    if target is None:
-        raise HTTPException(404, "the group has no library")
     moved = handover.hand_over(db, _own_library(db, user), target)
     db.commit()
     return Private(**moved.__dict__)

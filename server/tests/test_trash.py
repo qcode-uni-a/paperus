@@ -8,8 +8,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from paperus import trash
+from paperus.config import Settings
 from paperus.models import Blob, Item, Note
-from paperus.storage import BlobStore
+from paperus.storage import BlobStore, FilesystemStore
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 3000 + b"\n%%EOF\n"
@@ -112,3 +113,25 @@ def test_storage_usage(client: TestClient, db: Session) -> None:
     stats = root.get("/api/admin/stats").json()["storage"]
     assert stats["library_bytes"] == len(PDF)
     assert stats["disk"]["total"] == space["disk_total"]
+
+
+class UndeletableStore(FilesystemStore):
+    """A store whose files cannot be removed (e.g. a read-only mount)."""
+
+    def delete(self, sha256: bytes) -> None:
+        raise PermissionError(sha256.hex())
+
+
+def test_contents_that_cannot_be_removed(
+    client: TestClient, db: Session, settings: Settings
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Old")
+    sha = upload(ada, paper["id"], PDF)
+    ada.delete(f"/api/items/{paper['id']}")
+    store = UndeletableStore(settings.storage_path)
+    done = trash.empty(db, store)
+    # The row goes (an integrity check finds the file); emptying goes on.
+    assert (done.items, done.blobs, done.bytes) == (1, 1, len(PDF))
+    assert db.scalar(select(func.count()).select_from(Blob)) == 0
+    assert store.exists(bytes.fromhex(sha))

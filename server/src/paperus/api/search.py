@@ -172,8 +172,8 @@ def _query_vector(ml: MLClient, model: str, query: str) -> tuple[str, str] | Non
         embedded = ml.embed_named(
             [query], model=model, kind="query", timeout=QUERY_TIMEOUT
         )
-    except (MLUnavailable, MLRejected):
-        log.warning("search by meaning unavailable; keyword search only", exc_info=True)
+    except (MLUnavailable, MLRejected) as error:
+        log.warning("search by meaning unavailable, keyword search only: %s", error)
         return None
     [vector] = embedded.values
     return "[" + ",".join(f"{x:.6g}" for x in vector) + "]", embedded.vectors

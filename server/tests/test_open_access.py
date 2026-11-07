@@ -1,6 +1,6 @@
 """Downloading a damaged file again from an open-access source."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx2
@@ -10,9 +10,12 @@ from procrastinate import App
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from paperus import open_access
 from paperus.app import create_app
 from paperus.config import Settings
-from paperus.models import File, TextStatus
+from paperus.identifiers import Scheme
+from paperus.models import File, Identifier, Item, TextStatus, Version
+from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry, FakeML
 from tests.pdfs import make_pdf
 from tests.people import Person
@@ -135,3 +138,119 @@ def test_without_identifiers_nothing_to_fetch(site: TestClient, db: Session) -> 
     refused = ada.post(f"/api/files/{file['id']}/download-again")
     assert refused.status_code == 409
     assert "no open-access source" in refused.json()["detail"]
+
+
+# The sources one by one, as they fail.
+
+Handler = Callable[[httpx2.Request], httpx2.Response]
+
+
+def web(handler: Handler) -> httpx2.Client:
+    return httpx2.Client(transport=httpx2.MockTransport(handler))
+
+
+def down(request: httpx2.Request) -> httpx2.Response:
+    raise httpx2.ConnectError("unreachable", request=request)
+
+
+def paper(scheme: Scheme, value: str) -> Item:
+    """A paper with one identifier (not stored)."""
+    identifier = Identifier(scheme=scheme, value=value)
+    return Item(title="Floquet", versions=[Version(identifiers=[identifier])])
+
+
+def test_openalex_on_arxiv_or_not() -> None:
+    doi = "10.1103/physrevb.1.2"
+    assert open_access.arxiv_id_for(web(down), doi, None) is None
+    unknown = web(lambda request: httpx2.Response(503))
+    assert open_access.arxiv_id_for(unknown, doi, None) is None
+    asked: list[httpx2.Request] = []
+
+    def openalex(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        locations = [
+            "not a location",
+            {"landing_page_url": "https://journals.aps.org/x"},
+            {"pdf_url": "https://arxiv.org/pdf/2401.00001v2.pdf"},
+        ]
+        return httpx2.Response(200, json={"locations": locations})
+
+    assert open_access.arxiv_id_for(web(openalex), doi, "lab@example.org") == (
+        "2401.00001"
+    )
+    assert asked[0].url.params["mailto"] == "lab@example.org"
+
+
+def test_unpaywall_without_a_copy(blobs: BlobStore) -> None:
+    item = paper(Scheme.DOI, "10.1103/physrevb.1.2")
+    for answer in (
+        httpx2.Response(500),
+        httpx2.Response(200, json={"best_oa_location": None}),
+        httpx2.Response(200, json={"best_oa_location": {"url_for_pdf": "http://x"}}),
+    ):
+        with pytest.raises(open_access.NoSource, match="no open-access PDF"):
+            open_access.fetch(
+                web(lambda request, answer=answer: answer),
+                blobs,
+                item,
+                contact_email="lab@example.org",
+                max_bytes=10**6,
+            )
+    # Without a contact email Unpaywall is not asked.
+    with pytest.raises(open_access.NoSource, match="no open-access source"):
+        open_access.fetch(web(down), blobs, item, contact_email=None, max_bytes=10)
+
+
+def test_too_large_is_not_stored(blobs: BlobStore) -> None:
+    arxiv = web(lambda request: httpx2.Response(200, content=GOOD))
+    with pytest.raises(open_access.NoSource, match=r"arxiv\.org/pdf/2401\.00001"):
+        open_access.fetch(
+            arxiv,
+            blobs,
+            paper(Scheme.ARXIV, "2401.00001"),
+            contact_email=None,
+            max_bytes=len(GOOD) - 1,
+        )
+    stored, url = open_access.fetch(
+        arxiv,
+        blobs,
+        paper(Scheme.ARXIV, "2401.00001"),
+        contact_email=None,
+        max_bytes=len(GOOD),
+    )
+    assert url == "https://arxiv.org/pdf/2401.00001" and stored.size == len(GOOD)
+
+
+def test_the_journals_copy_refused(blobs: BlobStore) -> None:
+    doi = "10.1103/physrevb.1.2"
+
+    def sources(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "api.openalex.org":
+            open_copy = {"is_oa": True, "version": "publishedVersion"}
+            locations = [
+                {**open_copy, "pdf_url": "http://insecure.example.org/paper.pdf"},
+                {**open_copy, "pdf_url": "https://journal.example.org/login"},
+                {"is_oa": True, "version": "submittedVersion", "pdf_url": "x"},
+            ]
+            return httpx2.Response(200, json={"locations": locations})
+        if request.url.host == "journal.example.org":
+            return httpx2.Response(200, text="<html>Please log in</html>")
+        return httpx2.Response(404)
+
+    # Only what was tried, and why (never the insecure address).
+    with pytest.raises(open_access.NoSource) as refused:
+        open_access.fetch_journal_copy(
+            web(sources), blobs, doi, contact_email=None, max_bytes=10**6
+        )
+    assert str(refused.value) == (
+        "https://journal.example.org/login: not a PDF (probably a web page)"
+    )
+    nothing = web(lambda request: httpx2.Response(404))
+    with pytest.raises(open_access.NoSource, match="with the contact email set"):
+        open_access.fetch_journal_copy(
+            nothing, blobs, doi, contact_email=None, max_bytes=10
+        )
+    with pytest.raises(open_access.NoSource, match=r"^no open copy of the journal"):
+        open_access.fetch_journal_copy(
+            nothing, blobs, doi, contact_email="lab@example.org", max_bytes=10
+        )

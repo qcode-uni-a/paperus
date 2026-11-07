@@ -1,13 +1,16 @@
 """Notes: titles, the edit history, conflicts, trash and export."""
 
+import uuid
 from datetime import timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from paperus import notes
 from paperus.models import Note, NoteChunk
-from tests.people import Person
+from tests.people import Person, group
 
 
 def save(person: Person, note_id: str, text: str, etag: str) -> tuple[int, str]:
@@ -124,3 +127,80 @@ def test_links_to_trashed_papers_can_be_removed(
     assert response.status_code == 200
     ada.post(f"/api/items/{paper['id']}/restore")
     assert ada.get(f"/api/notes/{note['id']}").json()["items"] == []
+
+
+def test_owners_collections_and_pages(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, eve = Person(client, db, "ada"), Person(client, db, "eve")
+    chair = group(root, "Chair", ada)
+    paper = ada.add("Radar")
+    note = ada.note("# Minutes", items=[paper["id"]])
+    url = f"/api/notes/{note['id']}"
+
+    # The same paper again: its page changes, no second link.
+    linked = ada.put(f"{url}/items/{paper['id']}", json={"page": 4}).json()
+    assert linked["items"] == [{"item_id": paper["id"], "title": "Radar", "page": 4}]
+
+    # A group's collection holds only the group's notes.
+    shelf = ada.post(
+        "/api/collections", json={"name": "Shelf", "library_id": chair["library_id"]}
+    ).json()
+    inner = ada.post(
+        "/api/collections", json={"name": "Inner", "parent_id": shelf["id"]}
+    ).json()
+    refused = ada.post(
+        "/api/notes", json={"text": "# Mine", "collection_id": shelf["id"]}
+    )
+    assert refused.status_code == 409
+    mine = ada.post("/api/collections", json={"name": "Mine"}).json()
+    filed = ada.post("/api/notes", json={"text": "# Mine", "collection_id": mine["id"]})
+    assert filed.json()["collection_ids"] == [mine["id"]]
+    ada.post(f"/api/collections/{inner['id']}/notes", json={"note_ids": [note["id"]]})
+    assert ada.get(url).json()["collection_ids"] == []  # skipped
+    # Given to the group, it may go in; twice is once.
+    owner = ada.put(f"{url}/owner", json={"library_id": chair["library_id"]})
+    assert owner.status_code == 200, owner.text
+    for _ in range(2):
+        ada.post(
+            f"/api/collections/{inner['id']}/notes", json={"note_ids": [note["id"]]}
+        )
+    assert ada.get(url).json()["collection_ids"] == [inner["id"]]
+    nested = ada.get("/api/notes", params={"collection": shelf["id"]}).json()
+    assert [n["id"] for n in nested] == [note["id"]]
+    only_shelf = {"collection": shelf["id"], "nested": False}
+    assert ada.get("/api/notes", params=only_shelf).json() == []
+    # Back to Ada alone: the group's collection lets it go.
+    ada.put(f"{url}/owner", json={"library_id": ada.libraries()["Me"]["id"]})
+    assert ada.get(url).json()["collection_ids"] == []
+    ada.put(f"{url}/owner", json={"library_id": chair["library_id"]})
+    ada.post(f"/api/collections/{inner['id']}/notes", json={"note_ids": [note["id"]]})
+    removed = ada.delete(f"/api/collections/{inner['id']}/notes/{note['id']}")
+    assert removed.status_code == 204
+    assert ada.get(url).json()["collection_ids"] == []
+
+    # Trashed and restored.
+    ada.delete(url)
+    restored = ada.post(f"{url}/restore")
+    assert restored.status_code == 200 and restored.json()["deleted_at"] is None
+
+    # Others: not found, as if there were no such note or paper.
+    assert eve.get(url).status_code == 404
+    assert eve.get(f"/api/notes/{uuid.uuid4()}").status_code == 404
+    about_ada = eve.post("/api/notes", json={"items": [{"item_id": paper["id"]}]})
+    assert about_ada.status_code == 404
+    # Saving needs the version the editor started from.
+    assert ada.patch(url, json={"text": "x"}).status_code == 428
+
+
+def test_saving_the_same_text_changes_nothing(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    note = ada.note("")
+    assert note["title"] == ""
+    url = f"/api/notes/{note['id']}"
+    status, etag = save(ada, note["id"], "Text", ada.get(url).headers["ETag"])
+    assert status == 200
+    status, again = save(ada, note["id"], "Text", etag)
+    assert (status, again) == (200, etag)
+    assert ada.get(f"{url}/history").json() == []
+    with pytest.raises(LookupError):
+        notes.save(db, uuid.uuid4(), "Text", "0", None)

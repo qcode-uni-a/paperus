@@ -240,7 +240,7 @@ def _month(value: str | None) -> int | None:
     if not value:
         return None
     value = value.strip().lower()
-    if value.isdigit():
+    if value.isdecimal():  # not isdigit: int() refuses "²"
         return int(value)
     for number, name in enumerate(_MONTHS, 1):
         if value.startswith(name):

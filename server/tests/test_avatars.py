@@ -1,5 +1,6 @@
 """Profile pictures."""
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -89,6 +90,40 @@ def test_sizes_are_read() -> None:
     assert avatars.dimensions(png(300, 200), "image/png") == (300, 200)
     assert avatars.dimensions(jpeg(640, 480), "image/jpeg") == (640, 480)
     assert avatars.dimensions(webp(128, 96), "image/webp") == (128, 96)
+    # Lossless WebP: 14 bits each, less one.
+    bits = (128 - 1) | ((96 - 1) << 14)
+    lossless = (
+        b"RIFF\x00\x00\x00\x00WEBPVP8L"
+        + b"\x00" * 5
+        + bits.to_bytes(4, "little")
+        + b"\x00" * 20
+    )
+    assert avatars.dimensions(lossless, "image/webp") == (128, 96)
+    # Extended WebP: 24 bits each, less one.
+    extended = (
+        b"RIFF\x00\x00\x00\x00WEBPVP8X"
+        + b"\x00" * 8
+        + (128 - 1).to_bytes(3, "little")
+        + (96 - 1).to_bytes(3, "little")
+    )
+    assert avatars.dimensions(extended, "image/webp") == (128, 96)
+
+
+def test_unreadable_sizes() -> None:
+    for data, media_type in (
+        (png()[:12] + b"IEND" + b"\x00" * 20, "image/png"),
+        # JPEG segments that do not start with 0xFF, or no frame header.
+        (b"\xff\xd8\x00\xe0" + b"\x00" * 30, "image/jpeg"),
+        (
+            b"\xff\xd8" + b"\xff\xe0\x00\x0a" + b"\x00" * 8 + b"\xff\xd9" * 8,
+            "image/jpeg",
+        ),
+        (b"RIFF\x00\x00\x00\x00WEBPVP8Z" + b"\x00" * 20, "image/webp"),
+        # Cut off in the header (it would read as 1 x 1 pixels).
+        (b"RIFF\x00\x00\x00\x00WEBPVP8L\x00", "image/webp"),
+    ):
+        with pytest.raises(avatars.BadPicture, match="size cannot be read"):
+            avatars.dimensions(data, media_type)
 
 
 def test_no_full_size_photos(client: TestClient, db: Session) -> None:

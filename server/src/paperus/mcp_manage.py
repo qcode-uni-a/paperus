@@ -11,7 +11,6 @@ from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, ToolAnnotations
@@ -20,9 +19,9 @@ from sqlalchemy.orm import Session
 
 from paperus import duplicates, library, merge, metadata, missing, open_access
 from paperus import organize as organizing
-from paperus.access import Access, Forbidden
+from paperus.access import Access
 from paperus.api.files import read_again, replace_with_open_access, unreadable
-from paperus.api.items import get_readable_item, unsorted_conditions
+from paperus.api.items import unsorted_conditions
 from paperus.api.manage import manage_counts
 from paperus.identifiers import (
     InvalidIdentifier,
@@ -95,17 +94,6 @@ def register(
     brief: Brief,
 ) -> None:
     """Add the tidying tools to the MCP server."""
-
-    def paper(
-        db: Session, access: Access, paper_id: str, *, write: bool = False
-    ) -> Item:
-        try:
-            item = get_readable_item(db, access, _uuid(paper_id), allow_trashed=False)
-        except HTTPException as error:
-            raise ToolError(f"No such paper: {paper_id}.") from error
-        if write and not access.can_write_item(item):
-            raise ToolError(f"You may not change “{item.title}” (you only read it).")
-        return item
 
     def described(item: Item, access: Access, base: str) -> dict[str, Any]:
         """A paper with what tells duplicates apart."""
@@ -194,13 +182,11 @@ def register(
         kept one has already stays once) and the other goes to the trash
         (restore_papers brings it back). Ask the person first, naming both."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, base):
-            keep = paper(db, access, keep_id)
-            other = paper(db, access, other_id, write=True)
-            if keep.id == other.id:
-                raise ToolError("That is the same paper.")
+            keep = find_paper(db, access, keep_id)
+            other = find_paper(db, access, other_id, write=True)
             try:
                 steps = merge.merge_items(db, access, other, keep)
-            except (merge.CannotMerge, Forbidden) as error:
+            except merge.CannotMerge as error:
                 raise ToolError(str(error)) from error
             db.commit()
             db.refresh(keep)
@@ -220,7 +206,7 @@ def register(
         """Two papers that only look alike: they are not suggested as
         duplicates again (for everyone who sees both)."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
-            a, b = paper(db, access, paper_a), paper(db, access, paper_b)
+            a, b = find_paper(db, access, paper_a), find_paper(db, access, paper_b)
             if not (access.can_write_item(a) or access.can_write_item(b)):
                 raise ToolError("You may change neither of them.")
             duplicates.dismiss(db, a.id, b.id, access.user.id)
@@ -266,7 +252,7 @@ def register(
         If another paper has that DOI already, the answer says so: merge
         them instead. Ask the person first."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, base):
-            item = paper(db, access, paper_id, write=True)
+            item = find_paper(db, access, paper_id, write=True)
             try:
                 value = normalize(Scheme.DOI, _as_doi(doi))
             except InvalidIdentifier as error:
@@ -336,13 +322,10 @@ def register(
         paper (arXiv, or a copy Unpaywall knows), e.g. for a damaged PDF.
         Ask the person first."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
-            file = db.get(File, _uuid(file_id))
-            if file is None or file.deleted_at is not None:
+            file = readable_file(db, access, file_id)
+            if file is None:
                 raise ToolError("No such file.")
-            item = file.version.item
-            if not access.can_read_item(item):
-                raise ToolError("No such file.")
-            if not access.can_write_item(item):
+            if not access.can_write_item(file.version.item):
                 raise ToolError("You may not change this paper's files.")
             if download:
                 try:
@@ -411,7 +394,7 @@ def register(
         own copy (for papers with only their preprint's PDF). Ask the person
         first."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
-            item = paper(db, access, paper_id, write=True)
+            item = find_paper(db, access, paper_id, write=True)
             add = missing.add_journal_copy if journal else missing.add_open_access
             file = add(
                 db,
@@ -437,7 +420,7 @@ def register(
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
             changed = []
             for paper_id in paper_ids[:MAX_LIST]:
-                item = paper(db, access, paper_id, write=True)
+                item = find_paper(db, access, paper_id, write=True)
                 item.file_wanted = needed
                 changed.append(str(item.id))
             db.commit()
@@ -453,7 +436,7 @@ def register(
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
             changed = []
             for paper_id in paper_ids[:MAX_LIST]:
-                item = paper(db, access, paper_id, write=True)
+                item = find_paper(db, access, paper_id, write=True)
                 if (item.archived_at is not None) != archived:
                     item.archived_at = datetime.now(UTC) if archived else None
                 changed.append(str(item.id))
@@ -465,16 +448,16 @@ def register(
     def own_tag(db: Session, access: Access, name: str, group: str | None) -> Tag:
         """The tag of this name the person may change (theirs, or a group's
         they are a member of; ``group`` decides if both have one)."""
-        found = [
-            tag
-            for tag in db.scalars(
-                select(Tag).where(
-                    Tag.library_id.in_(access.writable),
-                    func.lower(Tag.name) == organizing.clean_name(name).lower(),
-                )
+        libraries = access.writable
+        if group is not None:
+            wanted = group_library(db, access, group)
+            libraries = [lib for lib in libraries if lib == wanted]
+        found = db.scalars(
+            select(Tag).where(
+                Tag.library_id.in_(libraries),
+                func.lower(Tag.name) == organizing.clean_name(name).lower(),
             )
-            if group is None or tag.library_id == _group_library(db, access, group)
-        ]
+        ).all()
         if not found:
             raise ToolError(f"You have no tag “{name}” you may change.")
         if len(found) > 1:
@@ -493,7 +476,7 @@ def register(
             names = {organizing.clean_name(t).lower() for t in tags}
             result = []
             for paper_id in paper_ids[:MAX_LIST]:
-                item = paper(db, access, paper_id)
+                item = find_paper(db, access, paper_id)
                 for link in list(item.tag_links):
                     if link.tag.name.lower() not in names:
                         continue
@@ -567,9 +550,7 @@ def register(
                 if parent.rules is not None:
                     raise ToolError("A smart collection holds no other collections.")
             elif group is not None:
-                library_id = _group_library(db, access, group)
-                if library_id is None:
-                    raise ToolError(f"You are in no group called “{group}”.")
+                library_id = group_library(db, access, group)
             else:
                 library_id = access.own_library
             if not access.can_write(library_id):
@@ -598,7 +579,7 @@ def register(
                 raise ToolError("You may not change this collection.")
             if target.rules is not None:
                 raise ToolError("A smart collection finds its papers by its rules.")
-            items = [paper(db, access, p) for p in paper_ids[:MAX_LIST]]
+            items = [find_paper(db, access, p) for p in paper_ids[:MAX_LIST]]
             added = organizing.add_to_collection(
                 db,
                 target,
@@ -621,7 +602,7 @@ def register(
                 raise ToolError("You may not change this collection.")
             removed = 0
             for paper_id in paper_ids[:MAX_LIST]:
-                item = paper(db, access, paper_id)
+                item = find_paper(db, access, paper_id)
                 before = len(item.collection_links)
                 item.collection_links = [
                     link
@@ -659,33 +640,64 @@ def register(
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, base):
             restored = []
             for paper_id in paper_ids[:MAX_LIST]:
-                try:
-                    item = get_readable_item(db, access, _uuid(paper_id))
-                except HTTPException as error:
-                    raise ToolError(f"No such paper: {paper_id}.") from error
-                if not access.can_write_item(item):
-                    raise ToolError(f"You may not restore “{item.title}”.")
+                item = find_paper(db, access, paper_id, write=True, trashed=True)
                 library.restore(item)
                 restored.append(brief(item, access, base))
             db.commit()
             return json(restored)
 
 
-def _group_library(db: Session, access: Access, name: str) -> uuid.UUID | None:
-    """The library of the person's group of this name."""
-    for group in db.scalars(
-        select(Group).where(Group.id.in_(list(access.group_libraries)))
-    ):
-        if group.name.lower() == name.strip().lower():
-            return access.group_libraries[group.id]
-    return None
+# Lookups shared with paperus.mcp_server: a ToolError for what the person
+# may not see, as if it did not exist.
 
 
-def _uuid(value: str) -> uuid.UUID:
+def parse_id(value: str) -> uuid.UUID:
     try:
         return uuid.UUID(value)
     except ValueError as error:
         raise ToolError(f"Not an id: {value!r}.") from error
+
+
+def find_paper(
+    db: Session,
+    access: Access,
+    paper_id: str,
+    *,
+    write: bool = False,
+    trashed: bool = False,
+) -> Item:
+    """A paper the person may read (``write``: change), not in the trash
+    (``trashed``: also one in the trash)."""
+    item = db.get(Item, parse_id(paper_id))
+    if (
+        item is None
+        or not access.can_read_item(item)
+        or (item.deleted_at is not None and not trashed)
+    ):
+        raise ToolError(f"No such paper: {paper_id}.")
+    if write and not access.can_write_item(item):
+        raise ToolError(f"You may not change “{item.title}” (you only read it).")
+    return item
+
+
+def readable_file(db: Session, access: Access, file_id: str) -> File | None:
+    """The file, if neither it nor its paper is in the trash and the person
+    may read it."""
+    file = db.get(File, parse_id(file_id))
+    if file is None or file.deleted_at is not None:
+        return None
+    item = file.version.item
+    return file if item.deleted_at is None and access.can_read_item(item) else None
+
+
+def group_library(db: Session, access: Access, name: str) -> uuid.UUID:
+    """The library of the person's group of this name."""
+    for group in db.scalars(
+        select(Group).where(Group.id.in_(list(access.group_libraries)))
+    ):
+        if group.name.casefold() == name.strip().casefold():
+            return access.group_libraries[group.id]
+    raise ToolError(f"The person is in no group called {name!r}.")
 
 
 def _section(value: str) -> missing.Section:

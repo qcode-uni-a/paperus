@@ -111,21 +111,16 @@ class UserBrief(BaseModel):
 def _ancestors(db: DB, group: Group) -> list[Group]:
     """The groups above, nearest first."""
     found: list[Group] = []
-    current = group.parent_id
-    while current is not None:
-        parent = db.get(Group, current)
-        if parent is None:
-            break
-        found.append(parent)
-        current = parent.parent_id
+    while group.parent_id is not None:
+        # Groups with groups inside cannot be deleted: the parent is there.
+        group = db.get_one(Group, group.parent_id)
+        found.append(group)
     return found
 
 
 def _library_of(db: DB, group_id: uuid.UUID) -> uuid.UUID:
-    library_id = db.scalar(select(Library.id).where(Library.group_id == group_id))
-    if library_id is None:  # every group gets one when created
-        raise HTTPException(500, "group has no library")
-    return library_id
+    # Every group gets one when created.
+    return db.scalars(select(Library.id).where(Library.group_id == group_id)).one()
 
 
 def _can_manage(access: Access, group_id: uuid.UUID) -> bool:

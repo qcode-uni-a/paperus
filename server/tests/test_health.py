@@ -13,6 +13,12 @@ def test_health() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_health_db(client: TestClient) -> None:
+    response = client.get("/api/health/db")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_health_db_unreachable() -> None:
     client = TestClient(create_app(Settings(database_url=UNREACHABLE_DB)))
     response = client.get("/api/health/db")

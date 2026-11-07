@@ -188,3 +188,60 @@ def test_long_journal_name() -> None:
         readable.values_for({"type": "thesis"}, "me", "x", "main")["journal_long"]
         == "thesis"
     )
+
+
+def test_journal_names_in_lists() -> None:
+    csl = {"container-title": ["Nature", "Nat."], "container-title-short": []}
+    values = readable.values_for(csl, "me", "x.pdf", "main")
+    assert (values["journal"], values["journal_long"]) == ("Nature", "Nature")
+    long = {"container-title": [], "container-title-short": ["Nat."]}
+    assert readable.values_for(long, "me", "x.pdf", "main")["journal_long"] == "Nat."
+
+
+def test_roles_trash_and_copies_instead_of_links(
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = add(ada, {"title": "Engines"})
+    upload(ada, paper, PDF)
+    version = ada.get(f"/api/items/{paper}").json()["versions"][0]["id"]
+    slides = client.post(
+        f"/api/versions/{version}/files",
+        headers=ada.headers,
+        files={"upload": ("talk.pdf", SLIDES, "application/pdf")},
+        data={"role": "slides"},
+    )
+    assert slides.status_code == 201, slides.text
+    gone = add(ada, {"title": "Gone"})
+    upload(ada, gone, b"%PDF-1.7\n" + b"g" * 3000)
+    file = ada.get(f"/api/items/{gone}").json()["versions"][0]["files"][0]["id"]
+    assert ada.delete(f"/api/files/{file}").status_code == 204
+
+    def other_disk(source: object, target: object) -> None:
+        raise OSError(18, "Invalid cross-device link")
+
+    monkeypatch.setattr(readable.os, "link", other_disk)
+    root = tmp_path / "copy"
+    report = readable.sync(db, blobs, root, "{title}", links=True)
+    assert report.error is None
+    # The slides are named after their role; the file in the trash is left out.
+    assert sorted(p.name for p in root.glob("*.pdf")) == [
+        "Engines (slides).pdf",
+        "Engines.pdf",
+    ]
+    assert (root / "Engines (slides).pdf").read_bytes() == SLIDES
+
+
+def test_a_copy_where_none_can_be(
+    client: TestClient, db: Session, blobs: BlobStore, tmp_path: Path
+) -> None:
+    (tmp_path / "a file").write_text("")
+    report = readable.sync(
+        db, blobs, tmp_path / "a file" / "copy", "{title}", links=False
+    )
+    assert report.error is not None and report.files == 0
+    assert readable.last_report(db) == report

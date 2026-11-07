@@ -4,11 +4,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx2
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from paperus import published
-from paperus.models import Item
+from paperus.models import Item, Version
 from tests.conftest import FakeDOIRegistry
 from tests.people import Person
 
@@ -119,3 +120,56 @@ def test_published_versions_are_found(
     db.expire_all()
     found = db.get(Item, numpy["id"])
     assert found is not None and found.published_checked_at is not None
+
+
+def test_in_batches_with_a_pause(
+    client: TestClient,
+    db: Session,
+    doi_registry: FakeDOIRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ada = Person(client, db, "ada")
+    preprint(ada, doi_registry, "2401.00001", "Floquet engineering of qubits")
+    preprint(ada, doi_registry, "2401.00002", "Not published anywhere")
+    sources = FakeSources(doi_registry)
+    http = httpx2.Client(transport=httpx2.MockTransport(sources))
+    monkeypatch.setattr(published, "ARXIV_BATCH", 1)
+    paused: list[float] = []
+    monkeypatch.setattr(published.time, "sleep", paused.append)
+    assert (
+        published.check(db, http, published.waiting(db, 10), contact_email=None) == []
+    )
+    # One request to arXiv per batch, a pause between them.
+    assert sources.asked.count("export.arxiv.org") == 2
+    assert paused == [published.ARXIV_PAUSE]
+
+
+def down(request: httpx2.Request) -> httpx2.Response:
+    raise httpx2.ConnectError("unreachable", request=request)
+
+
+def answering(response: httpx2.Response) -> httpx2.Client:
+    return httpx2.Client(transport=httpx2.MockTransport(lambda request: response))
+
+
+def test_sources_that_do_not_answer(db: Session) -> None:
+    unreachable = httpx2.Client(transport=httpx2.MockTransport(down))
+    assert published.arxiv_dois(unreachable, []) == {}
+    assert published.arxiv_dois(unreachable, ["2401.00001"]) == {}
+    assert published.arxiv_dois(answering(httpx2.Response(503)), ["2401.00001"]) == {}
+    assert published.openalex_doi(unreachable, "2401.00001", None) is None
+    # OpenAlex's work for a preprint may be the preprint itself.
+    asked: list[httpx2.Request] = []
+
+    def openalex(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        return httpx2.Response(200, json={"doi": "https://doi.org/10.48550/arxiv.1"})
+
+    http = httpx2.Client(transport=httpx2.MockTransport(openalex))
+    assert published.openalex_doi(http, "2401.00001", "lab@example.org") is None
+    assert asked[0].url.params["mailto"] == "lab@example.org"
+
+    # Neither an arXiv ID to look for, nor a DOI to take.
+    item = Item(title="Floquet", versions=[Version()])
+    assert published.arxiv_id(item) is None
+    assert published.add_published(db, unreachable, item, "no DOI", "arXiv") is None

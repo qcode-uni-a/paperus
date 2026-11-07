@@ -139,23 +139,18 @@ def _failed(
     request: Request, config: SystemConfig, back: str, link: bool, error: str
 ) -> RedirectResponse:
     """To the login page, or (when linking) back where one came from."""
-    if not link:
-        return _login_page(request, config, error)
-    separator = "&" if "?" in back else "?"
-    response = RedirectResponse(
-        f"{public_base(request, config)}{back}{separator}link_error={quote(error)}",
-        status_code=303,
-    )
+    if link:
+        separator = "&" if "?" in back else "?"
+        target = f"{back}{separator}link_error={quote(error)}"
+    else:
+        target = f"/login?error={quote(error)}"
+    response = RedirectResponse(public_base(request, config) + target, status_code=303)
     response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
     return response
 
 
 def _login_page(request: Request, config: SystemConfig, error: str) -> RedirectResponse:
-    response = RedirectResponse(
-        f"{public_base(request, config)}/login?error={quote(error)}", status_code=303
-    )
-    response.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
-    return response
+    return _failed(request, config, "/", False, error)
 
 
 @router.get("/oidc/start")

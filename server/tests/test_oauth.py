@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from paperus.models import OAuthCode
+from paperus.models import OAuthCode, OAuthGrant
 from tests.people import Person
 from tests.test_mcp import Assistant, ToolFailed
 
@@ -296,3 +296,132 @@ def test_revoking_and_deactivated_people(client: TestClient, db: Session) -> Non
         refresh_token=issued["refresh_token"],
     )
     assert refreshed.status_code == 400
+
+
+def test_token_requests_that_go_wrong(client: TestClient, db: Session) -> None:
+    assert client.get("/.well-known/oauth-protected-resource").json() == (
+        client.get("/.well-known/oauth-protected-resource/mcp").json()
+    )
+    ada = Person(client, db, "ada")
+    client_id = register(client)
+    verifier, challenge = pkce()
+
+    def code() -> dict[str, str]:
+        return {
+            "grant_type": "authorization_code",
+            "code": consent(ada, client_id, challenge)["code"][0],
+            "redirect_uri": REDIRECT,
+            "code_verifier": verifier,
+        }
+
+    def error(response: Any) -> tuple[int, str]:  # noqa: ANN401 (a response)
+        return response.status_code, response.json()["error"]
+
+    assert error(exchange(client, **code())) == (401, "invalid_client")
+    unknown = exchange(client, **code(), client_id="unknown")
+    assert error(unknown) == (401, "invalid_client")
+    for wrong in ("Basic abc", "Basic /w==", "Bearer abc"):
+        response = client.post(
+            "/api/oauth/token", data=code(), headers={"Authorization": wrong}
+        )
+        assert error(response) == (401, "invalid_client"), wrong
+    for form in (
+        {"grant_type": "authorization_code", "code": "c"},
+        {"grant_type": "refresh_token"},
+    ):
+        response = exchange(client, **form, client_id=client_id)
+        assert error(response) == (400, "invalid_request")
+    password = exchange(client, grant_type="password", client_id=client_id)
+    assert error(password) == (400, "unsupported_grant_type")
+    elsewhere = {**code(), "redirect_uri": "https://claude.ai/other"}
+    assert error(exchange(client, **elsewhere, client_id=client_id)) == (
+        400,
+        "invalid_grant",
+    )
+    short = {**code(), "code_verifier": "short"}
+    assert error(exchange(client, **short, client_id=client_id))[1] == "invalid_grant"
+
+    # The client_id by HTTP Basic, as some apps send it.
+    basic = base64.b64encode(f"{client_id}:".encode()).decode()
+    issued = client.post(
+        "/api/oauth/token", data=code(), headers={"Authorization": f"Basic {basic}"}
+    )
+    assert issued.status_code == 200, issued.text
+
+    # Unused too long: the connection ends.
+    db.execute(
+        update(OAuthGrant).values(
+            refresh_expires_at=datetime.now(UTC) - timedelta(seconds=1)
+        )
+    )
+    db.commit()
+    expired = exchange(
+        client,
+        grant_type="refresh_token",
+        client_id=client_id,
+        refresh_token=issued.json()["refresh_token"],
+    )
+    assert expired.json()["error_description"] == "The connection has expired."
+    assert ada.get("/api/me/connected-apps").json() == []
+
+
+def test_requests_and_registrations_refused(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    for uris in ([], ["http://[::1/callback"], ["https://" + "a" * 2000]):
+        response = client.post("/api/oauth/register", json={"redirect_uris": uris})
+        assert response.json()["error"] == "invalid_redirect_uri", uris
+    client_id = register(client)
+    _, challenge = pkce()
+    implicit = ada.post(
+        "/api/oauth/consent/check",
+        json={
+            "client_id": client_id,
+            "redirect_uri": REDIRECT,
+            "response_type": "token",
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        },
+    )
+    assert implicit.status_code == 400
+    assert implicit.json()["detail"] == "Only response_type=code."
+    # A code for someone deactivated before the app used it.
+    root = Person(client, db, "root", admin=True)
+    verifier, challenge = pkce()
+    back = consent(ada, client_id, challenge)
+    root.patch(f"/api/admin/users/{ada.id}", json={"active": False})
+    response = exchange(
+        client,
+        grant_type="authorization_code",
+        code=back["code"][0],
+        redirect_uri=REDIRECT,
+        client_id=client_id,
+        code_verifier=verifier,
+    )
+    assert response.json()["error_description"] == "The account is not active."
+
+
+def test_revoking_with_the_access_token(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    client_id = register(client)
+    verifier, challenge = pkce()
+    issued = exchange(
+        client,
+        grant_type="authorization_code",
+        code=consent(ada, client_id, challenge)["code"][0],
+        redirect_uri=REDIRECT,
+        client_id=client_id,
+        code_verifier=verifier,
+    ).json()
+    # Unknown tokens and one's own tokens are no error, and change nothing.
+    own = ada.post(
+        "/api/me/tokens", json={"name": "script", "scopes": ["papers.read"]}
+    ).json()["token"]
+    for token in ("whatever", "paperusr_unknown", own):
+        assert client.post("/api/oauth/revoke", data={"token": token}).is_success
+    assert len(ada.get("/api/me/connected-apps").json()) == 1
+    assert len(ada.get("/api/me/tokens").json()) == 1
+    response = client.post("/api/oauth/revoke", data={"token": issued["access_token"]})
+    assert response.status_code == 200
+    assert ada.get("/api/me/connected-apps").json() == []
+    with pytest.raises(ToolFailed, match="invalid, expired or revoked"):
+        Assistant(client, issued["access_token"]).call("list_documents")

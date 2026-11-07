@@ -3,8 +3,10 @@ login, session length, password length, logging everyone out."""
 
 import base64
 import json
+import socket
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -15,11 +17,12 @@ from procrastinate import App
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import oidc
+from paperus import avatars, oidc
 from paperus.app import create_app
 from paperus.auth import create_user
 from paperus.config import Settings
 from paperus.models import User
+from paperus.system import SystemConfig, oidc_secret
 from tests.conftest import FakeDOIRegistry, FakeML
 
 ISSUER = "https://idp.test/realms/uni"
@@ -341,3 +344,308 @@ def test_no_picture_from_elsewhere(site: TestClient, provider: FakeProvider) -> 
         assert log_in_with_oidc(site, provider).status_code == 303
         assert site.get("/api/auth/me").json()["avatar_url"] is None
     assert provider.pictures == 0
+
+
+# The steps one by one, against providers that misbehave.
+
+
+def http(handler: Any) -> httpx2.Client:  # noqa: ANN401 (a request handler)
+    return httpx2.Client(transport=httpx2.MockTransport(handler))
+
+
+def discovery(**change: Any) -> httpx2.Client:  # noqa: ANN401
+    """A provider whose discovery document has these changes (None: left
+    out)."""
+    document = {
+        "issuer": ISSUER,
+        "authorization_endpoint": f"{ISSUER}/auth",
+        "token_endpoint": f"{ISSUER}/token",
+        **change,
+    }
+    found = {key: value for key, value in document.items() if value is not None}
+    return http(lambda request: httpx2.Response(200, json=found))
+
+
+@pytest.mark.parametrize(
+    ("client", "error"),
+    [
+        (http(lambda request: httpx2.Response(500)), "did not answer"),
+        (http(lambda request: httpx2.Response(200, text="<html>")), "did not answer"),
+        (discovery(issuer="https://other.test"), "calls itself"),
+        (discovery(token_endpoint=None), "lacks 'token_endpoint'"),
+        (discovery(token_endpoint="http://idp.test/token"), "must use https"),
+    ],
+)
+def test_discovery_failures(
+    provider: FakeProvider,  # empties the cache
+    client: httpx2.Client,
+    error: str,
+) -> None:
+    with pytest.raises(oidc.LoginFailed, match=error):
+        oidc.discover(client, ISSUER)
+
+
+def test_discovery_is_cached() -> None:
+    oidc._discovered.clear()
+    asked: list[httpx2.Request] = []
+
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        return httpx2.Response(
+            200,
+            json={
+                "issuer": f"{ISSUER}/",
+                "authorization_endpoint": f"{ISSUER}/auth?kc=1",
+                "token_endpoint": f"{ISSUER}/token",
+            },
+        )
+
+    found = oidc.discover(http(answer), f"{ISSUER}/")
+    assert oidc.discover(http(answer), ISSUER) is found
+    assert len(asked) == 1
+    oidc.discover(http(answer), ISSUER, fresh=True)
+    assert len(asked) == 2
+    # The endpoint's own query stays.
+    assert oidc.start(found, "paperus", "https://x/cb").url.startswith(
+        f"{ISSUER}/auth?kc=1&response_type=code"
+    )
+    oidc._discovered.clear()
+
+
+PROVIDER = oidc.Provider(
+    issuer=ISSUER,
+    authorization_endpoint=f"{ISSUER}/auth",
+    token_endpoint=f"{ISSUER}/token",
+    userinfo_endpoint=f"{ISSUER}/userinfo",
+)
+
+
+def finish(
+    tokens: dict[str, Any] | httpx2.Response,
+    userinfo: Any = None,  # noqa: ANN401 (any JSON, or a response)
+    nonce: str = "n-1",
+) -> dict[str, Any]:
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("/token"):
+            if isinstance(tokens, httpx2.Response):
+                return tokens
+            return httpx2.Response(200, json=tokens)
+        if isinstance(userinfo, httpx2.Response):
+            return userinfo
+        return httpx2.Response(200, json=userinfo)
+
+    return oidc.finish(
+        http(answer),
+        PROVIDER,
+        client_id="paperus",
+        client_secret=None,
+        redirect_uri="https://testserver/api/auth/oidc/callback",
+        code="good",
+        verifier="v",
+        nonce=nonce,
+    )
+
+
+def id_token(**change: Any) -> dict[str, Any]:  # noqa: ANN401
+    claims = {
+        "iss": ISSUER,
+        "aud": ["other", "paperus"],
+        "exp": time.time() + 300,
+        "nonce": "n-1",
+        "sub": "u-1",
+        "name": "From the token",
+        **change,
+    }
+    return {"id_token": _jwt(claims), "access_token": "at"}
+
+
+def test_finish_takes_userinfo_of_the_same_person() -> None:
+    claims = finish(id_token(), {"sub": "u-1", "name": "Info", "email": "a@b.c"})
+    # The ID token's claims win over userinfo's.
+    assert (claims["name"], claims["email"]) == ("From the token", "a@b.c")
+    # Userinfo about someone else, or none at all, is ignored.
+    assert "email" not in finish(id_token(), {"sub": "u-2", "email": "x@y.z"})
+    assert finish(id_token(), ["not", "a", "dict"])["sub"] == "u-1"
+    assert finish(id_token(), httpx2.Response(502, text="bad gateway"))["sub"] == "u-1"
+
+
+@pytest.mark.parametrize(
+    ("tokens", "error"),
+    [
+        (httpx2.Response(200, text="not json"), "did not answer"),
+        (
+            httpx2.Response(400, json={"error_description": "code expired"}),
+            "refused the login: code expired",
+        ),
+        (httpx2.Response(503, json={}), "refused the login: 503"),
+        ({"access_token": "at"}, "refused the login: 200"),
+        ({"id_token": "no-dots"}, "unreadable ID token"),
+        ({"id_token": "a.!!!.c"}, "unreadable ID token"),
+        ({"id_token": "a.WzFd.c"}, "unreadable ID token"),  # a list: [1]
+        (id_token(iss="https://evil.test"), "another issuer"),
+        (id_token(aud="someone-else"), "another client"),
+        (id_token(exp=time.time() - 3600), "expired"),
+        (id_token(exp="tomorrow"), "expired"),
+        (id_token(nonce="replayed"), "nonce"),
+        (id_token(sub=""), "no sub"),
+    ],
+)
+def test_finish_refuses(tokens: dict[str, Any] | httpx2.Response, error: str) -> None:
+    with pytest.raises(oidc.LoginFailed, match=error):
+        finish(tokens)
+
+
+def test_finish_when_the_provider_is_down() -> None:
+    def down(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ConnectError("unreachable")
+
+    with pytest.raises(oidc.LoginFailed, match="did not answer"):
+        oidc.finish(
+            http(down),
+            PROVIDER,
+            client_id="paperus",
+            client_secret="s",
+            redirect_uri="https://x/cb",
+            code="c",
+            verifier="v",
+            nonce="n",
+        )
+
+
+def test_accounts_for_claims(db: Session) -> None:
+    config = SystemConfig(embedding_model="bge-m3")
+    claims = {"iss": ISSUER, "sub": "u-1", "preferred_username": "no spaces!"}
+    with pytest.raises(oidc.LoginFailed, match="no usable preferred_username"):
+        oidc.user_for(db, claims, config)
+    # An account of that name, already linked to another login.
+    ben = create_user(db, "ben", "password1")
+    ben.oidc_subject = f"{ISSUER} u-0"
+    with pytest.raises(oidc.LoginFailed, match="belongs to another login"):
+        oidc.user_for(db, {**claims, "preferred_username": "ben"}, config)
+    # The login linked to a deactivated account.
+    ben.deactivated_at = datetime.now(UTC)
+    with pytest.raises(oidc.LoginFailed, match="deactivated"):
+        oidc.user_for(db, {**claims, "sub": "u-0"}, config)
+    db.rollback()
+
+
+def test_pictures_only_from_safe_places(
+    provider: FakeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    user = User(username="ada")
+    client = http(provider)
+    # Missing, or not an image: skipped, the login goes on.
+    oidc.take_picture(client, user, {"picture": f"{ISSUER}/gone.png"}, ISSUER)
+
+    def text(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=b"<svg/>")
+
+    oidc.take_picture(http(text), user, {"picture": f"{ISSUER}/x.svg"}, ISSUER)
+    assert user.avatar_version is None
+    oidc.take_picture(client, user, {"picture": f"{ISSUER}/pic.png"}, ISSUER)
+    assert user.avatar == PNG
+
+    def huge(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=b"\x00" * (avatars.MAX_BYTES + 1))
+
+    assert oidc.fetch_picture(http(huge), f"{ISSUER}/big.png", ISSUER) is None
+    assert oidc.fetch_picture(client, "https:///pic.png", ISSUER) is None
+    # Another host is asked only if all its addresses are public.
+    assert oidc.fetch_picture(client, "https://localhost/pic.png", ISSUER) is None
+    assert oidc.fetch_picture(client, "https://1.1.1.1/pic.png", ISSUER) == PNG
+
+    def unknown(*args: object, **kwargs: object) -> None:
+        raise socket.gaierror("Name or service not known")
+
+    monkeypatch.setattr(socket, "getaddrinfo", unknown)
+    assert oidc.fetch_picture(client, "https://nowhere.test/pic.png", ISSUER) is None
+
+
+def test_login_redirects_when_something_is_wrong(
+    site: TestClient, provider: FakeProvider
+) -> None:
+    def start(query: str = "") -> str:
+        response = site.get(f"/api/auth/oidc/start{query}", follow_redirects=False)
+        assert response.status_code == 303
+        location: str = response.headers["location"]
+        return location
+
+    off = start("?next=//evil.test")
+    assert off == "https://testserver/login?error=The%20OIDC%20login%20is%20off."
+    # Linking: back to the page one came from (only one of this site).
+    assert start("?next=/settings?tab=me&link=true").startswith(
+        "https://testserver/settings?tab=me&link_error=The%20OIDC"
+    )
+    enable_oidc(site)
+    # Behind a proxy: the address set in the administration.
+    configure(site, public_url="https://library.example/")
+    assert parse_qs(urlsplit(start()).query)["redirect_uri"] == [
+        "https://library.example/api/auth/oidc/callback"
+    ]
+    configure(site, public_url=None, oidc_issuer="https://idp.test/realms/gone")
+    assert "calls%20itself" in start()
+
+    site.cookies.clear()
+    assert "Log%20in%20first" in start("?link=true")
+    # Back without the cookie (it lasts ten minutes).
+    late = site.get(
+        "/api/auth/oidc/callback",
+        params={"code": "good", "state": "s"},
+        follow_redirects=False,
+    )
+    assert "took%20too%20long" in late.headers["location"]
+
+
+def test_callback_errors(site: TestClient, provider: FakeProvider) -> None:
+    enable_oidc(site)
+
+    def back(**params: str) -> str:
+        site.get("/api/auth/oidc/start", follow_redirects=False)
+        response = site.get(
+            "/api/auth/oidc/callback", params=params, follow_redirects=False
+        )
+        location: str = response.headers["location"]
+        return location
+
+    # The person declined at the provider.
+    declined = back(error="access_denied", error_description="You said no")
+    assert "OIDC%20login%20failed%3A%20You%20said%20no." in declined
+    assert "access_denied" in back(error="access_denied")
+    # The administration turned it off meanwhile.
+    start = site.get("/api/auth/oidc/start", follow_redirects=False)
+    state = parse_qs(urlsplit(start.headers["location"]).query)["state"][0]
+    configure(site, oidc_enabled=False)
+    off = site.get(
+        "/api/auth/oidc/callback",
+        params={"code": "good", "state": state},
+        follow_redirects=False,
+    )
+    assert "login%20is%20off" in off.headers["location"]
+
+
+def test_link_after_logging_out(site: TestClient, provider: FakeProvider) -> None:
+    enable_oidc(site)
+    start = site.get("/api/auth/oidc/start?link=true", follow_redirects=False)
+    query = parse_qs(urlsplit(start.headers["location"]).query)
+    provider.nonce = query["nonce"][0]
+    site.post("/api/auth/logout")
+    back = site.get(
+        "/api/auth/oidc/callback",
+        params={"code": "good", "state": query["state"][0]},
+        follow_redirects=False,
+    )
+    assert "logged%20out%20meanwhile" in back.headers["location"]
+    assert "link_error=" in back.headers["location"]
+
+
+def test_oidc_settings_must_fit(
+    site: TestClient, db: Session, settings: Settings
+) -> None:
+    half = configure(site, oidc_enabled=True, oidc_issuer=ISSUER)
+    assert half.status_code == 422
+    assert "issuer and a client ID" in half.text
+    # A secret from the environment wins over one set in the administration.
+    enable_oidc(site)
+    assert oidc_secret(db, settings) == "s3cret"
+    from_environment = settings.model_copy(update={"oidc_client_secret": "env"})
+    assert oidc_secret(db, from_environment) == "env"

@@ -4,6 +4,7 @@ from paperus.identifiers import (
     InvalidIdentifier,
     Scheme,
     implied_by_doi,
+    is_arxiv_doi,
     normalize,
 )
 
@@ -54,3 +55,7 @@ def test_normalize_rejects(scheme: Scheme, given: str) -> None:
 def test_arxiv_doi_implies_arxiv_id() -> None:
     assert implied_by_doi("10.48550/arxiv.2101.00001") == [(Scheme.ARXIV, "2101.00001")]
     assert implied_by_doi(DOI) == []
+    # An arXiv DOI without a readable arXiv ID implies nothing.
+    assert implied_by_doi("10.48550/arxiv.not-an-id") == []
+    assert is_arxiv_doi("10.48550/arxiv.2101.00001")
+    assert not is_arxiv_doi(DOI)

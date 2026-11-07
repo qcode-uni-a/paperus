@@ -59,12 +59,9 @@ class Access:
     ) -> "Access":
         """What ``user`` may do; with ``only`` (an access token's owner limit),
         nothing outside these libraries; ``token``: through an access token."""
-        own = db.scalar(select(Library.id).where(Library.user_id == user.id))
-        if own is None:  # users from before libraries existed get one now
-            library = Library(user_id=user.id)
-            db.add(library)
-            db.flush()
-            own = library.id
+        # Everyone has one (``auth.create_user``; older accounts since
+        # migration 0006).
+        own = db.scalars(select(Library.id).where(Library.user_id == user.id)).one()
         parents: dict[uuid.UUID, uuid.UUID | None] = {
             group_id: parent
             for group_id, parent in db.execute(select(Group.id, Group.parent_id))

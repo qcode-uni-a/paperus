@@ -45,22 +45,29 @@ def _media_type(data: bytes) -> str:
 
 def dimensions(data: bytes, media_type: str) -> tuple[int, int]:
     """Width and height, read from the picture's header."""
-    try:
-        if media_type == "image/png":
-            if data[12:16] == b"IHDR":
-                return _big(data[16:20]), _big(data[20:24])
-        elif media_type == "image/jpeg":
-            return _jpeg_size(data)
-        elif data[12:16] == b"VP8 ":
-            return _little(data[26:28]) & 0x3FFF, _little(data[28:30]) & 0x3FFF
-        elif data[12:16] == b"VP8L":
-            bits = _little(data[21:25])
-            return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
-        elif data[12:16] == b"VP8X":
-            return _little(data[24:27]) + 1, _little(data[27:30]) + 1
-    except IndexError:
-        pass
-    raise BadPicture("the picture's size cannot be read")
+    # No picture's header is shorter: a cut-off one is refused.
+    size = _size(data, media_type) if len(data) >= 30 else None
+    if size is None:
+        raise BadPicture("the picture's size cannot be read")
+    return size
+
+
+def _size(data: bytes, media_type: str) -> tuple[int, int] | None:
+    if media_type == "image/png":
+        if data[12:16] != b"IHDR":
+            return None
+        return _big(data[16:20]), _big(data[20:24])
+    if media_type == "image/jpeg":
+        return _jpeg_size(data)
+    chunk = data[12:16]
+    if chunk == b"VP8 ":
+        return _little(data[26:28]) & 0x3FFF, _little(data[28:30]) & 0x3FFF
+    if chunk == b"VP8L":
+        bits = _little(data[21:25])
+        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+    if chunk == b"VP8X":
+        return _little(data[24:27]) + 1, _little(data[27:30]) + 1
+    return None
 
 
 def _big(raw: bytes) -> int:
@@ -75,16 +82,16 @@ def _little(raw: bytes) -> int:
 _FRAMES = set(range(0xC0, 0xD0)) - {0xC4, 0xC8, 0xCC}
 
 
-def _jpeg_size(data: bytes) -> tuple[int, int]:
+def _jpeg_size(data: bytes) -> tuple[int, int] | None:
     at = 2
     while at + 9 < len(data):
         if data[at] != 0xFF:
-            raise IndexError
+            return None
         marker = data[at + 1]
         if marker in _FRAMES:
             return _big(data[at + 7 : at + 9]), _big(data[at + 5 : at + 7])
         at += 2 + _big(data[at + 2 : at + 4])
-    raise IndexError
+    return None
 
 
 def set_avatar(user: User, data: bytes | None) -> None:

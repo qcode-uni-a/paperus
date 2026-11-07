@@ -127,3 +127,6 @@ def test_ml_down_or_refusing(
     assert ocr.read_scans(db, blobs, fake_ml.client(), "bge-m3", file_id) == []
     assert status(db, file_id) == (TextStatus.DONE, OcrStatus.FAILED)
     assert db.scalar(select(func.count()).select_from(OcrPage)) == 0
+    # Not waiting (any more), or gone: nothing to read.
+    assert ocr.read_scans(db, blobs, fake_ml.client(), MODEL, file_id) == []
+    assert ocr.read_scans(db, blobs, fake_ml.client(), MODEL, uuid.uuid4()) == []

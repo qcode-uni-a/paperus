@@ -14,7 +14,7 @@ import resource
 import struct
 import threading
 import zlib
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from multiprocessing import get_context
@@ -128,45 +128,39 @@ def png(width: int, height: int, pixels: bytes, stride: int) -> bytes:
 # In the helper process:
 
 
-def _open(path: str) -> pypdfium2.PdfDocument:
+@contextlib.contextmanager
+def _open(path: str) -> Generator[pypdfium2.PdfDocument]:
+    """The PDF, closed afterwards; PDFium's errors as ``PdfError``, with a
+    plain message (its own errors do not travel between processes intact)."""
     try:
-        return pypdfium2.PdfDocument(path)
+        pdf = pypdfium2.PdfDocument(path)
+        try:
+            yield pdf
+        finally:
+            pdf.close()
     except pypdfium2.PdfiumError as error:
-        # As a plain message: PDFium's own errors do not travel between
-        # processes intact.
         raise PdfError(f"PdfiumError: {error}") from None
 
 
 def _pages(path: str) -> list[str]:
-    pdf = _open(path)
-    try:
-        found = []
+    found = []
+    with _open(path) as pdf:
         for index in range(len(pdf)):
-            try:
-                page = pdf[index]
-                text_page = page.get_textpage()
-            except pypdfium2.PdfiumError as error:
-                raise PdfError(f"PdfiumError: {error}") from None
+            page = pdf[index]
+            text_page = page.get_textpage()
             found.append(text_page.get_text_bounded())
             text_page.close()
             page.close()
-        return found
-    finally:
-        pdf.close()
+    return found
 
 
 def _title(path: str) -> str | None:
-    pdf = _open(path)
-    try:
-        value = pdf.get_metadata_dict().get("Title")
-    finally:
-        pdf.close()
-    return value or None
+    with _open(path) as pdf:
+        return pdf.get_metadata_dict().get("Title") or None
 
 
 def _render(path: str, index: int) -> bytes:
-    pdf = _open(path)
-    try:
+    with _open(path) as pdf:
         page = pdf[index]
         width, height = page.get_size()
         scale = min(OCR_DPI / 72, OCR_MAX_SIDE / max(width, height, 1))
@@ -175,7 +169,3 @@ def _render(path: str, index: int) -> bytes:
         bitmap.close()
         page.close()
         return image
-    except pypdfium2.PdfiumError as error:
-        raise PdfError(f"PdfiumError: {error}") from None
-    finally:
-        pdf.close()

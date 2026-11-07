@@ -24,11 +24,13 @@ from tests.people import Person
 
 
 class FakeApp:
-    """Records the workers started; each runs until cancelled."""
+    """Records the workers started; each runs until cancelled (or fails at
+    once, if in ``failing``)."""
 
     def __init__(self) -> None:
         self.started: list[tuple[str, int]] = []
         self.cancelled: list[tuple[str, int]] = []
+        self.failing: set[tuple[str, int]] = set()
 
     @contextlib.asynccontextmanager
     async def open_async(self) -> AsyncGenerator[None]:
@@ -37,6 +39,9 @@ class FakeApp:
     async def run_worker_async(self, **options: Any) -> None:  # noqa: ANN401
         worker = (options["queues"][0], options["concurrency"])
         self.started.append(worker)
+        if worker in self.failing:
+            self.failing.remove(worker)
+            raise RuntimeError("lost the database connection")
         try:
             await asyncio.Event().wait()
         except asyncio.CancelledError:
@@ -83,6 +88,32 @@ def test_workers_follow_the_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     # The replaced worker first, then all at the end.
     assert app.cancelled[0] == ("text", 2)
     assert sorted(app.cancelled[1:]) == [("backup", 1), ("text", 4)]
+
+
+def test_workers_outlast_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings that cannot be read keep the workers as they are (or start
+    them with the defaults); a worker that stopped is started again."""
+    monkeypatch.setattr(jobs, "LIMITS_SECONDS", 0.01)
+    app = FakeApp()
+    app.failing = {("text", 2)}
+    rounds = 0
+
+    async def main() -> None:
+        stop = asyncio.Event()
+
+        def limits() -> dict[str, int]:
+            nonlocal rounds
+            rounds += 1
+            if rounds == 3:
+                stop.set()
+            raise RuntimeError("database down")
+
+        await run_workers(cast(App, app), limits, stop)
+
+    asyncio.run(main())
+    defaults = [("text", 2), ("ml", 1), ("ocr", 1), ("import", 1), ("backup", 1)]
+    assert app.started == [*defaults, ("text", 2)]
+    assert sorted(app.cancelled) == sorted(defaults)
 
 
 def test_weekly_on_a_chosen_day() -> None:

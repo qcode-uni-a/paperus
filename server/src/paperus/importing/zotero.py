@@ -16,7 +16,7 @@ from typing import Any
 from urllib.parse import unquote
 
 from markdownify import markdownify
-from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
+from rdflib import RDF, Graph, Literal, Namespace, URIRef
 from rdflib.term import Node
 
 from paperus.importing import Export, ExportedFile, ExportedNote, ExportedPaper
@@ -107,8 +107,7 @@ def read(text: str) -> Export:
         export.problems.append(f"The file could not be read as Zotero RDF: {error}")
         return export
     reader = _Reader(graph)
-    export.collections = reader.collection_paths()
-    member_of = reader.memberships()
+    export.collections, member_of = reader.collections()
     attached = set(graph.objects(None, LINK.link))
     for subject in sorted(set(graph.subjects(Z.itemType, None)), key=str):
         kind = str(graph.value(subject, Z.itemType))
@@ -148,52 +147,34 @@ class _Reader:
 
     # Collections
 
-    def collection_paths(self) -> list[tuple[str, ...]]:
+    def collections(
+        self,
+    ) -> tuple[list[tuple[str, ...]], dict[Node, list[tuple[str, ...]]]]:
+        """Every collection path (parents before children) and, per item,
+        the paths of the collections that hold it. Loops are cut."""
         paths: list[tuple[str, ...]] = []
-        for top in self._top_collections():
-            self._walk(top, (), paths)
-        return paths
-
-    def _collections(self) -> list[Node]:
-        return sorted(self.g.subjects(RDF.type, Z.Collection), key=str)
-
-    def _top_collections(self) -> list[Node]:
-        inside = {
-            part
-            for c in self._collections()
-            for part in self.g.objects(c, DCTERMS.hasPart)
-        }
-        return [c for c in self._collections() if c not in inside]
-
-    def _walk(
-        self, collection: Node, above: tuple[str, ...], paths: list[tuple[str, ...]]
-    ) -> None:
-        name = self.text(collection, DC.title) or "Untitled collection"
-        path = (*above, name)
-        if path in paths:  # a loop or a repeat
-            return
-        paths.append(path)
-        for part in sorted(self.g.objects(collection, DCTERMS.hasPart), key=str):
-            if (part, RDF.type, Z.Collection) in self.g:
-                self._walk(part, path, paths)
-
-    def memberships(self) -> dict[Node, list[tuple[str, ...]]]:
-        """Item → the paths of the collections that hold it."""
-        found: dict[Node, list[tuple[str, ...]]] = {}
+        holding: dict[Node, list[tuple[str, ...]]] = {}
 
         def visit(collection: Node, above: tuple[str, ...], seen: set[Node]) -> None:
             if collection in seen:
                 return
             path = (*above, self.text(collection, DC.title) or "Untitled collection")
-            for part in self.g.objects(collection, DCTERMS.hasPart):
+            if path not in paths:  # not for a repeated name
+                paths.append(path)
+            for part in sorted(self.g.objects(collection, DCTERMS.hasPart), key=str):
                 if (part, RDF.type, Z.Collection) in self.g:
                     visit(part, path, {*seen, collection})
                 else:
-                    found.setdefault(part, []).append(path)
+                    holding.setdefault(part, []).append(path)
 
-        for top in self._top_collections():
-            visit(top, (), set())
-        return found
+        collections = sorted(self.g.subjects(RDF.type, Z.Collection), key=str)
+        inside = {
+            part for c in collections for part in self.g.objects(c, DCTERMS.hasPart)
+        }
+        for top in collections:
+            if top not in inside:
+                visit(top, (), set())
+        return paths, holding
 
     # Items
 
@@ -201,10 +182,8 @@ class _Reader:
         g = self.g
         csl: dict[str, Any] = {"type": _TYPES.get(kind, "document")}
         csl["title"] = self.text(subject, DC.title) or "(untitled)"
-        for predicate, role in self._creator_properties(subject):
-            names = [self._name(p) for p in self._sequence(g.value(subject, predicate))]
-            if names:
-                csl[role] = names
+        for role, people in self._creators(subject):
+            csl[role] = [self._name(person) for person in people]
 
         identifiers: dict[str, str] = {}
         containers = [
@@ -359,31 +338,25 @@ class _Reader:
             source_key=str(subject),
         )
 
-    def _creator_properties(self, subject: Node) -> list[tuple[URIRef, str]]:
-        found: list[tuple[URIRef, str]] = []
-        for predicate in set(self.g.predicates(subject, None)):
-            if not isinstance(predicate, URIRef):
-                continue
-            if predicate in _ROLES:
-                found.append((predicate, _ROLES[predicate]))
-            elif str(predicate).startswith(str(Z)) and str(predicate).endswith("s"):
-                node = self.g.value(subject, predicate)
-                if isinstance(node, BNode) and self._sequence(node):
-                    role = str(predicate)[len(str(Z)) : -1]
-                    found.append(
-                        (predicate, re.sub(r"(?<!^)([A-Z])", r"-\1", role).lower())
-                    )
+    def _creators(self, subject: Node) -> list[tuple[str, list[Node]]]:
+        """(CSL role, people in order) of an item, the usual roles first;
+        other roles (``z:castMembers``) by their name (``cast-member``)."""
+        found: list[tuple[str, list[Node]]] = []
+        for predicate, node in self.g.predicate_objects(subject):
+            role = _ROLES.get(predicate)
+            name = str(predicate)
+            if role is None and name.startswith(str(Z)) and name.endswith("s"):
+                role = re.sub(r"(?<!^)([A-Z])", r"-\1", name[len(str(Z)) : -1]).lower()
+            people = self._sequence(node) if role else []
+            if role and people:
+                found.append((role, people))
+        order = list(_ROLES.values())
         return sorted(
-            found,
-            key=lambda p: (
-                list(_ROLES.values()).index(p[1]) if p[1] in _ROLES.values() else 99
-            ),
+            found, key=lambda pair: order.index(pair[0]) if pair[0] in order else 99
         )
 
-    def _sequence(self, node: Node | None) -> list[Node]:
+    def _sequence(self, node: Node) -> list[Node]:
         """Members of an rdf:Seq (rdf:_1, rdf:_2, … or rdf:li) in order."""
-        if node is None:
-            return []
         members: list[tuple[int, Node]] = []
         for predicate, member in self.g.predicate_objects(node):
             found = re.fullmatch(re.escape(str(RDF)) + r"_(\d+)", str(predicate))
