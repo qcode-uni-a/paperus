@@ -4139,6 +4139,48 @@
         }
       }
     },
+    "/api/manage/missing/open-access/progress": {
+      "post": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Open Access Progress",
+        "description": "How far a \"Download all\" has got: the papers tried since it started,\nand how many of them have their file now.",
+        "operationId": "open_access_progress",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/file-wanted": {
       "put": {
         "tags": [
@@ -11074,6 +11116,57 @@
         ],
         "title": "Problem"
       },
+      "Progress": {
+        "properties": {
+          "tried": {
+            "type": "integer",
+            "title": "Tried"
+          },
+          "found": {
+            "type": "integer",
+            "title": "Found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tried",
+          "found"
+        ],
+        "title": "Progress"
+      },
+      "ProgressRequest": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Item Ids"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "file",
+              "journal"
+            ],
+            "title": "Section",
+            "default": "file"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids",
+          "started_at"
+        ],
+        "title": "ProgressRequest"
+      },
       "ProviderCheck": {
         "properties": {
           "issuer": {
@@ -11128,6 +11221,27 @@
           "papers": {
             "type": "integer",
             "title": "Papers"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "default": []
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
           }
         },
         "type": "object",

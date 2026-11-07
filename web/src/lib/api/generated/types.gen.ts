@@ -2563,6 +2563,38 @@ export type Problem = {
 };
 
 /**
+ * Progress
+ */
+export type Progress = {
+    /**
+     * Tried
+     */
+    tried: number;
+    /**
+     * Found
+     */
+    found: number;
+};
+
+/**
+ * ProgressRequest
+ */
+export type ProgressRequest = {
+    /**
+     * Item Ids
+     */
+    item_ids: Array<string>;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Section
+     */
+    section?: 'file' | 'journal';
+};
+
+/**
  * ProviderCheck
  */
 export type ProviderCheck = {
@@ -2598,6 +2630,14 @@ export type Queued = {
      * Papers
      */
     papers: number;
+    /**
+     * Item Ids
+     */
+    item_ids?: Array<string>;
+    /**
+     * Started At
+     */
+    started_at?: string | null;
 };
 
 /**
@@ -6281,6 +6321,31 @@ export type DownloadAllOpenAccessResponses = {
 };
 
 export type DownloadAllOpenAccessResponse = DownloadAllOpenAccessResponses[keyof DownloadAllOpenAccessResponses];
+
+export type OpenAccessProgressData = {
+    body: ProgressRequest;
+    path?: never;
+    query?: never;
+    url: '/api/manage/missing/open-access/progress';
+};
+
+export type OpenAccessProgressErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type OpenAccessProgressError = OpenAccessProgressErrors[keyof OpenAccessProgressErrors];
+
+export type OpenAccessProgressResponses = {
+    /**
+     * Successful Response
+     */
+    200: Progress;
+};
+
+export type OpenAccessProgressResponse = OpenAccessProgressResponses[keyof OpenAccessProgressResponses];
 
 export type SetFileWantedData = {
     body: FileWanted;

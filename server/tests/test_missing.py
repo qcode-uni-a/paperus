@@ -213,7 +213,18 @@ def test_try_all_and_the_background_sweep(
     ).json()
     ada.add("No identifiers")
     queued = ada.post("/api/manage/missing/open-access").json()
-    assert queued == {"papers": 1}
+    assert (queued["papers"], queued["item_ids"]) == (1, [on_arxiv["id"]])
+
+    # The page follows how far it has got: none tried yet, then (the job
+    # done here by hand) tried and found.
+    def progress() -> dict[str, int]:
+        body = {"item_ids": queued["item_ids"], "started_at": queued["started_at"]}
+        response = ada.post("/api/manage/missing/open-access/progress", body)
+        assert response.status_code == 200, response.text
+        result: dict[str, int] = response.json()
+        return result
+
+    assert progress() == {"tried": 0, "found": 0}
     assert isinstance(job_app.connector, InMemoryConnector)
     jobs = [
         job
@@ -229,6 +240,10 @@ def test_try_all_and_the_background_sweep(
     assert [item_id for item_id, _ in waiting] == [uuid.UUID(on_arxiv["id"])]
     earlier = datetime.now(UTC) - timedelta(minutes=5)
     assert missing.never_tried(db, added_before=earlier, limit=10) == []
+
+    # Tried (here by hand, as the job would) and found.
+    assert ada.post(f"/api/items/{on_arxiv['id']}/open-access").status_code == 200
+    assert progress() == {"tried": 1, "found": 1}
 
 
 def test_only_the_preprint(

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import aliased
 
@@ -232,6 +232,9 @@ def download_open_access(
 
 class Queued(BaseModel):
     papers: int
+    item_ids: list[uuid.UUID] = []
+    """The papers queued, to follow with ``…/open-access/progress``."""
+    started_at: datetime | None = None
 
 
 @router.post("/api/manage/missing/open-access", status_code=202)
@@ -256,12 +259,54 @@ def download_all_open_access(
             ),
         )
     ).unique()
-    queued = 0
+    started_at = datetime.now(UTC)
+    queued: list[uuid.UUID] = []
     for item in candidates:
         if access.can_write_item(item) and _possible(item, section == "journal", email):
             queue_open_access(request.app.state.jobs, item.id, access.user.id, section)
-            queued += 1
-    return Queued(papers=queued)
+            queued.append(item.id)
+    return Queued(papers=len(queued), item_ids=queued, started_at=started_at)
+
+
+class ProgressRequest(BaseModel):
+    item_ids: list[uuid.UUID] = Field(max_length=10_000)
+    started_at: datetime
+    section: missing.Section = "file"
+
+
+class Progress(BaseModel):
+    tried: int
+    """Of the papers, how many were tried since the start."""
+    found: int
+    """Of those, how many got their file."""
+
+
+@router.post("/api/manage/missing/open-access/progress")
+def open_access_progress(
+    body: ProgressRequest, db: DB, access: CurrentAccess
+) -> Progress:
+    """How far a "Download all" has got: the papers tried since it started,
+    and how many of them have their file now."""
+    items = list(
+        db.scalars(
+            select(Item).where(
+                Item.id.in_(body.item_ids),
+                access.item_filter(access.readable),
+                Item.open_access_tried_at >= body.started_at,
+            )
+        ).unique()
+    )
+    still_missing = set(
+        db.scalars(
+            select(Item.id).where(
+                Item.id.in_([item.id for item in items]),
+                *missing.conditions(body.section),
+            )
+        )
+    )
+    return Progress(
+        tried=len(items), found=sum(item.id not in still_missing for item in items)
+    )
 
 
 class FileWanted(BaseModel):

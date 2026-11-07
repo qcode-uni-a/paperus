@@ -5,6 +5,7 @@
 		errorMessage,
 		manageCounts,
 		missingPapers,
+		openAccessProgress,
 		trashSnapshots,
 		setFileWanted,
 		uploadToItem,
@@ -261,18 +262,90 @@
 		}
 	}
 
+	/** A "Download all" running in the background, followed until every
+	 * paper was tried (found ones fold away from the list as they come). */
+	type Batch = {
+		ids: string[];
+		startedAt: string;
+		tried: number;
+		found: number;
+		/** When the number tried last changed (to notice a stuck worker). */
+		movedAt: number;
+	};
+	let batches = $state<Partial<Record<Section, Batch>>>({});
+	const STALLED_MS = 60_000;
+	let now = $state(Date.now());
+
 	async function tryAll(section: Section) {
 		const { data } = await downloadAllOpenAccess({ query: { section } });
-		const queued = data?.papers ?? 0;
-		notify({
-			kind: 'info',
-			title: queued ? 'Downloading' : 'Nothing to try',
-			text: queued
-				? `Looking for open-access copies of ${queued} ${queued === 1 ? 'paper' : 'papers'} in the background.`
-				: 'Every paper was tried in the last day, or none can be looked up.'
-		});
+		const ids = data?.item_ids ?? [];
+		if (!data?.started_at || !ids.length) {
+			notify({
+				kind: 'info',
+				title: 'Nothing to try',
+				text: 'Every paper was tried in the last day, or none can be looked up.'
+			});
+			return;
+		}
+		batches[section] = {
+			ids,
+			startedAt: data.started_at,
+			tried: 0,
+			found: 0,
+			movedAt: Date.now()
+		};
 	}
+
+	$effect(() => {
+		const timer = setInterval(async () => {
+			now = Date.now();
+			for (const section of ['file', 'journal'] as Section[]) {
+				const batch = batches[section];
+				if (!batch) continue;
+				const { data } = await openAccessProgress({
+					body: { item_ids: batch.ids, started_at: batch.startedAt, section }
+				});
+				if (!data || batches[section] !== batch) continue;
+				if (data.tried !== batch.tried) {
+					if (data.found !== batch.found) load(section);
+					batch.tried = data.tried;
+					batch.found = data.found;
+					batch.movedAt = Date.now();
+				}
+				if (batch.tried >= batch.ids.length) {
+					batches[section] = undefined;
+					load(section);
+					notify({
+						kind: data.found ? 'success' : 'info',
+						title: data.found
+							? `${data.found} of ${batch.ids.length} open-access ${batch.ids.length === 1 ? 'copy' : 'copies'} found`
+							: 'No open-access copies found',
+						text: data.found
+							? 'Their PDFs were added and are being read.'
+							: 'Publishers often refuse such downloads; the browser extension can get them with your own access.'
+					});
+				}
+			}
+		}, 3000);
+		return () => clearInterval(timer);
+	});
 </script>
+
+{#snippet progress(batch: Batch | undefined)}
+	{#if batch}
+		<div class="progress" role="status">
+			<progress value={batch.tried} max={batch.ids.length}></progress>
+			<span>
+				Looking for open-access copies: {batch.tried} of {batch.ids.length} tried, {batch.found} found.
+				{#if now - batch.movedAt > STALLED_MS}
+					<strong class="stalled"
+						>Nothing has been tried for a minute: is the worker running (Administration → Jobs)?</strong
+					>
+				{/if}
+			</span>
+		</div>
+	{/if}
+{/snippet}
 
 {#snippet row(paper: MissingPaper, section: Section | null)}
 	{@const link = publisherLink(paper)}
@@ -411,7 +484,9 @@
 			<h2>No file</h2>
 			{#if lists.file?.total}<span class="count">{lists.file.total}</span>{/if}
 			{#if untried('file') > 1}
-				<button onclick={() => tryAll('file')}>Download all open-access copies</button>
+				<button onclick={() => tryAll('file')} disabled={!!batches.file}
+					>Download all open-access copies</button
+				>
 			{/if}
 			{#if extension && (lists.file?.papers.length ?? 0) > 1}
 				<button
@@ -420,6 +495,7 @@
 				>
 			{/if}
 		</div>
+		{@render progress(batches.file)}
 		{@render list(lists.file, 'Every paper has a file.', 'file')}
 	</section>
 
@@ -428,7 +504,9 @@
 			<h2>Only the preprint</h2>
 			{#if lists.journal?.total}<span class="count">{lists.journal.total}</span>{/if}
 			{#if untried('journal') > 1}
-				<button onclick={() => tryAll('journal')}>Download all open-access copies</button>
+				<button onclick={() => tryAll('journal')} disabled={!!batches.journal}
+					>Download all open-access copies</button
+				>
 			{/if}
 			{#if extension && (lists.journal?.papers.length ?? 0) > 1}
 				<button
@@ -441,6 +519,7 @@
 			Published papers whose journal version has no file yet; their preprint's is there. Open access
 			here means the journal's own copy.
 		</p>
+		{@render progress(batches.journal)}
 		{@render list(lists.journal, 'No published paper misses its journal version.', 'journal')}
 	</section>
 {/if}
@@ -589,6 +668,22 @@
 	.fetching {
 		color: var(--royal);
 		font-weight: 600;
+	}
+	.progress {
+		display: grid;
+		gap: 4px;
+		max-width: 70ch;
+		margin: 8px 0 12px;
+		color: var(--royal);
+	}
+	.progress progress {
+		width: 100%;
+		height: 8px;
+		accent-color: var(--royal);
+	}
+	.stalled {
+		display: block;
+		color: var(--danger);
 	}
 	.toggle {
 		margin: 0;

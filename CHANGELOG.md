@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Download all open-access copies** (Manage → Missing) shows its
+  progress: how many papers were tried and found, with a bar; found ones
+  fold away, a message sums up at the end, and if nothing moves for a
+  minute it says so (the worker may not be running).
 - **Dates and times** in one form for everyone (Administration → Settings
   → Server): as each browser is set (as before), Europe (31.12.2026,
   14:30), UK (31/12/2026), ISO 8601 (2026-12-31) or US (12/31/2026,
