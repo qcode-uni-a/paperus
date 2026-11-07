@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.0.13 (2026-11-07)
+
+Papers show their reference lists and what in the library cites them,
+the references of any arXiv paper can be imported, the PDF viewer has a
+table of contents, keywords stay apart from tags, and a new server walks
+its administrator through the first steps (backups now run daily from the
+start). Test coverage is above 99%, with end-to-end tests in a browser.
 
 - **Reference lists**: each paper's page lists its references, found by
   themselves in the background: from arXiv's LaTeX source for arXiv
@@ -13,12 +19,15 @@
   under Administration → Settings → Server. References a publisher
   deposited as bare DOIs get their title, authors and journal from
   OpenAlex.
+- **Import the references of a paper**: give an arXiv ID or link on the
+  import page, or upload an arXiv source (`.tar.gz`), a zip of a LaTeX
+  project or a `.bbl` file. The references come into a collection named
+  after the paper, with their details looked up by DOI or arXiv ID (or
+  found on Crossref when certain); those that could not be recognised are
+  listed in the import's report.
 - **Contents of a PDF** in the viewer: a Contents button names the chapter
   being read and opens the chapters, foldable, from the PDF's bookmarks or
   else its headings; a click jumps there.
-- BibTeX files that start with an Emacs-style `@Comment` line (no braces)
-  are read again; they failed before.
-
 - **Keywords kept apart from tags**: what came with a paper's details
   (Zotero's automatic tags such as arXiv categories and publishers'
   subjects; Mendeley's author keywords) is imported as the paper's
@@ -26,14 +35,11 @@
   the tag list or the library's rows unless asked for, and removable all
   at once under Manage → Tags. Import the same Zotero export again to sort
   the tags of an earlier import. AI assistants see which are keywords.
-
-- **Import the references of a paper**: give an arXiv ID or link on the
-  import page, or upload an arXiv source (`.tar.gz`), a zip of a LaTeX
-  project or a `.bbl` file. The references come into a collection named
-  after the paper, with their details looked up by DOI or arXiv ID (or
-  found on Crossref when certain); those that could not be recognised are
-  listed in the import's report.
-
+- **Getting started** on the library page: the first steps, each ticked
+  off once done (a paper added, a library imported, the browser extension
+  connected, an AI assistant connected), and for administrators what the
+  server still needs (backups on, a contact email, the machine learning
+  service answering, other people). Hide it any time.
 - **GPU check** for administrators: Getting started (and Administration →
   Settings → Machine learning) names the GPU the ML service runs on, or,
   on the CPU, whether the machine has a suitable NVIDIA card and what to
@@ -43,16 +49,9 @@
   while paperus stays on a small server: `ML_URLS` in `.env` (documented
   under docs/operations.md, "On another machine"). On the CPU, Getting
   started and the machine learning settings point there.
-
 - **Daily backups from the start**: a new server (or one where backups were
   never set up) backs up its database every night at 03:00 UTC and keeps
   the newest 7; the files (PDFs) are added under Administration → Backups.
-
-- **Getting started** on the library page: the first steps, each ticked
-  off once done (a paper added, a library imported, the browser extension
-  connected, an AI assistant connected), and for administrators what the
-  server still needs (backups on, a contact email, the machine learning
-  service answering, other people). Hide it any time.
 - **Logging in over plain HTTP** with the default HTTPS-only login cookie
   now says so (and what to change), instead of returning to the login
   page without a word.
@@ -60,6 +59,8 @@
   gives 64 MB): enough for parallel queries and for building a vector
   index in parallel later. Only used while needed; takes effect when the
   database container is recreated (`docker compose up -d`).
+- BibTeX files that start with an Emacs-style `@Comment` line (no braces)
+  are read again; they failed before.
 - **Fixes:** a Zotero export whose collections contain each other no
   longer stops the import (and sub-collections of two collections with
   the same name are kept); BibTeX entries with an odd month are no longer
