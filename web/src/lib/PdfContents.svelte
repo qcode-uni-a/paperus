@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiTableOfContents } from '@mdi/js';
+	import { mdiChevronRight, mdiTableOfContents } from '@mdi/js';
 	import Icon from '#lib/Icon.svelte';
 	import type { Section } from '#lib/pdfContents.ts';
 
@@ -22,10 +22,55 @@
 
 	const reading = $derived(current >= 0 ? sections[current] : null);
 
+	/** Index of each section's parent (-1 for chapters). */
+	const parents = $derived.by(() => {
+		const stack: number[] = [];
+		return sections.map((section, index) => {
+			while (stack.length && sections[stack.at(-1)!].depth >= section.depth) stack.pop();
+			const parent = stack.at(-1) ?? -1;
+			stack.push(index);
+			return parent;
+		});
+	});
+	const hasChildren = $derived(new Set(parents.filter((parent) => parent >= 0)));
+
+	/** Folded chapters and sections: at first all but the one being read. */
+	let folded = $state<Set<number>>(new Set());
+	let foldedFor = $state<Section[] | null>(null);
+	$effect(() => {
+		if (foldedFor === sections) return;
+		foldedFor = sections;
+		folded = new Set(hasChildren);
+	});
+
+	function ancestors(index: number): number[] {
+		const found = [];
+		for (let at = parents[index] ?? -1; at >= 0; at = parents[at]) found.push(at);
+		return found;
+	}
+
+	/** Shown unless a chapter or section above it is folded. */
+	const visible = (index: number) => ancestors(index).every((at) => !folded.has(at));
+
+	function fold(index: number) {
+		const next = new Set(folded);
+		if (next.has(index)) next.delete(index);
+		else next.add(index);
+		folded = next;
+	}
+
+	function foldAll(all: boolean) {
+		folded = all ? new Set(hasChildren) : new Set();
+	}
+
 	$effect(() => {
 		if (!open) return;
-		// The chapter being read in view when the panel opens.
-		panel?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'center' });
+		// The chapter being read unfolded and in view when the panel opens.
+		const opened = ancestors(current).filter((at) => folded.has(at));
+		if (opened.length) folded = new Set([...folded].filter((at) => !opened.includes(at)));
+		requestAnimationFrame(() =>
+			panel?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'center' })
+		);
 		const away = (event: PointerEvent) => {
 			const target = event.target as Node;
 			if (!panel?.contains(target) && !toggle?.contains(target)) open = false;
@@ -67,18 +112,41 @@
 
 	{#if open}
 		<nav id="pdf-contents" class="panel" aria-label="Contents of the PDF" bind:this={panel}>
+			{#if hasChildren.size}
+				<div class="folding">
+					<button onclick={() => foldAll(false)}>Unfold all</button>
+					<button onclick={() => foldAll(true)}>Fold all</button>
+				</div>
+			{/if}
 			<ol>
 				{#each sections as section, index (index)}
-					<li style:--depth={section.depth}>
-						<button
-							class:current={index === current}
-							aria-current={index === current}
-							onclick={() => choose(section)}
-						>
-							<span class="title">{section.title}</span>
-							<span class="page">{section.page}</span>
-						</button>
-					</li>
+					{#if visible(index)}
+						<li style:--depth={section.depth} class:chapter={section.depth === 0}>
+							{#if hasChildren.has(index)}
+								<button
+									class="fold"
+									class:folded={folded.has(index)}
+									aria-expanded={!folded.has(index)}
+									aria-label="{folded.has(index) ? 'Unfold' : 'Fold'} {section.title}"
+									onclick={() => fold(index)}
+								>
+									<Icon path={mdiChevronRight} size={16} />
+								</button>
+							{:else if hasChildren.size}
+								<span class="fold-space"></span>
+							{/if}
+							<button
+								class="go"
+								class:current={index === current ||
+									(folded.has(index) && ancestors(current).includes(index))}
+								aria-current={index === current}
+								onclick={() => choose(section)}
+							>
+								<span class="title">{section.title}</span>
+								<span class="page">{section.page}</span>
+							</button>
+						</li>
+					{/if}
 				{/each}
 			</ol>
 		</nav>
@@ -126,9 +194,11 @@
 		padding: 0;
 	}
 	li {
+		display: flex;
+		align-items: flex-start;
 		padding-left: calc(var(--depth) * 14px);
 	}
-	li button {
+	li .go {
 		display: flex;
 		align-items: baseline;
 		gap: 12px;
@@ -143,16 +213,63 @@
 		text-align: left;
 		cursor: pointer;
 	}
-	li[style*='--depth: 0'] button {
+	li.chapter .go {
 		font-weight: 600;
 	}
-	li button:hover {
+	li .go:hover {
 		background: var(--rail);
 	}
 	/* The chapter being read: the highlighter's mark. */
-	li button.current {
+	li .go.current {
 		border-left-color: var(--highlighter);
 		background: color-mix(in srgb, var(--highlighter) 18%, transparent);
+	}
+	.fold,
+	.fold-space {
+		flex: none;
+		width: 22px;
+		height: 30px;
+	}
+	.fold {
+		display: grid;
+		place-items: center;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--faint);
+		cursor: pointer;
+	}
+	.fold:hover {
+		color: var(--ink);
+	}
+	.fold :global(svg) {
+		transform: rotate(90deg);
+	}
+	.fold.folded :global(svg) {
+		transform: none;
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.fold :global(svg) {
+			transition: transform 120ms ease-out;
+		}
+	}
+	.folding {
+		display: flex;
+		justify-content: flex-end;
+		gap: 4px;
+		margin: -2px 0 4px;
+	}
+	.folding button {
+		padding: 2px 8px;
+		border: none;
+		background: none;
+		color: var(--muted);
+		font-size: var(--step--1);
+		cursor: pointer;
+	}
+	.folding button:hover {
+		color: var(--ink);
+		text-decoration: underline;
 	}
 	.title {
 		flex: 1;
