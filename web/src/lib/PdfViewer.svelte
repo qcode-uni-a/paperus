@@ -8,6 +8,8 @@
 		type RenderTask
 	} from 'pdfjs-dist';
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+	import PdfContents from '#lib/PdfContents.svelte';
+	import { contents, type Section } from '#lib/pdfContents.ts';
 
 	GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -33,6 +35,10 @@
 	let width = $state(0);
 	let zoomIndex = $state(2);
 	let current = $state(1);
+	let sections = $state<Section[]>([]);
+	/** The chapter being read: the last one starting above the reading line. */
+	let reading = $state(-1);
+	let toolbar = $state<HTMLElement>();
 
 	const scale = $derived(
 		firstPage && width
@@ -51,6 +57,9 @@
 				if (cancelled) return;
 				firstPage = { width: viewport.width, height: viewport.height };
 				pdf = doc;
+				contents(doc).then((found) => {
+					if (!cancelled) sections = found;
+				});
 			})
 			.catch((reason: unknown) => {
 				if (!cancelled) error = reason instanceof Error ? reason.message : String(reason);
@@ -58,6 +67,7 @@
 		return () => {
 			cancelled = true;
 			pdf = null;
+			sections = [];
 			task.destroy();
 		};
 	});
@@ -71,6 +81,55 @@
 			.toLowerCase()
 			.replace(/[^\p{L}\p{N}]/gu, '');
 	}
+
+	/** Where a chapter starts on the page, from the document's top. */
+	function offsetOf(section: Section): number | null {
+		const node = document.getElementById(`page-${section.page}`);
+		if (!node) return null;
+		return node.getBoundingClientRect().top + window.scrollY + (section.top ?? 0) * scale;
+	}
+
+	/** Below the site's header and this toolbar, where reading happens. */
+	function readingLine(): number {
+		// Where the toolbar sticks (not where it is now: before the pages
+		// scroll, it sits lower).
+		if (!toolbar) return 112;
+		const top = parseFloat(getComputedStyle(toolbar).top) || 0;
+		return top + toolbar.offsetHeight + 12;
+	}
+
+	function go(section: Section) {
+		const offset = offsetOf(section);
+		if (offset === null) return;
+		const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		window.scrollTo({ top: offset - readingLine(), behavior: smooth ? 'smooth' : 'auto' });
+	}
+
+	$effect(() => {
+		if (!sections.length || !scale) return;
+		let frame = 0;
+		const update = () => {
+			frame = 0;
+			const line = window.scrollY + readingLine() + 4;
+			let found = -1;
+			sections.forEach((section, index) => {
+				const offset = offsetOf(section);
+				if (offset !== null && offset <= line) found = index;
+			});
+			reading = found;
+		};
+		const later = () => {
+			if (!frame) frame = requestAnimationFrame(update);
+		};
+		update();
+		window.addEventListener('scroll', later, { passive: true });
+		window.addEventListener('resize', later);
+		return () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener('scroll', later);
+			window.removeEventListener('resize', later);
+		};
+	});
 
 	/** Find a passage in a page's text layer and mark its spans. */
 	function mark(layer: HTMLElement, passage: string) {
@@ -184,8 +243,11 @@
 	{:else if !pdf}
 		<p class="muted">Opening PDF…</p>
 	{:else}
-		<div class="toolbar">
-			<span class="muted">{current} / {pdf.numPages}</span>
+		<div class="toolbar" bind:this={toolbar}>
+			<div class="row where">
+				{#if sections.length}<PdfContents {sections} current={reading} {go} />{/if}
+				<span class="muted">{current} / {pdf.numPages}</span>
+			</div>
 			<div class="row">
 				<button
 					onclick={() => (zoomIndex = Math.max(0, zoomIndex - 1))}
@@ -236,6 +298,10 @@
 	}
 	.toolbar button {
 		padding: 2px 10px;
+	}
+	.where {
+		min-width: 0;
+		gap: 12px;
 	}
 	.pages {
 		display: grid;
