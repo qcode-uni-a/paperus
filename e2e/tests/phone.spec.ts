@@ -18,6 +18,7 @@ const PAGES = [
 	'/import',
 	'/notes',
 	'/manage/tags',
+	'/manage/authors',
 	'/manage/collections',
 	'/manage/groups',
 	'/manage/missing',

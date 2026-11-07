@@ -371,6 +371,10 @@ def link_authors(job: JobContext, timestamp: int) -> None:
         log.info("authors: linked those of %d papers", done)
 
 
+def queue_author_linking(app: App) -> None:
+    _queue(app, "link_authors", "link-authors", timestamp=0)
+
+
 # Papers' reference lists (Administration → Settings → Server). One job at a
 # time (the lock), so the pauses between requests to arXiv hold.
 REFERENCES_LOCK = "find-references"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authorHref } from '#lib/authorLinks.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
 	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
@@ -314,7 +315,7 @@
 		<p class="muted">
 			{#each item.authors as author, i (i)}{i ? ', ' : ''}<a
 					class="person"
-					href="{resolve('/')}?{new URLSearchParams({ author })}"
+					href={authorHref(item, i)}
 					title="Papers by {fullName(author)} in the library">{fullName(author)}</a
 				>{/each}{#if item.year}{' '}({item.year}){/if}
 		</p>

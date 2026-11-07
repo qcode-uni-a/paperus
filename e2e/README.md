@@ -33,6 +33,9 @@ something already listens on its port.
   from an import folded on the paper.
 - `place`: Back from a paper returns to the same place in a long library,
   also when papers were added meanwhile.
+- `authors`: from a paper to its author's page; a paper split off to
+  another person of the same name; a shared name decided under Manage →
+  Authors; merged again; the author page on a phone.
 - `filter`: the library filtered by a tag clicked in the list, more rules
   in the Filter panel, saved as a smart collection, cleared; by an author
   (in the list and on a paper's page); the Filter button beside the count

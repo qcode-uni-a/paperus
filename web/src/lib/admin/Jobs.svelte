@@ -95,7 +95,15 @@
 	const rate = $derived(perMinute(history.samples, Date.now()));
 
 	async function run(
-		job: 'text' | 'embeddings' | 'ocr' | 'published' | 'references' | 'text-all' | 'text-failed'
+		job:
+			| 'text'
+			| 'embeddings'
+			| 'ocr'
+			| 'published'
+			| 'references'
+			| 'authors'
+			| 'text-all'
+			| 'text-failed'
 	) {
 		if (
 			job === 'text-all' &&
@@ -208,6 +216,11 @@
 						onclick={() => run('references')}
 						title="Find papers' reference lists: arXiv's LaTeX sources, Crossref, the PDFs (a few dozen at a time)"
 						>Look for reference lists</button
+					>
+					<button
+						onclick={() => run('authors')}
+						title="Link the authors of papers added or changed to people (it runs every 5 minutes by itself)"
+						>Link authors now</button
 					>
 					<button onclick={() => run('text-all')}>Read all files again</button>
 				</div>

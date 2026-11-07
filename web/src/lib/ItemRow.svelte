@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { authorHref } from '#lib/authorLinks.ts';
 	import Title from '#lib/Title.svelte';
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -49,7 +50,7 @@
 								? ' and '
 								: ', '}<a
 							class="person"
-							href="{resolve('/')}?{new URLSearchParams({ author })}"
+							href={authorHref(item, i)}
 							title="Papers by {fullName(author)}">{author.split(',')[0].trim()}</a
 						>{/each}{#if item.authors.length > 3}{' '}et al.{/if}{/if}{#if item.year}{authors
 						? ' '

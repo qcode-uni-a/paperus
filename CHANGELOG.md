@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Authors as people** (#35, first part): each paper's authors are linked
+  to people (the same ORCID or OpenAlex id, else the same full name; a
+  name several people share goes to the one with the same co-authors, or
+  is listed to check). Authors in lists and on a paper's page lead to the
+  author's page: their papers in your library, who they wrote with, where
+  they were, others of the same name. Papers by someone else of the same
+  name are split off there and kept apart from then on; two records of
+  one person are merged. Manage → Authors lists them, with the authors to
+  check. See docs/authors.md.
+
 ## 0.0.14 (2026-11-07)
 
 - **Phones and tablets**: on tablets held upright (up to 900 px) the menu

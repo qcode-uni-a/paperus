@@ -304,6 +304,9 @@ def test_the_job(client: TestClient, db: Session, worker: None) -> None:  # noqa
     jobs.link_authors(cast(Any, None), 0)
     assert people(db, item_id) != [None]
     jobs.link_authors(cast(Any, None), 0)  # nothing waiting: quiet
+    # An administrator can start it now.
+    root = Person(client, db, "root", admin=True)
+    assert root.post("/api/admin/jobs/authors").status_code == 202
 
 
 @pytest.mark.parametrize("names", [(), ("LIGO Collaboration",)])

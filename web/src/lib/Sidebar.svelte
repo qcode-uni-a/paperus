@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import {
+		mdiAccountEditOutline,
 		mdiAccountGroupOutline,
 		mdiAccountMultipleOutline,
 		mdiArchiveOutline,
@@ -65,6 +66,7 @@
 	const MANAGE = [
 		[resolve('/manage/collections'), 'Collections', mdiFolderCogOutline],
 		[resolve('/manage/tags'), 'Tags', mdiTagMultipleOutline],
+		[resolve('/manage/authors'), 'Authors', mdiAccountEditOutline],
 		[resolve('/manage/groups'), 'Groups', mdiAccountGroupOutline],
 		[resolve('/manage/duplicates'), 'Duplicates', mdiContentDuplicate],
 		[resolve('/manage/unsorted'), 'Unsorted', mdiFileQuestionOutline],
