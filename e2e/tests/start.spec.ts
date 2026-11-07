@@ -31,8 +31,12 @@ test('a new person gets started, step by step', async ({ page, browser }) => {
 	).toHaveAccessibleName('Done');
 
 	// Hidden for good, also after reloading.
+	const saved = own.waitForResponse(
+		(r) => r.url().includes('/hints/') && r.request().method() === 'PUT'
+	);
 	await steps.getByRole('button', { name: 'Hide' }).click();
 	await expect(steps).toBeHidden();
+	await saved;
 	await own.reload();
 	await expect(own.getByRole('heading', { level: 1 })).toContainText('1 item');
 	await expect(steps).toBeHidden();
