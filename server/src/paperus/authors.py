@@ -21,17 +21,32 @@ stamps ``Item.authors_key`` when the names change, and ``link_waiting``
 links the papers whose names are not linked yet.
 """
 
+import logging
 import re
 import unicodedata
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
+import httpx2
 from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from paperus import library
-from paperus.models import Author, AuthorsApart, Authorship, AuthorSource, Item
+from paperus.identifiers import Scheme
+from paperus.importing.references import Pacer
+from paperus.models import (
+    Author,
+    AuthorsApart,
+    Authorship,
+    AuthorSource,
+    Identifier,
+    Item,
+    Version,
+)
+
+log = logging.getLogger(__name__)
 
 # Papers linked per round of ``link_waiting`` (committed after each).
 BATCH = 200
@@ -164,6 +179,7 @@ def _resolve(
                 db.add(author)
             setattr(author, column.key, value)
             db.flush()
+        _take_ids(db, author, authorship)
         _better_name(author, shown)
         authorship.author_id, authorship.source = author.id, source
         db.flush()
@@ -178,6 +194,20 @@ def _resolve(
         db.flush()
     _better_name(author, shown)
     authorship.author_id, authorship.source = author.id, AuthorSource.NAME
+
+
+def _take_ids(db: Session, author: Author, authorship: Authorship) -> None:
+    """The person takes the paper's other ids they lack (unless someone
+    else has them), so a paper with another id is someone else."""
+    for column, value in (
+        (Author.orcid, authorship.orcid),
+        (Author.openalex_id, authorship.openalex_id),
+    ):
+        if value and getattr(author, column.key) is None:
+            taken = db.scalar(select(Author.id).where(column == value))
+            if taken is None:
+                setattr(author, column.key, value)
+    db.flush()
 
 
 def _shown(written: str) -> str:
@@ -260,6 +290,261 @@ def link_waiting(db: Session, *, limit: int = 100_000) -> int:
     return done
 
 
+# OpenAlex: who the authors are (ids, ORCID iDs) and where they were.
+
+OPENALEX = "https://api.openalex.org/works"
+OPENALEX_BATCH = 50
+_PACER = Pacer(0.2)
+# Papers looked up per round of ``check_waiting`` (an hourly job).
+LOOKUPS = 1000
+
+
+def _doi(item: Item) -> str | None:
+    """The DOI OpenAlex knows the paper by: the shown version's first."""
+    shown = library.preferred_version(item)
+    versions = [shown] if shown else []
+    versions += [v for v in item.versions if v is not shown]
+    for scheme in (Scheme.DOI, Scheme.ARXIV):
+        for version in versions:
+            for identifier in version.identifiers:
+                if identifier.scheme == scheme:
+                    value = identifier.value.lower()
+                    return value if scheme == Scheme.DOI else f"10.48550/arxiv.{value}"
+    return None
+
+
+def look_up(
+    db: Session,
+    http: httpx2.Client,
+    items: list[Item],
+    *,
+    contact_email: str | None = None,
+    pacer: Pacer = _PACER,
+) -> int:
+    """Each paper's authors as OpenAlex knows the paper (by its DOI, 50 to
+    a request): their OpenAlex ids, ORCID iDs and affiliations on it; then
+    linked again (ids win over names). Returns how many papers OpenAlex
+    knew. Does not commit."""
+    now = datetime.now(UTC)
+    by_doi: dict[str, list[Item]] = {}
+    for item in items:
+        item.authors_checked_at = now
+        if (doi := _doi(item)) is not None:
+            by_doi.setdefault(doi, []).append(item)
+    known = 0
+    dois = list(by_doi)
+    for start in range(0, len(dois), OPENALEX_BATCH):
+        params = {
+            "filter": "doi:" + "|".join(dois[start : start + OPENALEX_BATCH]),
+            "per-page": str(OPENALEX_BATCH),
+            "select": "doi,authorships",
+        }
+        if contact_email:
+            params["mailto"] = contact_email
+        pacer()
+        try:
+            response = http.get(OPENALEX, params=params, timeout=20)
+            response.raise_for_status()
+            works = response.json().get("results") or []
+        except (httpx2.HTTPError, ValueError) as error:
+            log.info("no authors from OpenAlex: %s", error)
+            continue
+        for work in works:
+            doi = str(work.get("doi") or "").removeprefix("https://doi.org/").lower()
+            for item in by_doi.get(doi, []):
+                _take(db, item, work.get("authorships") or [])
+                known += 1
+    db.flush()
+    return known
+
+
+def _take(db: Session, item: Item, theirs: list[Any]) -> None:
+    entries = [e for e in theirs if isinstance(e, dict)]
+    for authorship in item.authorships:
+        entry = _match(authorship, entries)
+        if entry is None:
+            continue
+        person = entry.get("author") or {}
+        openalex = str(person.get("id") or "").rsplit("/", 1)[-1]
+        if re.fullmatch(r"A\d+", openalex):
+            authorship.openalex_id = openalex
+        authorship.orcid = authorship.orcid or orcid_of(person.get("orcid"))
+        if not authorship.affiliation:
+            places = [
+                str(place.get("display_name"))
+                for place in entry.get("institutions") or []
+                if isinstance(place, dict) and place.get("display_name")
+            ]
+            raw = [str(r) for r in entry.get("raw_affiliation_strings") or [] if r]
+            found = "; ".join(dict.fromkeys(places)) or (raw[0] if raw else "")
+            authorship.affiliation = found[:500] or None
+        _resolve(db, item, authorship)
+
+
+def _match(
+    authorship: Authorship, entries: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """OpenAlex's entry for this author: at the same place if the family
+    name fits, else the only one it fits."""
+    family = fold(authorship.written.partition(",")[0]).split()
+
+    def fits(entry: dict[str, Any]) -> bool:
+        shown = fold(str((entry.get("author") or {}).get("display_name") or ""))
+        return bool(family) and all(word in shown.split() for word in family)
+
+    position = authorship.position - 1
+    if position < len(entries) and fits(entries[position]):
+        return entries[position]
+    fitting = [e for e in entries if fits(e)]
+    return fitting[0] if len(fitting) == 1 else None
+
+
+def check_waiting(
+    db: Session,
+    http: httpx2.Client,
+    *,
+    contact_email: str | None = None,
+    limit: int = LOOKUPS,
+) -> int:
+    """Look up the authors of papers never looked up (with a DOI or arXiv
+    ID, linked already), up to ``limit``, committing after each request's
+    worth. Returns how many papers OpenAlex knew."""
+    has_id = (
+        select(Identifier.id)
+        .join(Version, Version.id == Identifier.version_id)
+        .where(
+            Version.item_id == Item.id,
+            Identifier.scheme.in_([Scheme.DOI, Scheme.ARXIV]),
+        )
+        .exists()
+    )
+    items = list(
+        db.scalars(
+            select(Item)
+            .where(
+                Item.authors_checked_at.is_(None),
+                Item.authors_linked.is_not(None),
+                has_id,
+            )
+            .order_by(Item.id)
+            .limit(limit)
+        )
+    )
+    known = 0
+    for start in range(0, len(items), OPENALEX_BATCH):
+        known += look_up(
+            db, http, items[start : start + OPENALEX_BATCH], contact_email=contact_email
+        )
+        db.commit()
+    return known
+
+
+# Probably the same person: suggestions, decided by a person.
+
+# Authors of one family name compared pairwise, at most this many.
+MAX_NAMESAKES = 60
+
+
+@dataclass
+class Likely:
+    """Two people who are probably one."""
+
+    one: uuid.UUID
+    other: uuid.UUID
+    shared: int
+    """Co-authors in common."""
+
+
+def _given_fits(one: str, other: str) -> bool:
+    """Given names that may be the same person's: "M." and "Mónica", "M. F."
+    and "Mario Fernando"; not "Mónica" and "María"."""
+    a, b = fold(one).split(), fold(other).split()
+    if not a or not b:
+        return False
+    for x, y in zip(a, b, strict=False):
+        if x[0] != y[0] or (len(x) > 1 and len(y) > 1 and x != y):
+            return False
+    return True
+
+
+def _full_given(given: str) -> bool:
+    """A given name written out ("Mónica"), not an initial ("M.")."""
+    words = fold(given).split()
+    return bool(words) and len(words[0]) > 1
+
+
+def likely_the_same(
+    db: Session, visible: list[Any], *, limit: int = 50
+) -> list[Likely]:
+    """Pairs of people, among the authors of the papers ``visible`` finds,
+    with the same family name and given names that fit, not said to be
+    different and without two ORCID iDs; most co-authors in common first."""
+    rows = db.execute(
+        select(Authorship.author_id, Authorship.written, Authorship.item_id)
+        .join(Item, Item.id == Authorship.item_id)
+        .where(Authorship.author_id.is_not(None), *visible)
+    )
+    names: dict[uuid.UUID, set[tuple[str, str]]] = {}
+    on_item: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for author_id, written, item_id in rows:
+        if author_id is None:  # left out by the query; for the type checker
+            continue
+        family, _, given = written.partition(",")
+        names.setdefault(author_id, set()).add((fold(family), given.strip()))
+        on_item.setdefault(item_id, set()).add(author_id)
+    # A person known by a full given name is that name, not their initials
+    # ("Guido", also written "G.", is not "Gerda").
+    for person, spellings in names.items():
+        full = {(f, g) for f, g in spellings if _full_given(g)}
+        if full:
+            names[person] = full
+    with_others: dict[uuid.UUID, set[uuid.UUID]] = {}
+    for people in on_item.values():
+        for person in people:
+            with_others.setdefault(person, set()).update(people - {person})
+    by_family: dict[str, set[uuid.UUID]] = {}
+    for person, spellings in names.items():
+        for family, _ in spellings:
+            if family:
+                by_family.setdefault(family, set()).add(person)
+    orcids = dict(
+        db.execute(
+            select(Author.id, Author.orcid).where(
+                Author.id.in_(list(names)), Author.orcid.is_not(None)
+            )
+        ).all()
+    )
+    kept_apart = {
+        (row.first, row.second)
+        for row in db.scalars(
+            select(AuthorsApart).where(AuthorsApart.first.in_(list(names)))
+        )
+    }
+    found: dict[tuple[uuid.UUID, uuid.UUID], Likely] = {}
+    for family, people in by_family.items():
+        if len(people) < 2 or len(people) > MAX_NAMESAKES:
+            continue
+        ordered = sorted(people)
+        for i, one in enumerate(ordered):
+            for other in ordered[i + 1 :]:
+                if (one, other) in kept_apart or (one, other) in found:
+                    continue
+                if one in orcids and other in orcids and orcids[one] != orcids[other]:
+                    continue
+                if not any(
+                    _given_fits(g1, g2)
+                    for f1, g1 in names[one]
+                    for f2, g2 in names[other]
+                    if f1 == f2 == family
+                ):
+                    continue
+                shared = len(
+                    with_others.get(one, set()) & with_others.get(other, set())
+                )
+                found[(one, other)] = Likely(one, other, shared)
+    return sorted(found.values(), key=lambda pair: -pair.shared)[:limit]
+
+
 # By hand: split, merge, assign.
 
 
@@ -306,13 +591,13 @@ def split(db: Session, author: Author, item_ids: list[uuid.UUID]) -> Author:
 
 def merge(db: Session, keep: Author, other: Author) -> None:
     """The same person: ``other``'s papers go to ``keep``. Refused for two
-    different ORCID or OpenAlex ids. Commits."""
+    different ORCID iDs. Commits."""
     if keep.id == other.id:
         raise Refused("the same person already")
-    for column in ("orcid", "openalex_id"):
-        mine, theirs = getattr(keep, column), getattr(other, column)
-        if mine and theirs and mine != theirs:
-            raise Refused(f"they have different {column.replace('_id', '')} ids")
+    # Two ORCID iDs are two people; OpenAlex has duplicate profiles, so
+    # two OpenAlex ids may be one (the kept person keeps theirs).
+    if keep.orcid and other.orcid and keep.orcid != other.orcid:
+        raise Refused("they have different ORCID iDs")
     for column in ("orcid", "openalex_id"):
         value = getattr(other, column)
         if value and not getattr(keep, column):

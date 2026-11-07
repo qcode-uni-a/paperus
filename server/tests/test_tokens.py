@@ -243,6 +243,8 @@ ROUTES = {
     ("POST", "/api/authors/{author_id}/merge"): None,
     ("POST", "/api/authors/{author_id}/split"): None,
     ("GET", "/api/authors-to-check"): None,
+    ("GET", "/api/authors-suggestions"): None,
+    ("POST", "/api/authors/{author_id}/apart"): None,
     ("PUT", "/api/items/{item_id}/authors/{position}"): "papers.write",
     ("GET", "/api/citations"): "papers.read",
     ("GET", "/api/collections"): "papers.read",

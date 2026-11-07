@@ -18,6 +18,7 @@
 	let openAccess = $state(false);
 	let findPublished = $state(true);
 	let findReferences = $state(true);
+	let findAuthors = $state(true);
 	let dates = $state<DateFormat>('browser');
 	const now = new Date();
 	let saving = $state(false);
@@ -29,6 +30,7 @@
 		openAccess = config?.open_access_auto ?? false;
 		findPublished = config?.find_published ?? true;
 		findReferences = config?.find_references ?? true;
+		findAuthors = config?.find_authors ?? true;
 		dates = config?.date_format ?? 'browser';
 	}
 	// The page reloads its data every few seconds: start over only when the
@@ -43,6 +45,7 @@
 			config.open_access_auto,
 			config.find_published,
 			config.find_references,
+			config.find_authors,
 			config.date_format
 		]);
 		if (saved === seen) return;
@@ -58,6 +61,7 @@
 				openAccess !== (config.open_access_auto ?? false) ||
 				findPublished !== (config.find_published ?? true) ||
 				findReferences !== (config.find_references ?? true) ||
+				findAuthors !== (config.find_authors ?? true) ||
 				dates !== (config.date_format ?? 'browser'))
 	);
 
@@ -71,6 +75,7 @@
 				open_access_auto: openAccess,
 				find_published: findPublished,
 				find_references: findReferences,
+				find_authors: findAuthors,
 				date_format: dates
 			},
 			'Server settings'
@@ -111,6 +116,15 @@
 >
 	<label class="check"
 		><input id="find-references" type="checkbox" bind:checked={findReferences} /> Look for them</label
+	>
+</SettingRow>
+<SettingRow
+	id="find-authors"
+	title="Authors"
+	description="Who the papers' authors are: OpenAlex gives each author's id, ORCID iD and affiliation on the paper, so people with the same name are told apart and their papers come together (Manage → Authors). About a thousand papers an hour, each once; only the papers' DOIs are sent."
+>
+	<label class="check"
+		><input id="find-authors" type="checkbox" bind:checked={findAuthors} /> Look them up</label
 	>
 </SettingRow>
 <SettingRow

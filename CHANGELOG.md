@@ -10,7 +10,12 @@
   they were, others of the same name. Papers by someone else of the same
   name are split off there and kept apart from then on; two records of
   one person are merged. Manage → Authors lists them, with the authors to
-  check. See docs/authors.md.
+  check. OpenAlex gives each author's id, ORCID iD and affiliation on
+  each paper with a DOI (an hourly job; Administration → Settings →
+  Server → Authors), so namesakes are told apart and an author's page
+  shows where they were. Manage → Authors also suggests people who are
+  probably one ("M. Benito" and "Mónica Benito", co-authors in common
+  first): the same person, or different people. See docs/authors.md.
 
 ## 0.0.14 (2026-11-07)
 

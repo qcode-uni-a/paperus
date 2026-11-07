@@ -58,6 +58,10 @@ class SystemConfig(BaseModel):
     find_references: bool = True
     """Look for papers' reference lists (arXiv's LaTeX sources, Crossref,
     the PDF's own list); a few dozen papers an hour."""
+    find_authors: bool = True
+    """Look up papers' authors at OpenAlex by the papers' DOIs: their ids,
+    ORCID iDs and affiliations on each paper (``paperus.authors``); a few
+    hundred papers an hour."""
     open_access_auto: bool = False
     """Papers added without a file get an open-access copy by themselves, in
     the background: their arXiv version (found via OpenAlex), else one

@@ -85,3 +85,23 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 	}));
 	expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 });
+
+test('probably the same person: merged, or kept apart', async ({ page }) => {
+	const family = unique('Burkard');
+	const coauthor = { family: unique('Pályi'), given: 'András' };
+	await add(page, unique('Full name '), [{ family, given: 'Guido' }, coauthor]);
+	await add(page, unique('Initial '), [{ family, given: 'G.' }, coauthor]);
+	const last = await add(page, unique('Other '), [{ family, given: 'Gerda' }]);
+	await linked(page, last);
+
+	await page.goto('/manage/authors');
+	const section = page.locator('section').filter({ hasText: 'Probably the same' });
+	const pair = section.getByRole('listitem').filter({ hasText: `Guido ${family}` });
+	await expect(pair).toContainText('1 co-author in common');
+	await expect(pair).toContainText(`G. ${family}`);
+	await pair.getByRole('button', { name: 'The same person' }).click();
+	await expect(page.getByText(new RegExp(`is now one with Guido ${family}`))).toBeVisible();
+	await expect(pair).toBeHidden();
+	// "Gerda" never fits "Guido"; "G." did, but is merged now.
+	await expect(section.getByRole('listitem').filter({ hasText: family })).toHaveCount(0);
+});

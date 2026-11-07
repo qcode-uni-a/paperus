@@ -371,8 +371,33 @@ def link_authors(job: JobContext, timestamp: int) -> None:
         log.info("authors: linked those of %d papers", done)
 
 
+@tasks.periodic(cron="50 * * * *")
+@tasks.task(
+    name="look_up_authors",
+    queue="text",
+    lock="link-authors",
+    queueing_lock="look-up-authors",
+    pass_context=True,
+)
+def look_up_authors(job: JobContext, timestamp: int) -> None:
+    """Papers' authors at OpenAlex (ids, ORCID iDs, affiliations), for
+    papers never looked up; a thousand an hour (``paperus.authors``)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.find_authors:
+            return
+        known = authors.check_waiting(
+            db, context.http, contact_email=config.contact_email
+        )
+        authors.link_waiting(db)
+    log.info("authors: %d papers known to OpenAlex", known)
+
+
 def queue_author_linking(app: App) -> None:
+    """Link authors now, and look them up at OpenAlex (if that is on)."""
     _queue(app, "link_authors", "link-authors", timestamp=0)
+    _queue(app, "look_up_authors", "look-up-authors", timestamp=0)
 
 
 # Papers' reference lists (Administration → Settings → Server). One job at a

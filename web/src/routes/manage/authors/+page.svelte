@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { assignAuthor, authorsToCheck, errorMessage, listAuthors } from '#lib/api/client.ts';
-	import type { AuthorRow, AuthorToCheck } from '#lib/api/generated/types.gen.ts';
+	import {
+		assignAuthor,
+		authorSuggestions,
+		authorsToCheck,
+		errorMessage,
+		keepApart,
+		listAuthors,
+		mergeAuthors
+	} from '#lib/api/client.ts';
+	import type { AuthorRow, AuthorToCheck, LikelyOut } from '#lib/api/generated/types.gen.ts';
 	import { fullName } from '#lib/format.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
@@ -39,6 +47,40 @@
 	$effect(() => {
 		loadToCheck();
 	});
+
+	// Probably the same person: merged, or kept apart.
+	let likely = $state<LikelyOut[]>([]);
+	async function loadLikely() {
+		likely = (await authorSuggestions({ query: { limit: 50 } })).data ?? [];
+	}
+	$effect(() => {
+		loadLikely();
+	});
+
+	async function same(pair: LikelyOut) {
+		// The one with more papers (else the longer name) stays.
+		const [keep, other] =
+			pair.other.papers > pair.one.papers ||
+			(pair.other.papers === pair.one.papers && pair.other.name.length > pair.one.name.length)
+				? [pair.other, pair.one]
+				: [pair.one, pair.other];
+		const { error } = await mergeAuthors({
+			path: { author_id: keep.id },
+			body: { other_id: other.id }
+		});
+		if (error) {
+			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
+			return;
+		}
+		notify({ kind: 'success', title: `${other.name} is now one with ${keep.name}` });
+		loadLikely();
+		load();
+	}
+
+	async function different(pair: LikelyOut) {
+		await keepApart({ path: { author_id: pair.one.id }, body: { other_id: pair.other.id } });
+		likely = likely.filter((p) => p !== pair);
+	}
 
 	async function decide(entry: AuthorToCheck, person: AuthorRow | null) {
 		const { error } = await assignAuthor({
@@ -89,6 +131,34 @@
 							<a class="small" href={resolve('/authors/[id]', { id: person.id })}>see</a>
 						{/each}
 						<button class="quiet" onclick={() => decide(entry, null)}>Someone else</button>
+					</div>
+				</li>
+			{/each}
+		</ul>
+	</section>
+{/if}
+
+{#if likely.length}
+	<section class="check likely">
+		<h2>Probably the same <span class="count">{likely.length}</span></h2>
+		<p class="muted">
+			The same family name, given names that fit; with co-authors in common first.
+		</p>
+		<ul>
+			{#each likely as pair (`${pair.one.id}-${pair.other.id}`)}
+				<li>
+					<p>
+						<a href={resolve('/authors/[id]', { id: pair.one.id })}>{pair.one.name}</a>
+						<span class="muted">({pair.one.papers})</span> and
+						<a href={resolve('/authors/[id]', { id: pair.other.id })}>{pair.other.name}</a>
+						<span class="muted">({pair.other.papers})</span>{#if pair.shared}<span class="muted"
+								>{' '}· {pair.shared}
+								{pair.shared === 1 ? 'co-author' : 'co-authors'} in common</span
+							>{/if}
+					</p>
+					<div class="row">
+						<button onclick={() => same(pair)}>The same person</button>
+						<button class="quiet" onclick={() => different(pair)}>Different people</button>
 					</div>
 				</li>
 			{/each}
@@ -152,6 +222,9 @@
 		border: 1px solid var(--rule);
 		border-left: 4px solid var(--highlighter);
 		border-radius: 10px;
+	}
+	.likely {
+		border-left-color: var(--royal);
 	}
 	.check h2 {
 		margin: 0 0 4px;

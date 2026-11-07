@@ -27,6 +27,16 @@ export type Affiliation = {
 };
 
 /**
+ * Apart
+ */
+export type Apart = {
+    /**
+     * Other Id
+     */
+    other_id: string;
+};
+
+/**
  * ArxivImportIn
  */
 export type ArxivImportIn = {
@@ -1714,6 +1724,18 @@ export type LibraryOut = {
 };
 
 /**
+ * LikelyOut
+ */
+export type LikelyOut = {
+    one: AuthorRow;
+    other: AuthorRow;
+    /**
+     * Shared
+     */
+    shared: number;
+};
+
+/**
  * LinkChange
  */
 export type LinkChange = {
@@ -3379,6 +3401,10 @@ export type SystemConfig = {
      * Find References
      */
     find_references?: boolean;
+    /**
+     * Find Authors
+     */
+    find_authors?: boolean;
     /**
      * Open Access Auto
      */
@@ -5324,6 +5350,68 @@ export type AssignAuthorResponses = {
 };
 
 export type AssignAuthorResponse = AssignAuthorResponses[keyof AssignAuthorResponses];
+
+export type AuthorSuggestionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/authors-suggestions';
+};
+
+export type AuthorSuggestionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AuthorSuggestionsError = AuthorSuggestionsErrors[keyof AuthorSuggestionsErrors];
+
+export type AuthorSuggestionsResponses = {
+    /**
+     * Response Author Suggestions
+     *
+     * Successful Response
+     */
+    200: Array<LikelyOut>;
+};
+
+export type AuthorSuggestionsResponse = AuthorSuggestionsResponses[keyof AuthorSuggestionsResponses];
+
+export type KeepApartData = {
+    body: Apart;
+    path: {
+        /**
+         * Author Id
+         */
+        author_id: string;
+    };
+    query?: never;
+    url: '/api/authors/{author_id}/apart';
+};
+
+export type KeepApartErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type KeepApartError = KeepApartErrors[keyof KeepApartErrors];
+
+export type KeepApartResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type KeepApartResponse = KeepApartResponses[keyof KeepApartResponses];
 
 export type FindUploadData = {
     body?: never;

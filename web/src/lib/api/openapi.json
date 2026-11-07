@@ -2350,6 +2350,103 @@
         }
       }
     },
+    "/api/authors-suggestions": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Author Suggestions",
+        "description": "People among the authors of one's papers who are probably one: the\nsame family name, given names that fit (\"M.\" and \"M\u00f3nica\"), not said to\nbe different; most co-authors in common first.",
+        "operationId": "author_suggestions",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LikelyOut"
+                  },
+                  "title": "Response Author Suggestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors/{author_id}/apart": {
+      "post": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Keep Apart",
+        "description": "Two people, not one: no longer suggested as the same.",
+        "operationId": "keep_apart",
+        "parameters": [
+          {
+            "name": "author_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Author Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Apart"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads/{sha256}": {
       "get": {
         "tags": [
@@ -7194,6 +7291,20 @@
         ],
         "title": "Affiliation"
       },
+      "Apart": {
+        "properties": {
+          "other_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Other Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "other_id"
+        ],
+        "title": "Apart"
+      },
       "ArxivImportIn": {
         "properties": {
           "arxiv_id": {
@@ -10200,6 +10311,27 @@
         ],
         "title": "LibraryOut"
       },
+      "LikelyOut": {
+        "properties": {
+          "one": {
+            "$ref": "#/components/schemas/AuthorRow"
+          },
+          "other": {
+            "$ref": "#/components/schemas/AuthorRow"
+          },
+          "shared": {
+            "type": "integer",
+            "title": "Shared"
+          }
+        },
+        "type": "object",
+        "required": [
+          "one",
+          "other",
+          "shared"
+        ],
+        "title": "LikelyOut"
+      },
       "LinkChange": {
         "properties": {
           "page": {
@@ -13157,6 +13289,11 @@
           "find_references": {
             "type": "boolean",
             "title": "Find References",
+            "default": true
+          },
+          "find_authors": {
+            "type": "boolean",
+            "title": "Find Authors",
             "default": true
           },
           "open_access_auto": {

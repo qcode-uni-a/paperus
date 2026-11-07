@@ -4,13 +4,16 @@ a split, merged, assigned by hand; seen only through one's papers."""
 import uuid
 from typing import Any, cast
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from paperus import authors, jobs
+from paperus.config import Settings
 from paperus.models import Author, Authorship, Item
+from paperus.system import load_config, save_config
 from tests.people import Person
 from tests.test_jobs import worker  # noqa: F401 (fixture)
 
@@ -25,9 +28,13 @@ def paper(person: Person, title: str, *names: str, **fields: Any) -> str:  # noq
             if given
             else {"literal": family.strip()}
         )
+    identifiers = fields.pop("identifiers", [])
     response = person.post(
         "/api/items",
-        json={"metadata": {"title": title, "author": people, **fields}},
+        json={
+            "metadata": {"title": title, "author": people, **fields},
+            "identifiers": identifiers,
+        },
     )
     assert response.status_code == 201, response.text
     return str(response.json()["id"])
@@ -238,7 +245,7 @@ def test_merge(client: TestClient, db: Session) -> None:
     record.orcid = "0000-0009-8765-4321"
     db.commit()
     refused = ada.post(f"/api/authors/{keep}/merge", {"other_id": str(maria)})
-    assert refused.status_code == 409 and "orcid" in refused.text
+    assert refused.status_code == 409 and "ORCID" in refused.text
 
 
 def test_seen_only_through_ones_papers(client: TestClient, db: Session) -> None:
@@ -320,3 +327,195 @@ def test_papers_without_people(
     assert ada.get(f"/api/items/{item_id}").json()["author_ids"] == [
         str(i) for i in people(db, item_id)
     ]
+
+
+class FakeOpenAlex:
+    """OpenAlex's works by DOI: each a list of (display name, id, ORCID,
+    institution)."""
+
+    def __init__(self) -> None:
+        self.works: dict[str, list[tuple[str, str, str | None, str | None]]] = {}
+        self.status = 200
+        self.asked: list[str] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        assert request.url.host == "api.openalex.org"
+        if self.status != 200:
+            return httpx2.Response(self.status)
+        dois = request.url.params["filter"].removeprefix("doi:").split("|")
+        self.asked += dois
+        results = [
+            {
+                "doi": f"https://doi.org/{doi}",
+                "authorships": [
+                    {
+                        "author": {
+                            "display_name": name,
+                            "id": f"https://openalex.org/{openalex}",
+                            "orcid": f"https://orcid.org/{orcid}" if orcid else None,
+                        },
+                        "institutions": [{"display_name": place}] if place else [],
+                        "raw_affiliation_strings": ["Somewhere, raw"],
+                    }
+                    for name, openalex, orcid, place in self.works[doi]
+                ],
+            }
+            for doi in dois
+            if doi in self.works
+        ]
+        return httpx2.Response(200, json={"results": results})
+
+
+def with_doi(person: Person, title: str, doi: str, *names: str) -> str:
+    return paper(person, title, *names, identifiers=[{"scheme": "doi", "value": doi}])
+
+
+def test_who_they_are_from_openalex(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    openalex = FakeOpenAlex()
+    http = httpx2.Client(transport=httpx2.MockTransport(openalex))
+    orcid = "0000-0001-2345-6789"
+    full = with_doi(ada, "Full", "10.1000/full", "Benito, Mónica", "Platero, Gloria")
+    short = with_doi(ada, "Short", "10.1000/short", "Benito, M.")
+    other = with_doi(ada, "Proteins", "10.1000/proteins", "Benito, Mónica")
+    hand = with_doi(ada, "By hand", "10.1000/hand", "Benito, Mónica")
+    unknown = with_doi(ada, "Unknown to OpenAlex", "10.1000/unknown", "Nobody, Ned")
+    without = paper(ada, "Without a DOI", "Benito, Mónica")
+    openalex.works = {
+        "10.1000/full": [
+            ("Mónica Benito", "A1", orcid, "Universität Augsburg"),
+            ("Gloria Platero", "A2", None, None),
+        ],
+        "10.1000/short": [("M. Benito", "A1", orcid, None)],
+        "10.1000/proteins": [("Mónica Benito", "A9", None, "Universidad de Sevilla")],
+        "10.1000/hand": [("Mónica Benito", "A9", None, None)],
+    }
+    authors.link_waiting(db)
+    [before] = people(db, hand)
+    ada.put(f"/api/items/{hand}/authors/1", {"author_id": str(before)})
+
+    assert authors.check_waiting(db, http, contact_email="lab@example.org") == 4
+    assert sorted(openalex.asked) == [
+        f"10.1000/{name}" for name in ("full", "hand", "proteins", "short", "unknown")
+    ]
+    authors.link_waiting(db)
+    [benito, platero] = people(db, full)
+    # The same iD: initials and the full name are one person.
+    assert people(db, short) == [benito]
+    record = db.get(Author, benito)
+    assert record is not None and (record.orcid, record.openalex_id) == (orcid, "A1")
+    # Another OpenAlex id: another person of the same name; by hand stays.
+    [biologist] = people(db, other)
+    assert biologist not in (benito, None)
+    assert people(db, hand) == [before]
+    assert people(db, unknown) != [None]
+    # Where they were, per paper (an institution, else the raw string).
+    page = ada.get(f"/api/authors/{benito}").json()
+    assert page["affiliations"][0]["name"] == "Universität Augsburg"
+    assert page["openalex_id"] == "A1"
+    assert ada.get(f"/api/authors/{platero}").json()["affiliations"][0]["name"] == (
+        "Somewhere, raw"
+    )
+    # Each paper once; papers without a DOI are not asked about.
+    openalex.asked.clear()
+    assert authors.check_waiting(db, http) == 0
+    assert openalex.asked == []
+    db.expire_all()
+    item = db.get(Item, uuid.UUID(without))
+    assert item is not None and item.authors_checked_at is None
+    # Two OpenAlex profiles of one person may be merged; two ORCIDs not.
+    merged = ada.post(f"/api/authors/{biologist}/merge", {"other_id": str(benito)})
+    assert merged.status_code == 200, merged.text
+
+
+def test_openalex_unreachable(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    openalex = FakeOpenAlex()
+    openalex.status = 503
+    http = httpx2.Client(transport=httpx2.MockTransport(openalex))
+    item_id = with_doi(ada, "Down", "10.1000/down", "Benito, Mónica")
+    authors.link_waiting(db)
+    assert authors.check_waiting(db, http) == 0
+    [person] = people(db, item_id)
+    record = db.get(Author, person)
+    assert record is not None and record.openalex_id is None
+
+
+def test_the_hourly_lookup(
+    client: TestClient,
+    db: Session,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    worker: None,  # noqa: F811
+) -> None:
+    ada = Person(client, db, "ada")
+    openalex = FakeOpenAlex()
+    openalex.works["10.1000/x"] = [("Mónica Benito", "A1", None, None)]
+    item_id = with_doi(ada, "X", "10.1000/x", "Benito, Mónica")
+    context = jobs._worker_context()
+    monkeypatch.setattr(
+        context, "http", httpx2.Client(transport=httpx2.MockTransport(openalex))
+    )
+    config = load_config(db, settings)
+    config.find_authors = False
+    save_config(db, config)
+    db.commit()
+    jobs.look_up_authors(cast(Any, None), 0)
+    assert openalex.asked == []
+    config.find_authors = True
+    save_config(db, config)
+    db.commit()
+    jobs.link_authors(cast(Any, None), 0)
+    jobs.look_up_authors(cast(Any, None), 0)
+    assert openalex.asked == ["10.1000/x"]
+    [person] = people(db, item_id)
+    record = db.get(Author, person)
+    assert record is not None and record.openalex_id == "A1"
+
+
+def test_probably_the_same(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    full = paper(ada, "Full", "Benito, Mónica", "Platero, Gloria")
+    short = paper(ada, "Short", "Benito, M.", "Platero, Gloria")
+    maria = paper(ada, "María", "Benito, María")
+    initials = paper(ada, "Initials", "Benito, M. F.")
+    authors.link_waiting(db)
+    [monica, platero] = people(db, full)
+    [m, _] = people(db, short)
+    [other] = people(db, maria)
+    [mf] = people(db, initials)
+
+    def pairs() -> list[tuple[set[str], int]]:
+        response = ada.get("/api/authors-suggestions")
+        assert response.status_code == 200, response.text
+        return [
+            ({p["one"]["name"], p["other"]["name"]}, p["shared"])
+            for p in response.json()
+        ]
+
+    found = pairs()
+    # Co-authors in common first; "Mónica" and "María" never.
+    assert found[0] == ({"Mónica Benito", "M. Benito"}, 1)
+    assert {"Mónica Benito", "María Benito"} not in [names for names, _ in found]
+    assert ({"M. Benito", "M. F. Benito"}, 0) in found
+    assert ({"María Benito", "M. Benito"}, 0) in found
+    # Different people: not suggested again.
+    response = ada.post(f"/api/authors/{m}/apart", {"other_id": str(mf)})
+    assert response.status_code == 204
+    assert ({"M. Benito", "M. F. Benito"}, 0) not in pairs()
+    assert ada.post(f"/api/authors/{m}/apart", {"other_id": str(m)}).status_code == 422
+    # Merged, "M." is one of Mónica's spellings: it no longer fits María.
+    assert (
+        ada.post(f"/api/authors/{monica}/merge", {"other_id": str(m)}).status_code
+        == 200
+    )
+    assert {"Mónica Benito", "María Benito"} not in [names for names, _ in pairs()]
+    m = monica
+    # Two ORCID iDs: not suggested.
+    for person, orcid in ((m, "0000-0001-0000-0001"), (other, "0000-0002-0000-0002")):
+        record = db.get(Author, person)
+        assert record is not None
+        record.orcid = orcid
+    db.commit()
+    assert ({"María Benito", "Mónica Benito"}, 0) not in pairs()
+    assert platero

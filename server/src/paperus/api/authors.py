@@ -285,3 +285,47 @@ def assign_author(
     linked = db.get(Author, authorship.author_id)
     assert linked is not None
     return _row(linked, _counts(db, access, [linked.id]).get(linked.id, 0))
+
+
+class LikelyOut(BaseModel):
+    one: AuthorRow
+    other: AuthorRow
+    shared: int
+    """Co-authors in common."""
+
+
+@router.get("/api/authors-suggestions")
+def author_suggestions(
+    db: DB,
+    access: CurrentAccess,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[LikelyOut]:
+    """People among the authors of one's papers who are probably one: the
+    same family name, given names that fit ("M." and "Mónica"), not said to
+    be different; most co-authors in common first."""
+    pairs = authors.likely_the_same(db, _visible(access), limit=limit)
+    ids = {p.one for p in pairs} | {p.other for p in pairs}
+    people = {a.id: a for a in db.scalars(select(Author).where(Author.id.in_(ids)))}
+    counts = _counts(db, access, list(ids))
+    row = lambda i: _row(people[i], counts.get(i, 0))  # noqa: E731
+    return [
+        LikelyOut(one=row(p.one), other=row(p.other), shared=p.shared) for p in pairs
+    ]
+
+
+class Apart(BaseModel):
+    other_id: uuid.UUID
+
+
+@router.post("/api/authors/{author_id}/apart", status_code=204)
+def keep_apart(
+    author_id: uuid.UUID, body: Apart, db: DB, access: CurrentAccess
+) -> Response:
+    """Two people, not one: no longer suggested as the same."""
+    one = visible_author(db, access, author_id)
+    other = visible_author(db, access, body.other_id)
+    if one.id == other.id:
+        raise HTTPException(422, "the same person")
+    authors.apart(db, one.id, other.id)
+    db.commit()
+    return Response(status_code=204)

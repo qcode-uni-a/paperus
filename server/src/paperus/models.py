@@ -383,6 +383,8 @@ class Item(Record, Trashable, Base):
     differs from ``authors_linked``, its authors wait to be linked to
     people (``paperus.authors``)."""
     authors_linked: Mapped[str | None] = mapped_column(String(64))
+    authors_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """When its authors were looked up at OpenAlex (``paperus.authors``)."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )

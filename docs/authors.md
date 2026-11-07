@@ -33,20 +33,48 @@ Fixes by hand, which later automatic passes keep:
 
 - **Split** (author page → "Some are by someone else"): the chosen papers
   go to a new person of the same name; the two are remembered as different.
-- **Merge** ("Same person as…", or "The same person" next to a namesake):
-  the other person's papers come here. Refused for two different ids.
+- **Merge** ("Same person as…", or "The same person" next to a namesake
+  or a suggestion): the other person's papers come here. Refused for two
+  different ORCID iDs (OpenAlex sometimes has two profiles of one person:
+  those may be merged).
 - **Decide** a paper's author under "To check", or someone new.
+
+## Ids and affiliations from OpenAlex
+
+For papers with a DOI (or an arXiv ID), an hourly job asks OpenAlex for the
+paper's authorships, 50 papers to a request, about a thousand papers an
+hour, each paper once (`check_waiting`). Each author on the paper gets
+OpenAlex's author id, the ORCID iD, and the affiliation on that paper
+(institutions, else the raw affiliation string); then the paper's authors
+are linked again, so ids take effect: "M. Benito" with Mónica Benito's id
+is her, a Mónica Benito with another id is someone else. Only DOIs are
+sent (with the contact email, if one is set). Administration → Settings →
+Server → Authors turns it off.
+
+Affiliations belong to the paper, as they change over time; the author's
+page derives "where they were" from their papers, the newest one called
+"latest known".
+
+## Probably the same
+
+Manage → Authors suggests pairs of people who are probably one
+(`likely_the_same`): the same family name, given names that fit ("M." and
+"Mónica", "M. F." and "Mario Fernando"; not "Mónica" and "María"; a person
+known by a written-out given name is compared by that, not by initials
+also seen), not said to be different, not two different ORCID iDs; those
+with co-authors in common first. "The same person" merges them (the one
+with more papers stays), "Different people" remembers them as two.
 
 ## When it happens
 
 A paper's details stamp a key of its author names (`refresh_item`); a
 background job every 5 minutes links the papers whose names changed (at
 first, every paper) and removes people left without papers.
-Administration → Jobs → "Link authors now" starts it at once.
+Administration → Jobs → "Link authors now" starts it, and the OpenAlex
+lookup, at once.
 
-## Later (phase 2 and 3 of #35)
+## Later (phase 3 of #35)
 
-Author ids, ORCIDs and affiliations from OpenAlex for papers with a DOI;
-"probably the same" suggestions (same family name, compatible initials,
-shared co-authors); "This is me"; authors in smart-collection rules and
-for AI assistants.
+"This is me" (an account linked to its author record, or by ORCID from the
+OIDC login) and "My papers"; authors in smart-collection rules and for AI
+assistants; "other works" from OpenAlex, with Import.
