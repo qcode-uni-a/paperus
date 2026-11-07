@@ -21,8 +21,12 @@ function european(daysFromNow: number): string {
 
 test('dates in the European form, typed and shown', async ({ page }) => {
 	try {
+		// The saved settings first (they would reset a choice made before).
+		const loaded = page.waitForResponse((r) => r.url().endsWith('/api/admin/config'));
 		await page.goto('/admin/settings?open=server');
+		await loaded;
 		await page.getByRole('radio', { name: /^Europe/ }).check();
+		await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
 		await page.getByRole('button', { name: 'Save' }).click();
 		await expect(page.getByText('Server settings saved')).toBeVisible();
 

@@ -82,10 +82,11 @@
 	});
 
 	/** ``inLibrary``: preselect this library for a new collection;
-	 * ``asSmart``: start as a smart collection. */
-	export function open(inLibrary?: string, asSmart = false) {
+	 * ``asSmart``: start as a smart collection, with ``startRules`` if given
+	 * (e.g. the library's filter). */
+	export function open(inLibrary?: string, asSmart = false, startRules?: Rules) {
 		smart = collection ? isSmart(collection) : asSmart;
-		rules = structuredClone($state.snapshot(collection?.rules) ?? {});
+		rules = structuredClone($state.snapshot(startRules ?? collection?.rules) ?? {});
 		name = collection?.name ?? '';
 		description = collection?.description ?? '';
 		parent = collection ? (collection.parent_id ?? '') : (parentId ?? '');

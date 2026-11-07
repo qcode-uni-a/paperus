@@ -146,10 +146,15 @@ export const getAvatar = <ThrowOnError extends boolean = false>(options: Options
  * with a PDF whose details could not be found (all guessed from the file;
  * papers still being read, and notes or other files without a DOI to
  * find, are left out). ``tag`` (repeatable: items
- * with all of them) and ``collection`` (with its subcollections unless
- * ``nested=false``) filter the list, and ``title`` to items with all of its
- * words in their title (any case). ``X-Total-Count`` is the number of
- * matching items, for showing the total while paging.
+ * with all of them), the other rules of smart collections (``tag_any``,
+ * ``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,
+ * ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
+ * in ``authors``: the family name, and the given name's first letter if
+ * one is given) and ``collection`` (with its
+ * subcollections unless ``nested=false``) filter the list, and ``title``
+ * to items with all of its words in their title (any case).
+ * ``X-Total-Count`` is the number of matching items, for showing the total
+ * while paging.
  * ``since=N`` is for syncing:
  * every item changed after change number N, trashed or not, in change
  * order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header

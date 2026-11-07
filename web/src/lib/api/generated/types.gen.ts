@@ -4160,6 +4160,38 @@ export type ListItemsData = {
          */
         tag?: Array<string> | null;
         /**
+         * Tag Any
+         */
+        tag_any?: Array<string> | null;
+        /**
+         * Tag None
+         */
+        tag_none?: Array<string> | null;
+        /**
+         * Type
+         */
+        type?: Array<string> | null;
+        /**
+         * Published From
+         */
+        published_from?: string | null;
+        /**
+         * Published To
+         */
+        published_to?: string | null;
+        /**
+         * Owner
+         */
+        owner?: Array<string> | null;
+        /**
+         * Added Days
+         */
+        added_days?: number | null;
+        /**
+         * Author
+         */
+        author?: string | null;
+        /**
          * Collection
          */
         collection?: string | null;

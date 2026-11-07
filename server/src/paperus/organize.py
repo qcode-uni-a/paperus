@@ -244,7 +244,17 @@ def published_between(rules: Rules) -> tuple[date | None, date | None]:
 def matching(db: Session, collection: Collection) -> list[ColumnElement[bool]]:
     """Conditions on items for a smart collection's rules (who may see
     which item is up to the caller)."""
-    rules = Rules.model_validate(collection.rules or {})
+    conditions = rule_conditions(Rules.model_validate(collection.rules or {}))
+    owner = collection.library_id
+    group = db.scalar(select(Library.group_id).where(Library.id == owner))
+    if group is not None:
+        conditions.append(Item.library_id == collection.library_id)
+    return conditions
+
+
+def rule_conditions(rules: Rules) -> list[ColumnElement[bool]]:
+    """Conditions on items for these rules (a smart collection's, or the
+    library's filter)."""
 
     def tagged(tag_ids: list[uuid.UUID]) -> Select[uuid.UUID]:
         return select(ItemTag.item_id).where(ItemTag.tag_id.in_(tag_ids))
@@ -268,10 +278,6 @@ def matching(db: Session, collection: Collection) -> list[ColumnElement[bool]]:
     if rules.added_days is not None:
         since = datetime.now(UTC) - timedelta(days=rules.added_days)
         conditions.append(Item.created_at >= since)
-    owner = collection.library_id
-    group = db.scalar(select(Library.group_id).where(Library.id == owner))
-    if group is not None:
-        conditions.append(Item.library_id == collection.library_id)
     return conditions
 
 

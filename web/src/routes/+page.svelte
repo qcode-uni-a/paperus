@@ -10,6 +10,8 @@
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { shortAuthors } from '#lib/format.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
+	import LibraryFilter from '#lib/LibraryFilter.svelte';
+	import { fromAddress, isEmpty, toQuery } from '#lib/libraryFilter.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	const PAGE = 50;
@@ -88,12 +90,11 @@
 
 	let total = $state<number | null>(null);
 
-	// Filters from the address: ?collection=…, ?tag=… (several: all of them).
+	// Filters from the address: the rules of smart collections (?tag=…,
+	// several: all of them), an author (LibraryFilter).
 	const collectionId = $derived(page.url.searchParams.get('collection'));
-	const tagIds = $derived(page.url.searchParams.getAll('tag'));
-	const tagNames = $derived(
-		tagIds.map((id) => organize.tags.find((t) => t.id === id)?.name ?? '…')
-	);
+	const filter = $derived(fromAddress(page.url.searchParams));
+	const filtered = $derived(!isEmpty(filter));
 
 	// Collections have their own pages; older links still work.
 	$effect(() => {
@@ -117,7 +118,7 @@
 				limit,
 				before,
 				collection: collectionId ?? undefined,
-				tag: tagIds.length ? tagIds : undefined
+				...toQuery(filter)
 			}
 		});
 		if (request !== latest) return;
@@ -164,10 +165,11 @@
 		return () => observer.disconnect();
 	}
 
-	// The list for the current collection or tags (reloads when they change).
+	// The list for the current filter (reloads when it changes).
+	const filterKey = $derived(JSON.stringify(toQuery(filter)));
 	$effect(() => {
 		void collectionId;
-		void tagIds.join();
+		void filterKey;
 		untrack(() => loadItems());
 	});
 
@@ -206,7 +208,7 @@
 </script>
 
 <div class="library">
-	{#if !searched && !tagIds.length}<GettingStarted bind:shown={starting} />{/if}
+	{#if !searched && !filtered}<GettingStarted bind:shown={starting} />{/if}
 	{#if searched}
 		<div class="results-head row">
 			<h1 class="count">
@@ -272,9 +274,9 @@
 				{/each}
 			</ul>
 		{/if}
-	{:else if items.length === 0 && tagIds.length}
-		{@render filterHead()}
-		<p class="muted">No items with these tags.</p>
+	{:else if items.length === 0 && filtered}
+		<LibraryFilter count={heading} />
+		<p class="muted">No papers match the filter.</p>
 	{:else if items.length === 0 && starting}
 		<!-- The getting-started steps say how to add papers. -->
 	{:else if items.length === 0}
@@ -286,11 +288,7 @@
 			</p>
 		</div>
 	{:else}
-		{@render filterHead()}
-		<h1 class="count">
-			{(total ?? items.length).toLocaleString()}
-			{(total ?? items.length) === 1 ? 'item' : 'items'}
-		</h1>
+		<LibraryFilter count={heading} />
 		<ul class="items">
 			{#each items as item (item.id)}<ItemRow {item} />{/each}
 		</ul>
@@ -302,13 +300,11 @@
 	{/if}
 </div>
 
-{#snippet filterHead()}
-	{#if tagIds.length}
-		<div class="filter-head">
-			<h1>Tagged {tagNames.join(' and ')}</h1>
-			<a href={resolve('/')}>Show all items</a>
-		</div>
-	{/if}
+{#snippet heading()}
+	<h1 class="count listed">
+		{(total ?? items.length).toLocaleString()}
+		{(total ?? items.length) === 1 ? 'item' : 'items'}
+	</h1>
 {/snippet}
 
 <style>
@@ -323,15 +319,6 @@
 	.results-head .count {
 		margin: 0;
 	}
-	.filter-head {
-		display: grid;
-		gap: 6px;
-		margin-top: 8px;
-	}
-	.filter-head h1 {
-		margin: 0;
-		font-size: var(--step-2);
-	}
 	.count {
 		font-size: var(--step-0);
 		font-family: var(--sans);
@@ -339,6 +326,10 @@
 		color: var(--muted);
 		margin: 8px 0 -12px;
 		letter-spacing: 0;
+	}
+	/* Beside the Filter button. */
+	.count.listed {
+		margin: 0;
 	}
 	ul {
 		margin: 0;

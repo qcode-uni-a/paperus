@@ -18,19 +18,26 @@ test('Back from a paper returns to the same place in the library', async ({ page
 		await page.waitForTimeout(200);
 	}
 	await row.scrollIntoViewIfNeeded();
-	const before = await page.evaluate(() => window.scrollY);
-	expect(before).toBeGreaterThan(1000);
+	const top = async () => (await row.boundingBox())?.y ?? -1;
+	const before = await top();
+	expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
 
 	await row.click();
 	await expect(page).toHaveURL(/\/items\//);
+	// Papers added meanwhile (at the top) do not move the place.
+	for (const n of [121, 122, 123]) {
+		const added = await page.request.post('/api/items', {
+			data: { metadata: { title: `${word} paper ${n}` } }
+		});
+		expect(added.status()).toBe(201);
+	}
 	await page.goBack();
 	await expect(row).toBeInViewport();
-	const after = await page.evaluate(() => window.scrollY);
-	expect(Math.abs(after - before)).toBeLessThan(200);
+	expect(Math.abs((await top()) - before)).toBeLessThan(40);
 
 	// The library opened anew (not Back) starts at the top.
 	await page.getByRole('link', { name: `${word} paper 30`, exact: true }).click();
 	await page.goto('/');
-	await expect(page.getByRole('link', { name: `${word} paper 120`, exact: true })).toBeVisible();
+	await expect(page.getByRole('link', { name: `${word} paper 123`, exact: true })).toBeVisible();
 	expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

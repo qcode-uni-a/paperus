@@ -61,7 +61,7 @@ test('edit the title and the tags', async ({ page }) => {
 	await page.reload();
 	await expect(page.getByRole('heading', { level: 1 })).toHaveText(newTitle);
 	await page.getByRole('link', { name: tag, exact: true }).click();
-	await expect(page.getByRole('heading', { name: `Tagged ${tag}` })).toBeVisible();
+	await expect(page.getByText(`Papers tagged ${tag}.`)).toBeVisible();
 	await expect(page.getByRole('link', { name: newTitle })).toBeVisible();
 	await expect(page.getByRole('heading', { name: '1 item' })).toBeVisible();
 });

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Filter the library**: a Filter button beside the number of papers
+  opens the rules of smart collections (with all, any or none of some
+  tags or keywords, types, publication dates, owners, recently added);
+  what is filtered by is said in a sentence above the list, with "Clear
+  filter" and "Save as smart collection". Tags in the list and authors
+  (in the list and on a paper's page) are links to their papers; on
+  Manage → Tags, the number of papers is. The filter lives in the
+  address, so Back and shared links keep it. The list API takes the same
+  rules and `author` ("Family, Given": the family name and first letter).
+- **A paper's journal** is on its own line below the authors.
+- **Back to a list** finds its place by the paper that was at the top of
+  the window, so papers added meanwhile do not move it.
 - **Why no open copy was found**, in plain words with what to do: after
   "Download all open-access copies", the papers without one are listed
   with the reason (no open copy known, the site refused, a login page

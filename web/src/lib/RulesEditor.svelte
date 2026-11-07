@@ -31,7 +31,9 @@
 		if (!tag) return '?';
 		// Tags of the same name in several libraries: say whose.
 		const twins = organize.tags.filter((t) => t.name === tag.name).length > 1;
-		return twins ? `${tag.name} (${libraryName(tag.library_id)})` : tag.name;
+		const name = twins ? `${tag.name} (${libraryName(tag.library_id)})` : tag.name;
+		// Only on papers from their details: a keyword.
+		return !tag.sources?.manual && tag.sources?.automatic ? `${name} (keyword)` : name;
 	}
 
 	function addTag(rule: TagRule, id: string) {

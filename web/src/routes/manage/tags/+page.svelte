@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { deleteTag, errorMessage, removeKeywords } from '#lib/api/client.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 	import IconButton from '#lib/IconButton.svelte';
@@ -239,7 +240,11 @@
 						{#if isShared(tag.library_id)}<SharedIcon size={15} owner={tag.library_id} />{/if}
 						{#if tag.description}<p>{tag.description}</p>{/if}
 					</td>
-					<td class="number">{tag.count}</td>
+					<td class="number">
+						{#if tag.count}<a href="{resolve('/')}?tag={tag.id}" title="Papers tagged {tag.name}"
+								>{tag.count}</a
+							>{:else}0{/if}
+					</td>
 					<td class="wide muted">{sources(tag)}</td>
 					<td class="wide muted">
 						{#if tag.last_used}

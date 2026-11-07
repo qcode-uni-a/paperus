@@ -312,11 +312,13 @@
 			{/if}
 		</div>
 		<p class="muted">
-			{item.authors
-				.map(fullName)
-				.join(', ')}{#if item.year}{' '}({item.year}){/if}{#if item.container_title}.
-				<em>{item.container_title}</em>{/if}
+			{#each item.authors as author, i (i)}{i ? ', ' : ''}<a
+					class="person"
+					href="{resolve('/')}?{new URLSearchParams({ author })}"
+					title="Papers by {fullName(author)} in the library">{fullName(author)}</a
+				>{/each}{#if item.year}{' '}({item.year}){/if}
 		</p>
+		{#if item.container_title}<p class="muted journal"><em>{item.container_title}</em></p>{/if}
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
@@ -525,6 +527,17 @@
 {/if}
 
 <style>
+	.journal {
+		margin-top: -0.3em;
+	}
+	.person {
+		color: inherit;
+		text-decoration: none;
+	}
+	.person:hover {
+		color: var(--royal);
+		text-decoration: underline;
+	}
 	.web {
 		display: grid;
 		gap: 8px;

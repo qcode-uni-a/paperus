@@ -1,13 +1,13 @@
 """Items and their versions: adding by identifier or by hand, reading."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal, Self
 
 import httpx2
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import delete, func, select
+from sqlalchemy import TextClause, Uuid, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
@@ -24,7 +24,6 @@ from paperus.models import (
     File,
     FileRole,
     Item,
-    ItemTag,
     ItemView,
     MetadataSource,
     TextStatus,
@@ -32,7 +31,7 @@ from paperus.models import (
     Version,
     VersionKind,
 )
-from paperus.organize import item_ids_in
+from paperus.organize import Rules, item_ids_in, rule_conditions
 from paperus.similar import similar_items
 from paperus.system import load_config, vectors_in_use
 
@@ -525,6 +524,32 @@ def unsorted_conditions() -> list[ColumnElement[bool]]:
     ]
 
 
+# Papers with an author of this family name (or literal name), and the
+# given name's first letter: in any version's details, or the paper's edits.
+_BY_AUTHOR = """
+    SELECT {owner} FROM {table} source, jsonb_array_elements(
+        CASE WHEN jsonb_typeof(source.{details} -> 'author') = 'array'
+        THEN source.{details} -> 'author' ELSE '[]'::jsonb END) person
+    WHERE lower(coalesce(person ->> 'family', person ->> 'literal')) = :{table}_family
+    AND (:{table}_initial = '' OR lower(left(person ->> 'given', 1)) = :{table}_initial)
+"""
+
+
+def by_author(name: str) -> ColumnElement[bool]:
+    """Papers by this author: "Family, Given" (as ``ItemOut.authors``)."""
+    family, _, given = name.partition(",")
+    family, initial = family.strip().lower(), given.strip()[:1].lower()
+
+    def found(owner: str, table: str, details: str) -> TextClause:
+        return text(
+            _BY_AUTHOR.format(owner=owner, table=table, details=details)
+        ).bindparams(**{f"{table}_family": family, f"{table}_initial": initial})
+
+    in_versions = found("item_id", "versions", "csl").columns(item_id=Uuid)
+    edited = found("id", "items", "overrides").columns(id=Uuid)
+    return Item.id.in_(in_versions) | Item.id.in_(edited)
+
+
 @router.get("/api/items")
 def list_items(
     response: Response,
@@ -536,6 +561,14 @@ def list_items(
     archived: bool = False,
     since: Annotated[int | None, Query(ge=0)] = None,
     tag: Annotated[list[uuid.UUID] | None, Query()] = None,
+    tag_any: Annotated[list[uuid.UUID] | None, Query()] = None,
+    tag_none: Annotated[list[uuid.UUID] | None, Query()] = None,
+    type: Annotated[list[str] | None, Query()] = None,
+    published_from: date | None = None,
+    published_to: date | None = None,
+    owner: Annotated[list[uuid.UUID] | None, Query()] = None,
+    added_days: Annotated[int | None, Query(ge=1, le=36500)] = None,
+    author: Annotated[str | None, Query(max_length=300)] = None,
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
@@ -558,10 +591,15 @@ def list_items(
     with a PDF whose details could not be found (all guessed from the file;
     papers still being read, and notes or other files without a DOI to
     find, are left out). ``tag`` (repeatable: items
-    with all of them) and ``collection`` (with its subcollections unless
-    ``nested=false``) filter the list, and ``title`` to items with all of its
-    words in their title (any case). ``X-Total-Count`` is the number of
-    matching items, for showing the total while paging.
+    with all of them), the other rules of smart collections (``tag_any``,
+    ``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,
+    ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
+    in ``authors``: the family name, and the given name's first letter if
+    one is given) and ``collection`` (with its
+    subcollections unless ``nested=false``) filter the list, and ``title``
+    to items with all of its words in their title (any case).
+    ``X-Total-Count`` is the number of matching items, for showing the total
+    while paging.
     ``since=N`` is for syncing:
     every item changed after change number N, trashed or not, in change
     order; ``limit`` and ``before`` do not apply. The ``Last-Change`` header
@@ -587,10 +625,20 @@ def list_items(
         conditions.append(Item.archived_at.is_not(None))
     elif not trashed and not id:
         conditions.append(Item.archived_at.is_(None))
-    for tag_id in tag or []:
-        conditions.append(
-            Item.id.in_(select(ItemTag.item_id).where(ItemTag.tag_id == tag_id))
+    conditions += rule_conditions(
+        Rules(
+            tags_all=tag or [],
+            tags_any=tag_any or [],
+            tags_none=tag_none or [],
+            types=type or [],
+            published_from=published_from,
+            published_to=published_to,
+            owners=owner or [],
+            added_days=added_days,
         )
+    )
+    if author and author.strip():
+        conditions.append(by_author(author))
     if collection is not None:
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():

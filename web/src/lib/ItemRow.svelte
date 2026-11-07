@@ -3,7 +3,7 @@
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
-	import { shortAuthors, typeName } from '#lib/format.ts';
+	import { fullName, shortAuthors, typeName } from '#lib/format.ts';
 	import { isShared } from '#lib/organize.svelte.ts';
 	import FileIcon from '#lib/FileIcon.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
@@ -29,9 +29,11 @@
 	} = $props();
 
 	const authors = $derived(shortAuthors(item.authors));
+	// The names shown (as shortAuthors: up to three, else two and "et al.").
+	const shown = $derived(item.authors.length <= 3 ? item.authors : item.authors.slice(0, 2));
 </script>
 
-<li out:leave class:done>
+<li out:leave class:done data-place={item.id}>
 	<span class="corner"
 		><FileIcon files={item.files ?? []} />{#if isShared(item.library_id)}<SharedIcon
 				owner={item.library_id}
@@ -41,7 +43,15 @@
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}><Title text={item.title} /></a>
 	<p class="reference">
 		{#if authors || item.year || item.container_title}<span
-				>{#if authors}{authors}{/if}{#if item.year}{authors
+				>{#if authors}{#each shown as author, i (i)}{i === 0
+							? ''
+							: i === item.authors.length - 1
+								? ' and '
+								: ', '}<a
+							class="person"
+							href="{resolve('/')}?{new URLSearchParams({ author })}"
+							title="Papers by {fullName(author)}">{author.split(',')[0].trim()}</a
+						>{/each}{#if item.authors.length > 3}{' '}et al.{/if}{/if}{#if item.year}{authors
 						? ' '
 						: ''}({item.year}){/if}{#if item.container_title}{authors || item.year ? '. ' : ''}<em
 						>{item.container_title}</em
@@ -49,9 +59,11 @@
 			>{/if}
 		<span class="badge">{typeName(item.type)}</span>
 
-		{#each item.tags.filter((t) => t.source !== 'automatic') as tag (tag.id)}<span
+		{#each item.tags.filter((t) => t.source !== 'automatic') as tag (tag.id)}<a
 				class="tag"
-				data-tag-color={tag.color}>{tag.name}</span
+				href="{resolve('/')}?tag={tag.id}"
+				title="Papers tagged {tag.name}"
+				data-tag-color={tag.color}>{tag.name}</a
 			>{/each}
 		{#if item.processing}<span class="badge reading">Looking up details…</span>{/if}
 	</p>
@@ -133,6 +145,20 @@
 		border: 1px solid var(--tag-bg, var(--rule));
 		background: var(--tag-bg, none);
 		color: var(--tag-ink, var(--muted));
+	}
+	a.tag {
+		text-decoration: none;
+	}
+	a.tag:hover {
+		border-color: var(--royal);
+	}
+	.person {
+		color: inherit;
+		text-decoration: none;
+	}
+	.person:hover {
+		color: var(--royal);
+		text-decoration: underline;
 	}
 	.reading {
 		color: var(--royal);
