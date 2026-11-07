@@ -21,6 +21,7 @@ from paperus.models import Identifier, Item, Version, VersionKind
 from tests.conftest import FakeDOIRegistry, FakeML
 from tests.pdfs import make_pdf
 from tests.people import Person
+from tests.test_mcp import ALL, Assistant, ToolFailed, token
 
 PREPRINT = make_pdf([["Phonon-coupled hole-spin qubits, the preprint"]])
 JOURNAL = make_pdf([["Phonon-coupled hole-spin qubits, as published"]])
@@ -330,3 +331,62 @@ def test_a_journal_version_known_only_by_its_arxiv_doi() -> None:
     assert missing.journal_version(item) is version
     # No journal DOI to ask for the journal's copy with.
     assert missing.journal_doi(item) is None
+
+
+def test_an_assistant_can_do_what_the_page_does(
+    site: TestClient, db: Session, doi_registry: FakeDOIRegistry
+) -> None:
+    """Everything of Manage → Missing through the MCP tools: both lists and
+    the papers needing no file, download all with its progress, and the
+    saved web pages next to a PDF."""
+    published(doi_registry)
+    ada = Person(site, db, "ada")
+    ai = Assistant(site, token(ada, *ALL))
+    on_arxiv = ada.post(
+        "/api/items",
+        json={
+            "metadata": {"title": "Preprint"},
+            "identifiers": [{"scheme": "arxiv", "value": ARXIV}],
+        },
+    ).json()
+    book = ada.add("A book on the shelf")
+    ai.call("mark_file_not_needed", paper_ids=[book["id"]])
+    assert [p["title"] for p in ai.call("list_missing_pdfs", section="not_needed")] == [
+        "A book on the shelf"
+    ]
+    [waiting] = ai.call("list_missing_pdfs")
+    # Never tried yet: no "last_tried" (empty fields are left out).
+    assert waiting["title"] == "Preprint" and "last_tried" not in waiting
+
+    queued = ai.call("download_all_open_access")
+    assert (queued["queued"], queued["paper_ids"]) == (1, [on_arxiv["id"]])
+
+    def progress() -> dict[str, int]:
+        result: dict[str, int] = ai.call(
+            "open_access_progress",
+            paper_ids=queued["paper_ids"],
+            started_at=queued["started_at"],
+        )
+        return result
+
+    assert progress() == {"papers": 1, "tried": 0, "found": 0}
+    ai.call("download_open_access", paper_id=on_arxiv["id"])  # as the job would
+    assert progress() == {"papers": 1, "tried": 1, "found": 1}
+    assert ai.call("list_missing_pdfs") == []
+    with pytest.raises(ToolFailed, match="started_at"):
+        ai.call("open_access_progress", paper_ids=[], started_at="yesterday")
+
+    # A saved web page next to the PDF just downloaded.
+    response = site.post(
+        f"/api/items/{on_arxiv['id']}/files",
+        files={"upload": ("2504.html", b"<html>abs page</html>", "text/html")},
+        data={"role": "supplementary"},
+        headers=ada.headers,
+    )
+    assert response.status_code == 201, response.text
+    checkup = ai.call("library_checkup")
+    assert checkup["web_page_copies_next_to_a_pdf"]["count"] == 1
+    copies = ai.call("list_web_page_copies")
+    assert (copies["count"], copies["copies"][0]["file"]) == (1, "2504.html")
+    assert ai.call("trash_web_page_copies") == {"trashed": 1}
+    assert ai.call("list_web_page_copies")["count"] == 0

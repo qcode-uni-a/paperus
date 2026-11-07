@@ -4,14 +4,15 @@ file, or with only their preprint's)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, func, or_, select
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import Session, aliased
 
 from paperus import duplicates, library, missing, system
+from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import PDF, FileOut, file_out, unreadable
 from paperus.api.items import ItemOut, get_readable_item, item_out, unsorted_conditions
@@ -67,7 +68,7 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
         unreadable=len(unreadable(db, access)),
         missing=_count(db, access, *missing.conditions("file")),
         missing_journal=_count(db, access, *missing.conditions("journal")),
-        snapshots=len(_snapshots(db, access)),
+        snapshots=len(web_page_copies(db, access)),
     )
 
 
@@ -76,7 +77,7 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
 SNAPSHOT_TYPES = ("text/html", "application/xhtml+xml")
 
 
-def _snapshots(db: DB, access: CurrentAccess) -> list[File]:
+def web_page_copies(db: Session, access: Access) -> list[File]:
     """Saved web pages next to a PDF of the same version, on papers the
     person may change."""
     pdf = aliased(File)
@@ -109,7 +110,7 @@ class Trashed(BaseModel):
 def trash_snapshots(db: DB, access: CurrentAccess) -> Trashed:
     """Move saved web pages that sit next to a PDF to the trash (they can
     be restored from there)."""
-    files = _snapshots(db, access)
+    files = web_page_copies(db, access)
     for file in files:
         library.trash(file, access.user.id)
     db.commit()
@@ -247,7 +248,19 @@ def download_all_open_access(
     """Try to download open-access copies for all papers of the section
     that the person may change, in the background (not those tried in the
     last day)."""
-    email = system.load_config(db, request.app.state.settings).contact_email
+    queued, started_at = queue_all_open_access(db, access, request.app.state, section)
+    return Queued(papers=len(queued), item_ids=queued, started_at=started_at)
+
+
+def queue_all_open_access(
+    db: Session,
+    access: Access,
+    state: Any,  # noqa: ANN401 (Starlette's app.state)
+    section: missing.Section,
+) -> tuple[list[uuid.UUID], datetime]:
+    """Queue a download for every paper of the section the person may
+    change and that was not tried in the last day; those papers and when."""
+    email = system.load_config(db, state.settings).contact_email
     recently = datetime.now(UTC) - RETRY_AFTER
     candidates = db.scalars(
         select(Item).where(
@@ -263,9 +276,9 @@ def download_all_open_access(
     queued: list[uuid.UUID] = []
     for item in candidates:
         if access.can_write_item(item) and _possible(item, section == "journal", email):
-            queue_open_access(request.app.state.jobs, item.id, access.user.id, section)
+            queue_open_access(state.jobs, item.id, access.user.id, section)
             queued.append(item.id)
-    return Queued(papers=len(queued), item_ids=queued, started_at=started_at)
+    return queued, started_at
 
 
 class ProgressRequest(BaseModel):
@@ -287,12 +300,25 @@ def open_access_progress(
 ) -> Progress:
     """How far a "Download all" has got: the papers tried since it started,
     and how many of them have their file now."""
+    tried, found = progress_of(db, access, body.item_ids, body.started_at, body.section)
+    return Progress(tried=tried, found=found)
+
+
+def progress_of(
+    db: Session,
+    access: Access,
+    item_ids: list[uuid.UUID],
+    started_at: datetime,
+    section: missing.Section,
+) -> tuple[int, int]:
+    """Of these papers: how many were tried since ``started_at``, and how
+    many of those have their file now."""
     items = list(
         db.scalars(
             select(Item).where(
-                Item.id.in_(body.item_ids),
+                Item.id.in_(item_ids),
                 access.item_filter(access.readable),
-                Item.open_access_tried_at >= body.started_at,
+                Item.open_access_tried_at >= started_at,
             )
         ).unique()
     )
@@ -300,13 +326,11 @@ def open_access_progress(
         db.scalars(
             select(Item.id).where(
                 Item.id.in_([item.id for item in items]),
-                *missing.conditions(body.section),
+                *missing.conditions(section),
             )
         )
     )
-    return Progress(
-        tried=len(items), found=sum(item.id not in still_missing for item in items)
-    )
+    return len(items), sum(item.id not in still_missing for item in items)
 
 
 class FileWanted(BaseModel):

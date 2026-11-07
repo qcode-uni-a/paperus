@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **AI assistants can do all of Manage → Missing**: besides listing and
+  downloading one paper, download all of a section in the background and
+  follow its progress, list the papers marked as needing no file, and
+  find and trash saved web pages next to a PDF (`library_checkup` counts
+  them). Only "Get with the extension" stays with the person (it uses
+  their browser and access).
 - **Download all open-access copies** (Manage → Missing) shows its
   progress: how many papers were tried and found, with a bar; found ones
   fold away, a message sums up at the end, and if nothing moves for a

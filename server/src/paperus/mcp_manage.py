@@ -22,7 +22,12 @@ from paperus import organize as organizing
 from paperus.access import Access
 from paperus.api.files import read_again, replace_with_open_access, unreadable
 from paperus.api.items import unsorted_conditions
-from paperus.api.manage import manage_counts
+from paperus.api.manage import (
+    manage_counts,
+    progress_of,
+    queue_all_open_access,
+    web_page_copies,
+)
 from paperus.identifiers import (
     InvalidIdentifier,
     Scheme,
@@ -144,6 +149,10 @@ def register(
                         "count": counts.missing_journal,
                         "tools": "list_missing_pdfs(section='journal'), "
                         "download_open_access(journal=true)",
+                    },
+                    "web_page_copies_next_to_a_pdf": {
+                        "count": counts.snapshots,
+                        "tools": "list_web_page_copies, trash_web_page_copies",
                     },
                     "trash": {
                         "count": trash or 0,
@@ -344,17 +353,24 @@ def register(
         ctx: Context, section: str = "file", limit: int = 30
     ) -> CallToolResult:
         """Papers without a PDF (section="file"), or published papers with
-        only their preprint's PDF (section="journal"); whether an open copy
-        may be found, and the last try's result. download_open_access gets
-        one; mark_file_not_needed takes a paper off the list (a web page, a
-        book on the shelf). PDFs behind a login: the person can get them
-        with the paperus browser extension (Manage → Missing)."""
-        which = _section(section)
+        only their preprint's PDF (section="journal"), or those marked as
+        needing no file (section="not_needed", to undo that); whether an
+        open copy may be found, and the last try (when, and why it found
+        none). download_open_access gets one, download_all_open_access all
+        of a section in the background; mark_file_not_needed takes a paper
+        off the list (a web page, a book on the shelf). PDFs behind a
+        login: the person can get them with the paperus browser extension
+        (Manage → Missing)."""
+        hidden = section == "not_needed"
+        which = "file" if hidden else _section(section)
         with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
             email = load_config(db, state.settings).contact_email
+            conditions = (
+                missing.hidden_conditions() if hidden else missing.conditions(which)
+            )
             items = db.scalars(
                 select(Item)
-                .where(access.item_filter(), *missing.conditions(which))
+                .where(access.item_filter(), *conditions)
                 .order_by(Item.id.desc())
                 .limit(min(limit, MAX_LIST))
             ).unique()
@@ -379,6 +395,9 @@ def register(
                             None,
                         ),
                         "open_copy_possible": possible,
+                        "last_tried": item.open_access_tried_at.isoformat()
+                        if item.open_access_tried_at
+                        else None,
                         "last_try": item.open_access_error,
                     }
                 )
@@ -425,6 +444,77 @@ def register(
                 changed.append(str(item.id))
             db.commit()
             return json({"changed": changed, "file_needed": needed})
+
+    @mcp.tool(annotations=FETCHES)
+    def download_all_open_access(ctx: Context, section: str = "file") -> CallToolResult:
+        """Look for open copies of all papers of a section ("file": without
+        a PDF; "journal": with only their preprint's) in the background, as
+        Manage → Missing → "Download all" does; papers tried in the last day
+        are left out. Returns the papers queued and when; follow with
+        open_access_progress. Ask the person first."""
+        which = _section(section)
+        with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
+            queued, started_at = queue_all_open_access(db, access, state, which)
+            return json(
+                {
+                    "queued": len(queued),
+                    "paper_ids": [str(item_id) for item_id in queued],
+                    "started_at": started_at.isoformat(),
+                }
+            )
+
+    @mcp.tool(annotations=READ)
+    def open_access_progress(
+        paper_ids: list[str], started_at: str, ctx: Context, section: str = "file"
+    ) -> CallToolResult:
+        """How far download_all_open_access has got: of these papers, how
+        many were tried since started_at and how many got their PDF. If
+        none moves for minutes, the server's worker may not be running."""
+        which = _section(section)
+        try:
+            since = datetime.fromisoformat(started_at)
+        except ValueError as error:
+            raise ToolError(
+                "started_at as download_all_open_access gave it."
+            ) from error
+        ids = [parse_id(paper_id) for paper_id in paper_ids[:10_000]]
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, _):
+            tried, found = progress_of(db, access, ids, since, which)
+            return json({"papers": len(ids), "tried": tried, "found": found})
+
+    @mcp.tool(annotations=READ)
+    def list_web_page_copies(ctx: Context, limit: int = 30) -> CallToolResult:
+        """Web pages a reference manager saved with a paper (Zotero's
+        "snapshots") that sit next to a PDF of the same version: they add
+        nothing but noise in search. trash_web_page_copies moves them all to
+        the trash."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            files = web_page_copies(db, access)
+            return json(
+                {
+                    "count": len(files),
+                    "copies": [
+                        {
+                            **brief(file.version.item, access, base),
+                            "file_id": str(file.id),
+                            "file": file.filename,
+                        }
+                        for file in files[: min(limit, MAX_LIST)]
+                    ],
+                }
+            )
+
+    @mcp.tool(annotations=WRITE)
+    def trash_web_page_copies(ctx: Context) -> CallToolResult:
+        """Move all saved web pages that sit next to a PDF to the trash (as
+        Manage → Missing offers; restorable from the trash). Ask the person
+        first."""
+        with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
+            files = web_page_copies(db, access)
+            for file in files:
+                library.trash(file, access.user.id)
+            db.commit()
+            return json({"trashed": len(files)})
 
     @mcp.tool(annotations=WRITE)
     def archive_papers(
