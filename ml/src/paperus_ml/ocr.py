@@ -17,17 +17,18 @@ from typing import Any
 import cv2
 import numpy as np
 import numpy.typing as npt
-import onnxruntime
 import yaml
 
 from paperus_ml import metrics
-from paperus_ml.device import CUDA, Device, providers, run_options
-from paperus_ml.encoder import session_options
+from paperus_ml.device import Device, run_options
+from paperus_ml.encoder import open_session
 from paperus_ml.models import ModelSpec
 
 # OpenCV's arrays (8-bit images, float corners), loosely typed as OpenCV's are.
 Image = npt.NDArray[Any]
 Box = npt.NDArray[Any]
+Bounds = tuple[int, int, int, int]
+"""Left, top, right, bottom in pixels of the image."""
 
 # Finding lines: the page scaled so its shorter side has at least this many
 # pixels and its longer side at most that many (multiples of 32).
@@ -55,8 +56,7 @@ class NotAnImage(ValueError):
 class Line:
     text: str
     score: float
-    box: tuple[int, int, int, int]
-    """Left, top, right, bottom in pixels of the image."""
+    box: Bounds
 
 
 @dataclass
@@ -89,19 +89,13 @@ class Reader:
         assert spec.detector is not None
         self.spec = spec
         self.max_batch_lines = max_batch_texts
-        options = session_options(intra_op_threads)
-        self.detector = onnxruntime.InferenceSession(
-            str(model_dir / spec.detector.folder / spec.detector.onnx_file),
-            sess_options=options,
-            providers=providers(device),
+        self.detector, _ = open_session(
+            model_dir / spec.detector.folder / spec.detector.onnx_file,
+            intra_op_threads,
+            device,
         )
-        self.recognizer = onnxruntime.InferenceSession(
-            str(model_dir / spec.onnx_file),
-            sess_options=options,
-            providers=providers(device),
-        )
-        self.device: Device = (
-            "cuda" if self.recognizer.get_providers()[0] == CUDA else "cpu"
+        self.recognizer, self.device = open_session(
+            model_dir / spec.onnx_file, intra_op_threads, device
         )
         self.run_options = run_options(self.device)
         self.characters = characters(model_dir, spec)
@@ -199,15 +193,12 @@ def _boxes(
     boxes = []
     for contour in contours[:MAX_LINES]:
         (cx, cy), (w, h), angle = cv2.minAreaRect(contour)
-        if min(w, h) < 3:
+        if min(w, h) < 3 or _region_score(probabilities, contour) < BOX_THRESH:
             continue
-        if _region_score(probabilities, contour) < BOX_THRESH:
-            continue
-        # Growing a rectangle by d = area * ratio / perimeter on each side.
+        # Growing a rectangle by d = area * ratio / perimeter on each side
+        # (at least 1 pixel, as both sides are at least 3).
         grow = w * h * UNCLIP_RATIO / (2 * (w + h))
         corners = cv2.boxPoints(((cx, cy), (w + 2 * grow, h + 2 * grow), angle))
-        if min(w, h) + 2 * grow < 5:
-            continue
         corners[:, 0] = np.clip(corners[:, 0] * scale_x, 0, None)
         corners[:, 1] = np.clip(corners[:, 1] * scale_y, 0, None)
         boxes.append(_clockwise(corners))
@@ -253,7 +244,7 @@ def _crop(image: Image, box: Box) -> Image:
     return np.ascontiguousarray(crop)
 
 
-def _bounds(box: Box) -> tuple[int, int, int, int]:
+def _bounds(box: Box) -> Bounds:
     return (
         int(box[:, 0].min()),
         int(box[:, 1].min()),
@@ -275,9 +266,6 @@ def _straightened(boxes: list[Box], center: tuple[float, float]) -> list[Box]:
         return boxes
     turn = cv2.getRotationMatrix2D(center, math.degrees(tilt), 1.0)
     return [cv2.transform(box[None], turn)[0] for box in boxes]
-
-
-Bounds = tuple[int, int, int, int]
 
 
 def reading_order(boxes: list[Bounds], page_width: int) -> list[list[int]]:

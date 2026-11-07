@@ -78,3 +78,11 @@ def test_one_batch_at_a_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     for thread in threads:
         thread.join()
     assert most == 1
+
+
+def test_models_taking_token_types(tmp_path: Path) -> None:
+    plain = Encoder(write_tiny_model(tmp_path), tmp_path)
+    vectors = plain.embed(["drought rivers", "rain"], "passage")
+    with_types = Encoder(write_tiny_model(tmp_path, token_types=True), tmp_path)
+    assert "token_type_ids" in with_types.input_names
+    assert np.allclose(with_types.embed(["drought rivers", "rain"], "passage"), vectors)

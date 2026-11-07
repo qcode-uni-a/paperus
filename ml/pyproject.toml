@@ -49,6 +49,13 @@ testpaths = ["tests"]
 filterwarnings = ["error"]
 markers = ["download: downloads a real model (set PAPERUS_ML_TEST_DOWNLOAD=1)"]
 
+[tool.coverage.run]
+source = ["paperus_ml"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+
 [dependency-groups]
 dev = [
     "httpx2>=2.16.0",

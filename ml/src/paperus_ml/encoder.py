@@ -28,6 +28,46 @@ def session_options(intra_op_threads: int) -> onnxruntime.SessionOptions:
     return options
 
 
+def open_session(
+    path: Path, intra_op_threads: int, device: Device
+) -> tuple[onnxruntime.InferenceSession, Device]:
+    """The model file in ONNX Runtime, and where it actually runs: ONNX
+    Runtime falls back to the CPU when the GPU cannot be used."""
+    session = onnxruntime.InferenceSession(
+        str(path),
+        sess_options=session_options(intra_op_threads),
+        providers=providers(device),
+    )
+    return session, "cuda" if session.get_providers()[0] == CUDA else "cpu"
+
+
+def open_tokenizer(path: Path, max_tokens: int) -> Tokenizer:
+    """Truncating to what the model reads; padding is done per batch."""
+    tokenizer = Tokenizer.from_file(str(path))
+    tokenizer.enable_truncation(max_tokens)
+    tokenizer.no_padding()
+    return tokenizer
+
+
+def model_inputs(
+    encodings: Sequence[Encoding], input_names: set[str]
+) -> dict[str, npt.NDArray[np.int64]]:
+    """Token ids padded to the longest, the attention mask, and the token
+    types (query or passage) for models that take them."""
+    width = max(len(e.ids) for e in encodings)
+    ids = np.zeros((len(encodings), width), dtype=np.int64)
+    mask = np.zeros_like(ids)
+    types = np.zeros_like(ids)
+    for row, encoding in enumerate(encodings):
+        ids[row, : len(encoding.ids)] = encoding.ids
+        mask[row, : len(encoding.ids)] = 1
+        types[row, : len(encoding.ids)] = encoding.type_ids
+    feed = {"input_ids": ids, "attention_mask": mask}
+    if "token_type_ids" in input_names:
+        feed["token_type_ids"] = types
+    return feed
+
+
 def pool(
     hidden: npt.NDArray[np.float32],
     mask: npt.NDArray[np.int64],
@@ -73,18 +113,11 @@ class Encoder:
         self.spec = spec
         self.max_batch_texts = max_batch_texts
         self.max_batch_tokens = max_batch_tokens
-        self.tokenizer = Tokenizer.from_file(str(model_dir / spec.tokenizer_file))
-        self.tokenizer.enable_truncation(spec.max_tokens)
-        self.tokenizer.no_padding()
-        self.session = onnxruntime.InferenceSession(
-            str(model_dir / spec.onnx_file_for(device)),
-            sess_options=session_options(intra_op_threads),
-            providers=providers(device),
+        self.tokenizer = open_tokenizer(
+            model_dir / spec.tokenizer_file, spec.max_tokens
         )
-        # Where it actually runs: ONNX Runtime falls back to the CPU when
-        # the GPU cannot be used.
-        self.device: Device = (
-            "cuda" if self.session.get_providers()[0] == CUDA else "cpu"
+        self.session, self.device = open_session(
+            model_dir / spec.onnx_file_for(device), intra_op_threads, device
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
         self.run_options = run_options(self.device)
@@ -106,19 +139,15 @@ class Encoder:
         return result
 
     def _run(self, encodings: list[Encoding]) -> Vectors:
-        width = max(len(e.ids) for e in encodings)
-        ids = np.zeros((len(encodings), width), dtype=np.int64)
-        mask = np.zeros((len(encodings), width), dtype=np.int64)
-        for row, encoding in enumerate(encodings):
-            ids[row, : len(encoding.ids)] = encoding.ids
-            mask[row, : len(encoding.ids)] = 1
-        feed = {"input_ids": ids, "attention_mask": mask}
-        if "token_type_ids" in self.input_names:
-            feed["token_type_ids"] = np.zeros_like(ids)
+        feed = model_inputs(encodings, self.input_names)
         with self.running:
             started = time.perf_counter()
             hidden = self.session.run(None, feed, self.run_options)[0]
             metrics.BATCH_SECONDS.labels(self.spec.name).observe(
                 time.perf_counter() - started
             )
-        return pool(np.asarray(hidden, dtype=np.float32), mask, self.spec.pooling)
+        return pool(
+            np.asarray(hidden, dtype=np.float32),
+            feed["attention_mask"],
+            self.spec.pooling,
+        )

@@ -8,12 +8,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
-import onnxruntime
-from tokenizers import Tokenizer
 
 from paperus_ml import metrics
-from paperus_ml.device import CUDA, Device, providers, run_options
-from paperus_ml.encoder import batches, session_options
+from paperus_ml.device import Device, run_options
+from paperus_ml.encoder import batches, model_inputs, open_session, open_tokenizer
 from paperus_ml.models import ModelSpec
 
 
@@ -35,16 +33,11 @@ class Reranker:
             min(max_batch_texts, 16) if device == "cuda" else max_batch_texts
         )
         self.max_batch_tokens = max_batch_tokens
-        self.tokenizer = Tokenizer.from_file(str(model_dir / spec.tokenizer_file))
-        self.tokenizer.enable_truncation(spec.max_tokens)
-        self.tokenizer.no_padding()
-        self.session = onnxruntime.InferenceSession(
-            str(model_dir / spec.onnx_file_for(device)),
-            sess_options=session_options(intra_op_threads),
-            providers=providers(device),
+        self.tokenizer = open_tokenizer(
+            model_dir / spec.tokenizer_file, spec.max_tokens
         )
-        self.device: Device = (
-            "cuda" if self.session.get_providers()[0] == CUDA else "cpu"
+        self.session, self.device = open_session(
+            model_dir / spec.onnx_file_for(device), intra_op_threads, device
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
         self.run_options = run_options(self.device)
@@ -60,18 +53,7 @@ class Reranker:
             [len(e.ids) for e in encodings], self.max_batch_texts, self.max_batch_tokens
         )
         for group in groups:
-            width = max(len(encodings[i].ids) for i in group)
-            ids = np.zeros((len(group), width), dtype=np.int64)
-            mask = np.zeros_like(ids)
-            types = np.zeros_like(ids)
-            for row, index in enumerate(group):
-                encoding = encodings[index]
-                ids[row, : len(encoding.ids)] = encoding.ids
-                mask[row, : len(encoding.ids)] = 1
-                types[row, : len(encoding.ids)] = encoding.type_ids
-            feed = {"input_ids": ids, "attention_mask": mask}
-            if "token_type_ids" in self.input_names:
-                feed["token_type_ids"] = types
+            feed = model_inputs([encodings[i] for i in group], self.input_names)
             with self.running:
                 started = time.perf_counter()
                 logits = self.session.run(None, feed, self.run_options)[0]

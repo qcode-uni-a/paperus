@@ -255,7 +255,7 @@ def create_app(
         not loaded yet starts loading and the answer is 503 "loading": ask
         again. Other requests for the model wait while it measures, so they
         do not slow the measurement (other models still can)."""
-        model = _model(name)
+        model = _load(name)
         passages = sample_passages()
         with model.running:
             if isinstance(model, Reader):
@@ -289,7 +289,7 @@ def create_app(
             passages_per_second=round(len(passages) / max(seconds, 1e-6), 1),
         )
 
-    def _model(name: str) -> Model:
+    def _load(name: str) -> Model:
         try:
             return models.get(name, wait=settings.load_wait)
         except UnknownModel as error:
@@ -303,18 +303,24 @@ def create_app(
                 502, f"loading model {name!r} failed: {error.args[1]}"
             ) from error
 
+    def _model[M: Model](name: str, kind: str, task: type[M], what: str) -> M:
+        """The model for a request, of the task it needs; failed requests
+        are counted (as "loading" while it loads)."""
+        try:
+            model = _load(name)
+            if not isinstance(model, task):
+                raise HTTPException(422, f"{name!r} is not {what}")
+        except HTTPException as error:
+            outcome = "loading" if error.status_code == 503 else "error"
+            metrics.REQUESTS.labels(name, kind, outcome).inc()
+            raise
+        return model
+
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:
         """Runs in FastAPI's thread pool; ONNX Runtime releases the GIL."""
-        try:
-            model = _model(body.model)
-            if not isinstance(model, Encoder):
-                raise HTTPException(422, f"{body.model!r} is not an embedding model")
-            vectors = model.embed(body.texts, body.kind)
-        except HTTPException as error:
-            outcome = "loading" if error.status_code == 503 else "error"
-            metrics.REQUESTS.labels(body.model, body.kind, outcome).inc()
-            raise
+        model = _model(body.model, body.kind, Encoder, "an embedding model")
+        vectors = model.embed(body.texts, body.kind)
         metrics.REQUESTS.labels(body.model, body.kind, "ok").inc()
         metrics.TEXTS.labels(body.model, body.kind).inc(len(body.texts))
         return EmbedResponse(
@@ -328,14 +334,7 @@ def create_app(
     def rerank(body: RerankRequest) -> RerankResponse:
         """Score how well each passage answers the query, for reordering
         search hits. Runs in FastAPI's thread pool, like /embed."""
-        try:
-            model = _model(body.model)
-        except HTTPException as error:
-            outcome = "loading" if error.status_code == 503 else "error"
-            metrics.REQUESTS.labels(body.model, "rerank", outcome).inc()
-            raise
-        if not isinstance(model, Reranker):
-            raise HTTPException(422, f"{body.model!r} is not a reranker")
+        model = _model(body.model, "rerank", Reranker, "a reranker")
         scores = model.score(body.query, body.passages)
         metrics.REQUESTS.labels(body.model, "rerank", "ok").inc()
         metrics.TEXTS.labels(body.model, "rerank").inc(len(body.passages))
@@ -349,14 +348,9 @@ def create_app(
         data = await request.body()
         if not data or len(data) > MAX_IMAGE_BYTES:
             raise HTTPException(413 if data else 422, "send one image of up to 64 MB")
-        try:
-            model = await asyncio.to_thread(_model, name)
-        except HTTPException as error:
-            outcome = "loading" if error.status_code == 503 else "error"
-            metrics.REQUESTS.labels(name, "ocr", outcome).inc()
-            raise
-        if not isinstance(model, Reader):
-            raise HTTPException(422, f"{name!r} is not an OCR model")
+        model = await asyncio.to_thread(
+            lambda: _model(name, "ocr", Reader, "an OCR model")
+        )
         try:
             page = await asyncio.to_thread(model.read, data)
         except NotAnImage as error:
