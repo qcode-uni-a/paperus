@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Connect claude.ai, ChatGPT and other connectors** with OAuth: add
+  `https://<server>/mcp` as a custom connector, log in to paperus and
+  allow what it may do (reading only unless you tick changes). Settings →
+  Connected apps lists them and disconnects them. Tokens last an hour and
+  renew themselves; paperus follows the MCP authorization specification
+  (dynamic client registration, PKCE).
 - **Archive**: papers kept for good, but left out of the library, search
   and Manage (a paper's menu → Archive; for everyone who sees it, like
   the trash). Manage → Archive lists them; search can include them

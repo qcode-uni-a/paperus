@@ -16,7 +16,11 @@ happens in the user's own AI client. paperus never calls an LLM vendor.
 **Built (first version):** `/mcp` in the server (Streamable HTTP, official
 Python SDK). Clients connect with a personal access token (Settings → Access
 tokens) as `Authorization: Bearer …`; the page shows the setup for Claude
-Code, Claude Desktop (via `mcp-remote`) and Cursor. Tools: `search`
+Code, Claude Desktop (via `mcp-remote`) and Cursor. **Connectors** that take
+no token by hand (claude.ai, ChatGPT) sign in with OAuth instead: add
+`https://<server>/mcp` as a custom connector, log in to paperus (with a
+password or the OIDC login) and allow what it may do; read-only unless the
+person ticks changes. See "Connected apps" below. Tools: `search`
 (papers, best first, each with its best passages; compact JSON, optional
 abstracts), `get_abstracts`, `get_passage`, `get_document` (details with file download links, or text by
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
@@ -36,15 +40,36 @@ each file's text, to recognise the paper), `set_doi`,
 `list_trash`, `restore_papers`. Not for AI assistants: groups and their
 members, and emptying the trash (it cannot be undone). The
 server's instructions describe the search workflow: search, pick 2–5
-papers, compare their abstracts, read the best one's passage, repeat. Not yet: OAuth (needed for claude.ai and ChatGPT
-connectors), notes and annotations, the AI inbox, citation export.
+papers, compare their abstracts, read the best one's passage, repeat. Not
+yet: annotations and the AI inbox.
+
+### Connected apps (OAuth)
+
+paperus is its own OAuth 2.1 authorization server, as the MCP specification
+describes (`server/src/paperus/oauth.py`):
+
+- `/mcp` answers 401 with `WWW-Authenticate: Bearer resource_metadata=…`;
+  the metadata (`/.well-known/oauth-protected-resource/mcp`,
+  `/.well-known/oauth-authorization-server`) names the endpoints.
+- Apps register themselves (dynamic client registration, public clients
+  without a secret). Redirect addresses: HTTPS, HTTP only to this computer
+  (any port, for desktop apps), or an app's own scheme. Registrations nobody
+  allowed are removed after a day.
+- The website's `/oauth/authorize` page shows the app's name, where it
+  sends the person back, and what it asks for; reading is ticked, changes
+  are not. PKCE (S256) is required; codes last 10 minutes and work once.
+- Access tokens are ordinary access tokens that expire after an hour;
+  refresh tokens are replaced on every use and end after 90 days unused.
+  Settings → Connected apps lists the apps and disconnects them at once
+  (also `/api/oauth/revoke`). Website pages refuse to be framed by other
+  sites, so the "Allow" button cannot be hidden in one.
 
 The plan:
 
 - Transport: Streamable HTTP (remote connectors in Claude, ChatGPT, …); small
   stdio bridge/CLI for local clients.
-- Auth: OAuth 2.1 against paperus, delegating to university OIDC. Tokens act as
-  the user; scopes: read-only by default, write separately; admins can disable
+- Auth: OAuth 2.1 against paperus, which logs in with a password or the
+  OIDC login. Tokens act as the user; scopes: read-only by default, write separately; admins can disable
   write tools per group.
 
 ### Read tools

@@ -327,6 +327,132 @@ export type CollectionOut = {
 };
 
 /**
+ * ConnectedApp
+ */
+export type ConnectedApp = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<Scope>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+};
+
+/**
+ * Consent
+ */
+export type Consent = {
+    /**
+     * Client Id
+     */
+    client_id: string;
+    /**
+     * Redirect Uri
+     */
+    redirect_uri: string;
+    /**
+     * Response Type
+     */
+    response_type?: string;
+    /**
+     * Code Challenge
+     */
+    code_challenge?: string;
+    /**
+     * Code Challenge Method
+     */
+    code_challenge_method?: string;
+    /**
+     * Scope
+     */
+    scope?: string | null;
+    /**
+     * State
+     */
+    state?: string | null;
+    /**
+     * Allow
+     */
+    allow: boolean;
+    /**
+     * Scopes
+     */
+    scopes?: Array<Scope>;
+};
+
+/**
+ * ConsentInfo
+ */
+export type ConsentInfo = {
+    /**
+     * Client Name
+     */
+    client_name: string;
+    /**
+     * Redirect Host
+     */
+    redirect_host: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<Scope>;
+    /**
+     * Username
+     */
+    username: string;
+};
+
+/**
+ * ConsentRequest
+ *
+ * What the app asked for (the authorization request's parameters).
+ */
+export type ConsentRequest = {
+    /**
+     * Client Id
+     */
+    client_id: string;
+    /**
+     * Redirect Uri
+     */
+    redirect_uri: string;
+    /**
+     * Response Type
+     */
+    response_type?: string;
+    /**
+     * Code Challenge
+     */
+    code_challenge?: string;
+    /**
+     * Code Challenge Method
+     */
+    code_challenge_method?: string;
+    /**
+     * Scope
+     */
+    scope?: string | null;
+    /**
+     * State
+     */
+    state?: string | null;
+};
+
+/**
  * CopyReport
  */
 export type CopyReport = {
@@ -1944,6 +2070,16 @@ export type ReadableCopy = {
      * Links Possible
      */
     links_possible: boolean;
+};
+
+/**
+ * Redirect
+ */
+export type Redirect = {
+    /**
+     * Redirect
+     */
+    redirect: string;
 };
 
 /**
@@ -6322,3 +6458,101 @@ export type RevokeTokenResponses = {
 };
 
 export type RevokeTokenResponse = RevokeTokenResponses[keyof RevokeTokenResponses];
+
+export type CheckConsentData = {
+    body: ConsentRequest;
+    path?: never;
+    query?: never;
+    url: '/api/oauth/consent/check';
+};
+
+export type CheckConsentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckConsentError = CheckConsentErrors[keyof CheckConsentErrors];
+
+export type CheckConsentResponses = {
+    /**
+     * Successful Response
+     */
+    200: ConsentInfo;
+};
+
+export type CheckConsentResponse = CheckConsentResponses[keyof CheckConsentResponses];
+
+export type GiveConsentData = {
+    body: Consent;
+    path?: never;
+    query?: never;
+    url: '/api/oauth/consent';
+};
+
+export type GiveConsentErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GiveConsentError = GiveConsentErrors[keyof GiveConsentErrors];
+
+export type GiveConsentResponses = {
+    /**
+     * Successful Response
+     */
+    200: Redirect;
+};
+
+export type GiveConsentResponse = GiveConsentResponses[keyof GiveConsentResponses];
+
+export type ConnectedAppsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/connected-apps';
+};
+
+export type ConnectedAppsResponses = {
+    /**
+     * Response Connected Apps
+     *
+     * Successful Response
+     */
+    200: Array<ConnectedApp>;
+};
+
+export type ConnectedAppsResponse = ConnectedAppsResponses[keyof ConnectedAppsResponses];
+
+export type DisconnectAppData = {
+    body?: never;
+    path: {
+        /**
+         * Grant Id
+         */
+        grant_id: string;
+    };
+    query?: never;
+    url: '/api/me/connected-apps/{grant_id}';
+};
+
+export type DisconnectAppErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DisconnectAppError = DisconnectAppErrors[keyof DisconnectAppErrors];
+
+export type DisconnectAppResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DisconnectAppResponse = DisconnectAppResponses[keyof DisconnectAppResponses];

@@ -8,6 +8,12 @@ from fastapi.staticfiles import StaticFiles
 
 # The SPA's entry page for every route that is not a file.
 FALLBACK = "200.html"
+# Pages are never shown inside another site's frame (where a hidden page
+# could be clicked, e.g. "Allow" when connecting an app).
+NO_FRAMING = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+}
 
 
 def mount_web(app: FastAPI, root: Path) -> None:
@@ -21,5 +27,8 @@ def mount_web(app: FastAPI, root: Path) -> None:
             raise HTTPException(404, "not found")
         file = (root / path).resolve()
         if path and file.is_relative_to(root) and file.is_file():
-            return FileResponse(file)
-        return FileResponse(root / FALLBACK, headers={"Cache-Control": "no-cache"})
+            page = file.suffix == ".html"
+            return FileResponse(file, headers=NO_FRAMING if page else None)
+        return FileResponse(
+            root / FALLBACK, headers={"Cache-Control": "no-cache", **NO_FRAMING}
+        )

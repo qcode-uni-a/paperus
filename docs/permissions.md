@@ -154,6 +154,11 @@ nothing else, also not by id. Expired or revoked tokens, and those of
 deactivated people, stop working at once. Tested in
 `server/tests/test_tokens.py`, which pins the answer for every route.
 
+Connected apps (OAuth, e.g. a claude.ai connector) get the same kind of
+token, for at most what the person allowed on the consent page, valid for
+an hour and renewed by the app; Settings → Connected apps disconnects
+them. Only the person, logged in, can allow an app (never a token).
+
 ## Notes
 
 | Action | My notes | A group's notes, as reader | A group's notes, as member or admin |

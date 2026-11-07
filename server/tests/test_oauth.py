@@ -1,0 +1,298 @@
+"""OAuth for connected apps: an AI assistant registers, the person allows
+it, and it uses the MCP server with short-lived tokens."""
+
+import base64
+import hashlib
+import secrets
+from datetime import UTC, datetime, timedelta
+from typing import Any
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import update
+from sqlalchemy.orm import Session
+
+from paperus.models import OAuthCode
+from tests.people import Person
+from tests.test_mcp import Assistant, ToolFailed
+
+REDIRECT = "https://claude.ai/api/mcp/auth_callback"
+
+
+def pkce() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return verifier, base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
+def register(client: TestClient, *uris: str) -> str:
+    response = client.post(
+        "/api/oauth/register",
+        json={"client_name": "Claude", "redirect_uris": list(uris or [REDIRECT])},
+    )
+    assert response.status_code == 201, response.text
+    client_id: str = response.json()["client_id"]
+    return client_id
+
+
+def consent(
+    person: Person,
+    client_id: str,
+    challenge: str,
+    *,
+    allow: bool = True,
+    scopes: list[str] | None = None,
+    scope: str | None = None,
+    redirect_uri: str = REDIRECT,
+) -> dict[str, list[str]]:
+    """The person allows (or not); the parameters the app gets back."""
+    request = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+        "scope": scope,
+        "state": "xyz",
+    }
+    shown = person.post("/api/oauth/consent/check", json=request)
+    assert shown.status_code == 200, shown.text
+    body = {
+        **request,
+        "allow": allow,
+        "scopes": scopes if scopes is not None else shown.json()["scopes"],
+    }
+    response = person.post("/api/oauth/consent", json=body)
+    assert response.status_code == 200, response.text
+    target = urlsplit(response.json()["redirect"])
+    assert f"{target.scheme}://{target.netloc}{target.path}" == redirect_uri
+    return parse_qs(target.query)
+
+
+def exchange(client: TestClient, **form: str) -> Any:  # noqa: ANN401 (JSON)
+    return client.post("/api/oauth/token", data=form)
+
+
+def test_connecting_an_assistant(client: TestClient, db: Session) -> None:
+    # The MCP server says where to start.
+    response = client.post("/mcp", json={})
+    assert response.status_code == 401
+    server = client.get("/.well-known/oauth-authorization-server").json()
+    base = server["issuer"]
+    metadata = f"{base}/.well-known/oauth-protected-resource/mcp"
+    assert response.headers["WWW-Authenticate"] == (
+        f'Bearer resource_metadata="{metadata}"'
+    )
+    resource = client.get("/.well-known/oauth-protected-resource/mcp").json()
+    assert resource["resource"] == f"{base}/mcp"
+    assert resource["authorization_servers"] == [base]
+    assert server["code_challenge_methods_supported"] == ["S256"]
+    assert server["authorization_endpoint"] == f"{base}/oauth/authorize"
+
+    ada = Person(client, db, "ada")
+    ada.add("Floquet qubits")
+    client_id = register(client)
+    verifier, challenge = pkce()
+    shown = ada.post(
+        "/api/oauth/consent/check",
+        json={
+            "client_id": client_id,
+            "redirect_uri": REDIRECT,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "scope": "search papers.read papers.write unknown",
+        },
+    ).json()
+    assert shown == {
+        "client_name": "Claude",
+        "redirect_host": "claude.ai",
+        "scopes": ["papers.read", "papers.write", "search"],
+        "username": "ada",
+    }
+    # Ada allows reading only.
+    back = consent(
+        ada,
+        client_id,
+        challenge,
+        scope="search papers.read papers.write",
+        scopes=["search", "papers.read"],
+    )
+    assert back["state"] == ["xyz"]
+    assert back["iss"] == [base]
+    [code] = back["code"]
+
+    form = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": REDIRECT,
+        "client_id": client_id,
+    }
+    wrong = exchange(client, **form, code_verifier=pkce()[0])
+    assert wrong.status_code == 400 and wrong.json()["error"] == "invalid_grant"
+    # The code was used up by the failed try (a guess costs the real one).
+    again = exchange(client, **form, code_verifier=verifier)
+    assert again.status_code == 400
+
+    back = consent(ada, client_id, challenge, scopes=["search", "papers.read"])
+    form["code"] = back["code"][0]
+    tokens = exchange(client, **form, code_verifier=verifier)
+    assert tokens.status_code == 200, tokens.text
+    issued = tokens.json()
+    assert issued["token_type"] == "Bearer" and issued["expires_in"] == 3600
+    assert issued["scope"] == "papers.read search"
+    assert tokens.headers["Cache-Control"] == "no-store"
+
+    ai = Assistant(client, issued["access_token"])
+    papers = ai.call("list_documents")["papers"]
+    assert [p["title"] for p in papers] == ["Floquet qubits"]
+    with pytest.raises(ToolFailed, match="lacks the scope"):
+        ai.call("add_tags", paper_ids=[papers[0]["paper_id"]], tags=["x"])
+
+    # Listed as a connected app, not as one of Ada's tokens.
+    assert ada.get("/api/me/tokens").json() == []
+    [app] = ada.get("/api/me/connected-apps").json()
+    assert app["name"] == "Claude" and app["scopes"] == ["papers.read", "search"]
+
+    # Refreshing gives new tokens; the old refresh token is used up.
+    refresh = {"grant_type": "refresh_token", "client_id": client_id}
+    renewed = exchange(client, **refresh, refresh_token=issued["refresh_token"])
+    assert renewed.status_code == 200, renewed.text
+    old = exchange(client, **refresh, refresh_token=issued["refresh_token"])
+    assert old.status_code == 400
+    other_client = register(client)
+    stolen = exchange(
+        client,
+        grant_type="refresh_token",
+        client_id=other_client,
+        refresh_token=renewed.json()["refresh_token"],
+    )
+    assert stolen.status_code == 400
+
+    # Disconnecting ends it at once.
+    assert ada.delete(f"/api/me/connected-apps/{app['id']}").status_code == 204
+    with pytest.raises(ToolFailed, match="invalid, expired or revoked"):
+        Assistant(client, renewed.json()["access_token"]).call("list_documents")
+    gone = exchange(client, **refresh, refresh_token=renewed.json()["refresh_token"])
+    assert gone.status_code == 400
+
+
+def test_refusing_and_wrong_requests(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    client_id = register(client)
+    verifier, challenge = pkce()
+    back = consent(ada, client_id, challenge, allow=False)
+    assert back["error"] == ["access_denied"] and "code" not in back
+
+    # Nothing asked for: reading only is offered.
+    request = {
+        "client_id": client_id,
+        "redirect_uri": REDIRECT,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
+    shown = ada.post("/api/oauth/consent/check", json=request).json()
+    assert shown["scopes"] == ["files.read", "papers.read", "search"]
+    # More than asked is not given.
+    back = consent(ada, client_id, challenge, scopes=["papers.write"])
+    assert back["error"] == ["access_denied"]
+
+    for wrong in (
+        {"redirect_uri": "https://evil.example/callback"},
+        {"client_id": "unknown"},
+        {"code_challenge_method": "plain"},
+        {"code_challenge": "short"},
+    ):
+        response = ada.post("/api/oauth/consent/check", json={**request, **wrong})
+        assert response.status_code == 400, wrong
+    # Not with a token: only the person, logged in.
+    raw = ada.post(
+        "/api/me/tokens", json={"name": "script", "scopes": ["papers.read"]}
+    ).json()["token"]
+    response = client.post(
+        "/api/oauth/consent/check",
+        json=request,
+        headers={"Authorization": f"Bearer {raw}"},
+    )
+    assert response.status_code == 403
+
+    # Expired codes are refused.
+    back = consent(ada, client_id, challenge)
+    db.execute(
+        update(OAuthCode).values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    db.commit()
+    response = exchange(
+        client,
+        grant_type="authorization_code",
+        code=back["code"][0],
+        redirect_uri=REDIRECT,
+        client_id=client_id,
+        code_verifier=verifier,
+    )
+    assert response.json()["error"] == "invalid_grant"
+
+
+def test_registration_rules(client: TestClient, db: Session) -> None:
+    for uri in (
+        "http://claude.ai/callback",
+        "javascript:alert(1)",
+        "https://claude.ai/cb#fragment",
+        "data:text/html,hi",
+    ):
+        response = client.post("/api/oauth/register", json={"redirect_uris": [uri]})
+        assert response.status_code == 400, uri
+    # Desktop apps: back to this computer, on any port.
+    ada = Person(client, db, "ada")
+    client_id = register(client, "http://127.0.0.1/callback", "cursor://oauth/cb")
+    _, challenge = pkce()
+    back = consent(
+        ada, client_id, challenge, redirect_uri="http://127.0.0.1:53682/callback"
+    )
+    assert "code" in back
+    back = consent(ada, client_id, challenge, redirect_uri="cursor://oauth/cb")
+    assert "code" in back
+    # Browsers may read the metadata and get tokens from elsewhere.
+    response = client.options(
+        "/api/oauth/token", headers={"Origin": "http://localhost:6274"}
+    )
+    assert response.headers["Access-Control-Allow-Origin"] == "*"
+
+
+def test_revoking_and_deactivated_people(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    client_id = register(client)
+    verifier, challenge = pkce()
+    back = consent(ada, client_id, challenge)
+    issued = exchange(
+        client,
+        grant_type="authorization_code",
+        code=back["code"][0],
+        redirect_uri=REDIRECT,
+        client_id=client_id,
+        code_verifier=verifier,
+    ).json()
+    # The app disconnects itself.
+    response = client.post("/api/oauth/revoke", data={"token": issued["refresh_token"]})
+    assert response.status_code == 200
+    assert ada.get("/api/me/connected-apps").json() == []
+
+    back = consent(ada, client_id, challenge)
+    issued = exchange(
+        client,
+        grant_type="authorization_code",
+        code=back["code"][0],
+        redirect_uri=REDIRECT,
+        client_id=client_id,
+        code_verifier=verifier,
+    ).json()
+    response = root.patch(f"/api/admin/users/{ada.id}", json={"active": False})
+    assert response.status_code == 200, response.text
+    refreshed = exchange(
+        client,
+        grant_type="refresh_token",
+        client_id=client_id,
+        refresh_token=issued["refresh_token"],
+    )
+    assert refreshed.status_code == 400

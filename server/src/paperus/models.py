@@ -165,6 +165,61 @@ class AccessToken(Record, Base):
     """Only these owners' things (libraries); all the user's if None."""
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    grant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("oauth_grants.id", ondelete="CASCADE"), index=True
+    )
+    """Issued to a connected app (OAuth), short-lived; not listed as the
+    person's own tokens."""
+
+
+class OAuthClient(Record, Base):
+    """An app that registered itself to connect (OAuth dynamic client
+    registration, e.g. Claude or ChatGPT); a public client, no secret."""
+
+    __tablename__ = "oauth_clients"
+
+    client_id: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    redirect_uris: Mapped[list[str]] = mapped_column(JSONB)
+
+
+class OAuthCode(Record, Base):
+    """A one-time authorization code, given after the person allowed the
+    app; exchanged for tokens with the PKCE verifier."""
+
+    __tablename__ = "oauth_codes"
+
+    code_hash: Mapped[bytes] = mapped_column(LargeBinary(32), unique=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("oauth_clients.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    redirect_uri: Mapped[str]
+    code_challenge: Mapped[str] = mapped_column(String(128))
+    scopes: Mapped[list[str]] = mapped_column(JSONB)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class OAuthGrant(Record, Base):
+    """A connected app: what the person allowed it, and its current refresh
+    token (replaced on every use). Deleting it disconnects the app."""
+
+    __tablename__ = "oauth_grants"
+
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("oauth_clients.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    scopes: Mapped[list[str]] = mapped_column(JSONB)
+    refresh_hash: Mapped[bytes] = mapped_column(LargeBinary(32), unique=True)
+    refresh_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    client: Mapped[OAuthClient] = relationship(lazy="joined")
 
 
 class ChangeCounter(Base):

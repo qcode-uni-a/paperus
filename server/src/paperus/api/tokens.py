@@ -64,7 +64,8 @@ def _out(token: AccessToken) -> TokenOut:
 def list_tokens(db: DB, user: SessionUser) -> list[TokenOut]:
     rows = db.scalars(
         select(AccessToken)
-        .where(AccessToken.user_id == user.id)
+        # Connected apps' tokens are listed as apps (api/oauth.py).
+        .where(AccessToken.user_id == user.id, AccessToken.grant_id.is_(None))
         .order_by(AccessToken.created_at.desc())
     )
     return [_out(token) for token in rows]

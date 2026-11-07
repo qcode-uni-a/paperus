@@ -21,6 +21,11 @@ def test_serves_the_website(tmp_path: Path) -> None:
         create_app(Settings(database_url=UNREACHABLE_DB, web_path=tmp_path))
     )
     assert client.get("/").text == "<html>app</html>"
+    page = client.get("/oauth/authorize")
+    assert page.text == "<html>app</html>"
+    # Never inside another site's frame.
+    assert page.headers["X-Frame-Options"] == "DENY"
+    assert client.get("/robots.txt").headers.get("X-Frame-Options") is None
     assert client.get("/items/123").text == "<html>app</html>"
     assert client.get("/robots.txt").text == "User-agent: *"
     assert client.get("/_app/immutable/app.js").text == "console.log(1)"

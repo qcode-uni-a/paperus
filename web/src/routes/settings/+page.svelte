@@ -12,6 +12,7 @@
 		writableLibraries
 	} from '#lib/organize.svelte.ts';
 	import AccessTokens from '#lib/AccessTokens.svelte';
+	import ConnectedApps from '#lib/ConnectedApps.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
 	import OidcLink from '#lib/OidcLink.svelte';
@@ -131,6 +132,11 @@
 <section>
 	<h2>Access tokens</h2>
 	<AccessTokens />
+</section>
+
+<section>
+	<h2>Connected apps</h2>
+	<ConnectedApps />
 </section>
 
 <section>

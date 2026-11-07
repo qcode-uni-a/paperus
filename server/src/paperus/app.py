@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx2
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
@@ -28,6 +29,7 @@ from paperus.api import (
     items,
     manage,
     notes,
+    oauth,
     organize,
     search,
     setup,
@@ -117,6 +119,7 @@ def create_app(
     app.include_router(backups.router)
     app.include_router(setup.router)
     app.include_router(token_api.router)
+    app.include_router(oauth.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:
@@ -159,18 +162,51 @@ def create_app(
         )
         return response
 
+    def resource_metadata_url(request: Request) -> str:
+        with app.state.sessionmaker() as db:
+            config = system.load_config(db, settings)
+        base = auth.public_base(request, config)
+        return f"{base}/.well-known/oauth-protected-resource/mcp"
+
     @app.middleware("http")
     async def mcp_needs_a_token(request: Request, call_next: Any) -> Response:  # noqa: ANN401
-        """Clients learn at once that a token is missing or wrong."""
-        if request.url.path == "/mcp":
+        """Clients learn at once that a token is missing or wrong, and where
+        to get one (OAuth, see paperus.oauth)."""
+        if request.url.path == "/mcp" and request.method != "OPTIONS":
             scheme, _, raw = request.headers.get("authorization", "").partition(" ")
             if scheme.lower() != "bearer" or not tokens.is_token(raw):
+                metadata = await run_in_threadpool(resource_metadata_url, request)
                 return JSONResponse(
                     {"detail": "a paperus access token is needed"},
                     status_code=401,
-                    headers={"WWW-Authenticate": "Bearer"},
+                    headers={
+                        "WWW-Authenticate": f'Bearer resource_metadata="{metadata}"'
+                    },
                 )
         response: Response = await call_next(request)
+        return response
+
+    @app.middleware("http")
+    async def open_to_apps(request: Request, call_next: Any) -> Response:  # noqa: ANN401
+        """Apps in a browser (e.g. an MCP inspector) may read the OAuth
+        metadata and get tokens: no cookies are involved there."""
+        path = request.url.path
+        if not path.startswith(("/.well-known/oauth-", "/api/oauth/")) or (
+            path.startswith("/api/oauth/consent")
+        ):
+            response: Response = await call_next(request)
+            return response
+        cors = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, "
+            "mcp-protocol-version",
+            "Access-Control-Max-Age": "86400",
+        }
+        if request.method == "OPTIONS":
+            return Response(status_code=204, headers=cors)
+        response = await call_next(request)
+        response.headers.update(cors)
         return response
 
     if settings.web_path is not None and (settings.web_path / FALLBACK).is_file():

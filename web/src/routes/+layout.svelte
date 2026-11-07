@@ -17,9 +17,12 @@
 
 	let { children }: LayoutProps = $props();
 
-	// The login and first-start pages stand alone, without menu or header.
+	// The login, first-start and app-connecting pages stand alone, without
+	// menu or header.
 	const onLoginPage = $derived(
-		page.url.pathname === resolve('/login') || page.url.pathname === resolve('/setup')
+		page.url.pathname === resolve('/login') ||
+			page.url.pathname === resolve('/setup') ||
+			page.url.pathname === resolve('/oauth/authorize')
 	);
 
 	$effect(() => {
