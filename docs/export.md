@@ -11,7 +11,8 @@ beside the files (see [For other programs](#for-other-programs)).
   the files, in paperus' own format. Choices: the format (paperus,
   Zotero, JabRef, Mendeley), whose (my own papers and each group's; at least one),
   what comes along (files, notes, tags and keywords, collections,
-  reference lists, archived papers; all ticked at first), also the trash
+  reference lists, authors as people, archived papers; all ticked at
+  first), also the trash
   (off at first), and only one collection (also from a collection's menu:
   "Export with files and notes…"). The size is estimated before starting.
   The export is written in the background; a message says when it is
@@ -21,7 +22,8 @@ beside the files (see [For other programs](#for-other-programs)).
   with `--format zotero|jabref|mendeley`, `--owner NAME` (repeatable:
   "Me" or a group's name or path),
   `--collection ID`, `--no-files`, `--no-notes`, `--no-tags`,
-  `--no-collections`, `--no-references`, `--no-archive`, `--trash`. `OUT`
+  `--no-collections`, `--no-references`, `--no-authors`, `--no-archive`,
+  `--trash`. `OUT`
   is the first zip; further parts are written beside it
   (`OUT-part2-of-3.zip`).
 - **What it holds**: exactly what the person can read when it is written
@@ -118,12 +120,14 @@ so the schema stays the same.
 | `files` | file of a version | `id`, `created_at`, `version_id`, `role` (main, supplementary, slides, transcript, recording, other), `filename` (as uploaded), `media_type`, `source` (upload, open_access, browser, import), `uploaded_by`, `deleted_at`, `deleted_by`, `sha256` (of the contents), `size` (bytes), `included` (1: in the zips), `path` (in the export folder: `files/…`), `part` (which zip) |
 | `tags` | tag or keyword | `id`, `created_at`, `library_id` (its owner), `name`, `color`, `description` |
 | `item_tags` | tag on a paper | `item_id`, `tag_id`, `source` (manual; automatic: a keyword from the paper's details; ai: suggested by an assistant), `added_by`, `created_at` |
-| `collections` | collection | `id`, `created_at`, `library_id`, `name`, `description`, `parent_id` (the one it is in), `rules` (JSON, smart collections: tags_all, tags_any, tags_none, types, year_from, year_to, owners, added_days), `created_by` |
+| `collections` | collection | `id`, `created_at`, `library_id`, `name`, `description`, `parent_id` (the one it is in), `rules` (JSON, smart collections: tags_all, tags_any, tags_none, types, published_from, published_to, year_from, year_to, owners, authors, added_days), `created_by` |
 | `collection_items` | paper in a collection | `collection_id`, `item_id`, `added_by`, `created_at` |
 | `notes` | note | `id`, `created_at`, `library_id`, `text` (Markdown), `title` (its first line), `created_by`, `changed_by`, `changed_at`, `text_changed_at`, `deleted_at`, `deleted_by` |
 | `note_items` | paper a note is about | `note_id`, `item_id`, `page`, `added_by`, `created_at` |
 | `collection_notes` | note in a collection | `collection_id`, `note_id`, `added_by`, `created_at` |
 | `item_references` | entry of a paper's reference list | `item_id`, `position` (from 1), `text` (as printed), `title`, `authors` ("Smith et al."), `year`, `container` (journal), `doi`, `arxiv`, `url` |
+| `authors` | person who wrote exported papers (or whom a smart collection's rules name); see [authors](authors.md) | `id`, `name`, `orcid`, `openalex_id` |
+| `authorships` | author of a paper, at their place | `item_id`, `position` (from 1), `author_id` (none: to check), `written` ("Benito, M."), `source` (orcid, openalex, name, hand), `affiliation` (on this paper), `orcid`, `openalex_id` |
 | `favourites` | paper the exporting person starred | `user_id`, `item_id`, `created_at` |
 | `pinned_collections` | collection the exporting person pinned | `user_id`, `collection_id`, `created_at` |
 
@@ -198,7 +202,13 @@ and [import-mapping](import-mapping.md).
      uploads), tags with their sources (keywords stay keywords), the
      collection tree and smart rules (their tags and owners those here),
      notes with their links and pages, favourites, archive marks, the trash,
-     reference lists, times. People named in the export are the same here
+     reference lists, times. Authors: each person of the export is the one
+     here with the same ORCID iD, else OpenAlex id, else the only person
+     here of that full name, else new; people of one name in the export
+     stay apart; new papers keep their authors' links (splits and links
+     by hand too), and smart collections' author rules name the people
+     here. Exports from before authors were people (no `authors` table)
+     still import; their papers' authors are linked afterwards. People named in the export are the same here
      only if a person with the same id and username exists; otherwise the
      importing person.
    - Each file is checked against its SHA-256: a damaged or cut-off file is

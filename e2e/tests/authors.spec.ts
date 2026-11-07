@@ -105,3 +105,28 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	// "Gerda" never fits "Guido"; "G." did, but is merged now.
 	await expect(section.getByRole('listitem').filter({ hasText: family })).toHaveCount(0);
 });
+
+test('a smart collection of an author’s papers', async ({ page }) => {
+	const family = unique('Platero');
+	const gloria = { family, given: 'Gloria' };
+	const word = unique('Collected ');
+	const first = await add(page, `${word} one`, [gloria]);
+	await add(page, `${word} two`, [{ family: unique('Other'), given: 'O.' }, gloria]);
+	await linked(page, first);
+
+	const id = (await (await page.request.get(`/api/items/${first}`)).json()).author_ids[0];
+	await page.goto(`/authors/${id}`);
+	await page.getByRole('button', { name: 'Smart collection' }).click();
+	const dialog = page.getByRole('dialog', { name: 'New collection' });
+	await expect(dialog.getByRole('radio', { name: /^Smart/ })).toBeChecked();
+	await expect(dialog.getByLabel('Name')).toHaveValue(`Gloria ${family}`);
+	await expect(dialog.getByRole('button', { name: `Remove Gloria ${family}` })).toBeVisible();
+	await dialog.getByRole('button', { name: 'Create collection' }).click();
+	await page.goto('/collections');
+	await page
+		.getByRole('link', { name: `Gloria ${family}` })
+		.first()
+		.click();
+	await expect(page.getByText(`Papers by Gloria ${family}.`)).toBeVisible();
+	await expect(page.getByRole('heading', { name: '2 items' })).toBeVisible();
+});

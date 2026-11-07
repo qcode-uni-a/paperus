@@ -11,6 +11,7 @@
 		type Item
 	} from '#lib/api/client.ts';
 	import type { AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
+	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { notify } from '#lib/toasts.svelte.ts';
 
@@ -22,6 +23,7 @@
 	const PAGE = 50;
 
 	let author = $state<AuthorOut | null>(null);
+	let collectionDialog = $state<CollectionDialog>();
 	let missing = $state(false);
 	let items = $state<Item[]>([]);
 	let total = $state(0);
@@ -29,7 +31,7 @@
 	async function load(shown: string) {
 		const [person, papers] = await Promise.all([
 			getAuthor({ path: { author_id: shown } }),
-			listItems({ query: { author_id: shown, limit: PAGE } })
+			listItems({ query: { author_id: [shown], limit: PAGE } })
 		]);
 		if (shown !== id) return;
 		missing = !person.data;
@@ -40,7 +42,7 @@
 
 	async function more() {
 		const { data } = await listItems({
-			query: { author_id: id, limit: PAGE, before: items.at(-1)?.id }
+			query: { author_id: [id], limit: PAGE, before: items.at(-1)?.id }
 		});
 		items = [...items, ...(data ?? [])];
 	}
@@ -202,6 +204,13 @@
 				{#if !merging}
 					<button onclick={() => (merging = true)}>Same person as…</button>
 				{/if}
+				<button
+					title="A collection that always holds their papers, also those added later"
+					onclick={() =>
+						author &&
+						collectionDialog?.open(undefined, true, { authors: [author.id] }, author.name)}
+					>Smart collection</button
+				>
 			</div>
 		</div>
 		{#if merging}
@@ -267,6 +276,8 @@
 {:else}
 	<p class="muted">Loading…</p>
 {/if}
+
+<CollectionDialog bind:this={collectionDialog} />
 
 <style>
 	.head {

@@ -519,3 +519,22 @@ def test_probably_the_same(client: TestClient, db: Session) -> None:
     db.commit()
     assert ({"María Benito", "Mónica Benito"}, 0) not in pairs()
     assert platero
+
+
+def test_smart_collections_by_author(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    qubits = paper(ada, "Qubits", "Benito, Mónica", "Platero, Gloria")
+    paper(ada, "Proteins", "Smith, Jane")
+    paper(ada, "Lone", "Platero, Gloria")
+    paper(ada, "Dots", "Benito, Mónica")
+    authors.link_waiting(db)
+    [benito, platero] = people(db, qubits)
+    response = ada.post(
+        "/api/collections",
+        json={"name": "Mónica's", "rules": {"authors": [str(benito)]}},
+    )
+    assert response.status_code == 201, response.text
+    assert ada.titles(collection=response.json()["id"]) == ["Dots", "Qubits"]
+    # In the list: by any of several people.
+    listed = ada.get("/api/items", params={"author_id": [str(benito), str(platero)]})
+    assert sorted(i["title"] for i in listed.json()) == ["Dots", "Lone", "Qubits"]

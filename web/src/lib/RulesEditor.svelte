@@ -1,5 +1,7 @@
 <script lang="ts">
-	import type { Rules } from '#lib/api/generated/types.gen.ts';
+	import { listAuthors } from '#lib/api/client.ts';
+	import type { AuthorRow, Rules } from '#lib/api/generated/types.gen.ts';
+	import { authorName, rememberAuthor } from '#lib/authorNames.svelte.ts';
 	import DateInput from '#lib/DateInput.svelte';
 	import { TYPE_NAMES } from '#lib/format.ts';
 	import { libraryById, libraryName, organize } from '#lib/organize.svelte.ts';
@@ -60,6 +62,30 @@
 		}
 	});
 
+	// Authors, found by name.
+	let authorSearch = $state('');
+	let authorsFound = $state<AuthorRow[]>([]);
+	$effect(() => {
+		const words = authorSearch.trim();
+		if (words.length < 2) {
+			authorsFound = [];
+			return;
+		}
+		const timer = setTimeout(async () => {
+			const { data } = await listAuthors({ query: { q: words, limit: 6 } });
+			if (words === authorSearch.trim()) {
+				authorsFound = (data ?? []).filter((a) => !(rules.authors ?? []).includes(a.id));
+			}
+		}, 250);
+		return () => clearTimeout(timer);
+	});
+	function addAuthor(author: AuthorRow) {
+		rememberAuthor(author.id, author.name);
+		rules.authors = [...(rules.authors ?? []), author.id];
+		authorSearch = '';
+		authorsFound = [];
+	}
+
 	/** Empty fields: no rule. */
 	function number(value: string): number | null {
 		const parsed = Number.parseInt(value, 10);
@@ -98,6 +124,39 @@
 			</div>
 		</div>
 	{/each}
+
+	<div class="row">
+		<span class="name">By these authors</span>
+		<div class="chips">
+			{#each rules.authors ?? [] as id (id)}
+				<span class="chip"
+					>{authorName(id)}<button
+						type="button"
+						aria-label="Remove {authorName(id)}"
+						onclick={() => (rules.authors = (rules.authors ?? []).filter((a) => a !== id))}
+						>×</button
+					></span
+				>
+			{/each}
+			<input
+				type="search"
+				class="author-search"
+				bind:value={authorSearch}
+				placeholder="Add an author…"
+				aria-label="By these authors: find an author"
+				autocomplete="off"
+			/>
+		</div>
+		{#if authorsFound.length}
+			<div class="chips">
+				{#each authorsFound as author (author.id)}
+					<button type="button" class="pick" onclick={() => addAuthor(author)}
+						>{author.name} <span class="muted">{author.papers}</span></button
+					>
+				{/each}
+			</div>
+		{/if}
+	</div>
 
 	<div class="row">
 		<span class="name">Of these types</span>
@@ -194,6 +253,14 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 6px 10px;
+	}
+	.author-search {
+		flex: 1 1 12rem;
+		max-width: 20rem;
+	}
+	.pick {
+		padding: 2px 10px;
+		border-radius: 14px;
 	}
 	.chip {
 		display: inline-flex;

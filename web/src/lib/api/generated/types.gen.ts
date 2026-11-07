@@ -1392,6 +1392,10 @@ export type Include = {
      */
     references?: boolean;
     /**
+     * Authors
+     */
+    authors?: boolean;
+    /**
      * Files
      */
     files?: boolean;
@@ -3101,6 +3105,10 @@ export type Rules = {
      * Added Days
      */
     added_days?: number | null;
+    /**
+     * Authors
+     */
+    authors?: Array<string>;
 };
 
 /**
@@ -4367,7 +4375,7 @@ export type ListItemsData = {
         /**
          * Author Id
          */
-        author_id?: string | null;
+        author_id?: Array<string> | null;
         /**
          * Collection
          */

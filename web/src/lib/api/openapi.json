@@ -535,7 +535,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given), ``author_id`` (a person, ``paperus.authors``) and\n``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case).\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given), ``author_id`` (repeatable: by one of these people,\n``paperus.authors``) and ``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case).\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -779,8 +779,11 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
                 },
                 {
                   "type": "null"
@@ -9639,6 +9642,11 @@
             "title": "References",
             "default": true
           },
+          "authors": {
+            "type": "boolean",
+            "title": "Authors",
+            "default": true
+          },
           "files": {
             "type": "boolean",
             "title": "Files",
@@ -11675,6 +11683,7 @@
               "tags": true,
               "collections": true,
               "references": true,
+              "authors": true,
               "files": true,
               "archived": true
             }
@@ -12733,6 +12742,15 @@
               }
             ],
             "title": "Added Days"
+          },
+          "authors": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Authors",
+            "default": []
           }
         },
         "type": "object",

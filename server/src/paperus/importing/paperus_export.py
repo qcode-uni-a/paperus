@@ -28,6 +28,7 @@ import tempfile
 import uuid
 import zipfile
 import zlib
+from collections import Counter
 from collections.abc import Callable, Generator, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
@@ -41,9 +42,10 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import library, notes, organize
+from paperus import authors, library, notes, organize
 from paperus.access import Access
 from paperus.export import (
+    ADDED_LATER,
     DATABASE,
     FORMAT,
     FORMAT_VERSION,
@@ -55,6 +57,9 @@ from paperus.identifiers import Scheme
 from paperus.importing.apply import Report, _reason, item_with_file
 from paperus.importing.choices import Choices, GroupSuggestion
 from paperus.models import (
+    Author,
+    Authorship,
+    AuthorSource,
     Blob,
     Collection,
     CollectionItem,
@@ -358,7 +363,7 @@ def _open_database(first: Marker, target: Path) -> sqlite3.Connection:
     except sqlite3.DatabaseError as error:
         database.close()
         raise NotAnExport(f"{DATABASE} is not a SQLite database.") from error
-    lacking = [table for table in TABLES if table not in tables]
+    lacking = [t for t in TABLES if t not in tables and t not in ADDED_LATER]
     if lacking:
         database.close()
         raise NotAnExport(
@@ -486,6 +491,10 @@ class _Run:
     tags: dict[str, Tag] = field(default_factory=dict)
     collections: dict[str, uuid.UUID] = field(default_factory=dict)
     items: dict[str, uuid.UUID] = field(default_factory=dict)
+    authors: dict[str, uuid.UUID] = field(default_factory=dict)
+    """The export's people → people here."""
+    tables: set[str] = field(default_factory=set)
+    """The export's tables (older exports lack some)."""
     seen: dict[tuple[str, str], uuid.UUID] = field(default_factory=dict)
     new_files: list[uuid.UUID] = field(default_factory=list)
 
@@ -562,6 +571,12 @@ def apply_export(
     ):
         if exported.get(str(user_id)) == username:
             run.users[str(user_id)] = user_id
+    run.tables = {
+        str(row[0])
+        for row in run.rows("SELECT name FROM sqlite_master WHERE type = 'table'")
+    }
+    if "authors" in run.tables:
+        _guarded(run, "authors", lambda: _authors(run))
     for row in run.rows("SELECT * FROM tags ORDER BY created_at, id"):
         _guarded(run, f"tag {row['name']}", lambda row=row: _tag(run, row))
     for row in _parents_first(list(run.rows("SELECT * FROM collections"))):
@@ -658,6 +673,78 @@ def _tag(run: _Run, row: sqlite3.Row) -> None:
     run.tags[str(row["id"])] = tag
 
 
+def _authors(run: _Run) -> None:
+    """The export's people as people here: the same ORCID iD, else the same
+    OpenAlex id, else the only person here of that full name; else new.
+    People of one name in the export (after a split) stay apart."""
+    db = run.db
+    rows = list(run.rows("SELECT * FROM authors ORDER BY id"))
+    names = Counter(authors.fold(_text(r["name"])) for r in rows)
+    made: dict[str, list[uuid.UUID]] = {}
+    for row in rows:
+        name = _text(row["name"])
+        key = authors.fold(name)
+        orcid = _optional_text(row["orcid"], 19)
+        openalex = _optional_text(row["openalex_id"], 32)
+        found = None
+        if orcid:
+            found = db.scalar(select(Author).where(Author.orcid == orcid))
+        if found is None and openalex:
+            found = db.scalar(select(Author).where(Author.openalex_id == openalex))
+        if found is None and names[key] == 1:
+            same = list(db.scalars(select(Author).where(Author.key == key).limit(2)))
+            if len(same) == 1 and not (same[0].orcid and orcid):
+                found = same[0]
+        if found is None:
+            found = Author(**keep_id(db, Author, row["id"]), name=name, key=key)
+            db.add(found)
+            db.flush()
+            for column, value in (("orcid", orcid), ("openalex_id", openalex)):
+                taken = value and db.scalar(
+                    select(Author.id).where(getattr(Author, column) == value)
+                )
+                if value and not taken:
+                    setattr(found, column, value)
+        run.authors[str(row["id"])] = found.id
+        made.setdefault(key, []).append(found.id)
+    for people in made.values():
+        for i, one in enumerate(people):
+            for other in people[i + 1 :]:
+                if one != other:
+                    authors.apart(db, one, other)
+
+
+def _authorships(run: _Run, item: Item, item_id: object) -> None:
+    """A new paper's authors as the export linked them (splits and links by
+    hand stay), if its names are the same; else left to the linking."""
+    rows = list(
+        run.rows(
+            "SELECT * FROM authorships WHERE item_id = ? ORDER BY position", item_id
+        )
+    )
+    csl = library.citation_csl(item)
+    written = authors.written_authors(csl)
+    if not rows or [_int(r["position"]) for r in rows] != list(
+        range(1, len(written) + 1)
+    ):
+        return
+    for row, person in zip(rows, written, strict=True):
+        item.authorships.append(
+            Authorship(
+                item_id=item.id,
+                position=_int(row["position"]),
+                author_id=run.authors.get(str(row["author_id"])),
+                written=person.written,
+                key=person.key,
+                source=_choice(row["source"], AuthorSource, AuthorSource.NAME),
+                affiliation=_optional_text(row["affiliation"], 500),
+                orcid=_optional_text(row["orcid"], 19),
+                openalex_id=_optional_text(row["openalex_id"], 32),
+            )
+        )
+    item.authors_key = item.authors_linked = library.authors_key(csl)
+
+
 def _collection(run: _Run, row: sqlite3.Row) -> None:
     db, target = run.db, run.owner(row["library_id"])
     name = organize.clean_name(_text(row["name"]))[:200]
@@ -725,6 +812,8 @@ def _rules(run: _Run, value: object) -> dict[str, Any] | None:
             run.plan.owners[str(o)] for o in rules.owners if str(o) in run.plan.owners
         )
     )
+    # People here; one unknown (an export without them) still matches no one.
+    rules.authors = [run.authors.get(str(a), a) for a in rules.authors]
     return rules.model_dump(mode="json")
 
 
@@ -815,6 +904,8 @@ def _item(run: _Run, row: sqlite3.Row) -> None:
     if new:
         db.flush()
         library.refresh_item(item)
+        if "authorships" in run.tables:
+            _authorships(run, item, row["id"])
     for key in keys:
         run.seen[key] = item.id
     for sha in shas:

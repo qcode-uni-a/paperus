@@ -120,6 +120,7 @@ def main(argv: list[str] | None = None) -> None:
         ("tags", "tags and keywords"),
         ("collections", "collections"),
         ("references", "reference lists"),
+        ("authors", "authors as people"),
         ("archive", "archived papers"),
     ):
         export_.add_argument(
@@ -414,6 +415,7 @@ def export_command(args: argparse.Namespace) -> int:
                     tags=not args.no_tags,
                     collections=not args.no_collections,
                     references=not args.no_references,
+                    authors=not args.no_authors,
                     archived=not args.no_archive,
                 ),
                 trash=args.trash,

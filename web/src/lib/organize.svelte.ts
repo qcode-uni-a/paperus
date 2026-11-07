@@ -1,4 +1,5 @@
 import { listCollections, listLibraries, listTags } from '#lib/api/client.ts';
+import { authorName } from '#lib/authorNames.svelte.ts';
 import type { CollectionOut, LibraryOut, Rules, TagOut } from '#lib/api/generated/types.gen.ts';
 import { formatLongDate, formatMonth } from '#lib/dates.svelte.ts';
 import { plural } from '#lib/format.ts';
@@ -148,6 +149,7 @@ export function describeRules(rules: Rules): string {
 	const published = publishedWords(rules);
 	if (published) parts.push(published);
 	if (rules.owners?.length) parts.push(`owned by ${and(rules.owners.map(libraryName), 'or')}`);
+	if (rules.authors?.length) parts.push(`by ${and(rules.authors.map(authorName), 'or')}`);
 	if (rules.added_days != null)
 		parts.push(
 			rules.added_days === 1

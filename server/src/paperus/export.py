@@ -48,6 +48,8 @@ from paperus.importing import Export as ProgramExport
 from paperus.importing import ExportedFile, ExportedNote, ExportedPaper
 from paperus.library import KIND_PREFERENCE
 from paperus.models import (
+    Author,
+    Authorship,
     Blob,
     Collection,
     CollectionItem,
@@ -68,6 +70,7 @@ from paperus.models import (
     User,
     Version,
 )
+from paperus.organize import Rules
 from paperus.readable import values_for
 from paperus.storage import BlobStore
 from paperus.system import load_config
@@ -105,6 +108,9 @@ class Include(BaseModel):
     """The collections (also smart ones), what they hold, pinned ones."""
     references: bool = True
     """The papers' reference lists."""
+    authors: bool = True
+    """The papers' authors as people (who is who: splits, merges, ids, and
+    their affiliations on each paper)."""
     files: bool = True
     """The files themselves (their rows are kept, marked not included)."""
     archived: bool = True
@@ -290,6 +296,23 @@ CREATE TABLE pinned_collections (
   created_at TEXT NOT NULL,
   PRIMARY KEY (user_id, collection_id)
 );
+CREATE TABLE authors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  orcid TEXT,
+  openalex_id TEXT
+);
+CREATE TABLE authorships (
+  item_id TEXT NOT NULL REFERENCES items (id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  author_id TEXT REFERENCES authors (id),
+  written TEXT NOT NULL,
+  source TEXT NOT NULL,
+  affiliation TEXT,
+  orcid TEXT,
+  openalex_id TEXT,
+  PRIMARY KEY (item_id, position)
+);
 """
 
 # Like the server's, created after the rows are in (faster).
@@ -315,6 +338,8 @@ CREATE INDEX ix_favourites_item_id ON favourites (item_id);
 CREATE INDEX ix_pinned_collections_collection_id ON pinned_collections (collection_id);
 """
 
+# Tables of later exports: an import reads them if there.
+ADDED_LATER = ["authors", "authorships"]
 TABLES = [
     "paperus",
     "users",
@@ -333,6 +358,7 @@ TABLES = [
     "item_references",
     "favourites",
     "pinned_collections",
+    *ADDED_LATER,
 ]
 
 
@@ -946,6 +972,17 @@ COLUMNS: dict[str, list[Any]] = {
         ItemReference.arxiv,
         ItemReference.url,
     ],
+    "authors": [Author.id, Author.name, Author.orcid, Author.openalex_id],
+    "authorships": [
+        Authorship.item_id,
+        Authorship.position,
+        Authorship.author_id,
+        Authorship.written,
+        Authorship.source,
+        Authorship.affiliation,
+        Authorship.orcid,
+        Authorship.openalex_id,
+    ],
     "favourites": [Favourite.user_id, Favourite.item_id, Favourite.created_at],
     "pinned_collections": [
         PinnedCollection.user_id,
@@ -1116,6 +1153,30 @@ class Seen:
         return self._of_items(
             "item_references", (Item, Item.id == ItemReference.item_id)
         )
+
+    def authorships(self) -> Iterator[Any]:
+        return self._of_items("authorships", (Item, Item.id == Authorship.item_id))
+
+    def authors(self) -> Iterator[Any]:
+        """The people of the exported papers, and those smart collections'
+        rules name."""
+        wanted = {row[2] for row in self.authorships() if row[2] is not None} | {
+            author_id
+            for (rules,) in self.db.execute(
+                select(Collection.rules).where(
+                    Collection.id.in_(self.selection.collections),
+                    Collection.rules.is_not(None),
+                )
+            )
+            for author_id in Rules.model_validate(rules or {}).authors
+        }
+        ordered = sorted(wanted)
+        for start in range(0, len(ordered), 1000):
+            yield from self.db.execute(
+                select(*COLUMNS["authors"]).where(
+                    Author.id.in_(ordered[start : start + 1000])
+                )
+            )
 
     def favourites(self) -> Iterator[Any]:
         """The person's own stars."""
@@ -1334,6 +1395,7 @@ def _paperus(
         "note_items",
         "collection_notes",
         *(["item_references"] if options.include.references else []),
+        *(["authors", "authorships"] if options.include.authors else []),
         "favourites",
         "pinned_collections",
     ):
@@ -1510,11 +1572,18 @@ PROGRAMS = {
     "mendeley": "Mendeley",
 }
 CANNOT_HOLD: dict[str, dict[str, str]] = {
-    "zotero": {"references": "Zotero RDF has no reference lists"},
-    "jabref": {"references": "BibTeX has no reference lists"},
+    "zotero": {
+        "references": "Zotero RDF has no reference lists",
+        "authors": "Zotero RDF has authors as names only",
+    },
+    "jabref": {
+        "references": "BibTeX has no reference lists",
+        "authors": "BibTeX has authors as names only",
+    },
     "mendeley": {
         "references": "RIS has no reference lists",
         "collections": "RIS has no collections",
+        "authors": "RIS has authors as names only",
     },
 }
 """What each program's format cannot hold, and why (for the website)."""

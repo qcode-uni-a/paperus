@@ -20,7 +20,7 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
-from paperus import export, library, notes, organize
+from paperus import authors, export, library, notes, organize
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
 from paperus.identifiers import Scheme
@@ -317,6 +317,10 @@ def build(client: TestClient, db: Session) -> Rich:
         ]
     )
     db.commit()
+    # Its authors as people (the background job, by hand here; it loaded
+    # the papers into this session, which the tests change behind it).
+    authors.link_waiting(db)
+    db.expire_all()
     return rich
 
 

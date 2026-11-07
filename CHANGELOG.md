@@ -16,6 +16,14 @@
   shows where they were. Manage → Authors also suggests people who are
   probably one ("M. Benito" and "Mónica Benito", co-authors in common
   first): the same person, or different people. See docs/authors.md.
+- **Smart collections by author**: "By these authors" among the rules (an
+  author's page offers "Smart collection" with them filled in); the
+  library's filter takes them too, and saves them.
+- **Exports keep who is who**: paperus exports carry the authors as
+  people and each paper's links to them ("Authors as people", ticked at
+  first; `--no-authors`); importing finds the people here by ORCID iD,
+  OpenAlex id or name, keeps splits and links made by hand, and maps
+  smart collections' author rules. Older exports still import.
 
 ## 0.0.14 (2026-11-07)
 

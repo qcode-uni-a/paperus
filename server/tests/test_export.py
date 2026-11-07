@@ -246,7 +246,7 @@ def test_the_trash_only_when_asked(
 
 @pytest.mark.parametrize(
     "left_out",
-    ["notes", "tags", "collections", "references", "files", "archived"],
+    ["notes", "tags", "collections", "references", "authors", "files", "archived"],
 )
 def test_each_part_can_be_left_out(
     rich: Rich,
@@ -267,6 +267,7 @@ def test_each_part_can_be_left_out(
             "pinned_collections",
         },
         "references": {"item_references"},
+        "authors": {"authors", "authorships"},
         "files": set(),
         "archived": set(),
     }[left_out]

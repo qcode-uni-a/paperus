@@ -18,7 +18,7 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from paperus import export, jobs
+from paperus import authors, export, jobs
 from paperus.access import Access
 from paperus.cli import _other_parts as other_parts
 from paperus.cli import main
@@ -28,6 +28,8 @@ from paperus.export import TABLES
 from paperus.importing import paperus_export
 from paperus.importing.run import run_import
 from paperus.models import (
+    Author,
+    Authorship,
     Blob,
     Collection,
     CollectionItem,
@@ -129,6 +131,30 @@ def test_round_trip_into_an_empty_server(
     tmp_path: Path,
 ) -> None:
     rich = build(client, db)
+    # Its authors as people, one paper's split off to someone else.
+    for title in ("Spin qubits", "Proteins"):
+        response = rich.ada.post(
+            "/api/items",
+            json={"metadata": {"title": title, "author": [
+                {"family": "Benito", "given": "Mónica"}
+            ]}},
+        )  # fmt: skip
+        assert response.status_code == 201, response.text
+    authors.link_waiting(db)  # the new ones
+    prolific = db.scalar(
+        select(Authorship.author_id)
+        .group_by(Authorship.author_id)
+        .having(func.count() > 1)
+        .limit(1)
+    )
+    benito = db.scalar(select(Authorship).where(Authorship.author_id == prolific))
+    assert benito is not None and benito.author_id is not None
+    person = db.get(Author, benito.author_id)
+    assert person is not None
+    person.orcid = "0000-0001-2345-6789"
+    benito.affiliation = "Universität Augsburg"
+    db.commit()
+    apart = person.id, authors.split(db, person, [benito.item_id]).id
     parts = exported(
         rich.ada, job_app, engine, blobs, settings, tmp_path / "first", trash=True
     )
@@ -162,6 +188,10 @@ def test_round_trip_into_an_empty_server(
     want, got = normalized(before, owners), normalized(after, owners)
     for table in want:
         assert got[table] == want[table], table
+    assert want["authors"] and want["authorships"]
+    # The split holds: the two stay apart here too.
+    db.expire_all()
+    assert authors.are_apart(db, *apart)
     before.close()
     after.close()
 
@@ -1061,3 +1091,65 @@ def test_the_command_line_looks_for_parts_beside(tmp_path: Path) -> None:
     assert other_parts(first) == [(second, "two.zip")]
     assert other_parts(part("alone.zip", parts=1)) == []
     assert other_parts(tmp_path / "newer.zip") == []
+
+
+def test_authors_found_here_and_older_exports(
+    client: TestClient,
+    db: Session,
+    job_app: App,
+    engine: Engine,
+    blobs: BlobStore,
+    settings: Settings,
+    tmp_path: Path,
+) -> None:
+    """The export's people are found here by ORCID iD, and rules name them;
+    an export from before authors were people still imports."""
+    ada = Person(client, db, "ada")
+    bob = Person(client, db, "bob")
+    for title in ("Spin qubits", "Driven dots"):
+        response = ada.post(
+            "/api/items",
+            json={"metadata": {"title": title, "author": [
+                {"family": "Benito", "given": "M."}
+            ]}},
+        )  # fmt: skip
+        assert response.status_code == 201, response.text
+    authors.link_waiting(db)
+    benito = db.scalar(select(Author).where(Author.key == "m benito"))
+    assert benito is not None
+    benito.orcid = "0000-0001-2345-6789"
+    db.commit()
+    response = ada.post(
+        "/api/collections",
+        json={"name": "Benito's", "rules": {"authors": [str(benito.id)]}},
+    )
+    assert response.status_code == 201, response.text
+    parts = exported(ada, job_app, engine, blobs, settings, tmp_path / "out")
+    db.expire_all()
+
+    # Bob, on this server: Benito is the one here (by the iD).
+    record = import_into(bob, parts)
+    finished(bob, db, blobs, job_app, record["id"])
+    db.expire_all()
+    assert db.scalar(select(func.count()).select_from(Author)) == 1
+    copied = db.scalars(
+        select(Collection).where(Collection.name.startswith("Benito"))
+    ).all()
+    assert {str(a) for c in copied for a in (c.rules or {}).get("authors", [])} == {
+        str(benito.id)
+    }
+    bobs = bob.get("/api/items").json()
+    assert {tuple(i["author_ids"] or []) for i in bobs} == {(str(benito.id),)}
+
+    # An older export, without authors: imported, linked afterwards.
+    older = rezip(
+        parts[0],
+        tmp_path / "older.zip",
+        sql=["DROP TABLE authorships", "DROP TABLE authors"],
+    )
+    carol = on_a_new_server(db, engine, client)
+    record = import_into(carol, [older])
+    finished(carol, db, blobs, job_app, record["id"])
+    assert all(i["author_ids"] is None for i in carol.get("/api/items").json())
+    authors.link_waiting(db)
+    assert all(i["author_ids"] for i in carol.get("/api/items").json())

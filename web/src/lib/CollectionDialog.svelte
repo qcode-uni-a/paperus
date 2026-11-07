@@ -84,10 +84,15 @@
 	/** ``inLibrary``: preselect this library for a new collection;
 	 * ``asSmart``: start as a smart collection, with ``startRules`` if given
 	 * (e.g. the library's filter). */
-	export function open(inLibrary?: string, asSmart = false, startRules?: Rules) {
+	export function open(
+		inLibrary?: string,
+		asSmart = false,
+		startRules?: Rules,
+		startName?: string
+	) {
 		smart = collection ? isSmart(collection) : asSmart;
 		rules = structuredClone($state.snapshot(startRules ?? collection?.rules) ?? {});
-		name = collection?.name ?? '';
+		name = collection?.name ?? startName ?? '';
 		description = collection?.description ?? '';
 		parent = collection ? (collection.parent_id ?? '') : (parentId ?? '');
 		const parentLibrary = organize.collections.find((c) => c.id === parentId)?.library_id;

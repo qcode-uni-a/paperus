@@ -25,6 +25,11 @@
 		{ key: 'tags', label: 'Tags and keywords', help: '' },
 		{ key: 'collections', label: 'Collections', help: 'also smart ones, and which are pinned' },
 		{ key: 'references', label: 'Reference lists', help: 'what each paper cites' },
+		{
+			key: 'authors',
+			label: 'Authors as people',
+			help: 'who is who (splits, merges, ids) and where they were'
+		},
 		{ key: 'archived', label: 'Archived papers', help: '' }
 	];
 
@@ -42,9 +47,13 @@
 	// What a format cannot hold, and why (as the server's export.CANNOT_HOLD).
 	const CANNOT: Record<Format, Partial<Record<keyof Include, string>>> = {
 		paperus: {},
-		zotero: { references: 'not in Zotero RDF' },
-		jabref: { references: 'not in BibTeX' },
-		mendeley: { references: 'not in RIS', collections: 'RIS has none' }
+		zotero: { references: 'not in Zotero RDF', authors: 'names only in Zotero RDF' },
+		jabref: { references: 'not in BibTeX', authors: 'names only in BibTeX' },
+		mendeley: {
+			references: 'not in RIS',
+			collections: 'RIS has none',
+			authors: 'names only in RIS'
+		}
 	};
 	let format = $state<Format>('paperus');
 	let owners = $state<string[]>([]);
@@ -54,6 +63,7 @@
 		tags: true,
 		collections: true,
 		references: true,
+		authors: true,
 		archived: true
 	});
 	let trash = $state(false);

@@ -20,7 +20,6 @@ from paperus.api.organize import ItemTagOut, item_tags
 from paperus.avatars import avatar_url
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
-    Authorship,
     Favourite,
     File,
     FileRole,
@@ -581,7 +580,7 @@ def list_items(
     owner: Annotated[list[uuid.UUID] | None, Query()] = None,
     added_days: Annotated[int | None, Query(ge=1, le=36500)] = None,
     author: Annotated[str | None, Query(max_length=300)] = None,
-    author_id: uuid.UUID | None = None,
+    author_id: Annotated[list[uuid.UUID] | None, Query()] = None,
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
@@ -608,8 +607,8 @@ def list_items(
     ``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,
     ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
     in ``authors``: the family name, and the given name's first letter if
-    one is given), ``author_id`` (a person, ``paperus.authors``) and
-    ``collection`` (with its
+    one is given), ``author_id`` (repeatable: by one of these people,
+    ``paperus.authors``) and ``collection`` (with its
     subcollections unless ``nested=false``) filter the list, and ``title``
     to items with all of its words in their title (any case).
     ``X-Total-Count`` is the number of matching items, for showing the total
@@ -649,16 +648,11 @@ def list_items(
             published_to=published_to,
             owners=owner or [],
             added_days=added_days,
+            authors=author_id or [],
         )
     )
     if author and author.strip():
         conditions.append(by_author(author))
-    if author_id is not None:
-        conditions.append(
-            Item.id.in_(
-                select(Authorship.item_id).where(Authorship.author_id == author_id)
-            )
-        )
     if collection is not None:
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():

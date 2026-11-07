@@ -150,8 +150,8 @@ export const getAvatar = <ThrowOnError extends boolean = false>(options: Options
  * ``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,
  * ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
  * in ``authors``: the family name, and the given name's first letter if
- * one is given), ``author_id`` (a person, ``paperus.authors``) and
- * ``collection`` (with its
+ * one is given), ``author_id`` (repeatable: by one of these people,
+ * ``paperus.authors``) and ``collection`` (with its
  * subcollections unless ``nested=false``) filter the list, and ``title``
  * to items with all of its words in their title (any case).
  * ``X-Total-Count`` is the number of matching items, for showing the total

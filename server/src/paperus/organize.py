@@ -9,6 +9,7 @@ from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import Session
 
 from paperus.models import (
+    Authorship,
     Collection,
     CollectionItem,
     Item,
@@ -45,6 +46,8 @@ class Rules(BaseModel):
     smart collection holds only that group's papers anyway."""
     added_days: int | None = Field(None, ge=1, le=36500)
     """Added to paperus in the last so many days."""
+    authors: list[uuid.UUID] = []
+    """Written by one of these people (``paperus.authors``)."""
 
 
 class NotFound(LookupError):
@@ -275,6 +278,14 @@ def rule_conditions(rules: Rules) -> list[ColumnElement[bool]]:
         conditions.append(Item.issued_from <= end)
     if rules.owners:
         conditions.append(Item.library_id.in_(rules.owners))
+    if rules.authors:
+        conditions.append(
+            Item.id.in_(
+                select(Authorship.item_id).where(
+                    Authorship.author_id.in_(rules.authors)
+                )
+            )
+        )
     if rules.added_days is not None:
         since = datetime.now(UTC) - timedelta(days=rules.added_days)
         conditions.append(Item.created_at >= since)
