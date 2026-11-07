@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from paperus.mcp_server import _short_authors
+from paperus.mcp_server import TOOL_SCOPES, _short_authors
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
@@ -143,8 +143,9 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "mark_file_not_needed",
         "download_all_open_access",
         "open_access_progress",
-        "list_web_page_copies",
-        "trash_web_page_copies",
+        "list_files",
+        "trash_files",
+        "restore_files",
         "archive_papers",
         "remove_tags",
         "rename_tag",
@@ -154,6 +155,8 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "list_trash",
         "restore_papers",
     }
+    # my_access names every tool with the scope it needs.
+    assert set(tools) == {*TOOL_SCOPES, "my_access"}
     assert tools["search"]["annotations"]["readOnlyHint"] is True
     assert tools["merge_papers"]["annotations"]["destructiveHint"] is True
     assert tools["add_tags"]["annotations"]["readOnlyHint"] is False

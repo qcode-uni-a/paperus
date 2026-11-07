@@ -1,6 +1,6 @@
 """MCP tools for tidying the library, as Manage in the website does:
-duplicates, papers without details, unreadable files, missing PDFs, tags,
-collections and the trash. Groups and their members are not for AI
+duplicates, papers without details, unreadable files, missing PDFs, files,
+tags, collections and the trash. Groups and their members are not for AI
 assistants (tokens never manage people), and the trash is never emptied
 here (that cannot be undone)."""
 
@@ -14,7 +14,7 @@ from typing import Any
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, ToolAnnotations
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from paperus import duplicates, library, merge, metadata, missing, open_access
@@ -22,12 +22,8 @@ from paperus import organize as organizing
 from paperus.access import Access
 from paperus.api.files import read_again, replace_with_open_access, unreadable
 from paperus.api.items import unsorted_conditions
-from paperus.api.manage import (
-    manage_counts,
-    progress_of,
-    queue_all_open_access,
-    web_page_copies,
-)
+from paperus.api.manage import manage_counts, progress_of, queue_all_open_access
+from paperus.api.manage import next_to_a_pdf as beside_a_pdf
 from paperus.identifiers import (
     InvalidIdentifier,
     Scheme,
@@ -44,6 +40,7 @@ from paperus.models import (
     Item,
     MetadataSource,
     Tag,
+    Version,
 )
 from paperus.system import load_config, max_upload_bytes
 from paperus.tokens import Scope
@@ -79,6 +76,11 @@ TOOL_SCOPES = {
     "list_missing_pdfs": Scope.PAPERS_READ,
     "download_open_access": Scope.PAPERS_WRITE,
     "mark_file_not_needed": Scope.PAPERS_WRITE,
+    "download_all_open_access": Scope.PAPERS_WRITE,
+    "open_access_progress": Scope.PAPERS_READ,
+    "list_files": Scope.PAPERS_READ,
+    "trash_files": Scope.PAPERS_WRITE,
+    "restore_files": Scope.PAPERS_WRITE,
     "archive_papers": Scope.PAPERS_WRITE,
     "remove_tags": Scope.TAGS_WRITE,
     "rename_tag": Scope.TAGS_WRITE,
@@ -117,8 +119,8 @@ def register(
         """What needs tidying in the library (as Manage in the website):
         possible duplicates, papers whose details are only guessed from
         their file, files whose text could not be read, papers without a
-        PDF or with only their preprint's, and the trash; each with the
-        tool to look at it."""
+        PDF or with only their preprint's, saved web pages next to a PDF,
+        and the trash; each with the tool to look at it."""
         with acting(ctx, Scope.PAPERS_READ) as (db, access, _):
             counts = manage_counts(db, access)
             trash = db.scalar(
@@ -150,9 +152,11 @@ def register(
                         "tools": "list_missing_pdfs(section='journal'), "
                         "download_open_access(journal=true)",
                     },
-                    "web_page_copies_next_to_a_pdf": {
+                    "web_pages_next_to_a_pdf": {
                         "count": counts.snapshots,
-                        "tools": "list_web_page_copies, trash_web_page_copies",
+                        "tools": "list_files(media_types=['text/html', "
+                        "'application/xhtml+xml'], next_to_a_pdf=true), "
+                        "trash_files",
                     },
                     "trash": {
                         "count": trash or 0,
@@ -482,39 +486,113 @@ def register(
             tried, found = progress_of(db, access, ids, since, which)
             return json({"papers": len(ids), "tried": tried, "found": found})
 
+    # Files
+
     @mcp.tool(annotations=READ)
-    def list_web_page_copies(ctx: Context, limit: int = 30) -> CallToolResult:
-        """Web pages a reference manager saved with a paper (Zotero's
-        "snapshots") that sit next to a PDF of the same version: they add
-        nothing but noise in search. trash_web_page_copies moves them all to
-        the trash."""
+    def list_files(
+        ctx: Context,
+        media_types: list[str] | None = None,
+        next_to_a_pdf: bool = False,
+        in_trash: bool = False,
+        limit: int = 30,
+    ) -> CallToolResult:
+        """Files of the papers the person can see, newest first, with their
+        paper and the total count: optionally only some media types
+        ("text/html", or "image/" for all images); next_to_a_pdf=true: only
+        files that sit next to a PDF of the same version (supplements, but
+        also copies such as a saved web page repeating the abstract);
+        in_trash=true: files moved to the trash. trash_files and
+        restore_files act on them; get_document lists one paper's files."""
         with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
-            files = web_page_copies(db, access)
+            conditions = [
+                File.deleted_at.is_not(None) if in_trash else File.deleted_at.is_(None),
+                Item.deleted_at.is_(None),
+                access.item_filter(),
+            ]
+            if media_types:
+                conditions.append(
+                    or_(
+                        *(
+                            File.media_type.startswith(kind)
+                            if kind.endswith("/")
+                            else File.media_type == kind
+                            for kind in media_types
+                        )
+                    )
+                )
+            if next_to_a_pdf:
+                conditions.append(beside_a_pdf())
+            query = (
+                select(File)
+                .join(Version, Version.id == File.version_id)
+                .join(Item, Item.id == Version.item_id)
+                .where(*conditions)
+            )
+            count = db.scalar(select(func.count()).select_from(query.subquery()))
+            files = db.scalars(
+                query.order_by(File.created_at.desc(), File.id).limit(
+                    min(limit, MAX_LIST)
+                )
+            )
             return json(
                 {
-                    "count": len(files),
-                    "copies": [
+                    "count": count or 0,
+                    "files": [
                         {
-                            **brief(file.version.item, access, base),
                             "file_id": str(file.id),
-                            "file": file.filename,
+                            "filename": file.filename,
+                            "media_type": file.media_type,
+                            "role": file.role,
+                            "bytes": file.blob.size,
+                            "paper": brief(file.version.item, access, base),
                         }
-                        for file in files[: min(limit, MAX_LIST)]
+                        for file in files
                     ],
                 }
             )
 
-    @mcp.tool(annotations=WRITE)
-    def trash_web_page_copies(ctx: Context) -> CallToolResult:
-        """Move all saved web pages that sit next to a PDF to the trash (as
-        Manage → Missing offers; restorable from the trash). Ask the person
-        first."""
+    def own_files(db: Session, access: Access, file_ids: list[str]) -> list[File]:
+        """Files of papers (not in the trash) the person may change."""
+        found = []
+        for file_id in file_ids[:MAX_LIST]:
+            file = db.get(File, parse_id(file_id))
+            item = file.version.item if file else None
+            if (
+                file is None
+                or item is None
+                or item.deleted_at is not None
+                or not access.can_read_item(item)
+            ):
+                raise ToolError(f"No such file: {file_id}.")
+            if not access.can_write_item(item):
+                raise ToolError(
+                    f"You may not change the files of “{item.title}” (you only "
+                    "read it)."
+                )
+            found.append(file)
+        return found
+
+    @mcp.tool(annotations=TRASHES)
+    def trash_files(file_ids: list[str], ctx: Context) -> CallToolResult:
+        """Move files to the trash (their papers stay; restore_files brings
+        them back). Ask the person first, naming the files."""
         with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
-            files = web_page_copies(db, access)
+            files = own_files(db, access, file_ids)
             for file in files:
                 library.trash(file, access.user.id)
             db.commit()
-            return json({"trashed": len(files)})
+            return json({"trashed": [str(file.id) for file in files]})
+
+    @mcp.tool(annotations=WRITE)
+    def restore_files(file_ids: list[str], ctx: Context) -> CallToolResult:
+        """Bring files back from the trash (list_files(in_trash=true) lists
+        them)."""
+        with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
+            files = own_files(db, access, file_ids)
+            for file in files:
+                library.restore(file)
+            db.commit()
+            return json({"restored": [str(file.id) for file in files]})
 
     @mcp.tool(annotations=WRITE)
     def archive_papers(

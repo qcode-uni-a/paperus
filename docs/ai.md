@@ -39,8 +39,9 @@ each file's text, to recognise the paper), `set_doi`,
 `list_unreadable_files`, `retry_file`, `list_missing_pdfs` (both
 sections of Manage → Missing, and the papers marked as needing no file),
 `download_open_access`, `download_all_open_access` with
-`open_access_progress`, `mark_file_not_needed`, `list_web_page_copies`
-and `trash_web_page_copies` (saved web pages next to a PDF),
+`open_access_progress`, `mark_file_not_needed`, `list_files` (by media
+type, next to a PDF, or in the trash; e.g. saved web pages that repeat a
+PDF), `trash_files`, `restore_files`,
 `archive_papers`,
 `remove_tags`,
 `rename_tag` (merges into an existing tag of that name),

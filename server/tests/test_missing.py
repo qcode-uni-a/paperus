@@ -338,7 +338,7 @@ def test_an_assistant_can_do_what_the_page_does(
 ) -> None:
     """Everything of Manage → Missing through the MCP tools: both lists and
     the papers needing no file, download all with its progress, and the
-    saved web pages next to a PDF."""
+    saved web pages next to a PDF (with the general file tools)."""
     published(doi_registry)
     ada = Person(site, db, "ada")
     ai = Assistant(site, token(ada, *ALL))
@@ -385,8 +385,15 @@ def test_an_assistant_can_do_what_the_page_does(
     )
     assert response.status_code == 201, response.text
     checkup = ai.call("library_checkup")
-    assert checkup["web_page_copies_next_to_a_pdf"]["count"] == 1
-    copies = ai.call("list_web_page_copies")
-    assert (copies["count"], copies["copies"][0]["file"]) == (1, "2504.html")
-    assert ai.call("trash_web_page_copies") == {"trashed": 1}
-    assert ai.call("list_web_page_copies")["count"] == 0
+    assert checkup["web_pages_next_to_a_pdf"]["count"] == 1
+    pages = ai.call(
+        "list_files",
+        media_types=["text/html", "application/xhtml+xml"],
+        next_to_a_pdf=True,
+    )
+    [page] = pages["files"]
+    assert (pages["count"], page["filename"]) == (1, "2504.html")
+    assert ai.call("trash_files", file_ids=[page["file_id"]]) == {
+        "trashed": [page["file_id"]]
+    }
+    assert ai.call("library_checkup")["web_pages_next_to_a_pdf"]["count"] == 0

@@ -77,10 +77,23 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
 SNAPSHOT_TYPES = ("text/html", "application/xhtml+xml")
 
 
+def next_to_a_pdf() -> ColumnElement[bool]:
+    """Files other than PDFs with a PDF in the same version."""
+    pdf = aliased(File)
+    return (File.media_type != PDF) & (
+        select(pdf.id)
+        .where(
+            pdf.version_id == File.version_id,
+            pdf.media_type == PDF,
+            pdf.deleted_at.is_(None),
+        )
+        .exists()
+    )
+
+
 def web_page_copies(db: Session, access: Access) -> list[File]:
     """Saved web pages next to a PDF of the same version, on papers the
     person may change."""
-    pdf = aliased(File)
     files = db.scalars(
         select(File)
         .join(Version, Version.id == File.version_id)
@@ -90,13 +103,7 @@ def web_page_copies(db: Session, access: Access) -> list[File]:
             File.deleted_at.is_(None),
             Item.deleted_at.is_(None),
             access.item_filter(access.readable),
-            select(pdf.id)
-            .where(
-                pdf.version_id == File.version_id,
-                pdf.media_type == PDF,
-                pdf.deleted_at.is_(None),
-            )
-            .exists(),
+            next_to_a_pdf(),
         )
     )
     return [file for file in files if access.can_write_item(file.version.item)]
