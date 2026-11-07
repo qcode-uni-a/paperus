@@ -59,17 +59,12 @@ test('filter the library by tags and authors', async ({ page }) => {
 	await expect(page.getByText(/^Papers tagged/)).toBeHidden();
 	expect(new URL(page.url()).search).toBe('');
 
-	// An author: the same family name, and the same first letter.
-	await rows
-		.filter({ hasText: `${word} one` })
-		.getByRole('link', { name: family })
-		.click();
+	// By an author's name (where authors lead until they are linked to
+	// people, see authors.spec.ts): the family name and the first letter.
+	await page.goto(`/?${new URLSearchParams({ author: `${family}, Mónica` })}`);
 	await expect(page.getByText(`Papers by Mónica ${family}.`)).toBeVisible();
 	await expect(rows).toHaveCount(2);
-
-	// On a paper's page, its authors lead there too.
-	await page.getByRole('link', { name: `${word} three` }).click();
-	await page.getByRole('link', { name: `M. ${family}` }).click();
+	await page.goto(`/?${new URLSearchParams({ author: `${family}, M.` })}`);
 	await expect(page.getByText(`Papers by M. ${family}.`)).toBeVisible();
 	await expect(rows).toHaveCount(2);
 });
