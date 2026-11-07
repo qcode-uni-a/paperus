@@ -64,14 +64,6 @@ export function ago(when: string | Date, now: Date = new Date()): string {
 	return 'just now';
 }
 
-/** A time of day stored in UTC (as the server's schedules are), in the
- * browser's time zone: "03:30". */
-export function localTime(utcHour: number, minute = 0): string {
-	const date = new Date();
-	date.setUTCHours(utcHour, minute, 0, 0);
-	return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
 /** Why a file's text could not be read, in plain words (the technical
  * message stays available beside it). */
 export function readingProblem(error: string | null | undefined): string {

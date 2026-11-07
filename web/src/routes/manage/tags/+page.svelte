@@ -12,6 +12,7 @@
 		type Tag
 	} from '#lib/organize.svelte.ts';
 	import TagDialog from '#lib/TagDialog.svelte';
+	import { formatDateTime } from '#lib/dates.svelte.ts';
 	import { ago } from '#lib/format.ts';
 
 	type Sort = 'name' | 'count' | 'last_used' | 'created_at';
@@ -242,13 +243,13 @@
 					<td class="wide muted">{sources(tag)}</td>
 					<td class="wide muted">
 						{#if tag.last_used}
-							<time datetime={tag.last_used} title={new Date(tag.last_used).toLocaleString()}
+							<time datetime={tag.last_used} title={formatDateTime(tag.last_used)}
 								>{ago(tag.last_used)}</time
 							>
 						{:else}never{/if}
 					</td>
 					<td class="wide muted">
-						<time datetime={tag.created_at} title={new Date(tag.created_at).toLocaleString()}
+						<time datetime={tag.created_at} title={formatDateTime(tag.created_at)}
 							>{ago(tag.created_at)}</time
 						>
 					</td>

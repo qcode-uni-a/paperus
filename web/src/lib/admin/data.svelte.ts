@@ -11,7 +11,7 @@ import {
 } from '@mdi/js';
 import { getConfig, mlStatus, stats as getStats } from '#lib/api/client.ts';
 import type { MlStatus, Stats, SystemConfig } from '#lib/api/generated/types.gen.ts';
-import { localTime } from '#lib/format.ts';
+import { localTime } from '#lib/dates.svelte.ts';
 
 /** Shared by the admin pages; refreshed while one of them is open. */
 export const admin = $state<{
@@ -118,7 +118,7 @@ export const SETTINGS: {
 	{
 		slug: 'server',
 		title: 'Server',
-		subtitle: 'Public address, contact email for metadata services, upload limits',
+		subtitle: 'Public address, contact email for metadata services, dates and times, upload limits',
 		icon: mdiServerOutline,
 		status: (c) => (c.public_url ? new URL(c.public_url).host : null)
 	},

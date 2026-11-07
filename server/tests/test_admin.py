@@ -14,6 +14,7 @@ from paperus.processing import process_file
 from paperus.storage import BlobStore
 from paperus.system import load_config
 from tests.conftest import FakeML
+from tests.people import Person
 
 
 def queued(job_app: App) -> list[str]:
@@ -144,3 +145,25 @@ def test_read_failed_files_again(admin: TestClient, db: Session, job_app: App) -
     db.expire_all()
     assert db.scalar(select(File.text_status)) == TextStatus.PENDING
     assert admin.get("/api/admin/stats").json()["files_failed"] == 0
+
+
+def test_date_format_for_everyone(client: TestClient, db: Session) -> None:
+    """The administrator's choice of date format reaches every person with
+    their account (login, /me, a new profile picture)."""
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    assert ada.get("/api/auth/me").json()["date_format"] == "browser"
+    config = root.get("/api/admin/config").json()
+    assert config["date_format"] == "browser"
+    refused = root.put("/api/admin/config", json={**config, "date_format": "mars"})
+    assert refused.status_code == 422
+    saved = root.put("/api/admin/config", json={**config, "date_format": "europe"})
+    assert saved.status_code == 200
+    assert root.get("/api/admin/config").json()["date_format"] == "europe"
+    assert ada.get("/api/auth/me").json()["date_format"] == "europe"
+    login = client.post(
+        "/api/auth/login", json={"username": "ada", "password": "secret"}
+    )
+    assert login.json()["user"]["date_format"] == "europe"
+    removed = ada.delete("/api/me/avatar")
+    assert removed.json()["date_format"] == "europe"

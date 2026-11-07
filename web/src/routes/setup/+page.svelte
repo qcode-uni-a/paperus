@@ -14,6 +14,7 @@
 		setupState
 	} from '#lib/api/client.ts';
 	import type { ProviderFound, RestoreCheckOut, SetupState } from '#lib/api/generated/types.gen.ts';
+	import { formatDateTime } from '#lib/dates.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	/** First start: a new administrator, or a backup restored. */
@@ -240,7 +241,7 @@
 								class:chosen={chosen === backup.name}
 								onclick={() => choose(backup.name)}
 							>
-								<strong>{new Date(backup.created_at).toLocaleString()}</strong>
+								<strong>{formatDateTime(backup.created_at)}</strong>
 								<span
 									>{backup.items} papers, {backup.with_files
 										? `${backup.files} files`

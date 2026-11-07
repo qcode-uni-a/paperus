@@ -3,11 +3,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import select
 
 from paperus import avatars
-from paperus.api.auth import UserOut, user_out
+from paperus.api.auth import UserOut, session_user_out
 from paperus.api.deps import DB, CurrentUser, SessionUser
 from paperus.models import User
 
@@ -16,7 +16,7 @@ router = APIRouter(tags=["avatars"])
 
 @router.put("/api/me/avatar")
 async def set_avatar(
-    upload: Annotated[UploadFile, File()], db: DB, user: SessionUser
+    upload: Annotated[UploadFile, File()], db: DB, user: SessionUser, request: Request
 ) -> UserOut:
     """One's profile picture: PNG, JPEG or WebP, up to 256 KB (the website
     sends it square, 256 pixels wide)."""
@@ -26,14 +26,14 @@ async def set_avatar(
     except avatars.BadPicture as error:
         raise HTTPException(422, str(error)) from error
     db.commit()
-    return user_out(user)
+    return session_user_out(user, db, request)
 
 
 @router.delete("/api/me/avatar")
-def remove_avatar(db: DB, user: SessionUser) -> UserOut:
+def remove_avatar(db: DB, user: SessionUser, request: Request) -> UserOut:
     avatars.set_avatar(user, None)
     db.commit()
-    return user_out(user)
+    return session_user_out(user, db, request)
 
 
 @router.get(

@@ -7,7 +7,8 @@
 		startBackup
 	} from '#lib/api/client.ts';
 	import type { BackupConfig, Backups } from '#lib/api/generated/types.gen.ts';
-	import { ago, localTime } from '#lib/format.ts';
+	import { formatDateTime, localTime } from '#lib/dates.svelte.ts';
+	import { ago } from '#lib/format.ts';
 
 	let data = $state<Backups | null>(null);
 	let config = $state<BackupConfig | null>(null);
@@ -158,7 +159,7 @@
 					{#each data.backups as backup (backup.name)}
 						<tr>
 							<td>
-								<strong>{new Date(backup.created_at).toLocaleString()}</strong>
+								<strong>{formatDateTime(backup.created_at)}</strong>
 								<small>{ago(backup.created_at)}</small>
 							</td>
 							<td class="wide"

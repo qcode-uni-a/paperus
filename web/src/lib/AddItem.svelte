@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { addItem, addItems, errorMessage } from '#lib/api/client.ts';
+	import DateInput from '#lib/DateInput.svelte';
 	import { addedPaper } from '#lib/hints.svelte.ts';
 	import {
 		defaultLibrary,
@@ -15,12 +16,13 @@
 	 * then; with it, the item is put into that collection and stays closed. */
 	let { ondone, collection }: { ondone?: () => void; collection?: string } = $props();
 
+	const uid = $props.id();
 	let doi = $state('');
 	let manual = $state(false);
 	let title = $state('');
 	let type = $state('document');
 	let genre = $state('');
-	let date = $state('');
+	let date = $state<string | null>(null);
 	let error = $state('');
 	let busy = $state(false);
 	// A group's collection takes only the group's papers; otherwise the
@@ -101,7 +103,9 @@
 				</select>
 			</label>
 			<label>Genre <input bind:value={genre} placeholder="e.g. Meeting notes" /></label>
-			<label>Date <input type="date" bind:value={date} /></label>
+			<div class="field">
+				<label for="{uid}-date">Date</label><DateInput id="{uid}-date" bind:value={date} />
+			</div>
 		</div>
 	{:else}
 		<label
@@ -136,7 +140,8 @@
 		display: grid;
 		gap: 12px;
 	}
-	label {
+	label,
+	.field {
 		display: grid;
 		gap: 4px;
 	}

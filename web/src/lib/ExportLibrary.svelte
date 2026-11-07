@@ -8,6 +8,7 @@
 		startExport
 	} from '#lib/api/client.ts';
 	import type { Estimate, ExportOut, Include } from '#lib/api/generated/types.gen.ts';
+	import { formatDateTime } from '#lib/dates.svelte.ts';
 	import { ago, fileSize } from '#lib/format.ts';
 	import { collectionPath, flatTree, libraryName, organize } from '#lib/organize.svelte.ts';
 	import { watchExport } from '#lib/processing.svelte.ts';
@@ -259,7 +260,7 @@
 						{/each}
 					</ul>
 					{#if record.expires_at}<small
-							>Until {new Date(record.expires_at).toLocaleString()}{record.parts.length > 1
+							>Until {formatDateTime(record.expires_at)}{record.parts.length > 1
 								? '. Unpack all zips into one folder.'
 								: '.'}</small
 						>{/if}

@@ -6,7 +6,7 @@
 	import Stepper from '#lib/admin/Stepper.svelte';
 	import Switch from '#lib/admin/Switch.svelte';
 	import { runJob } from '#lib/api/client.ts';
-	import { localTime } from '#lib/format.ts';
+	import { localTime } from '#lib/dates.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	const config = $derived(admin.config);

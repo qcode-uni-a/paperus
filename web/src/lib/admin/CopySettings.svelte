@@ -6,7 +6,8 @@
 	import Switch from '#lib/admin/Switch.svelte';
 	import { previewTemplate, readableCopy, runJob } from '#lib/api/client.ts';
 	import type { ReadableCopy } from '#lib/api/generated/types.gen.ts';
-	import { ago, localTime } from '#lib/format.ts';
+	import { localTime } from '#lib/dates.svelte.ts';
+	import { ago } from '#lib/format.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	const DEFAULT = '{owner}/{first_author}_{journal}_{year}';

@@ -19,6 +19,8 @@ from paperus.models import SystemSetting
 
 KEY = "config"
 
+DateFormat = Literal["browser", "europe", "uk", "iso", "us"]
+
 
 class Joining(BaseModel):
     group_id: uuid.UUID
@@ -62,6 +64,10 @@ class SystemConfig(BaseModel):
     Unpaywall knows (needs the contact email). Sends their DOIs there."""
     max_upload_mb: int | None = Field(None, ge=1, le=100_000)
     """Largest file one may upload (an import's files each)."""
+    date_format: DateFormat = "browser"
+    """How the website shows dates and times, for everyone: "browser" (each
+    browser's own), "europe" (31.12.2026, 14:30), "uk" (31/12/2026, 14:30),
+    "iso" (2026-12-31, 14:30) or "us" (12/31/2026, 2:30 PM)."""
 
     # Trash
     trash_days: int | None = Field(None, ge=1, le=3650)

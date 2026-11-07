@@ -12194,6 +12194,18 @@
             ],
             "title": "Max Upload Mb"
           },
+          "date_format": {
+            "type": "string",
+            "enum": [
+              "browser",
+              "europe",
+              "uk",
+              "iso",
+              "us"
+            ],
+            "title": "Date Format",
+            "default": "browser"
+          },
           "trash_days": {
             "anyOf": [
               {
@@ -12986,6 +12998,18 @@
               }
             ],
             "title": "Avatar Url"
+          },
+          "date_format": {
+            "type": "string",
+            "enum": [
+              "browser",
+              "europe",
+              "uk",
+              "iso",
+              "us"
+            ],
+            "title": "Date Format",
+            "default": "browser"
           }
         },
         "type": "object",

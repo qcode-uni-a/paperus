@@ -14,6 +14,7 @@
 		OwnerChoice,
 		Preview
 	} from '#lib/api/generated/types.gen.ts';
+	import { formatDate } from '#lib/dates.svelte.ts';
 	import { libraryName, writableLibraries } from '#lib/organize.svelte.ts';
 
 	/** A paperus export waiting for the person's choices (the rule book is
@@ -219,7 +220,7 @@
 	<p>
 		A paperus export by <strong>{choices.exported_by}</strong>{choices.server_url
 			? ` on ${choices.server_url}`
-			: ''}, {new Date(choices.exported_at).toLocaleDateString()}.
+			: ''}, {formatDate(choices.exported_at)}.
 	</p>
 	{#each choices.missing as missing (missing.part)}
 		<p class="warning">

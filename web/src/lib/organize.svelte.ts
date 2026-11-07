@@ -1,5 +1,6 @@
 import { listCollections, listLibraries, listTags } from '#lib/api/client.ts';
 import type { CollectionOut, LibraryOut, Rules, TagOut } from '#lib/api/generated/types.gen.ts';
+import { formatLongDate, formatMonth } from '#lib/dates.svelte.ts';
 import { plural } from '#lib/format.ts';
 
 export type Collection = CollectionOut;
@@ -123,26 +124,15 @@ function publishedWords(rules: Rules): string | null {
 				: `published ${year(from)}–${year(to)}`;
 		return from ? `published in ${year(from)} or later` : `published in ${year(to!)} or earlier`;
 	}
-	const day = (iso: string) =>
-		new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-			day: 'numeric',
-			month: 'long',
-			year: 'numeric',
-			timeZone: 'UTC'
-		});
-	const month = (iso: string) =>
-		new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
-			month: 'long',
-			year: 'numeric',
-			timeZone: 'UTC'
-		});
 	if (from && to) {
 		const last = new Date(Date.UTC(+to.slice(0, 4), +to.slice(5, 7), 0)).getUTCDate();
 		if (from.slice(0, 7) === to.slice(0, 7) && from.endsWith('-01') && +to.slice(8) === last)
-			return `published in ${month(from)}`;
-		return `published ${day(from)} – ${day(to)}`;
+			return `published in ${formatMonth(from)}`;
+		return `published ${formatLongDate(from)} – ${formatLongDate(to)}`;
 	}
-	return from ? `published on ${day(from)} or later` : `published on ${day(to!)} or earlier`;
+	return from
+		? `published on ${formatLongDate(from)} or later`
+		: `published on ${formatLongDate(to!)} or earlier`;
 }
 
 export function describeRules(rules: Rules): string {

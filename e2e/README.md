@@ -31,6 +31,9 @@ something already listens on its port.
   reads it, keyword search finds it; edit the title, add and remove tags.
 - `organize`: collections, trash and restore, archive and take out.
 - `settings`: an access token: create, use from outside the browser, revoke.
+- `dates`: the European date format: set by the administrator, typed into a
+  smart collection's date field, shown in its description and a token's
+  expiry; set back to the browser's at the end.
 - `oauth`: an app registers, the consent page, the code traded for a token,
   disconnecting; an unknown app refused.
 - `phone`: on a phone-sized screen, pages have no sideways scroll; the menu

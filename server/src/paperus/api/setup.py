@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from paperus import auth, backup
-from paperus.api.auth import LoginResponse, set_session_cookie, user_out
+from paperus.api.auth import LoginResponse, session_user_out, set_session_cookie
 from paperus.api.backups import BackupOut, backup_out
 from paperus.api.deps import DB
 from paperus.api.users import NewUser
@@ -93,7 +93,7 @@ def create_first_admin(
     token = auth.start_session(db, user)
     db.commit()
     set_session_cookie(request, response, token, auth.SESSION_LIFETIME.days)
-    return LoginResponse(token=token, user=user_out(user))
+    return LoginResponse(token=token, user=session_user_out(user, db, request))
 
 
 @router.post("/restore", status_code=204)

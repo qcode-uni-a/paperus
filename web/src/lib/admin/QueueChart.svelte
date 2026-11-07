@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Sample } from '#lib/admin/data.svelte.ts';
+	import { formatTime } from '#lib/dates.svelte.ts';
 
 	/** One queue over the last two minutes: jobs waiting or running (the
 	 * area) and jobs finished per minute (the dashed line), each on its own
@@ -39,11 +40,7 @@
 		for (let at = end - (end % 30_000); at >= end - WINDOW; at -= 30_000) {
 			ticks.push({
 				x: x(at),
-				label: new Date(at).toLocaleTimeString([], {
-					hour: '2-digit',
-					minute: '2-digit',
-					second: '2-digit'
-				})
+				label: formatTime(at, { seconds: true })
 			});
 		}
 		return {

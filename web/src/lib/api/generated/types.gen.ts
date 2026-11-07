@@ -3175,6 +3175,10 @@ export type SystemConfig = {
      */
     max_upload_mb?: number | null;
     /**
+     * Date Format
+     */
+    date_format?: 'browser' | 'europe' | 'uk' | 'iso' | 'us';
+    /**
      * Trash Days
      */
     trash_days?: number | null;
@@ -3586,6 +3590,10 @@ export type UserOut = {
      * Avatar Url
      */
     avatar_url?: string | null;
+    /**
+     * Date Format
+     */
+    date_format?: 'browser' | 'europe' | 'uk' | 'iso' | 'us';
 };
 
 /**

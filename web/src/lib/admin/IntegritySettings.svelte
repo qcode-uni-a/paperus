@@ -6,7 +6,8 @@
 	import SettingRow from '#lib/admin/SettingRow.svelte';
 	import { integrityReport, runJob } from '#lib/api/client.ts';
 	import type { Report } from '#lib/api/generated/types.gen.ts';
-	import { ago, localTime } from '#lib/format.ts';
+	import { localTime } from '#lib/dates.svelte.ts';
+	import { ago } from '#lib/format.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	let report = $state<Report | null>(null);

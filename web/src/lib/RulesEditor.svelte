@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Rules } from '#lib/api/generated/types.gen.ts';
+	import DateInput from '#lib/DateInput.svelte';
 	import { TYPE_NAMES } from '#lib/format.ts';
 	import { libraryById, libraryName, organize } from '#lib/organize.svelte.ts';
 
@@ -7,6 +8,7 @@
 	 * match all rules given. */
 	let { rules = $bindable(), library }: { rules: Rules; library: string } = $props();
 
+	const uid = $props.id();
 	const group = $derived(libraryById(library)?.kind === 'group');
 	// A group's smart collection holds only the group's papers, so only its
 	// tags matter; one's own may use any tag one can see.
@@ -113,21 +115,17 @@
 	<div class="row">
 		<span class="name">Published</span>
 		<div class="dates">
-			<label
-				>from <input
-					type="date"
-					max={rules.published_to ?? undefined}
-					value={rules.published_from ?? ''}
-					oninput={(event) => (rules.published_from = event.currentTarget.value || null)}
-				/></label
+			<span class="date"
+				><label for="{uid}-from">from</label>
+				<DateInput
+					id="{uid}-from"
+					bind:value={rules.published_from}
+					max={rules.published_to}
+				/></span
 			>
-			<label
-				>to <input
-					type="date"
-					min={rules.published_from ?? undefined}
-					value={rules.published_to ?? ''}
-					oninput={(event) => (rules.published_to = event.currentTarget.value || null)}
-				/></label
+			<span class="date"
+				><label for="{uid}-to">to</label>
+				<DateInput id="{uid}-to" bind:value={rules.published_to} min={rules.published_from} /></span
 			>
 		</div>
 	</div>
@@ -242,12 +240,12 @@
 		gap: 8px;
 		font-weight: 400;
 	}
-	.dates label {
+	.dates .date {
 		display: flex;
 		align-items: center;
 		gap: 6px;
 	}
-	input[type='date'] {
+	.dates :global(input.native) {
 		width: auto;
 		max-width: 11rem;
 	}

@@ -20,7 +20,7 @@ from paperus.api.deps import (
     request_token,
 )
 from paperus.avatars import avatar_url
-from paperus.system import SystemConfig, load_config, oidc_secret
+from paperus.system import DateFormat, SystemConfig, load_config, oidc_secret
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -40,6 +40,8 @@ class UserOut(BaseModel):
     """The account is linked to the OIDC login."""
     avatar_url: str | None = None
     """The profile picture, if one is set."""
+    date_format: DateFormat = "browser"
+    """How dates and times are shown (the installation's setting)."""
 
 
 class PasswordChange(BaseModel):
@@ -52,7 +54,7 @@ class LoginResponse(BaseModel):
     user: UserOut
 
 
-def user_out(user: auth.User) -> UserOut:
+def user_out(user: auth.User, date_format: DateFormat) -> UserOut:
     return UserOut(
         id=user.id,
         username=user.username,
@@ -60,7 +62,14 @@ def user_out(user: auth.User) -> UserOut:
         seen_hints=user.seen_hints,
         oidc_linked=user.oidc_subject is not None,
         avatar_url=avatar_url(user.id, user.avatar_version),
+        date_format=date_format,
     )
+
+
+def session_user_out(user: auth.User, db: Session, request: Request) -> UserOut:
+    """The person as the website keeps them, with the installation's date
+    format."""
+    return user_out(user, load_config(db, request.app.state.settings).date_format)
 
 
 @router.post("/login")
@@ -77,7 +86,7 @@ def login(
     token = auth.start_session(db, user, timedelta(days=config.session_days))
     db.commit()
     set_session_cookie(request, response, token, config.session_days)
-    return LoginResponse(token=token, user=user_out(user))
+    return LoginResponse(token=token, user=user_out(user, config.date_format))
 
 
 def set_session_cookie(
@@ -264,8 +273,8 @@ def logout(request: Request, response: Response, db: DB) -> None:
 
 
 @router.get("/me")
-def me(user: CurrentUser) -> UserOut:
-    return user_out(user)
+def me(user: CurrentUser, db: DB, request: Request) -> UserOut:
+    return session_user_out(user, db, request)
 
 
 @router.post("/password", status_code=204)

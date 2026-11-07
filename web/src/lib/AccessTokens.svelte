@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createToken, errorMessage, listTokens, revokeToken } from '#lib/api/client.ts';
 	import type { CreatedToken, Scope, TokenOut } from '#lib/api/generated/types.gen.ts';
+	import { formatDate } from '#lib/dates.svelte.ts';
 	import { ago } from '#lib/format.ts';
 	import { libraryName, organize } from '#lib/organize.svelte.ts';
 
@@ -139,7 +140,7 @@
 							: ''}{token.last_used_at
 							? `Used ${ago(token.last_used_at)}`
 							: 'Not used yet'}{token.expires_at
-							? `; expires ${new Date(token.expires_at).toLocaleDateString()}`
+							? `; expires ${formatDate(token.expires_at)}`
 							: ''}.
 					</small>
 				</div>

@@ -3,6 +3,13 @@
 	import { saveConfig } from '#lib/admin/config.svelte.ts';
 	import SectionButtons from '#lib/admin/SectionButtons.svelte';
 	import SettingRow from '#lib/admin/SettingRow.svelte';
+	import {
+		DATE_FORMATS,
+		formatDateTime,
+		formatLongDate,
+		type DateFormat
+	} from '#lib/dates.svelte.ts';
+	import { session } from '#lib/session.svelte.ts';
 
 	const config = $derived(admin.config);
 	let publicUrl = $state('');
@@ -11,6 +18,8 @@
 	let openAccess = $state(false);
 	let findPublished = $state(true);
 	let findReferences = $state(true);
+	let dates = $state<DateFormat>('browser');
+	const now = new Date();
 	let saving = $state(false);
 
 	function reset() {
@@ -20,6 +29,7 @@
 		openAccess = config?.open_access_auto ?? false;
 		findPublished = config?.find_published ?? true;
 		findReferences = config?.find_references ?? true;
+		dates = config?.date_format ?? 'browser';
 	}
 	// The page reloads its data every few seconds: start over only when the
 	// saved values change (not while someone is typing).
@@ -32,7 +42,8 @@
 			config.max_upload_mb,
 			config.open_access_auto,
 			config.find_published,
-			config.find_references
+			config.find_references,
+			config.date_format
 		]);
 		if (saved === seen) return;
 		seen = saved;
@@ -46,22 +57,26 @@
 				uploadMb !== config.max_upload_mb ||
 				openAccess !== (config.open_access_auto ?? false) ||
 				findPublished !== (config.find_published ?? true) ||
-				findReferences !== (config.find_references ?? true))
+				findReferences !== (config.find_references ?? true) ||
+				dates !== (config.date_format ?? 'browser'))
 	);
 
 	async function save() {
 		saving = true;
-		await saveConfig(
+		const saved = await saveConfig(
 			{
 				public_url: publicUrl.trim() || null,
 				contact_email: email.trim() || null,
 				max_upload_mb: uploadMb,
 				open_access_auto: openAccess,
 				find_published: findPublished,
-				find_references: findReferences
+				find_references: findReferences,
+				date_format: dates
 			},
 			'Server settings'
 		);
+		// One's own pages follow right away; others' on their next visit.
+		if (saved && session.user) session.user.date_format = dates;
 		saving = false;
 	}
 </script>
@@ -108,6 +123,22 @@
 	>
 </SettingRow>
 <SettingRow
+	title="Dates and times"
+	description="How the website shows dates and times, for everyone. Times are in each person's own time zone."
+>
+	<fieldset class="choice">
+		<legend class="visually-hidden">Dates and times</legend>
+		{#each DATE_FORMATS as [format, name] (format)}
+			<label
+				><input type="radio" bind:group={dates} value={format} />
+				<span
+					>{name}<small>{formatDateTime(now, format)} · {formatLongDate(now, format)}</small></span
+				></label
+			>
+		{/each}
+	</fieldset>
+</SettingRow>
+<SettingRow
 	id="upload-limit"
 	title="Largest upload"
 	description="In MB, for each uploaded file (also each file of an import). A reverse proxy may have its own limit."
@@ -125,5 +156,26 @@
 	.check input {
 		width: auto;
 		margin: 0;
+	}
+	.choice {
+		display: grid;
+		gap: 6px;
+		margin: 0;
+		padding: 0;
+		border: none;
+	}
+	.choice label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.choice input {
+		width: auto;
+		margin: 0;
+	}
+	.choice small {
+		display: block;
+		color: var(--muted);
+		font-size: var(--step--1);
 	}
 </style>

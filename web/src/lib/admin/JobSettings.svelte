@@ -7,7 +7,7 @@
 	import Stepper from '#lib/admin/Stepper.svelte';
 	import { listBackups } from '#lib/api/client.ts';
 	import type { BackupConfig } from '#lib/api/generated/types.gen.ts';
-	import { localTime } from '#lib/format.ts';
+	import { localTime } from '#lib/dates.svelte.ts';
 
 	const config = $derived(admin.config);
 	let text = $state(2);

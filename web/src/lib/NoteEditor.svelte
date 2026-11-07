@@ -18,6 +18,7 @@
 		type Item
 	} from '#lib/api/client.ts';
 	import type { NoteDetail, RevisionOut } from '#lib/api/generated/types.gen.ts';
+	import { formatDateTime } from '#lib/dates.svelte.ts';
 	import { ago, shortAuthors } from '#lib/format.ts';
 	import Markdown from '#lib/Markdown.svelte';
 	import MenuButton from '#lib/MenuButton.svelte';
@@ -442,7 +443,7 @@
 						<li>
 							<button aria-pressed={shown?.id === revision.id} onclick={() => (shown = revision)}>
 								{revision.written_by ?? 'Someone'}<small
-									>{new Date(revision.written_at).toLocaleString()}</small
+									>{formatDateTime(revision.written_at)}</small
 								>
 							</button>
 						</li>

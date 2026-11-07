@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Dates and times** in one form for everyone (Administration → Settings
+  → Server): as each browser is set (as before), Europe (31.12.2026,
+  14:30), UK (31/12/2026), ISO 8601 (2026-12-31) or US (12/31/2026,
+  2:30 PM). Lists, schedules and smart collections' descriptions follow
+  it, and date fields take dates typed that way ("15.3.2024"), with a
+  calendar beside them.
 - **Saved web pages** (Zotero's snapshots) show on a paper's page as
   pages, not as their source text, in a frame that runs no scripts and
   loads nothing from the web (also when opened on their own, so no
