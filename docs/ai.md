@@ -28,7 +28,9 @@ pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 meaning, by the average of their passages' vectors), `get_references` (a
 paper's reference list, each reference a `paper` in the library, a `link`
 (DOI, arXiv ID or URL) or `text`), `cited_by` (papers in the library whose
-reference lists have it), `list_tags`, `my_access` (who the
+reference lists have it), `list_tags`, `find_authors` and `get_author`
+(authors as people: ids, co-authors, where they were; `list_documents`
+takes `author_id`, and `get_document` names each author's person), `my_access` (who the
 token acts for, its rights and the tools they allow, groups with
 `groups.read`), `export_citations` (BibTeX or CSL-JSON); with write
 scopes `add_tags` and `add_document`. **Tidying** (what Manage does in the

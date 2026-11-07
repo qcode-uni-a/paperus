@@ -16,6 +16,7 @@ from paperus.models import Author, Authorship, Item
 from paperus.system import load_config, save_config
 from tests.people import Person
 from tests.test_jobs import worker  # noqa: F401 (fixture)
+from tests.test_mcp import ALL, Assistant, ToolFailed, token
 
 
 def paper(person: Person, title: str, *names: str, **fields: Any) -> str:  # noqa: ANN401
@@ -538,3 +539,31 @@ def test_smart_collections_by_author(client: TestClient, db: Session) -> None:
     # In the list: by any of several people.
     listed = ada.get("/api/items", params={"author_id": [str(benito), str(platero)]})
     assert sorted(i["title"] for i in listed.json()) == ["Dots", "Lone", "Qubits"]
+
+
+def test_assistants_find_authors(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    qubits = paper(ada, "Qubits", "Benito, Mónica", "Platero, Gloria")
+    paper(ada, "Dots", "Benito, M.")
+    authors.link_waiting(db)
+    [benito, platero] = people(db, qubits)
+    ai = Assistant(client, token(ada, *ALL))
+    found = ai.call("find_authors", name="benito")
+    assert sorted((f["name"], f["papers"]) for f in found) == [
+        ("M. Benito", 1),
+        ("Mónica Benito", 1),
+    ]
+    person = ai.call("get_author", author_id=str(benito))
+    assert person["name"] == "Mónica Benito"
+    assert [p["title"] for p in person["newest_papers"]] == ["Qubits"]
+    assert [c["name"] for c in person["coauthors"]] == ["Gloria Platero"]
+    with pytest.raises(ToolFailed, match="No such author"):
+        ai.call("get_author", author_id=str(uuid.uuid4()))
+    listed = ai.call("list_documents", author_id=str(platero))["papers"]
+    assert [p["title"] for p in listed] == ["Qubits"]
+    document = ai.call("get_document", paper_id=qubits)
+    assert document["people"] == [
+        # (Empty fields are left out.)
+        {"name": "Benito, Mónica", "author_id": str(benito)},
+        {"name": "Platero, Gloria", "author_id": str(platero)},
+    ]

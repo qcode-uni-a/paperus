@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from typing import Any, Literal
 
 import pydantic_core
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import (
@@ -40,6 +40,7 @@ from paperus import (
     tokens,
 )
 from paperus.access import Access, Forbidden, NotVisible
+from paperus.api import authors as author_api
 from paperus.api.citations import export_items, render
 from paperus.api.items import ItemIn, add_or_find
 from paperus.api.organize import item_tags
@@ -48,6 +49,7 @@ from paperus.jobs import queue_note_embedding
 from paperus.mcp_manage import find_paper, group_library, parse_id, readable_file
 from paperus.models import (
     AccessToken,
+    Authorship,
     Chunk,
     Collection,
     File,
@@ -75,6 +77,9 @@ full text, shared in groups. You act for one person and see only what they may.
   one's passage with `get_passage` (more context, or `get_document` with
   pages, if needed). If it does not fit, take the next candidate or search
   again in other words. Say so if nothing matches.
+- Papers by someone: `find_authors` (authors are people: one person may
+  have several spellings, several people one name), then
+  `list_documents(author_id=…)` or `get_author`.
 - Unsure what you may do? `my_access` says who you act for and what the
   access token allows.
 - Cite every claim with the `link` returned; never cite from memory. For
@@ -509,10 +514,12 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
         limit: int = 50,
         offset: int = 0,
         archived: bool = False,
+        author_id: str | None = None,
     ) -> CallToolResult:
         """Papers the person can see, newest first: optionally in a
         collection (with those inside it), with a tag (by name), or with
-        words in the title. Archived papers are left out; archived=true
+        words in the title, or by an author (author_id from find_authors).
+        Archived papers are left out; archived=true
         lists only them."""
         with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
             conditions = [
@@ -539,6 +546,14 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                     )
                 )
                 conditions.append(Item.id.in_(tagged))
+            if author_id:
+                conditions.append(
+                    Item.id.in_(
+                        select(Authorship.item_id).where(
+                            Authorship.author_id == parse_id(author_id)
+                        )
+                    )
+                )
             for word in (title or "").split():
                 conditions.append(Item.title.icontains(word, autoescape=True))
             total = db.scalar(select(func.count()).select_from(Item).where(*conditions))
@@ -676,6 +691,64 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                     }
                     for tag, count, by_hand in rows
                 ]
+            )
+
+    @mcp.tool(annotations=READ)
+    def find_authors(name: str, ctx: Context, limit: int = 10) -> CallToolResult:
+        """People among the authors of the person's papers, by words of
+        their name (accents and case ignored), most papers here first. Each
+        is a person, not a spelling: "M. Benito" and "Mónica Benito" may be
+        one, two people may share a name. get_author tells more;
+        list_documents(author_id=…) lists their papers."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            rows = author_api.list_authors(
+                Response(), db, access, q=name, limit=min(max(limit, 1), 50)
+            )
+            return _json(
+                [
+                    {
+                        "author_id": str(row.id),
+                        "name": row.name,
+                        "papers": row.papers,
+                        "orcid": row.orcid,
+                        "link": f"{base}/authors/{row.id}",
+                    }
+                    for row in rows
+                ]
+            )
+
+    @mcp.tool(annotations=READ)
+    def get_author(author_id: str, ctx: Context) -> CallToolResult:
+        """An author as a person: their ids (ORCID, OpenAlex), the names
+        on their papers, co-authors, where they were (from their papers'
+        affiliations, newest first: "latest known", not necessarily
+        current), others of the same name, and their newest papers here."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            try:
+                found = author_api.get_author(parse_id(author_id), db, access)
+            except HTTPException as error:
+                raise ToolError(f"No such author: {author_id}.") from error
+            papers = db.scalars(
+                select(Item)
+                .where(
+                    Item.deleted_at.is_(None),
+                    Item.archived_at.is_(None),
+                    access.item_filter(),
+                    Item.id.in_(
+                        select(Authorship.item_id).where(
+                            Authorship.author_id == found.id
+                        )
+                    ),
+                )
+                .order_by(Item.id.desc())
+                .limit(30)
+            ).unique()
+            return _json(
+                {
+                    **found.model_dump(mode="json"),
+                    "link": f"{base}/authors/{found.id}",
+                    "newest_papers": [_brief(item, access, base) for item in papers],
+                }
             )
 
     @mcp.tool(annotations=WRITE)
@@ -872,6 +945,8 @@ TOOL_SCOPES = {
     "get_references": Scope.PAPERS_READ,
     "cited_by": Scope.PAPERS_READ,
     "list_tags": Scope.PAPERS_READ,
+    "find_authors": Scope.PAPERS_READ,
+    "get_author": Scope.PAPERS_READ,
     "add_tags": Scope.TAGS_WRITE,
     "add_document": Scope.PAPERS_WRITE,
     "get_note": Scope.PAPERS_READ,
@@ -977,8 +1052,21 @@ def _details(db: Session, access: Access, item: Item, base: str) -> dict[str, An
         for link in item.collection_links
         if access.can_read(link.collection.library_id)
     ]
+    people = (
+        [
+            {
+                "name": a.written,
+                "author_id": str(a.author_id) if a.author_id else None,
+                "affiliation": a.affiliation,
+            }
+            for a in item.authorships
+        ]
+        if item.authors_linked == library.authors_key(csl)
+        else None
+    )
     return {
         **_brief(item, access, base),
+        "people": people,
         "container_title": csl.get("container-title"),
         "abstract": csl.get("abstract"),
         "identifiers": [

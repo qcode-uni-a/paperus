@@ -24,6 +24,9 @@
   first; `--no-authors`); importing finds the people here by ORCID iD,
   OpenAlex id or name, keeps splits and links made by hand, and maps
   smart collections' author rules. Older exports still import.
+- **AI assistants and authors**: `find_authors`, `get_author`, papers by
+  an author with `list_documents(author_id=…)`, and each author's person
+  in `get_document`.
 
 ## 0.0.14 (2026-11-07)
 

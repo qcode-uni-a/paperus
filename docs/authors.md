@@ -76,5 +76,9 @@ lookup, at once.
 ## Later (phase 3 of #35)
 
 "This is me" (an account linked to its author record, or by ORCID from the
-OIDC login) and "My papers"; authors in smart-collection rules and for AI
-assistants; "other works" from OpenAlex, with Import.
+OIDC login) and "My papers"; "other works" from OpenAlex, with Import.
+
+Done of phase 3: smart collections and the library's filter by author
+(the "authors" rule), exports and imports that keep who is who, and AI
+assistants' `find_authors`, `get_author`, `list_documents(author_id=…)`
+and the people in `get_document`.

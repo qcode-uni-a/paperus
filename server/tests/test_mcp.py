@@ -124,6 +124,8 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "get_references",
         "cited_by",
         "list_tags",
+        "find_authors",
+        "get_author",
         "add_tags",
         "add_document",
         "get_note",
