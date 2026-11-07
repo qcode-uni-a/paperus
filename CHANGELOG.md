@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **GPU check** for administrators: Getting started (and Administration →
+  Settings → Machine learning) names the GPU the ML service runs on, or,
+  on the CPU, whether the machine has a suitable NVIDIA card and what to
+  do: switch to the `-cuda` image, pass the GPU to its container, or
+  install or update the driver (580 or newer; RTX 20xx generation on).
+
 - **Daily backups from the start**: a new server (or one where backups were
   never set up) backs up its database every night at 03:00 UTC and keeps
   the newest 7; the files (PDFs) are added under Administration → Backups.

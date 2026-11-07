@@ -71,6 +71,12 @@ class MLSpeed(BaseModel):
     """The ML service that measured it."""
 
 
+class MLGPU(BaseModel):
+    name: str
+    supported: bool
+    """New enough for the GPU image (RTX 20xx generation or newer)."""
+
+
 class MLServiceState(BaseModel):
     url: str
     threads: int
@@ -81,6 +87,16 @@ class MLServiceState(BaseModel):
     """Where its models run: "cpu", or "cuda" (an NVIDIA GPU)."""
     loaded: list[str]
     loading: list[str] = []
+    cuda_image: bool = False
+    """It is the GPU image (``-cuda``)."""
+    gpu_problem: str | None = None
+    """Why its models run on the CPU."""
+    gpus: list[MLGPU] = []
+    """The NVIDIA cards of its machine, also those not passed to it."""
+    driver: int | None = None
+    """The NVIDIA driver's major version there, if one is loaded."""
+    driver_needed: int = 580
+    """The oldest driver the GPU image runs with."""
 
 
 class MLStatus(BaseModel):

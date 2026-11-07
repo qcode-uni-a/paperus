@@ -21,6 +21,8 @@
 	const passages = $derived(admin.stats?.chunks ?? 0);
 	const rerankers = $derived(admin.ml?.models.filter((m) => m.task === 'rerank') ?? []);
 	const onGpu = $derived(admin.ml?.service?.device === 'cuda');
+	/** The machine's GPU the ML service can use (or could, with its -cuda image). */
+	const gpuName = $derived(admin.ml?.service?.gpus?.find((gpu) => gpu.supported)?.name);
 
 	// Reranking: chosen here, saved with the button.
 	let rerank = $state<'auto' | 'on' | 'off' | null>(null);
@@ -192,8 +194,16 @@
 	{#if admin.ml?.service}
 		<p class="device">
 			Runs on {admin.ml.service.device === 'cuda'
-				? 'an NVIDIA GPU: models take seconds where a CPU takes minutes.'
+				? `the GPU${gpuName ? ` (${gpuName})` : ''}: models take seconds where a CPU takes minutes.`
 				: `the CPU (${admin.ml.service.cores} cores).`}
+			{#if admin.ml.service.device !== 'cuda' && gpuName}
+				This machine has a GPU, the {gpuName}: the ML service's -cuda image would use it (see
+				<a
+					href="https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-an-nvidia-gpu"
+					target="_blank"
+					rel="noopener">On an NVIDIA GPU</a
+				>).
+			{/if}
 		</p>
 	{/if}
 	<p class="warning" role="note">

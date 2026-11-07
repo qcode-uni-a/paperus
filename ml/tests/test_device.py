@@ -1,6 +1,7 @@
 """CPU or GPU, and which model file each uses."""
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -95,3 +96,58 @@ def test_other_files_are_other_vectors() -> None:
     )
     # Full precision on the GPU, a quantized file on the CPU.
     assert MODELS["ms-marco-minilm-l6"].vectors("cuda") == "ms-marco-minilm-l6@fp32"
+
+
+def _pci(root: Path, bus: str, vendor: str, kind: str, ident: str) -> None:
+    folder = root / "sys/bus/pci/devices" / bus
+    folder.mkdir(parents=True)
+    for name, value in (("vendor", vendor), ("class", kind), ("device", ident)):
+        (folder / name).write_text(value + "\n")
+
+
+def test_the_machines_nvidia_cards(tmp_path: Path) -> None:
+    """Seen also from a container without the GPU, to recommend the GPU
+    image; named by the NVIDIA driver if it is loaded."""
+    assert device.host_cards(tmp_path) == []
+    assert device.driver_version(tmp_path) is None
+
+    _pci(tmp_path, "0000:2d:00.0", "0x10de", "0x030000", "0x1e81")
+    _pci(tmp_path, "0000:2d:00.1", "0x10de", "0x040300", "0x10f8")  # its sound
+    _pci(tmp_path, "0000:03:00.0", "0x10de", "0x030200", "0x1b80")  # a GTX 1080
+    _pci(tmp_path, "0000:00:02.0", "0x8086", "0x030000", "0x3e92")  # Intel
+    (tmp_path / "sys/bus/pci/devices/0000:00:1f.0").mkdir()  # unreadable
+    nvidia = tmp_path / "proc/driver/nvidia"
+    (nvidia / "gpus/0000:2d:00.0").mkdir(parents=True)
+    (nvidia / "gpus/0000:2d:00.0/information").write_text(
+        "Model: \t\t NVIDIA GeForce RTX 2080 SUPER\nIRQ:   \t\t 101\n"
+    )
+    _pci(tmp_path, "0000:04:00.0", "0x10de", "0x030000", "0x2684")
+    (nvidia / "gpus/0000:04:00.0").mkdir()
+    (nvidia / "gpus/0000:04:00.0/information").write_text("IRQ: 5\n")
+    (nvidia / "version").write_text(
+        "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  615.78.08  "
+        "Release Build\n"
+    )
+    assert device.host_cards(tmp_path) == [
+        device.Card("NVIDIA graphics card (0x1b80)", supported=False),
+        device.Card("NVIDIA graphics card (0x2684)", supported=True),
+        device.Card("NVIDIA GeForce RTX 2080 SUPER", supported=True),
+    ]
+    assert device.driver_version(tmp_path) == 615
+    (nvidia / "version").write_text("something else\n")
+    assert device.driver_version(tmp_path) is None
+
+
+def test_why_not_the_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        device.onnxruntime, "get_available_providers", lambda: [device.CPU]
+    )
+    assert "use the -cuda image" in (device.gpu_problem() or "")
+    monkeypatch.setattr(
+        device.onnxruntime, "get_available_providers", lambda: [device.CUDA, device.CPU]
+    )
+    monkeypatch.setattr(device.onnxruntime, "preload_dlls", lambda: None, raising=False)
+    monkeypatch.setattr(device, "gpu_count", lambda: 0)
+    assert "not passed to the container" in (device.gpu_problem() or "")
+    monkeypatch.setattr(device, "gpu_count", lambda: 1)
+    assert device.gpu_problem() is None

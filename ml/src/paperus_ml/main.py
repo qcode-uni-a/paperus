@@ -17,11 +17,13 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Annotated
 
+import onnxruntime
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from paperus_ml import metrics
 from paperus_ml.config import Settings
+from paperus_ml.device import CUDA, DRIVER_NEEDED, driver_version, host_cards
 from paperus_ml.encoder import Encoder
 from paperus_ml.manager import (
     Model,
@@ -118,6 +120,12 @@ class ServiceConfig(BaseModel):
     """Models to keep loaded (paperus sends the one in use)."""
 
 
+class GPU(BaseModel):
+    name: str
+    supported: bool
+    """New enough for the GPU image (RTX 20xx generation or newer)."""
+
+
 class ServiceState(BaseModel):
     threads: int
     keep: list[str]
@@ -129,6 +137,16 @@ class ServiceState(BaseModel):
     loading: list[str]
     started: str
     """When this service started (an ID: a new value means a restart)."""
+    cuda_image: bool = False
+    """The GPU image (ONNX Runtime with CUDA)."""
+    gpu_problem: str | None = None
+    """Why models run on the CPU (None on the GPU)."""
+    gpus: list[GPU] = []
+    """The machine's NVIDIA cards, also those not passed to this container."""
+    driver: int | None = None
+    """The NVIDIA driver's major version, if one is loaded."""
+    driver_needed: int = DRIVER_NEEDED
+    """The oldest driver the GPU image runs with."""
 
 
 class Speed(BaseModel):
@@ -235,6 +253,10 @@ def create_app(
             loaded=models.loaded(),
             loading=models.loading(),
             started=started,
+            cuda_image=CUDA in onnxruntime.get_available_providers(),
+            gpu_problem=models.gpu_problem,
+            gpus=[GPU(name=c.name, supported=c.supported) for c in host_cards()],
+            driver=driver_version(),
         )
 
     @app.put("/config", dependencies=[Depends(check_token)])

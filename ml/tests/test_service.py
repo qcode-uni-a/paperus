@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from paperus_ml import device, main
 from paperus_ml.config import Settings
 from paperus_ml.encoder import Encoder
 from paperus_ml.main import create_app
@@ -153,13 +154,23 @@ def test_default_cache_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     assert Settings().cache_path == tmp_path / "paperus-ml"
 
 
-def test_config_from_paperus(tiny: Encoder) -> None:
+def test_config_from_paperus(tiny: Encoder, monkeypatch: pytest.MonkeyPatch) -> None:
     loader = CountingLoader(tiny)
-    manager = ModelManager(Settings(), loader)
+    manager = ModelManager(Settings(device="cpu"), loader)
+    monkeypatch.setattr(
+        main, "host_cards", lambda: [device.Card("NVIDIA GeForce RTX 4090", True)]
+    )
+    monkeypatch.setattr(main, "driver_version", lambda: 570)
     with TestClient(create_app(Settings(), manager)) as client:
         state = client.get("/config").json()
         assert (state["threads"], state["keep"], state["loaded"]) == (0, [], [])
         assert state["cores"] >= 1
+        # What the server needs to say whether a GPU would help.
+        assert state["device"] == "cpu"
+        assert state["gpu_problem"] == "set to the CPU (PAPERUS_ML_DEVICE=cpu)"
+        assert state["gpus"] == [{"name": "NVIDIA GeForce RTX 4090", "supported": True}]
+        assert (state["driver"], state["driver_needed"]) == (570, 580)
+        assert state["cuda_image"] in (True, False)
         # The model in use is kept and loads in the background.
         state = client.put("/config", json={"threads": 2, "keep": ["bge-m3"]}).json()
         assert (state["threads"], state["keep"]) == (2, ["bge-m3"])

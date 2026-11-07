@@ -3,6 +3,9 @@ build of ONNX Runtime is installed (the ``-cuda`` image)."""
 
 import ctypes
 import logging
+import re
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 import onnxruntime
@@ -20,24 +23,29 @@ class NoGPU(RuntimeError):
     pass
 
 
+def gpu_problem() -> str | None:
+    """Why models cannot run on a GPU here; None if they can."""
+    if CUDA not in onnxruntime.get_available_providers():
+        return "this ONNX Runtime has no CUDA support (use the -cuda image)"
+    # The GPU build finds CUDA and cuDNN in the nvidia-* Python packages
+    # only once they are loaded.
+    preload = getattr(onnxruntime, "preload_dlls", None)
+    if preload is not None:
+        preload()
+    if gpu_count():
+        return None
+    return "no NVIDIA GPU is reachable (e.g. not passed to the container)"
+
+
 def choose(choice: Choice) -> Device:
     """``auto``: the GPU if ONNX Runtime can use one, else the CPU; ``cuda``
     insists on it."""
     if choice == "cpu":
         return "cpu"
-    if CUDA not in onnxruntime.get_available_providers():
-        problem = "this ONNX Runtime has no CUDA support (use the -cuda image)"
-    else:
-        # The GPU build finds CUDA and cuDNN in the nvidia-* Python packages
-        # only once they are loaded.
-        preload = getattr(onnxruntime, "preload_dlls", None)
-        if preload is not None:
-            preload()
-        cards = gpu_count()
-        if cards:
-            log.info("running models on the GPU (%d found)", cards)
-            return "cuda"
-        problem = "no NVIDIA GPU is reachable (e.g. not passed to the container)"
+    problem = gpu_problem()
+    if problem is None:
+        log.info("running models on the GPU")
+        return "cuda"
     if choice == "cuda":
         raise NoGPU(f"PAPERUS_ML_DEVICE=cuda, but {problem}")
     if CUDA in onnxruntime.get_available_providers():
@@ -82,3 +90,60 @@ def providers(device: Device) -> list[str | tuple[str, dict[str, str]]]:
     # Grow GPU memory by what is needed, not in doubling steps: several
     # models share a card of a few GB.
     return [(CUDA, {"arena_extend_strategy": "kSameAsRequested"}), CPU]
+
+
+# The GPU image's CUDA 13 runs on cards from the RTX 20xx generation (Turing)
+# on, whose PCI device ids start here, with this driver or newer.
+FIRST_SUPPORTED_DEVICE = 0x1E00
+DRIVER_NEEDED = 580
+
+
+@dataclass(frozen=True)
+class Card:
+    name: str
+    supported: bool
+    """New enough for the GPU image (RTX 20xx generation or newer)."""
+
+
+def host_cards(root: Path = Path("/")) -> list[Card]:
+    """The machine's NVIDIA graphics cards, also when none is passed to this
+    container: the kernel lists the PCI devices (and the NVIDIA driver its
+    cards) in every container."""
+    cards = []
+    for device in sorted((root / "sys/bus/pci/devices").glob("*")):
+        try:
+            vendor, kind, ident = (
+                (device / name).read_text().strip()
+                for name in ("vendor", "class", "device")
+            )
+        except OSError:
+            continue
+        if vendor != "0x10de" or not kind.startswith("0x03"):
+            continue
+        cards.append(
+            Card(
+                _model_name(root, device.name) or f"NVIDIA graphics card ({ident})",
+                int(ident, 16) >= FIRST_SUPPORTED_DEVICE,
+            )
+        )
+    return cards
+
+
+def _model_name(root: Path, bus: str) -> str | None:
+    """The card's name, as the NVIDIA driver gives it (if installed)."""
+    try:
+        text = (root / "proc/driver/nvidia/gpus" / bus / "information").read_text()
+    except OSError:
+        return None
+    found = re.search(r"^Model:\s*(.+?)\s*$", text, re.MULTILINE)
+    return found[1] if found else None
+
+
+def driver_version(root: Path = Path("/")) -> int | None:
+    """The NVIDIA driver's major version, if one is loaded."""
+    try:
+        text = (root / "proc/driver/nvidia/version").read_text()
+    except OSError:
+        return None
+    found = re.search(r"\s(\d{3,4})\.\d+", text)
+    return int(found[1]) if found else None

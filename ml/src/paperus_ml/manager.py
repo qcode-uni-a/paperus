@@ -10,7 +10,7 @@ from pathlib import Path
 from huggingface_hub import snapshot_download
 
 from paperus_ml.config import Settings
-from paperus_ml.device import Device, choose
+from paperus_ml.device import Device, choose, gpu_problem
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
 from paperus_ml.ocr import Reader
@@ -51,6 +51,14 @@ class ModelManager:
         """CPU threads per model (0: all ONNX Runtime sees); set by paperus."""
         self.device: Device = choose(settings.device)
         """Where models run (each model loads the file for it)."""
+        self.gpu_problem: str | None = None
+        """Why models run on the CPU (None on the GPU)."""
+        if self.device == "cpu":
+            self.gpu_problem = (
+                "set to the CPU (PAPERUS_ML_DEVICE=cpu)"
+                if settings.device == "cpu"
+                else gpu_problem()
+            )
 
     def model_dir(self, spec: ModelSpec) -> Path:
         """<cache>/<task>/<model>, with plain files: the shared Hugging Face

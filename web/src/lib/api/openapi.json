@@ -6960,6 +6960,64 @@
         ],
         "title": "FileWanted"
       },
+      "GPUStep": {
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "advice": {
+            "type": "string",
+            "enum": [
+              "in_use",
+              "use_cuda_image",
+              "pass_gpu",
+              "update_driver",
+              "install_driver"
+            ],
+            "title": "Advice"
+          },
+          "card": {
+            "type": "string",
+            "title": "Card"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "driver": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver"
+          },
+          "driver_needed": {
+            "type": "integer",
+            "title": "Driver Needed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "done",
+          "advice",
+          "card",
+          "driver_needed"
+        ],
+        "title": "GPUStep",
+        "description": "Whether the machine learning service could use the machine's GPU."
+      },
       "GettingStarted": {
         "properties": {
           "papers": {
@@ -8080,6 +8138,24 @@
         ],
         "title": "LoginResponse"
       },
+      "MLGPU": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "supported"
+        ],
+        "title": "MLGPU"
+      },
       "MLModel": {
         "properties": {
           "name": {
@@ -8226,6 +8302,46 @@
             "type": "array",
             "title": "Loading",
             "default": []
+          },
+          "cuda_image": {
+            "type": "boolean",
+            "title": "Cuda Image",
+            "default": false
+          },
+          "gpu_problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Problem"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/MLGPU"
+            },
+            "type": "array",
+            "title": "Gpus",
+            "default": []
+          },
+          "driver": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver"
+          },
+          "driver_needed": {
+            "type": "integer",
+            "title": "Driver Needed",
+            "default": 580
           }
         },
         "type": "object",
@@ -9868,6 +9984,16 @@
           "people": {
             "type": "boolean",
             "title": "People"
+          },
+          "gpu": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GPUStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -9875,7 +10001,8 @@
           "backups",
           "contact_email",
           "search",
-          "people"
+          "people",
+          "gpu"
         ],
         "title": "ServerSteps",
         "description": "What an administrator should set up before others rely on paperus."

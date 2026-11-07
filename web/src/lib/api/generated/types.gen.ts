@@ -677,6 +677,38 @@ export type FileWanted = {
 };
 
 /**
+ * GPUStep
+ *
+ * Whether the machine learning service could use the machine's GPU.
+ */
+export type GpuStep = {
+    /**
+     * Done
+     */
+    done: boolean;
+    /**
+     * Advice
+     */
+    advice: 'in_use' | 'use_cuda_image' | 'pass_gpu' | 'update_driver' | 'install_driver';
+    /**
+     * Card
+     */
+    card: string;
+    /**
+     * Problem
+     */
+    problem?: string | null;
+    /**
+     * Driver
+     */
+    driver?: number | null;
+    /**
+     * Driver Needed
+     */
+    driver_needed: number;
+};
+
+/**
  * GettingStarted
  */
 export type GettingStarted = {
@@ -1262,6 +1294,20 @@ export type LoginResponse = {
 };
 
 /**
+ * MLGPU
+ */
+export type Mlgpu = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Supported
+     */
+    supported: boolean;
+};
+
+/**
  * MLModel
  */
 export type MlModel = {
@@ -1365,6 +1411,26 @@ export type MlServiceState = {
      * Loading
      */
     loading?: Array<string>;
+    /**
+     * Cuda Image
+     */
+    cuda_image?: boolean;
+    /**
+     * Gpu Problem
+     */
+    gpu_problem?: string | null;
+    /**
+     * Gpus
+     */
+    gpus?: Array<Mlgpu>;
+    /**
+     * Driver
+     */
+    driver?: number | null;
+    /**
+     * Driver Needed
+     */
+    driver_needed?: number;
 };
 
 /**
@@ -2311,6 +2377,7 @@ export type ServerSteps = {
      * People
      */
     people: boolean;
+    gpu: GpuStep | null;
 };
 
 /**

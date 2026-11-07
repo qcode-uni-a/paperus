@@ -123,6 +123,12 @@ five minutes, so a restarted ML service gets them back):
 
 ### On an NVIDIA GPU
 
+Not sure whether it would help? The ML service sees the machine's NVIDIA
+cards even from the CPU image (the kernel lists them in every container),
+and an administrator's Getting started on the library page says what to
+do: switch to the `-cuda` image, pass the GPU to its container, or update
+the driver; or that it runs on the GPU, by name.
+
 The image `paperus-ml:<version>-cuda` (e.g. `release-cuda`) is the same
 service with ONNX Runtime's GPU build and CUDA (about 4 GB larger). On the
 host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
@@ -149,7 +155,7 @@ registered in Docker (`sudo nvidia-ctk runtime configure --runtime=docker`
 and a restart of Docker); with only CDI it fails with "could not select
 device driver".
 
-Administration → Settings → Machine learning then says "GPU"; without a
+Administration → Settings → Machine learning then names the GPU; without a
 reachable card the image runs on the CPU and logs why
 (`PAPERUS_ML_DEVICE=cuda` refuses to start instead). Measured on an RTX
 2080 SUPER (8 GB), against 24 CPU cores: arctic-embed-m-v2 188 passages/s
