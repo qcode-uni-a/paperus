@@ -20,6 +20,7 @@ from paperus.api.organize import ItemTagOut, item_tags
 from paperus.avatars import avatar_url
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
+    Authorship,
     Favourite,
     File,
     FileRole,
@@ -105,6 +106,9 @@ class ItemOut(BaseModel):
     type: str
     title: str
     authors: list[str]
+    author_ids: list[uuid.UUID | None] | None = None
+    """The person of each of ``authors`` (None: not decided, e.g. a name
+    several people share); missing while the authors wait to be linked."""
     year: int | None
     container_title: str | None
     identifiers: list[IdentifierOut]
@@ -170,6 +174,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
         type=item.type,
         title=item.title,
         authors=library.author_names(csl),
+        author_ids=_author_ids(item, csl),
         year=library.issued_year(csl),
         container_title=_container_title(csl),
         identifiers=[i for v in item.versions for i in _identifiers(v)],
@@ -192,6 +197,13 @@ def item_out(item: Item, access: Access) -> ItemOut:
         favourite=any(f.user_id == access.user.id for f in item.favourites),
         files=_files(item),
     )
+
+
+def _author_ids(item: Item, csl: dict[str, Any]) -> list[uuid.UUID | None] | None:
+    """Each author's person, if the links are up to date with the names."""
+    if item.authors_linked is None or item.authors_linked != library.authors_key(csl):
+        return None
+    return [a.author_id for a in item.authorships]
 
 
 def _files(item: Item) -> list[FileLink]:
@@ -569,6 +581,7 @@ def list_items(
     owner: Annotated[list[uuid.UUID] | None, Query()] = None,
     added_days: Annotated[int | None, Query(ge=1, le=36500)] = None,
     author: Annotated[str | None, Query(max_length=300)] = None,
+    author_id: uuid.UUID | None = None,
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
@@ -595,7 +608,8 @@ def list_items(
     ``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,
     ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
     in ``authors``: the family name, and the given name's first letter if
-    one is given) and ``collection`` (with its
+    one is given), ``author_id`` (a person, ``paperus.authors``) and
+    ``collection`` (with its
     subcollections unless ``nested=false``) filter the list, and ``title``
     to items with all of its words in their title (any case).
     ``X-Total-Count`` is the number of matching items, for showing the total
@@ -639,6 +653,12 @@ def list_items(
     )
     if author and author.strip():
         conditions.append(by_author(author))
+    if author_id is not None:
+        conditions.append(
+            Item.id.in_(
+                select(Authorship.item_id).where(Authorship.author_id == author_id)
+            )
+        )
     if collection is not None:
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from paperus import (
     auth,
+    authors,
     integrity,
     item_references,
     missing,
@@ -350,6 +351,24 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
 
 def queue_published_check(app: App) -> None:
     _queue(app, "find_published_versions", "find-published", timestamp=0)
+
+
+@tasks.periodic(cron="*/5 * * * *")
+@tasks.task(
+    name="link_authors",
+    queue="text",
+    lock="link-authors",
+    queueing_lock="link-authors",
+    pass_context=True,
+)
+def link_authors(job: JobContext, timestamp: int) -> None:
+    """The authors of papers added or changed since, linked to people
+    (``paperus.authors``); at first, every paper's."""
+    context = _worker_context()
+    with context.sessions() as db:
+        done = authors.link_waiting(db)
+    if done:
+        log.info("authors: linked those of %d papers", done)
 
 
 # Papers' reference lists (Administration → Settings → Server). One job at a

@@ -378,6 +378,11 @@ class Item(Record, Trashable, Base):
     references_source: Mapped[str | None] = mapped_column(String(16))
     """Where its reference list came from (``arxiv``, ``crossref``, ``pdf``);
     None: none found (yet)."""
+    authors_key: Mapped[str | None] = mapped_column(String(64))
+    """A hash of the paper's author names (set with its details); when it
+    differs from ``authors_linked``, its authors wait to be linked to
+    people (``paperus.authors``)."""
+    authors_linked: Mapped[str | None] = mapped_column(String(64))
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )
@@ -407,6 +412,12 @@ class Item(Record, Trashable, Base):
         cascade="all, delete-orphan", lazy="selectin"
     )
     """Who starred it (lists show each person only their own star)."""
+    authorships: Mapped[list[Authorship]] = relationship(
+        order_by="Authorship.position",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    """Its authors as people (``paperus.authors``)."""
 
 
 class ItemReference(Base):
@@ -431,6 +442,73 @@ class ItemReference(Base):
     doi: Mapped[str | None] = mapped_column(index=True)
     arxiv: Mapped[str | None] = mapped_column(index=True)
     url: Mapped[str | None]
+
+
+class Author(Record, Base):
+    """A person who wrote papers, shared by the whole installation (authors
+    are public facts; who sees which papers is up to ``Access``). See
+    ``paperus.authors``."""
+
+    __tablename__ = "authors"
+
+    name: Mapped[str]
+    """As shown: "Mónica Benito" (the fullest spelling seen)."""
+    key: Mapped[str] = mapped_column(index=True)
+    """The name folded (``authors.fold``): what "the same full name" means."""
+    orcid: Mapped[str | None] = mapped_column(String(19), unique=True)
+    openalex_id: Mapped[str | None] = mapped_column(String(32), unique=True)
+
+
+class AuthorSource(StrEnum):
+    """How a paper's author was linked to a person."""
+
+    NAME = "name"
+    """The same full name."""
+    ORCID = "orcid"
+    OPENALEX = "openalex"
+    HAND = "hand"
+    """By a person; automatic passes leave it alone."""
+
+
+class Authorship(Base):
+    """An author of a paper, at their place in its author list, linked to
+    the person (none yet: to check, e.g. a name several people share)."""
+
+    __tablename__ = "authorships"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    """From 1, in the order of the paper's authors."""
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("authors.id", ondelete="SET NULL"), index=True
+    )
+    written: Mapped[str]
+    """The name as on this paper: "Benito, M." ("Family, Given")."""
+    key: Mapped[str] = mapped_column(index=True)
+    """``written`` folded."""
+    source: Mapped[str] = mapped_column(String(16))
+    """``AuthorSource``."""
+    affiliation: Mapped[str | None]
+    """Where they were for this paper (it changes over time)."""
+    orcid: Mapped[str | None] = mapped_column(String(19))
+    openalex_id: Mapped[str | None] = mapped_column(String(32))
+    """The ids this paper's details give for the author."""
+
+
+class AuthorsApart(Base):
+    """Two people with the same name, said to be different (after a split):
+    matching by name never joins them again. ``first`` < ``second``."""
+
+    __tablename__ = "authors_apart"
+
+    first: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("authors.id", ondelete="CASCADE"), primary_key=True
+    )
+    second: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("authors.id", ondelete="CASCADE"), primary_key=True
+    )
 
 
 class ItemView(Base):

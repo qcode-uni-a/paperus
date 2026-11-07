@@ -39,6 +39,7 @@ from paperus.api import (
     trash,
     users,
 )
+from paperus.api import authors as author_api
 from paperus.api import tokens as token_api
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -108,6 +109,7 @@ def create_app(
     app.include_router(avatars.router)
     app.include_router(items.router)
     app.include_router(references.router)
+    app.include_router(author_api.router)
     app.include_router(files.router)
     app.include_router(search.router)
     app.include_router(citations.router)

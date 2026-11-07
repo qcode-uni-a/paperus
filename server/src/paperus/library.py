@@ -1,6 +1,8 @@
 """Items, versions and identifiers: the rules that keep them consistent."""
 
 import calendar
+import hashlib
+import json
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
@@ -129,10 +131,22 @@ def _day_range(parts: list[int]) -> tuple[date, date] | None:
     return date(year, month, day), date(year, month, day)
 
 
+def authors_key(csl: dict[str, Any]) -> str:
+    """A hash of the authors (names and ORCID iDs): when it changes, the
+    paper's authors are linked to people again (``paperus.authors``)."""
+    people = [
+        [p.get(k) for k in ("family", "given", "literal", "ORCID")]
+        for p in csl.get("author") or []
+        if isinstance(p, dict)
+    ]
+    return hashlib.sha256(json.dumps(people, default=str).encode()).hexdigest()
+
+
 def refresh_item(item: Item) -> None:
-    """Update the cached type, title, year and dates after versions or
-    overrides change."""
+    """Update the cached type, title, year, dates and authors' key after
+    versions or overrides change."""
     csl = citation_csl(item)
+    item.authors_key = authors_key(csl)
     item.type = csl_type(csl)
     item.title = csl_title(csl)
     item.year = issued_year(csl)

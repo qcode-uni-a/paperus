@@ -535,7 +535,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given) and ``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case).\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given), ``author_id`` (a person, ``paperus.authors``) and\n``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case).\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -770,6 +770,23 @@
                 }
               ],
               "title": "Author"
+            }
+          },
+          {
+            "name": "author_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Author Id"
             }
           },
           {
@@ -1960,6 +1977,362 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "List Authors",
+        "description": "The authors of the papers the person sees, with how many of those\npapers each wrote; ``q``: words of the name (accents and case ignored).\n``X-Total-Count``: how many match.",
+        "operationId": "list_authors",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "papers",
+                "name"
+              ],
+              "type": "string",
+              "default": "papers",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthorRow"
+                  },
+                  "title": "Response List Authors"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors/{author_id}": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Get Author",
+        "description": "An author: names, ids, co-authors, where they were, and others of\nthe same name (their papers: ``GET /api/items?author_id=``).",
+        "operationId": "get_author",
+        "parameters": [
+          {
+            "name": "author_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Author Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors-to-check": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Authors To Check",
+        "description": "Authors of the person's papers not linked to anyone: a name several\npeople share, with nothing to tell which one.",
+        "operationId": "authors_to_check",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthorToCheck"
+                  },
+                  "title": "Response Authors To Check"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors/{author_id}/split": {
+      "post": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Split Author",
+        "description": "These papers are by someone else: a new person, remembered as\ndifferent (matching by name never joins them again).",
+        "operationId": "split_author",
+        "parameters": [
+          {
+            "name": "author_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Author Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Split"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/authors/{author_id}/merge": {
+      "post": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Merge Authors",
+        "operationId": "merge_authors",
+        "parameters": [
+          {
+            "name": "author_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Author Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Merge"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/authors/{position}": {
+      "put": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Assign Author",
+        "description": "Which person a paper's author is, by hand (later automatic passes\nkeep it).",
+        "operationId": "assign_author",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Position"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Assign"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorRow"
                 }
               }
             }
@@ -6779,6 +7152,48 @@
   },
   "components": {
     "schemas": {
+      "Affiliation": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "first_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Year"
+          },
+          "last_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Year"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "first_year",
+          "last_year",
+          "papers"
+        ],
+        "title": "Affiliation"
+      },
       "ArxivImportIn": {
         "properties": {
           "arxiv_id": {
@@ -6803,6 +7218,27 @@
           "arxiv_id"
         ],
         "title": "ArxivImportIn"
+      },
+      "Assign": {
+        "properties": {
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author_id"
+        ],
+        "title": "Assign"
       },
       "Authentication": {
         "properties": {
@@ -6836,6 +7272,149 @@
           "sessions"
         ],
         "title": "Authentication"
+      },
+      "AuthorOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          },
+          "orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid"
+          },
+          "openalex_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openalex Id"
+          },
+          "spellings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Spellings"
+          },
+          "coauthors": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorRow"
+            },
+            "type": "array",
+            "title": "Coauthors"
+          },
+          "affiliations": {
+            "items": {
+              "$ref": "#/components/schemas/Affiliation"
+            },
+            "type": "array",
+            "title": "Affiliations"
+          },
+          "namesakes": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorRow"
+            },
+            "type": "array",
+            "title": "Namesakes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "papers",
+          "spellings",
+          "coauthors",
+          "affiliations",
+          "namesakes"
+        ],
+        "title": "AuthorOut"
+      },
+      "AuthorRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          },
+          "orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "papers"
+        ],
+        "title": "AuthorRow"
+      },
+      "AuthorToCheck": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ItemOut"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "written": {
+            "type": "string",
+            "title": "Written"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorRow"
+            },
+            "type": "array",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item",
+          "position",
+          "written",
+          "candidates"
+        ],
+        "title": "AuthorToCheck"
       },
       "BackupConfig": {
         "properties": {
@@ -8991,6 +9570,28 @@
             "type": "array",
             "title": "Authors"
           },
+          "author_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Ids"
+          },
           "year": {
             "anyOf": [
               {
@@ -9280,6 +9881,28 @@
             },
             "type": "array",
             "title": "Authors"
+          },
+          "author_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Ids"
           },
           "year": {
             "anyOf": [
@@ -10081,6 +10704,20 @@
           "inherited_from"
         ],
         "title": "MemberOut"
+      },
+      "Merge": {
+        "properties": {
+          "other_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Other Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "other_id"
+        ],
+        "title": "Merge"
       },
       "MergeInto": {
         "properties": {
@@ -12129,6 +12766,28 @@
             "type": "array",
             "title": "Authors"
           },
+          "author_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Ids"
+          },
           "year": {
             "anyOf": [
               {
@@ -12265,6 +12924,25 @@
           "similarity"
         ],
         "title": "SimilarItem"
+      },
+      "Split": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Item Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids"
+        ],
+        "title": "Split"
       },
       "Stats": {
         "properties": {

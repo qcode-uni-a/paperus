@@ -5,6 +5,28 @@ export type ClientOptions = {
 };
 
 /**
+ * Affiliation
+ */
+export type Affiliation = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * First Year
+     */
+    first_year: number | null;
+    /**
+     * Last Year
+     */
+    last_year: number | null;
+    /**
+     * Papers
+     */
+    papers: number;
+};
+
+/**
  * ArxivImportIn
  */
 export type ArxivImportIn = {
@@ -16,6 +38,16 @@ export type ArxivImportIn = {
      * Library Id
      */
     library_id?: string | null;
+};
+
+/**
+ * Assign
+ */
+export type Assign = {
+    /**
+     * Author Id
+     */
+    author_id: string | null;
 };
 
 /**
@@ -42,6 +74,89 @@ export type Authentication = {
      * Sessions
      */
     sessions: number;
+};
+
+/**
+ * AuthorOut
+ */
+export type AuthorOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Papers
+     */
+    papers: number;
+    /**
+     * Orcid
+     */
+    orcid?: string | null;
+    /**
+     * Openalex Id
+     */
+    openalex_id?: string | null;
+    /**
+     * Spellings
+     */
+    spellings: Array<string>;
+    /**
+     * Coauthors
+     */
+    coauthors: Array<AuthorRow>;
+    /**
+     * Affiliations
+     */
+    affiliations: Array<Affiliation>;
+    /**
+     * Namesakes
+     */
+    namesakes: Array<AuthorRow>;
+};
+
+/**
+ * AuthorRow
+ */
+export type AuthorRow = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Papers
+     */
+    papers: number;
+    /**
+     * Orcid
+     */
+    orcid?: string | null;
+};
+
+/**
+ * AuthorToCheck
+ */
+export type AuthorToCheck = {
+    item: ItemOut;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Written
+     */
+    written: string;
+    /**
+     * Candidates
+     */
+    candidates: Array<AuthorRow>;
 };
 
 /**
@@ -1301,6 +1416,10 @@ export type ItemDetail = {
      */
     authors: Array<string>;
     /**
+     * Author Ids
+     */
+    author_ids?: Array<string | null> | null;
+    /**
      * Year
      */
     year: number | null;
@@ -1442,6 +1561,10 @@ export type ItemOut = {
      * Authors
      */
     authors: Array<string>;
+    /**
+     * Author Ids
+     */
+    author_ids?: Array<string | null> | null;
     /**
      * Year
      */
@@ -1897,6 +2020,16 @@ export type MemberOut = {
      * Avatar Url
      */
     avatar_url?: string | null;
+};
+
+/**
+ * Merge
+ */
+export type Merge = {
+    /**
+     * Other Id
+     */
+    other_id: string;
 };
 
 /**
@@ -3040,6 +3173,10 @@ export type SimilarItem = {
      */
     authors: Array<string>;
     /**
+     * Author Ids
+     */
+    author_ids?: Array<string | null> | null;
+    /**
      * Year
      */
     year: number | null;
@@ -3099,6 +3236,16 @@ export type SimilarItem = {
      * Similarity
      */
     similarity: number;
+};
+
+/**
+ * Split
+ */
+export type Split = {
+    /**
+     * Item Ids
+     */
+    item_ids: Array<string>;
 };
 
 /**
@@ -4192,6 +4339,10 @@ export type ListItemsData = {
          */
         author?: string | null;
         /**
+         * Author Id
+         */
+        author_id?: string | null;
+        /**
          * Collection
          */
         collection?: string | null;
@@ -4973,6 +5124,206 @@ export type ImportReferencesResponses = {
 };
 
 export type ImportReferencesResponse = ImportReferencesResponses[keyof ImportReferencesResponses];
+
+export type ListAuthorsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Sort
+         */
+        sort?: 'papers' | 'name';
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Offset
+         */
+        offset?: number;
+    };
+    url: '/api/authors';
+};
+
+export type ListAuthorsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListAuthorsError = ListAuthorsErrors[keyof ListAuthorsErrors];
+
+export type ListAuthorsResponses = {
+    /**
+     * Response List Authors
+     *
+     * Successful Response
+     */
+    200: Array<AuthorRow>;
+};
+
+export type ListAuthorsResponse = ListAuthorsResponses[keyof ListAuthorsResponses];
+
+export type GetAuthorData = {
+    body?: never;
+    path: {
+        /**
+         * Author Id
+         */
+        author_id: string;
+    };
+    query?: never;
+    url: '/api/authors/{author_id}';
+};
+
+export type GetAuthorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetAuthorError = GetAuthorErrors[keyof GetAuthorErrors];
+
+export type GetAuthorResponses = {
+    /**
+     * Successful Response
+     */
+    200: AuthorOut;
+};
+
+export type GetAuthorResponse = GetAuthorResponses[keyof GetAuthorResponses];
+
+export type AuthorsToCheckData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/authors-to-check';
+};
+
+export type AuthorsToCheckErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AuthorsToCheckError = AuthorsToCheckErrors[keyof AuthorsToCheckErrors];
+
+export type AuthorsToCheckResponses = {
+    /**
+     * Response Authors To Check
+     *
+     * Successful Response
+     */
+    200: Array<AuthorToCheck>;
+};
+
+export type AuthorsToCheckResponse = AuthorsToCheckResponses[keyof AuthorsToCheckResponses];
+
+export type SplitAuthorData = {
+    body: Split;
+    path: {
+        /**
+         * Author Id
+         */
+        author_id: string;
+    };
+    query?: never;
+    url: '/api/authors/{author_id}/split';
+};
+
+export type SplitAuthorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SplitAuthorError = SplitAuthorErrors[keyof SplitAuthorErrors];
+
+export type SplitAuthorResponses = {
+    /**
+     * Successful Response
+     */
+    201: AuthorRow;
+};
+
+export type SplitAuthorResponse = SplitAuthorResponses[keyof SplitAuthorResponses];
+
+export type MergeAuthorsData = {
+    body: Merge;
+    path: {
+        /**
+         * Author Id
+         */
+        author_id: string;
+    };
+    query?: never;
+    url: '/api/authors/{author_id}/merge';
+};
+
+export type MergeAuthorsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MergeAuthorsError = MergeAuthorsErrors[keyof MergeAuthorsErrors];
+
+export type MergeAuthorsResponses = {
+    /**
+     * Successful Response
+     */
+    200: AuthorRow;
+};
+
+export type MergeAuthorsResponse = MergeAuthorsResponses[keyof MergeAuthorsResponses];
+
+export type AssignAuthorData = {
+    body: Assign;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+        /**
+         * Position
+         */
+        position: number;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/authors/{position}';
+};
+
+export type AssignAuthorErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AssignAuthorError = AssignAuthorErrors[keyof AssignAuthorErrors];
+
+export type AssignAuthorResponses = {
+    /**
+     * Successful Response
+     */
+    200: AuthorRow;
+};
+
+export type AssignAuthorResponse = AssignAuthorResponses[keyof AssignAuthorResponses];
 
 export type FindUploadData = {
     body?: never;
