@@ -6,6 +6,18 @@
   gives 64 MB): enough for parallel queries and for building a vector
   index in parallel later. Only used while needed; takes effect when the
   database container is recreated (`docker compose up -d`).
+- **Fixes:** a Zotero export whose collections contain each other no
+  longer stops the import (and sub-collections of two collections with
+  the same name are kept); BibTeX entries with an odd month are no longer
+  dropped; AI assistants are told why a tool was refused (a reader adding
+  a note, an unknown collection) instead of a bare error; collection
+  pages no longer send a failing request when opened; a cut-off WebP
+  picture is refused as avatar; a failing reranker address is tried last,
+  like the others.
+- **Tests:** end-to-end tests in a real browser (`e2e/`: setup, login,
+  upload and reading, search, tags, collections, trash, archive, tokens,
+  connecting an app, sharing in a group, phone layout), and test coverage
+  of the server and ML service up from 91% and 75% to over 99%.
 
 ## 0.0.12 (2026-11-07)
 
