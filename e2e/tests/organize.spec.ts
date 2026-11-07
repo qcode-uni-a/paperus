@@ -107,3 +107,31 @@ test('archive and take out', async ({ page }) => {
 	await page.getByRole('button', { name: 'Take out of the archive' }).click();
 	await expect(page.getByText(/This paper is in the archive/)).toBeHidden();
 });
+
+test('keywords from an import are folded away on the paper', async ({ page }) => {
+	const title = unique('Keyworded ');
+	// As Mendeley writes it: the person's tags in mendeley-tags, the authors'
+	// keywords besides them in keywords.
+	const bib = `@article{k, title = {${title}}, author = {Tester, Ada}, year = {2024},
+		keywords = {Quantum Physics, Floquet systems, to read}, mendeley-tags = {to read}}`;
+	const started = await page.request.post('/api/imports', {
+		multipart: { upload: { name: 'library.bib', mimeType: 'text/plain', buffer: Buffer.from(bib) } }
+	});
+	expect(started.status()).toBe(201);
+	const { id } = await started.json();
+	await expect
+		.poll(async () => (await (await page.request.get(`/api/imports/${id}`)).json()).status)
+		.toBe('done');
+
+	// Papers without a file have no text for search to find: open it by id.
+	const listed = await (await page.request.get('/api/items?limit=50')).json();
+	const paper = listed.find((item: { title: string }) => item.title === title);
+	await page.goto(`/items/${paper.id}`);
+	const keywords = page.locator('details.keywords');
+	await expect(keywords.locator('summary')).toHaveText('Keywords (2)');
+	const chip = keywords.getByRole('link', { name: 'Floquet systems' });
+	await expect(chip).toBeHidden();
+	await keywords.locator('summary').click();
+	await expect(chip).toBeVisible();
+	await expect(keywords.getByRole('link', { name: 'Quantum Physics' })).toBeVisible();
+});

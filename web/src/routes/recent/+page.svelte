@@ -6,6 +6,7 @@
 	import { listItems, type Item } from '#lib/api/client.ts';
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	const PAGE = 50;
 	// All activity (changes by anyone, and what one opened), or only opened.
@@ -17,20 +18,39 @@
 	let loading = false;
 	let latest = 0;
 
-	async function load(offset = 0) {
+	async function load(offset = 0, limit = PAGE) {
 		if (offset && loading) return;
 		const request = ++latest;
 		loading = true;
 		const { data, response } = await listItems({
-			query: { sort: onlyOpened ? 'opened' : 'recent', limit: PAGE, offset }
+			query: { sort: onlyOpened ? 'opened' : 'recent', limit, offset }
 		});
 		if (request !== latest) return;
 		loading = false;
 		if (!data) return;
 		items = offset ? [...items, ...data] : data;
 		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
-		more = data.length === PAGE && items.length < total;
+		more = data.length === limit && items.length < total;
 	}
+
+	/** While the first rows load again: no pages added in between. */
+	let refilling = false;
+
+	keepPlace(
+		'recent',
+		() => items.length,
+		async (count) => {
+			refilling = true;
+			try {
+				await load(0, Math.min(Math.max(count, PAGE), 200));
+				while (more && items.length < count) {
+					await load(items.length, Math.min(count - items.length, 200));
+				}
+			} finally {
+				refilling = false;
+			}
+		}
+	);
 
 	$effect(() => {
 		void onlyOpened;
@@ -40,7 +60,7 @@
 	function loadMoreNearby(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			([entry]) => {
-				if (entry.isIntersecting && more) load(items.length);
+				if (entry.isIntersecting && more && !refilling) load(items.length);
 			},
 			{ rootMargin: '800px 0px' }
 		);

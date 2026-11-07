@@ -29,7 +29,9 @@ something already listens on its port.
 - `auth`: login needed, wrong password, log in and out.
 - `papers`: upload a PDF (made in the test, `fixtures/pdf.ts`), the worker
   reads it, keyword search finds it; edit the title, add and remove tags.
-- `organize`: collections, trash and restore, archive and take out.
+- `organize`: collections, trash and restore, archive and take out, keywords
+  from an import folded on the paper.
+- `place`: Back from a paper returns to the same place in a long library.
 - `settings`: an access token: create, use from outside the browser, revoke.
 - `dates`: the European date format: set by the administrator, typed into a
   smart collection's date field, shown in its description and a token's

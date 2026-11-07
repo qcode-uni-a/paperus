@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Back keeps your place**: going back from a paper to the library, a
+  collection, Recent, Favourites or the Archive returns to where you were
+  in the list, with as many papers loaded as before, instead of the top.
+- **Keywords folded** on a paper's page ("Keywords (n)", below the
+  collections), like Similar papers and References: there when wanted,
+  out of the way of the paper's own tags.
 - **AI assistants can do all of Manage → Missing**: besides listing and
   downloading one paper, download all of a section in the background and
   follow its progress, and list the papers marked as needing no file.

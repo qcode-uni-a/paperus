@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { listItems, type Item } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	let items = $state<Item[] | null>(null);
 
+	async function load() {
+		const { data } = await listItems({ query: { favourite: true, limit: 200 } });
+		items = data ?? [];
+	}
+
 	$effect(() => {
-		listItems({ query: { favourite: true, limit: 200 } }).then(({ data }) => {
-			items = data ?? [];
-		});
+		load();
 	});
+
+	keepPlace('favourites', () => items?.length ?? 0, load);
 </script>
 
 <svelte:head><title>Favourites · paperus</title></svelte:head>

@@ -3,23 +3,26 @@
 	import { listItems, type Item } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
+	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	/** Items of a collection, loading more while scrolling. */
 	let { collection, nested = false }: { collection: string; nested?: boolean } = $props();
 
 	const PAGE = 50;
+	// The most the server lists at once.
+	const MOST = 200;
 	let items = $state<Item[]>([]);
 	let total = $state<number | null>(null);
 	let more = $state(false);
 	let loading = false;
 	let latest = 0;
 
-	async function load(before?: string) {
+	async function load(before?: string, limit = PAGE) {
 		if (before && loading) return;
 		const request = ++latest;
 		loading = true;
 		const { data, response } = await listItems({
-			query: { limit: PAGE, before, collection, nested }
+			query: { limit, before, collection, nested }
 		});
 		if (request !== latest) return;
 		loading = false;
@@ -29,6 +32,24 @@
 		more = data.length > 0 && items.length < total;
 	}
 
+	/** While the first rows load again: no pages added in between. */
+	let refilling = false;
+
+	/** The first ``count`` rows again (at least a page), e.g. after Back. */
+	async function loadUpTo(count: number) {
+		refilling = true;
+		try {
+			await load(undefined, Math.min(Math.max(count, PAGE), MOST));
+			while (more && items.length < count) {
+				await load(items.at(-1)?.id, Math.min(count - items.length, MOST));
+			}
+		} finally {
+			refilling = false;
+		}
+	}
+
+	keepPlace('collection', () => items.length, loadUpTo);
+
 	$effect(() => {
 		void collection;
 		void nested;
@@ -37,19 +58,19 @@
 
 	$effect(() => {
 		if (!items.some((item) => item.processing)) return;
-		const timer = setInterval(() => load(), 2000);
+		const timer = setInterval(() => !refilling && loadUpTo(items.length), 2000);
 		return () => clearInterval(timer);
 	});
 
 	// Reload when uploads (dropped here, or added with +) finish.
 	$effect(() => {
-		if (uploads.finished) untrack(() => load());
+		if (uploads.finished) untrack(() => loadUpTo(items.length));
 	});
 
 	function loadMoreNearby(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			([entry]) => {
-				if (entry.isIntersecting && more) load(items.at(-1)?.id);
+				if (entry.isIntersecting && more && !refilling) load(items.at(-1)?.id);
 			},
 			{ rootMargin: '800px 0px' }
 		);

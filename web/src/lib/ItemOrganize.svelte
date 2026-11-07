@@ -145,39 +145,6 @@
 		{/if}
 	</div>
 
-	{#if keywords.length}
-		<div
-			class="line"
-			title="Came with the paper’s details (arXiv categories, a publisher’s subjects, the authors’ keywords), not from anyone here"
-		>
-			<span class="label">Keywords</span>
-			{#each keywords as tag (tag.id)}
-				{@const library = tagLibraryOf(tag.id)}
-				<span class="chip keyword">
-					<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
-					{#if mayTag(library)}
-						<button
-							onclick={async () =>
-								done(
-									await addTag({
-										path: { item_id: item.id },
-										body: { name: tag.name, library_id: library }
-									})
-								)}
-							title="Make it one of the paper’s tags"
-							aria-label="Make {tag.name} one of the paper’s tags">+</button
-						>
-						<button
-							onclick={async () =>
-								done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}
-							aria-label="Remove tag {tag.name}">×</button
-						>
-					{/if}
-				</span>
-			{/each}
-		</div>
-	{/if}
-
 	<div class="line">
 		<span class="label">Collections</span>
 		{#each item.collection_ids as id (id)}
@@ -212,6 +179,42 @@
 			<span class="hint">Create collections in the menu with +.</span>
 		{/if}
 	</div>
+
+	{#if keywords.length}
+		<!-- Folded: they describe the paper, but are not the person's tags. -->
+		<details class="keywords">
+			<summary
+				title="Came with the paper’s details (arXiv categories, a publisher’s subjects, the authors’ keywords), not from anyone here"
+				>Keywords ({keywords.length})</summary
+			>
+			<div class="line">
+				{#each keywords as tag (tag.id)}
+					{@const library = tagLibraryOf(tag.id)}
+					<span class="chip keyword">
+						<a href="{resolve('/')}?tag={tag.id}">{tag.name}</a>
+						{#if mayTag(library)}
+							<button
+								onclick={async () =>
+									done(
+										await addTag({
+											path: { item_id: item.id },
+											body: { name: tag.name, library_id: library }
+										})
+									)}
+								title="Make it one of the paper’s tags"
+								aria-label="Make {tag.name} one of the paper’s tags">+</button
+							>
+							<button
+								onclick={async () =>
+									done(await removeTag({ path: { item_id: item.id, tag_id: tag.id } }))}
+								aria-label="Remove tag {tag.name}">×</button
+							>
+						{/if}
+					</span>
+				{/each}
+			</div>
+		</details>
+	{/if}
 	{#if error}<p class="error">{error}</p>{/if}
 </div>
 
@@ -327,6 +330,18 @@
 	}
 	.error {
 		margin: 0;
+	}
+	.keywords summary {
+		width: fit-content;
+		cursor: pointer;
+		color: var(--muted);
+		font-size: var(--step--1);
+	}
+	.keywords summary:hover {
+		color: inherit;
+	}
+	.keywords .line {
+		margin-top: 6px;
 	}
 	.chip.keyword {
 		border: 1px dashed var(--rule);

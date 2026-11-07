@@ -2,6 +2,7 @@
 	import { listItems, unarchiveItem, type Item } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { libraryById } from '#lib/organize.svelte.ts';
+	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	const PAGE = 100;
 	let items = $state<Item[] | null>(null);
@@ -18,6 +19,19 @@
 	$effect(() => {
 		load();
 	});
+
+	keepPlace(
+		'archive',
+		() => items?.length ?? 0,
+		async (count) => {
+			await load();
+			let shown = 0;
+			while (items && items.length > shown && items.length < Math.min(count, total)) {
+				shown = items.length;
+				await load(items.at(-1)?.id);
+			}
+		}
+	);
 
 	async function takeOut(id: string) {
 		await unarchiveItem({ path: { item_id: id } });

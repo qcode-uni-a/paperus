@@ -10,8 +10,11 @@
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { shortAuthors } from '#lib/format.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
+	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 
 	const PAGE = 50;
+	// The most the server lists at once.
+	const MOST = 200;
 	// Passages fetched per search: the best few per paper (as the AI
 	// assistants get them), so one paper cannot fill the list; "More from
 	// this paper" fetches the rest of that one.
@@ -50,6 +53,8 @@
 	const types = $derived(page.url.searchParams.getAll('type'));
 	const archived = $derived(page.url.searchParams.has('archived'));
 	let passages = $state<Passage[] | null>(null);
+	/** The search under way (for Back to the results' place). */
+	let searching: Promise<unknown> = Promise.resolve();
 
 	/** Passages grouped by paper or note, in the order of their best passage. */
 	const groups = $derived.by(() => {
@@ -103,13 +108,13 @@
 	// latest request may update the list.
 	let latest = 0;
 
-	async function loadItems(before?: string) {
+	async function loadItems(before?: string, limit = PAGE) {
 		if (before && loading) return;
 		const request = ++latest;
 		loading = true;
 		const { data, response } = await listItems({
 			query: {
-				limit: PAGE,
+				limit,
 				before,
 				collection: collectionId ?? undefined,
 				tag: tagIds.length ? tagIds : undefined
@@ -123,11 +128,35 @@
 		more = data.length > 0 && items.length < total;
 	}
 
+	/** While the first rows load again: no pages added in between. */
+	let refilling = false;
+
+	/** The first ``count`` rows again (at least a page), e.g. after Back. */
+	async function loadUpTo(count: number) {
+		refilling = true;
+		try {
+			await loadItems(undefined, Math.min(Math.max(count, PAGE), MOST));
+			while (more && items.length < count) {
+				await loadItems(items.at(-1)?.id, Math.min(count - items.length, MOST));
+			}
+		} finally {
+			refilling = false;
+		}
+	}
+
+	keepPlace(
+		'library',
+		() => items.length,
+		async (count) => {
+			await Promise.all([loadUpTo(count), searching]);
+		}
+	);
+
 	/** Load the next page when the end of the list comes near. */
 	function loadMoreNearby(node: HTMLElement) {
 		const observer = new IntersectionObserver(
 			([entry]) => {
-				if (entry.isIntersecting && more) loadItems(items.at(-1)?.id);
+				if (entry.isIntersecting && more && !refilling) loadItems(items.at(-1)?.id);
 			},
 			{ rootMargin: '800px 0px' }
 		);
@@ -156,23 +185,23 @@
 			return;
 		}
 		const key = page.url.search;
-		search({ query: { q, limit: SEARCH_PASSAGES, per_item: PER_PAPER, ...options } }).then(
-			({ data }) => {
-				if (key === untrack(() => page.url.search)) passages = data ?? [];
-			}
-		);
+		searching = search({
+			query: { q, limit: SEARCH_PASSAGES, per_item: PER_PAPER, ...options }
+		}).then(({ data }) => {
+			if (key === untrack(() => page.url.search)) passages = data ?? [];
+		});
 	});
 
 	// While the server reads new files, refresh to show their real titles.
 	$effect(() => {
 		if (!items.some((item) => item.processing)) return;
-		const timer = setInterval(() => loadItems(), 2000);
+		const timer = setInterval(() => !refilling && loadUpTo(items.length), 2000);
 		return () => clearInterval(timer);
 	});
 
 	// Reload when uploads (dropped anywhere, or picked below) finish.
 	$effect(() => {
-		if (uploads.finished) loadItems();
+		if (uploads.finished) untrack(() => loadUpTo(items.length));
 	});
 </script>
 
