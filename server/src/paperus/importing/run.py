@@ -30,10 +30,19 @@ from sqlalchemy.orm import Session
 from paperus import metadata
 from paperus.access import Access
 from paperus.identifiers import normalize_arxiv
-from paperus.importing import Export, bbl, bibtex, csljson, references, ris, zotero
+from paperus.importing import (
+    Export,
+    bbl,
+    bibtex,
+    csljson,
+    paperus_export,
+    references,
+    ris,
+    zotero,
+)
 from paperus.importing.apply import Files as FileSource
-from paperus.importing.apply import FolderFiles, NoFiles, ZipFiles, apply
-from paperus.models import Blob, File, Import, ImportStatus, User
+from paperus.importing.apply import FolderFiles, NoFiles, Report, ZipFiles, apply
+from paperus.models import Blob, File, Import, ImportPart, ImportStatus, User
 from paperus.storage import BlobStore
 
 log = logging.getLogger(__name__)
@@ -373,12 +382,28 @@ def run_import(
     record: Import,
     *,
     path: Path,
+    parts: list[tuple[Path, str]] | None = None,
     max_file_bytes: int,
     file_added: Callable[[uuid.UUID], None] = lambda file_id: None,
     http: httpx2.Client | None = None,
 ) -> None:
-    """Run the import described by ``record`` from the export at ``path``;
-    with ``http``, references from LaTeX sources are looked up online."""
+    """Run the import described by ``record`` from the export at ``path``
+    (and ``parts``: further files, with their names); with ``http``,
+    references from LaTeX sources are looked up online."""
+    uploads = [
+        paperus_export.Upload(path, record.filename),
+        *(paperus_export.Upload(p, name) for p, name in parts or []),
+    ]
+    if record.format == paperus_export.NAME or paperus_export.is_export(uploads):
+        _run_paperus_export(
+            db,
+            blobs,
+            record,
+            uploads,
+            max_file_bytes=max_file_bytes,
+            file_added=file_added,
+        )
+        return
 
     @contextmanager
     def read() -> Generator[tuple[Export, FileSource]]:
@@ -410,6 +435,9 @@ def into_collection(export: Export, name: str) -> None:
         paper.collections.append(collection)
 
 
+Progress = Callable[[int, int], None]
+
+
 def run_export(
     db: Session,
     blobs: BlobStore,
@@ -421,27 +449,13 @@ def run_export(
 ) -> None:
     """Add what ``read`` gives (an export and its files) for the person who
     started the import, keeping ``record`` up to date."""
-    record.status = ImportStatus.RUNNING
-    db.commit()
-    user = db.get(User, record.user_id)
-    try:
-        if user is None or user.deactivated_at is not None:
-            raise NotAnExport("The person who started the import cannot log in.")
-        access = Access.of(db, user)
+
+    def work(
+        access: Access, started: Callable[[int], None], progress: Progress
+    ) -> Report:
         with read() as (export, files):
-            record.total = len(export.papers) + len(export.notes)
-            db.commit()
-            row_id = record.id
-
-            def progress(done: int, total: int) -> None:
-                # Every few papers: the page shows the progress.
-                if done % 5 == 0 or done == total:
-                    row = db.get(Import, row_id)
-                    if row is not None:
-                        row.done = done
-                        db.commit()
-
-            report = apply(
+            started(len(export.papers) + len(export.notes))
+            return apply(
                 db,
                 blobs,
                 access,
@@ -452,32 +466,105 @@ def run_export(
                 progress=progress,
                 file_added=file_added,
             )
+
+    _run(db, blobs, record, work)
+
+
+def _run_paperus_export(
+    db: Session,
+    blobs: BlobStore,
+    record: Import,
+    uploads: list[paperus_export.Upload],
+    *,
+    max_file_bytes: int,
+    file_added: Callable[[uuid.UUID], None],
+) -> None:
+    """A paperus export, its owners going where the person chose."""
+    record.format = paperus_export.NAME
+    choices = (record.choices or {}).get("mapping") or {}
+    mapping = {key: uuid.UUID(str(value)) for key, value in choices.items()}
+
+    def work(
+        access: Access, started: Callable[[int], None], progress: Progress
+    ) -> Report:
+        with paperus_export.opened(uploads, blobs.temp_dir) as opened:
+            started(sum(o.items + o.notes for o in opened.choices.owners))
+            return paperus_export.apply_export(
+                db,
+                blobs,
+                access,
+                opened,
+                mapping=mapping,
+                default=record.library_id,
+                max_file_bytes=max_file_bytes,
+                progress=progress,
+                file_added=file_added,
+            )
+
+    _run(db, blobs, record, work)
+
+
+def _run(
+    db: Session,
+    blobs: BlobStore,
+    record: Import,
+    work: Callable[[Access, Callable[[int], None], Progress], Report],
+) -> None:
+    """Run ``work`` for the person who started the import, keeping
+    ``record`` up to date; the uploads are dropped at the end."""
+    record.status = ImportStatus.RUNNING
+    db.commit()
+    user = db.get(User, record.user_id)
+    row_id = record.id
+    try:
+        if user is None or user.deactivated_at is not None:
+            raise NotAnExport("The person who started the import cannot log in.")
+
+        def started(total: int) -> None:
+            record.total = total
+            db.commit()
+
+        def progress(done: int, total: int) -> None:
+            # Every few papers: the page shows the progress.
+            if done % 5 == 0 or done == total:
+                row = db.get(Import, row_id)
+                if row is not None:
+                    row.done = done
+                    db.commit()
+
+        report = work(Access.of(db, user), started, progress)
         record = db.get(Import, row_id) or record
         record.report = dataclasses.asdict(report)
         record.status = ImportStatus.DONE
     except Exception as error:
         db.rollback()
         log.warning("import %s failed", record.id, exc_info=True)
-        record = db.get(Import, record.id) or record
+        record = db.get(Import, row_id) or record
         record.status = ImportStatus.FAILED
         record.error = (
             str(error)
-            if isinstance(error, NotAnExport)
+            if isinstance(error, NotAnExport | paperus_export.NotAnExport)
             else (f"The import stopped: {error}")
         )
     record.finished_at = datetime.now(UTC)
-    upload, record.blob_sha256 = record.blob_sha256, None
+    uploads = [record.blob_sha256, *(part.blob_sha256 for part in record.parts)]
+    record.blob_sha256 = None
+    record.parts.clear()
     db.commit()
-    if upload is not None:
-        _forget_upload(db, blobs, upload)
+    for sha in uploads:
+        if sha is not None:
+            forget_upload(db, blobs, sha)
 
 
-def _forget_upload(db: Session, blobs: BlobStore, sha256: bytes) -> None:
+def forget_upload(db: Session, blobs: BlobStore, sha256: bytes) -> None:
     """Delete the uploaded export, unless something else stores the same
     bytes (e.g. the same zip imported as a paper's file, or imported again)."""
     used = db.scalar(select(File.id).where(File.blob_sha256 == sha256).limit(1))
     waiting = db.scalar(select(Import.id).where(Import.blob_sha256 == sha256).limit(1))
-    if used is not None or waiting is not None:
+    part = db.scalar(
+        select(ImportPart.import_id).where(ImportPart.blob_sha256 == sha256).limit(1)
+    )
+    if used is not None or waiting is not None or part is not None:
         return
     db.execute(delete(Blob).where(Blob.sha256 == sha256))
     db.commit()

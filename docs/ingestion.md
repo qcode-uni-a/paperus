@@ -217,6 +217,7 @@ Decided 2026-11-05; built in steps (see the changelog).
 | RIS (`.ris`) | Mendeley, EndNote, Citavi, publishers | Papers, keywords as tags, notes, file links |
 | CSL-JSON | Zotero, Pandoc | Papers (metadata only) |
 | LaTeX reference list: arXiv source (`.tar.gz`, or by arXiv ID), `.bbl`, zip of a LaTeX project | arXiv, BibTeX/biber, Overleaf | The paper's references, looked up by DOI/arXiv ID (else found on Crossref), in a collection named after the paper |
+| paperus export (its zips: `library.sqlite` and `files/`) | paperus (Settings → Export) | Everything: papers with versions, files, tags and keywords, collections (also smart), notes, favourites, archive marks, reference lists; see [export](export.md) |
 
 Mendeley's exports do not include its collections.
 
@@ -269,6 +270,15 @@ earlier import took as tags. (Stored as tags with the source
 - **Zotero RDF** is read as an RDF graph (rdflib), so the XML layout does
   not matter; checked against a hand-made sample in Zotero's layout, still
   to be checked against a real export.
+- **A paperus export** (decided 2026-11-07; see [export](export.md)): all
+  its zips at once (or part 1 alone: the files of missing parts are then
+  reported missing). Before anything is added, the import page lists the
+  export's owners ("Me" and its groups) and the person chooses where each
+  goes: their own library (the default), or a group they may add to (one
+  of the same name is suggested, never chosen by itself). Ids are kept
+  where unused, so importing again finds everything; papers are matched
+  by id, identifier or file as above; each file is checked against its
+  SHA-256.
 - **Not now**: Zotero PDF annotations (not in Zotero's exports; later via
   the Zotero Web API or the local database), sync instead of a one-off
   import, reading `zotero.sqlite` directly.

@@ -9,7 +9,7 @@ from paperus.importing import Export, ExportedFile, ExportedPaper
 from paperus.importing.common import date_parts, identifiers_of
 
 # RIS reference type → CSL type (anything else: document).
-_TYPES = {
+TYPES = {
     "JOUR": "article-journal",
     "JFULL": "article-journal",
     "EJOUR": "article-journal",
@@ -36,10 +36,31 @@ _TYPES = {
 _LISTS = [*rispy.LIST_TYPE_TAGS, "L1", "L2", "N2", "SN", "DO"]
 
 
+class _Parser(rispy.RisParser):
+    """rispy, but a note over several lines (EndNote's, paperus') stays one
+    note with its line breaks and indents, not a note per line."""
+
+    def parse_line(self, line: str) -> tuple[str, str] | tuple[None, str]:
+        tag, content = super().parse_line(line)
+        return (tag, content) if tag is not None else (None, line.rstrip())
+
+    def _add_tag(
+        self, record: dict, tag: str, content: str, extend_multiline: bool = False
+    ) -> None:
+        if extend_multiline and tag == "N1" and record.get("notes"):
+            record["notes"][-1] += "\n" + content
+            return
+        if extend_multiline:
+            content = content.strip()
+        super()._add_tag(record, tag, content, extend_multiline)
+
+
 def read(text: str) -> Export:
     export = Export(format="ris")
     try:
-        entries = rispy.loads(text, list_tags=_LISTS, skip_unknown_tags=True)
+        entries = rispy.loads(
+            text, implementation=_Parser, list_tags=_LISTS, skip_unknown_tags=True
+        )
     except Exception as error:
         export.problems.append(f"The file could not be read as RIS: {error}")
         return export
@@ -74,14 +95,18 @@ def _name(text: str) -> dict[str, str]:
 
 def _paper(number: int, entry: dict[str, Any]) -> ExportedPaper:
     ris_type = str(entry.get("type_of_reference") or "GEN").upper()
-    csl: dict[str, Any] = {"type": _TYPES.get(ris_type, "document")}
+    csl: dict[str, Any] = {"type": TYPES.get(ris_type, "document")}
     csl["title"] = (
         _first(entry, "title", "primary_title", "translated_title") or "(untitled)"
     )
     authors = [*entry.get("authors", []), *entry.get("first_authors", [])]
     if authors:
         csl["author"] = [_name(a) for a in authors]
-    editors = entry.get("secondary_authors", []) if csl["type"] == "chapter" else []
+    # A2 is the book's editor for chapters and books, other people for
+    # other types (a journal article's, for one, in some programs).
+    editors = (
+        entry.get("secondary_authors", []) if csl["type"] in ("chapter", "book") else []
+    )
     if editors:
         csl["editor"] = [_name(e) for e in editors]
     container = _first(
@@ -103,6 +128,7 @@ def _paper(number: int, entry: dict[str, Any]) -> ExportedPaper:
         "publisher": ("publisher",),
         "publisher-place": ("place_published",),
         "edition": ("edition",),
+        "collection-title": ("tertiary_title",),
         "abstract": ("abstract", "notes_abstract"),
         "language": ("language",),
         "URL": ("urls",),

@@ -22,6 +22,7 @@ from paperus.api import (
     backups,
     citations,
     duplicates,
+    exports,
     files,
     groups,
     health,
@@ -112,6 +113,7 @@ def create_app(
     app.include_router(citations.router)
     app.include_router(notes.router)
     app.include_router(imports.router)
+    app.include_router(exports.router)
     app.include_router(duplicates.router)
     app.include_router(manage.router)
     app.include_router(trash.router)

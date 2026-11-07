@@ -2,7 +2,7 @@
 
 import { type Client, type ClientMeta, formDataBodySerializer, type Options as Options2, type RequestResult, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddNotesData, AddNotesErrors, AddNotesResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ArchiveItemData, ArchiveItemErrors, ArchiveItemResponses, AuthenticationData, AuthenticationResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeNoteData, ChangeNoteErrors, ChangeNoteResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckConsentData, CheckConsentErrors, CheckConsentResponses, CheckProviderData, CheckProviderErrors, CheckProviderResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, ConnectedAppsData, ConnectedAppsResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateNoteData, CreateNoteErrors, CreateNoteResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DisconnectAppData, DisconnectAppErrors, DisconnectAppResponses, DownloadAgainData, DownloadAgainErrors, DownloadAgainResponses, DownloadAllOpenAccessData, DownloadAllOpenAccessErrors, DownloadAllOpenAccessResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, DownloadOpenAccessData, DownloadOpenAccessErrors, DownloadOpenAccessResponses, EmptyTrashData, EmptyTrashResponses, EndAllSessionsData, EndAllSessionsResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindReferenceData, FindReferenceErrors, FindReferenceResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetAvatarData, GetAvatarErrors, GetAvatarResponses, GetConfigData, GetConfigResponses, GetImportData, GetImportErrors, GetImportResponses, GetItemData, GetItemErrors, GetItemResponses, GettingStartedData, GettingStartedResponses, GiveConsentData, GiveConsentErrors, GiveConsentResponses, HandOverData, HandOverErrors, HandOverResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ImportArxivData, ImportArxivErrors, ImportArxivResponses, ImportReferencesData, ImportReferencesErrors, ImportReferencesResponses, IntegrityReportData, IntegrityReportResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, LinkItemData, LinkItemErrors, LinkItemResponses, ListBackupsData, ListBackupsResponses, ListCitingData, ListCitingErrors, ListCitingResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesEverywhereData, ListDuplicatesEverywhereResponses, ListDuplicatesResponses, ListGroupsData, ListGroupsResponses, ListImportsData, ListImportsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListNotesData, ListNotesErrors, ListNotesResponses, ListReferencesData, ListReferencesErrors, ListReferencesResponses, ListSimilarData, ListSimilarErrors, ListSimilarResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginMethodsData, LoginMethodsResponses, LoginResponses, LogoutData, LogoutResponses, LookupItemsData, LookupItemsErrors, LookupItemsResponses, ManageCountsData, ManageCountsResponses, MarkDifferentData, MarkDifferentErrors, MarkDifferentResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeasureMlSpeedData, MeasureMlSpeedErrors, MeasureMlSpeedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MissingPapersData, MissingPapersErrors, MissingPapersResponses, MlStatusData, MlStatusResponses, NoteHistoryData, NoteHistoryErrors, NoteHistoryResponses, NoteMarkdownData, NoteMarkdownErrors, NoteMarkdownResponses, OidcCallbackData, OidcCallbackErrors, OidcCallbackResponses, OidcStartData, OidcStartErrors, OidcStartResponses, PassageTextData, PassageTextErrors, PassageTextResponses, PinCollectionData, PinCollectionErrors, PinCollectionResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, PreviewTemplateData, PreviewTemplateErrors, PreviewTemplateResponses, PrivateThingsData, PrivateThingsErrors, PrivateThingsResponses, ReadableCopyData, ReadableCopyResponses, ReadFileAgainData, ReadFileAgainErrors, ReadFileAgainResponses, ReadNoteData, ReadNoteErrors, ReadNoteResponses, RefreshReferencesData, RefreshReferencesErrors, RefreshReferencesResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveKeywordsData, RemoveKeywordsResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveNoteData, RemoveNoteErrors, RemoveNoteResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreNoteData, RestoreNoteErrors, RestoreNoteResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetAvatarData, SetAvatarErrors, SetAvatarResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetFileWantedData, SetFileWantedErrors, SetFileWantedResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetNoteOwnerData, SetNoteOwnerErrors, SetNoteOwnerResponses, SetOidcSecretData, SetOidcSecretErrors, SetOidcSecretResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StarItemData, StarItemErrors, StarItemResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StartImportData, StartImportErrors, StartImportResponses, StatsData, StatsResponses, StorageData, StorageResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, TrashNoteData, TrashNoteErrors, TrashNoteResponses, UnarchiveItemData, UnarchiveItemErrors, UnarchiveItemResponses, UnlinkItemData, UnlinkItemErrors, UnlinkItemResponses, UnlinkOidcData, UnlinkOidcResponses, UnpinCollectionData, UnpinCollectionErrors, UnpinCollectionResponses, UnreadableFilesData, UnreadableFilesResponses, UnstarItemData, UnstarItemErrors, UnstarItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
+import type { AddImportPartsData, AddImportPartsErrors, AddImportPartsResponses, AddItemData, AddItemErrors, AddItemResponses, AddItemsData, AddItemsErrors, AddItemsResponses, AddNotesData, AddNotesErrors, AddNotesResponses, AddTagData, AddTagErrors, AddTagResponses, AddVersionData, AddVersionErrors, AddVersionResponses, ArchiveItemData, ArchiveItemErrors, ArchiveItemResponses, AuthenticationData, AuthenticationResponses, ChangeCollectionData, ChangeCollectionErrors, ChangeCollectionResponses, ChangeGroupData, ChangeGroupErrors, ChangeGroupResponses, ChangeNoteData, ChangeNoteErrors, ChangeNoteResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeTagData, ChangeTagErrors, ChangeTagResponses, ChangeUserData, ChangeUserErrors, ChangeUserResponses, CheckConsentData, CheckConsentErrors, CheckConsentResponses, CheckProviderData, CheckProviderErrors, CheckProviderResponses, CheckRestoreData, CheckRestoreErrors, CheckRestoreResponses, ConnectedAppsData, ConnectedAppsResponses, CreateCollectionData, CreateCollectionErrors, CreateCollectionResponses, CreateFirstAdminData, CreateFirstAdminErrors, CreateFirstAdminResponses, CreateGroupData, CreateGroupErrors, CreateGroupResponses, CreateNoteData, CreateNoteErrors, CreateNoteResponses, CreateTagData, CreateTagErrors, CreateTagResponses, CreateTokenData, CreateTokenErrors, CreateTokenResponses, CreateUserData, CreateUserErrors, CreateUserResponses, DeleteBackupData, DeleteBackupErrors, DeleteBackupResponses, DeleteCollectionData, DeleteCollectionErrors, DeleteCollectionResponses, DeleteExportData, DeleteExportErrors, DeleteExportResponses, DeleteGroupData, DeleteGroupErrors, DeleteGroupResponses, DeleteImportData, DeleteImportErrors, DeleteImportResponses, DeleteMlModelData, DeleteMlModelErrors, DeleteMlModelResponses, DeleteTagData, DeleteTagErrors, DeleteTagResponses, DisconnectAppData, DisconnectAppErrors, DisconnectAppResponses, DownloadAgainData, DownloadAgainErrors, DownloadAgainResponses, DownloadAllOpenAccessData, DownloadAllOpenAccessErrors, DownloadAllOpenAccessResponses, DownloadExportData, DownloadExportErrors, DownloadExportResponses, DownloadFileData, DownloadFileErrors, DownloadFileResponses, DownloadOpenAccessData, DownloadOpenAccessErrors, DownloadOpenAccessResponses, EmptyTrashData, EmptyTrashResponses, EndAllSessionsData, EndAllSessionsResponses, EstimateExportData, EstimateExportErrors, EstimateExportResponses, ExportCitationsData, ExportCitationsErrors, ExportCitationsResponses, FindReferenceData, FindReferenceErrors, FindReferenceResponses, FindUploadData, FindUploadErrors, FindUploadResponses, FindUsersData, FindUsersErrors, FindUsersResponses, GetAvatarData, GetAvatarErrors, GetAvatarResponses, GetConfigData, GetConfigResponses, GetExportData, GetExportErrors, GetExportResponses, GetImportData, GetImportErrors, GetImportResponses, GetItemData, GetItemErrors, GetItemResponses, GettingStartedData, GettingStartedResponses, GiveConsentData, GiveConsentErrors, GiveConsentResponses, HandOverData, HandOverErrors, HandOverResponses, HealthData, HealthDbData, HealthDbResponses, HealthResponses, ImportArxivData, ImportArxivErrors, ImportArxivResponses, ImportReferencesData, ImportReferencesErrors, ImportReferencesResponses, IntegrityReportData, IntegrityReportResponses, LeaveGroupData, LeaveGroupErrors, LeaveGroupResponses, LinkItemData, LinkItemErrors, LinkItemResponses, ListBackupsData, ListBackupsResponses, ListCitingData, ListCitingErrors, ListCitingResponses, ListCollectionsData, ListCollectionsResponses, ListDuplicatesData, ListDuplicatesErrors, ListDuplicatesEverywhereData, ListDuplicatesEverywhereResponses, ListDuplicatesResponses, ListExportsData, ListExportsResponses, ListGroupsData, ListGroupsResponses, ListImportsData, ListImportsResponses, ListItemsData, ListItemsErrors, ListItemsResponses, ListLibrariesData, ListLibrariesResponses, ListMembersData, ListMembersErrors, ListMembersResponses, ListNotesData, ListNotesErrors, ListNotesResponses, ListReferencesData, ListReferencesErrors, ListReferencesResponses, ListSimilarData, ListSimilarErrors, ListSimilarResponses, ListTagsData, ListTagsResponses, ListTokensData, ListTokensResponses, ListUsersData, ListUsersResponses, LoginData, LoginErrors, LoginMethodsData, LoginMethodsResponses, LoginResponses, LogoutData, LogoutResponses, LookupItemsData, LookupItemsErrors, LookupItemsResponses, ManageCountsData, ManageCountsResponses, MarkDifferentData, MarkDifferentErrors, MarkDifferentResponses, MarkHintSeenData, MarkHintSeenErrors, MarkHintSeenResponses, MarkViewedData, MarkViewedErrors, MarkViewedResponses, MeasureMlSpeedData, MeasureMlSpeedErrors, MeasureMlSpeedResponses, MeData, MeResponses, MergeItemData, MergeItemErrors, MergeItemResponses, MissingPapersData, MissingPapersErrors, MissingPapersResponses, MlStatusData, MlStatusResponses, NoteHistoryData, NoteHistoryErrors, NoteHistoryResponses, NoteMarkdownData, NoteMarkdownErrors, NoteMarkdownResponses, OidcCallbackData, OidcCallbackErrors, OidcCallbackResponses, OidcStartData, OidcStartErrors, OidcStartResponses, PassageTextData, PassageTextErrors, PassageTextResponses, PinCollectionData, PinCollectionErrors, PinCollectionResponses, PinVersionData, PinVersionErrors, PinVersionResponses, PreviewMergeData, PreviewMergeErrors, PreviewMergeResponses, PreviewMoveData, PreviewMoveErrors, PreviewMoveResponses, PreviewTemplateData, PreviewTemplateErrors, PreviewTemplateResponses, PrivateThingsData, PrivateThingsErrors, PrivateThingsResponses, ReadableCopyData, ReadableCopyResponses, ReadFileAgainData, ReadFileAgainErrors, ReadFileAgainResponses, ReadNoteData, ReadNoteErrors, ReadNoteResponses, RefreshReferencesData, RefreshReferencesErrors, RefreshReferencesResponses, RemoveAvatarData, RemoveAvatarResponses, RemoveItemData, RemoveItemErrors, RemoveItemResponses, RemoveKeywordsData, RemoveKeywordsResponses, RemoveMemberData, RemoveMemberErrors, RemoveMemberResponses, RemoveNoteData, RemoveNoteErrors, RemoveNoteResponses, RemoveTagData, RemoveTagErrors, RemoveTagResponses, RestoreFileData, RestoreFileErrors, RestoreFileResponses, RestoreItemData, RestoreItemErrors, RestoreItemResponses, RestoreNoteData, RestoreNoteErrors, RestoreNoteResponses, RestoreOnFirstStartData, RestoreOnFirstStartErrors, RestoreOnFirstStartResponses, RevokeTokenData, RevokeTokenErrors, RevokeTokenResponses, RunJobData, RunJobErrors, RunJobResponses, SearchData, SearchErrors, SearchResponses, SetAvatarData, SetAvatarErrors, SetAvatarResponses, SetBackupConfigData, SetBackupConfigErrors, SetBackupConfigResponses, SetConfigData, SetConfigErrors, SetConfigResponses, SetDefaultLibraryData, SetDefaultLibraryErrors, SetDefaultLibraryResponses, SetFileWantedData, SetFileWantedErrors, SetFileWantedResponses, SetMemberData, SetMemberErrors, SetMemberResponses, SetNoteOwnerData, SetNoteOwnerErrors, SetNoteOwnerResponses, SetOidcSecretData, SetOidcSecretErrors, SetOidcSecretResponses, SetOverridesData, SetOverridesErrors, SetOverridesResponses, SetOwnerData, SetOwnerErrors, SetOwnerResponses, SetupStateData, SetupStateResponses, StarItemData, StarItemErrors, StarItemResponses, StartBackupData, StartBackupErrors, StartBackupResponses, StartExportData, StartExportErrors, StartExportResponses, StartImportData, StartImportErrors, StartImportResponses, StartPaperusImportData, StartPaperusImportErrors, StartPaperusImportResponses, StatsData, StatsResponses, StorageData, StorageResponses, TrashFileData, TrashFileErrors, TrashFileResponses, TrashItemData, TrashItemErrors, TrashItemResponses, TrashNoteData, TrashNoteErrors, TrashNoteResponses, UnarchiveItemData, UnarchiveItemErrors, UnarchiveItemResponses, UnlinkItemData, UnlinkItemErrors, UnlinkItemResponses, UnlinkOidcData, UnlinkOidcResponses, UnpinCollectionData, UnpinCollectionErrors, UnpinCollectionResponses, UnreadableFilesData, UnreadableFilesResponses, UnstarItemData, UnstarItemErrors, UnstarItemResponses, UploadNewItemData, UploadNewItemErrors, UploadNewItemResponses, UploadToItemData, UploadToItemErrors, UploadToItemResponses, UploadToVersionData, UploadToVersionErrors, UploadToVersionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -636,9 +636,11 @@ export const listImports = <ThrowOnError extends boolean = false>(options?: Opti
  * Start Import
  *
  * Import an export: BibTeX, RIS or CSL-JSON, alone or zipped with its
- * files, or a LaTeX source (.tar.gz, .bbl) for its references. Everything
- * new belongs to ``library_id`` (default: the person's default owner).
- * Runs in the background; poll ``GET /api/imports/{id}``.
+ * files, a LaTeX source (.tar.gz, .bbl) for its references, or a paperus
+ * export (with ``parts``: its other zips). Everything new belongs to
+ * ``library_id`` (default: the person's default owner); a paperus export
+ * waits for the person to choose where its owners go (``start``). Runs in
+ * the background; poll ``GET /api/imports/{id}``.
  */
 export const startImport = <ThrowOnError extends boolean = false>(options: Options<StartImportData, ThrowOnError>): RequestResult<StartImportResponses, StartImportErrors, ThrowOnError> => (options.client ?? client).post<StartImportResponses, StartImportErrors, ThrowOnError>({
     ...formDataBodySerializer,
@@ -649,6 +651,49 @@ export const startImport = <ThrowOnError extends boolean = false>(options: Optio
         ...options.headers
     }
 });
+
+/**
+ * Add Import Parts
+ *
+ * More zips of a paperus export waiting for choices (parts missing so
+ * far); those of another export are left out.
+ */
+export const addImportParts = <ThrowOnError extends boolean = false>(options: Options<AddImportPartsData, ThrowOnError>): RequestResult<AddImportPartsResponses, AddImportPartsErrors, ThrowOnError> => (options.client ?? client).post<AddImportPartsResponses, AddImportPartsErrors, ThrowOnError>({
+    ...formDataBodySerializer,
+    url: '/api/imports/{import_id}/parts',
+    ...options,
+    headers: {
+        'Content-Type': null,
+        ...options.headers
+    }
+});
+
+/**
+ * Start Paperus Import
+ *
+ * Import a paperus export, its owners where the person chose.
+ */
+export const startPaperusImport = <ThrowOnError extends boolean = false>(options: Options<StartPaperusImportData, ThrowOnError>): RequestResult<StartPaperusImportResponses, StartPaperusImportErrors, ThrowOnError> => (options.client ?? client).post<StartPaperusImportResponses, StartPaperusImportErrors, ThrowOnError>({
+    url: '/api/imports/{import_id}/start',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Import
+ *
+ * Remove an import from the list (one waiting for choices: drop it
+ * with its uploads); not while it runs.
+ */
+export const deleteImport = <ThrowOnError extends boolean = false>(options: Options<DeleteImportData, ThrowOnError>): RequestResult<DeleteImportResponses, DeleteImportErrors, ThrowOnError> => (options.client ?? client).delete<DeleteImportResponses, DeleteImportErrors, ThrowOnError>({ url: '/api/imports/{import_id}', ...options });
+
+/**
+ * Get Import
+ */
+export const getImport = <ThrowOnError extends boolean = false>(options: Options<GetImportData, ThrowOnError>): RequestResult<GetImportResponses, GetImportErrors, ThrowOnError> => (options.client ?? client).get<GetImportResponses, GetImportErrors, ThrowOnError>({ url: '/api/imports/{import_id}', ...options });
 
 /**
  * Import Arxiv
@@ -667,9 +712,58 @@ export const importArxiv = <ThrowOnError extends boolean = false>(options: Optio
 });
 
 /**
- * Get Import
+ * Estimate Export
+ *
+ * How much an export with these options would hold, and its size.
  */
-export const getImport = <ThrowOnError extends boolean = false>(options: Options<GetImportData, ThrowOnError>): RequestResult<GetImportResponses, GetImportErrors, ThrowOnError> => (options.client ?? client).get<GetImportResponses, GetImportErrors, ThrowOnError>({ url: '/api/imports/{import_id}', ...options });
+export const estimateExport = <ThrowOnError extends boolean = false>(options: Options<EstimateExportData, ThrowOnError>): RequestResult<EstimateExportResponses, EstimateExportErrors, ThrowOnError> => (options.client ?? client).post<EstimateExportResponses, EstimateExportErrors, ThrowOnError>({
+    url: '/api/exports/estimate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Exports
+ *
+ * The person's exports, newest first.
+ */
+export const listExports = <ThrowOnError extends boolean = false>(options?: Options<ListExportsData, ThrowOnError>): RequestResult<ListExportsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListExportsResponses, unknown, ThrowOnError>({ url: '/api/exports', ...options });
+
+/**
+ * Start Export
+ *
+ * Export what the person sees (by default everything, with files).
+ * Written in the background; poll ``GET /api/exports/{id}``.
+ */
+export const startExport = <ThrowOnError extends boolean = false>(options: Options<StartExportData, ThrowOnError>): RequestResult<StartExportResponses, StartExportErrors, ThrowOnError> => (options.client ?? client).post<StartExportResponses, StartExportErrors, ThrowOnError>({
+    url: '/api/exports',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Export
+ */
+export const deleteExport = <ThrowOnError extends boolean = false>(options: Options<DeleteExportData, ThrowOnError>): RequestResult<DeleteExportResponses, DeleteExportErrors, ThrowOnError> => (options.client ?? client).delete<DeleteExportResponses, DeleteExportErrors, ThrowOnError>({ url: '/api/exports/{export_id}', ...options });
+
+/**
+ * Get Export
+ */
+export const getExport = <ThrowOnError extends boolean = false>(options: Options<GetExportData, ThrowOnError>): RequestResult<GetExportResponses, GetExportErrors, ThrowOnError> => (options.client ?? client).get<GetExportResponses, GetExportErrors, ThrowOnError>({ url: '/api/exports/{export_id}', ...options });
+
+/**
+ * Download Export
+ *
+ * One zip of the export (from 1), while it lasts; answers range
+ * requests (to read only the database out of part 1, say).
+ */
+export const downloadExport = <ThrowOnError extends boolean = false>(options: Options<DownloadExportData, ThrowOnError>): RequestResult<DownloadExportResponses, DownloadExportErrors, ThrowOnError> => (options.client ?? client).get<DownloadExportResponses, DownloadExportErrors, ThrowOnError>({ url: '/api/exports/{export_id}/parts/{part}', ...options });
 
 /**
  * List Duplicates Everywhere

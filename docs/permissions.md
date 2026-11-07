@@ -147,9 +147,9 @@ optionally to some owners; it never gets more than the person has.
 | `notes.write` | Writing, changing and trashing notes |
 
 Never with a token, whatever its scopes: passwords, users, groups (changes),
-tokens, imports, settings and administration (a site administrator's token
-gets no administration either), nor the person's own view (stars, pinned
-collections, what they opened). A token limited to some owners reaches
+tokens, imports, exports, settings and administration (a site
+administrator's token gets no administration either), nor the person's own
+view (stars, pinned collections, what they opened). A token limited to some owners reaches
 nothing else, also not by id. Expired or revoked tokens, and those of
 deactivated people, stop working at once. Tested in
 `server/tests/test_tokens.py`, which pins the answer for every route.

@@ -3295,7 +3295,7 @@
           "imports"
         ],
         "summary": "Start Import",
-        "description": "Import an export: BibTeX, RIS or CSL-JSON, alone or zipped with its\nfiles, or a LaTeX source (.tar.gz, .bbl) for its references. Everything\nnew belongs to ``library_id`` (default: the person's default owner).\nRuns in the background; poll ``GET /api/imports/{id}``.",
+        "description": "Import an export: BibTeX, RIS or CSL-JSON, alone or zipped with its\nfiles, a LaTeX source (.tar.gz, .bbl) for its references, or a paperus\nexport (with ``parts``: its other zips). Everything new belongs to\n``library_id`` (default: the person's default owner); a paperus export\nwaits for the person to choose where its owners go (``start``). Runs in\nthe background; poll ``GET /api/imports/{id}``.",
         "operationId": "start_import",
         "requestBody": {
           "content": {
@@ -3309,6 +3309,192 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}/parts": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Add Import Parts",
+        "description": "More zips of a paperus export waiting for choices (parts missing so\nfar); those of another export are left out.",
+        "operationId": "add_import_parts",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_add_import_parts"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}/start": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Start Paperus Import",
+        "description": "Import a paperus export, its owners where the person chose.",
+        "operationId": "start_paperus_import",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportStart"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}": {
+      "delete": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Delete Import",
+        "description": "Remove an import from the list (one waiting for choices: drop it\nwith its uploads); not while it runs.",
+        "operationId": "delete_import",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Get Import",
+        "operationId": "get_import",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -3373,22 +3559,130 @@
         }
       }
     },
-    "/api/imports/{import_id}": {
+    "/api/exports/estimate": {
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Estimate Export",
+        "description": "How much an export with these options would hold, and its size.",
+        "operationId": "estimate_export",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Options"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Estimate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports": {
       "get": {
         "tags": [
-          "imports"
+          "exports"
         ],
-        "summary": "Get Import",
-        "operationId": "get_import",
+        "summary": "List Exports",
+        "description": "The person's exports, newest first.",
+        "operationId": "list_exports",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExportOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Exports"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Start Export",
+        "description": "Export what the person sees (by default everything, with files).\nWritten in the background; poll ``GET /api/exports/{id}``.",
+        "operationId": "start_export",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Options"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports/{export_id}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Get Export",
+        "operationId": "get_export",
         "parameters": [
           {
-            "name": "import_id",
+            "name": "export_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid",
-              "title": "Import Id"
+              "title": "Export Id"
             }
           }
         ],
@@ -3398,9 +3692,92 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportOut"
+                  "$ref": "#/components/schemas/ExportOut"
                 }
               }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Delete Export",
+        "operationId": "delete_export",
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Export Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports/{export_id}/parts/{part}": {
+      "get": {
+        "tags": [
+          "exports"
+        ],
+        "summary": "Download Export",
+        "description": "One zip of the export (from 1), while it lasts; answers range\nrequests (to read only the database out of part 1, say).",
+        "operationId": "download_export",
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Export Id"
+            }
+          },
+          {
+            "name": "part",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Part"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/zip": {}
             }
           },
           "422": {
@@ -6314,6 +6691,23 @@
         ],
         "title": "Backups"
       },
+      "Body_add_import_parts": {
+        "properties": {
+          "parts": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parts"
+        ],
+        "title": "Body_add_import_parts"
+      },
       "Body_set_avatar": {
         "properties": {
           "upload": {
@@ -6346,6 +6740,21 @@
               }
             ],
             "title": "Library Id"
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "contentMediaType": "application/octet-stream"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts"
           }
         },
         "type": "object",
@@ -7145,6 +7554,253 @@
         ],
         "title": "Emptied"
       },
+      "Estimate": {
+        "properties": {
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "notes": {
+            "type": "integer",
+            "title": "Notes"
+          },
+          "collections": {
+            "type": "integer",
+            "title": "Collections"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          },
+          "files_bytes": {
+            "type": "integer",
+            "title": "Files Bytes"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "parts": {
+            "type": "integer",
+            "title": "Parts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "notes",
+          "collections",
+          "files",
+          "files_bytes",
+          "size",
+          "parts"
+        ],
+        "title": "Estimate"
+      },
+      "ExportOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExportStatus"
+          },
+          "options": {
+            "$ref": "#/components/schemas/Options"
+          },
+          "collection_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Name"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/ExportPartOut"
+            },
+            "type": "array",
+            "title": "Parts"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "options",
+          "collection_name",
+          "done",
+          "total",
+          "size",
+          "parts",
+          "error",
+          "created_at",
+          "finished_at",
+          "expires_at"
+        ],
+        "title": "ExportOut"
+      },
+      "ExportOwner": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "items": {
+            "type": "integer",
+            "title": "Items"
+          },
+          "notes": {
+            "type": "integer",
+            "title": "Notes"
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "role",
+          "items",
+          "notes"
+        ],
+        "title": "ExportOwner"
+      },
+      "ExportPartOut": {
+        "properties": {
+          "part": {
+            "type": "integer",
+            "title": "Part"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part",
+          "name",
+          "size",
+          "files"
+        ],
+        "title": "ExportPartOut"
+      },
+      "ExportStatus": {
+        "type": "string",
+        "enum": [
+          "waiting",
+          "running",
+          "done",
+          "failed",
+          "expired"
+        ],
+        "title": "ExportStatus"
+      },
       "FileLink": {
         "properties": {
           "id": {
@@ -7653,6 +8309,105 @@
         ],
         "title": "IdentifierOut"
       },
+      "ImportChoices": {
+        "properties": {
+          "export_id": {
+            "type": "string",
+            "title": "Export Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parts": {
+            "type": "integer",
+            "title": "Parts"
+          },
+          "exported_by": {
+            "type": "string",
+            "title": "Exported By"
+          },
+          "exported_at": {
+            "type": "string",
+            "title": "Exported At"
+          },
+          "server_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Url"
+          },
+          "options": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Options"
+          },
+          "uploaded": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Uploaded"
+          },
+          "missing": {
+            "items": {
+              "$ref": "#/components/schemas/MissingPart"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "refused": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refused"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/ExportOwner"
+            },
+            "type": "array",
+            "title": "Owners"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping"
+          }
+        },
+        "type": "object",
+        "required": [
+          "export_id",
+          "name",
+          "parts",
+          "exported_by",
+          "exported_at",
+          "server_url",
+          "options",
+          "uploaded",
+          "missing",
+          "refused",
+          "owners"
+        ],
+        "title": "ImportChoices",
+        "description": "A paperus export waiting for the person's choice of owners."
+      },
       "ImportOut": {
         "properties": {
           "id": {
@@ -7730,6 +8485,16 @@
               }
             ],
             "title": "Finished At"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportChoices"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7748,15 +8513,68 @@
         ],
         "title": "ImportOut"
       },
+      "ImportStart": {
+        "properties": {
+          "owners": {
+            "additionalProperties": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "object",
+            "title": "Owners",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "title": "ImportStart"
+      },
       "ImportStatus": {
         "type": "string",
         "enum": [
+          "needs_choices",
           "waiting",
           "running",
           "done",
           "failed"
         ],
         "title": "ImportStatus"
+      },
+      "Include": {
+        "properties": {
+          "notes": {
+            "type": "boolean",
+            "title": "Notes",
+            "default": true
+          },
+          "tags": {
+            "type": "boolean",
+            "title": "Tags",
+            "default": true
+          },
+          "collections": {
+            "type": "boolean",
+            "title": "Collections",
+            "default": true
+          },
+          "references": {
+            "type": "boolean",
+            "title": "References",
+            "default": true
+          },
+          "files": {
+            "type": "boolean",
+            "title": "Files",
+            "default": true
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "Include",
+        "description": "What comes along with the papers (their versions, identifiers,\nfavourites and archive marks always do); each can be left out. Left\nout, its tables stay empty."
       },
       "ItemDetail": {
         "properties": {
@@ -9137,6 +9955,29 @@
         ],
         "title": "MissingPapers"
       },
+      "MissingPart": {
+        "properties": {
+          "part": {
+            "type": "integer",
+            "title": "Part"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "part",
+          "name",
+          "files"
+        ],
+        "title": "MissingPart"
+      },
       "MovePreview": {
         "properties": {
           "papers": {
@@ -9558,6 +10399,67 @@
         ],
         "title": "OcrStatus",
         "description": "Pages without text (scans) are read by OCR in the ML service;\n``None``: the file has none."
+      },
+      "Options": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "paperus",
+              "zotero",
+              "jabref",
+              "mendeley"
+            ],
+            "title": "Format",
+            "default": "paperus"
+          },
+          "owners": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owners"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
+          },
+          "include": {
+            "$ref": "#/components/schemas/Include",
+            "default": {
+              "notes": true,
+              "tags": true,
+              "collections": true,
+              "references": true,
+              "files": true,
+              "archived": true
+            }
+          },
+          "trash": {
+            "type": "boolean",
+            "title": "Trash",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Options",
+        "description": "What to export."
       },
       "Owner": {
         "properties": {

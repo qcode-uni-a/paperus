@@ -13,6 +13,8 @@
 	} from '#lib/organize.svelte.ts';
 	import AccessTokens from '#lib/AccessTokens.svelte';
 	import ConnectedApps from '#lib/ConnectedApps.svelte';
+	import ExportLibrary from '#lib/ExportLibrary.svelte';
+	import { page } from '$app/state';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
 	import OidcLink from '#lib/OidcLink.svelte';
@@ -137,6 +139,11 @@
 <section>
 	<h2>Connected apps</h2>
 	<ConnectedApps />
+</section>
+
+<section id="export">
+	<h2>Export</h2>
+	<ExportLibrary collection={page.url.searchParams.get('export') ?? ''} />
 </section>
 
 <section>

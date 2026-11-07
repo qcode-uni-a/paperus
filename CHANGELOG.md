@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **Export everything you can see** (Settings → Export): your papers and
+  your groups' (each marked with its owner), with their versions, files,
+  notes, tags and keywords, collections, reference lists, stars and the
+  archive, as one SQLite database (open it with any SQLite tool) and a
+  folder of the files with readable names, in a zip to download for a
+  day. Choose whose papers and what comes along, or only one collection
+  (also from a collection's menu); the size is shown first. Large
+  exports come in zips of at most 2 GB. Or export for Zotero, JabRef or
+  Mendeley: their file (RDF, BibTeX, RIS) with the files beside it. On the
+  server: `paperus export --user NAME library.zip`.
+- **Import a paperus export** on the import page (all its zips at once):
+  you choose where its papers go, yours or a group's; nothing is lost,
+  papers you have already are found, and importing it again adds nothing.
+
 ## 0.0.13 (2026-11-07)
 
 Papers show their reference lists and what in the library cites them,

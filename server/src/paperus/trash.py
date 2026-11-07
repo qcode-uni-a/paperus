@@ -16,6 +16,7 @@ from paperus.models import (
     File,
     FileChunk,
     Import,
+    ImportPart,
     Item,
     Note,
     NoteChunk,
@@ -83,6 +84,7 @@ def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
         select(Blob.sha256, Blob.size).where(
             ~exists().where(File.blob_sha256 == Blob.sha256),
             ~exists().where(Import.blob_sha256 == Blob.sha256),
+            ~exists().where(ImportPart.blob_sha256 == Blob.sha256),
         )
     ).all()
     for sha256, _ in orphans:

@@ -829,6 +829,9 @@ class NoteChunk(Base):
 
 
 class ImportStatus(StrEnum):
+    NEEDS_CHOICES = "needs_choices"
+    """A paperus export: waiting for the person to choose where each of its
+    owners goes (``Import.choices``)."""
     WAITING = "waiting"
     RUNNING = "running"
     DONE = "done"
@@ -859,6 +862,64 @@ class Import(Record, Base):
     report: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None]
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    choices: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """A paperus export: its owners and parts, and where the person chose
+    each owner to go (``api.imports.ImportChoices``)."""
+
+    parts: Mapped[list[ImportPart]] = relationship(
+        cascade="all, delete-orphan", order_by="ImportPart.position"
+    )
+    """Further uploaded files (the other parts of a paperus export)."""
+
+
+class ImportPart(Base):
+    """Another uploaded file of an import (a paperus export in several
+    zips); dropped with the upload when the import is done."""
+
+    __tablename__ = "import_parts"
+
+    import_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("imports.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    blob_sha256: Mapped[bytes | None] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="SET NULL"), index=True
+    )
+
+
+class ExportStatus(StrEnum):
+    WAITING = "waiting"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    """Its zips were deleted after a day (``paperus.export.KEEP``)."""
+
+
+class Export(Record, Base):
+    """A person's export of what they can see (see ``paperus.export``): zips
+    written by the worker, kept for a day."""
+
+    __tablename__ = "exports"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(16))
+    options: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """What to export (``export.Options``)."""
+    done: Mapped[int] = mapped_column(server_default=text("0"))
+    total: Mapped[int] = mapped_column(server_default=text("0"))
+    size: Mapped[int | None] = mapped_column(BigInteger)
+    """Bytes of all its zips together."""
+    parts: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """Its zips, in order: name and size of each."""
+    error: Mapped[str | None]
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class NotDuplicate(Base):

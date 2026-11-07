@@ -3,16 +3,23 @@
 JabRef's groups (``@Comment{jabref-meta: grouping: …}`` and the ``groups``
 field) become collections, ``keywords`` tags (from Mendeley, its
 ``mendeley-tags``, the authors' keywords kept apart as keywords),
-``annote``/``comment`` notes,
+``annote``/``comment`` notes (as written: JabRef keeps Markdown there),
 ``file`` links files; the entry key is kept as the citation key.
 """
 
 import re
+from collections.abc import Iterable
 from typing import Any
 
-from pybtex.database import BibliographyData, Entry, Person, parse_string
+from pybtex.database import BibliographyData, Entry, Person
+from pybtex.database.input.bibtex import Parser
 from pybtex.scanner import PybtexSyntaxError
-from pylatexenc.latex2text import LatexNodes2Text
+from pylatexenc.latex2text import (
+    LatexNodes2Text,
+    MacroTextSpec,
+    get_default_latex_context_db,
+)
+from pylatexenc.macrospec import LatexContextDb
 
 from paperus.identifiers import Scheme
 from paperus.importing import Export, ExportedFile, ExportedPaper
@@ -59,7 +66,33 @@ _MONTHS = (
     "nov",
     "dec",
 )
-_latex = LatexNodes2Text(math_mode="verbatim", keep_comments=False)
+
+
+def _latex_context() -> LatexContextDb:
+    """pylatexenc's macros, and the escapes BibTeX exports write (paperus'
+    and Zotero's) that it lacks or reads as other characters."""
+    context = get_default_latex_context_db()
+    context.add_context_category(
+        "bibtex-escapes",
+        macros=[
+            MacroTextSpec(name, text)
+            for name, text in (
+                ("textless", "<"),
+                ("textgreater", ">"),
+                ("textbar", "|"),
+                ("textbraceleft", "{"),
+                ("textbraceright", "}"),
+                ("textasciicircum", "^"),
+            )
+        ],
+        prepend=True,
+    )
+    return context
+
+
+_latex = LatexNodes2Text(
+    latex_context=_latex_context(), math_mode="verbatim", keep_comments=False
+)
 
 
 def plain(value: str) -> str:
@@ -72,10 +105,31 @@ def plain(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+class _Parser(Parser):
+    """pybtex's parser, but notes stay as written: it makes every run of
+    spaces and line breaks in a field one space."""
+
+    def process_entry(
+        self,
+        entry_type: str,
+        key: str | None,
+        fields: Iterable[tuple[str, list[str]]],
+    ) -> None:
+        fields = list(fields)
+        super().process_entry(entry_type, key, fields)
+        entry = self.data.entries.get(key) if key is not None else None
+        for name, values in reversed(fields):  # the first of repeats counts
+            if entry is not None and name.lower() in _AS_WRITTEN:
+                entry.fields[name] = self.flatten_value_list(values)
+
+
+_AS_WRITTEN = {"annote", "comment"}
+
+
 def read(text: str) -> Export:
     export = Export(format="bibtex")
     try:
-        data = parse_string(_without_comments(text), "bibtex")
+        data = _Parser().parse_string(_without_comments(text))
     except PybtexSyntaxError as error:
         export.problems.append(f"The file could not be read as BibTeX: {error}")
         return export
@@ -110,7 +164,7 @@ def _parse_leniently(text: str, export: Export) -> BibliographyData | None:
         if not chunk.strip().startswith("@"):
             continue
         try:
-            part = parse_string(chunk, "bibtex")
+            part = _Parser().parse_string(chunk)
         except Exception as error:
             export.problems.append(f"An entry could not be read: {error}")
             continue
@@ -136,20 +190,39 @@ def _jabref_groups(text: str) -> dict[str, tuple[str, ...]]:
         return {}
     paths: dict[str, tuple[str, ...]] = {}
     stack: list[str] = []
-    for line in re.split(r";\s*\n", found.group(1)):
-        match = re.match(r"\s*(\d+)\s+(\w+):(.*)", line.strip())
+    # Escaped twice: a group's fields are separated by ";" (with "\" before
+    # ";" and "\" in them), then the line ends with ";" (the same again).
+    for line in _split_escaped(found.group(1)):
+        match = re.match(r"\s*(\d+)\s+(\w+):(.*)", line.strip(), flags=re.S)
         if not match:
             continue
         level, kind, rest = int(match.group(1)), match.group(2), match.group(3)
         if level == 0:  # AllEntriesGroup
             continue
-        # Fields are separated by "\;", the first is the name.
-        name = rest.split("\\;")[0].replace("\\\\", "\\").strip()
+        name = _split_escaped(rest)[0].strip()  # the first field
         del stack[level - 1 :]
         stack.append(name)
         if kind in ("StaticGroup", "ExplicitGroup"):
             paths[name] = tuple(stack)
     return paths
+
+
+def _split_escaped(text: str) -> list[str]:
+    """``a\\;b;c`` → ``["a;b", "c"]``: split at ";", a backslash keeps the
+    next character as it is."""
+    parts = [""]
+    escaped = False
+    for char in text:
+        if escaped:
+            parts[-1] += char
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == ";":
+            parts.append("")
+        else:
+            parts[-1] += char
+    return parts
 
 
 def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> ExportedPaper:
@@ -164,7 +237,7 @@ def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> Export
 
     entry_type = (entry.type or "misc").lower()
     csl: dict[str, Any] = {"type": _TYPES.get(entry_type, "document")}
-    if entry_type == "misc" and get("eprint") and _is_arxiv(fields):
+    if entry_type == "misc" and _link(fields.get("eprint")) and _is_arxiv(fields):
         csl["type"] = "article"
     csl["title"] = get("title") or "(untitled)"
     for role in ("author", "editor", "translator"):
@@ -193,7 +266,6 @@ def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> Export
         "language": ("language", "langid"),
         "ISBN": ("isbn",),
         "ISSN": ("issn",),
-        "URL": ("url",),
         "note": ("note",),
         "genre": ("type",),
     }.items():
@@ -209,10 +281,13 @@ def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> Export
     accessed = date_parts(get("urldate"))
     if accessed:
         csl["accessed"] = accessed
-    doi = get("doi")
+    url = _link(fields.get("url"))
+    if url:
+        csl["URL"] = url
+    doi = _link(fields.get("doi"))
     csl["citation-key"] = key
 
-    arxiv = get("eprint") if _is_arxiv(fields) else None
+    arxiv = _link(fields.get("eprint")) if _is_arxiv(fields) else None
     identifiers = identifiers_of(
         doi=doi,
         arxiv=arxiv,
@@ -237,13 +312,37 @@ def _paper(key: str, entry: Entry, groups: dict[str, tuple[str, ...]]) -> Export
         identifiers=identifiers,
         tags=tags,
         keywords=automatic,
-        notes=[note for note in (get("annote"), get("comment")) if note],
+        notes=[
+            note
+            for note in (_note(fields.get("annote")), _note(fields.get("comment")))
+            if note
+        ],
         files=_files(fields.get("file", "")),
         source_key=key,
     )
     for name in split_keywords(fields.get("groups", "")):
         paper.collections.append(groups.get(name, (name,)))
     return paper
+
+
+def _link(value: str | None) -> str | None:
+    """A URL, DOI or arXiv ID as written, without LaTeX's escapes
+    (``a{\\_}b``, ``\\url{…}``) that some programs add."""
+    if not value or not value.strip():
+        return None
+    text = re.sub(r"\\url\s*\{(.*)\}", r"\1", value.strip(), flags=re.S)
+    text = re.sub(r"\\([_%&#$~])", r"\1", text)
+    return text.replace("{", "").replace("}", "").strip() or None
+
+
+def _note(value: str | None) -> str | None:
+    """A note as written (JabRef keeps Markdown in comments): line breaks,
+    %, & and the like kept; only ``\\%``, ``\\&`` and ``\\$`` (LaTeX's
+    escapes, which Zotero writes) undone."""
+    if not value:
+        return None
+    text = re.sub(r"\\([%&$])", r"\1", value.replace("\r\n", "\n"))
+    return text.strip() or None
 
 
 def _is_arxiv(fields: dict[str, str]) -> bool:

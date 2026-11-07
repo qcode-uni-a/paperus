@@ -1,5 +1,5 @@
 import { resolve } from '$app/paths';
-import { getImport, listItems } from '#lib/api/client.ts';
+import { getExport, getImport, listItems } from '#lib/api/client.ts';
 import { notify } from '#lib/toasts.svelte.ts';
 
 /** Background work the person started, followed while they use the site:
@@ -67,6 +67,7 @@ export function watchImport(importId: string, filename: string): void {
 			return;
 		}
 		watchedImports.delete(importId);
+		if (data.status === 'needs_choices') return; // the import page asks
 		const report = (data.report ?? {}) as Record<string, number | string[]>;
 		const missing = (report.missing_files as string[] | undefined)?.length ?? 0;
 		const problems = (report.problems as string[] | undefined)?.length ?? 0;
@@ -87,6 +88,41 @@ export function watchImport(importId: string, filename: string): void {
 						title: `Import of ${filename} failed`,
 						text: data.error ?? undefined,
 						link: { href: resolve('/import'), label: 'Details' }
+					}
+		);
+	};
+	setTimeout(check, EVERY);
+}
+
+const watchedExports = new Set<string>();
+
+/** Follow an export until its zips are ready (or it failed). */
+export function watchExport(exportId: string): void {
+	if (watchedExports.has(exportId)) return;
+	watchedExports.add(exportId);
+	const check = async () => {
+		const { data } = await getExport({ path: { export_id: exportId } });
+		if (!data || data.status === 'waiting' || data.status === 'running') {
+			setTimeout(check, EVERY);
+			return;
+		}
+		watchedExports.delete(exportId);
+		notify(
+			data.status === 'done'
+				? {
+						kind: 'success',
+						title: 'Your export is ready',
+						text:
+							data.parts.length > 1
+								? `${data.parts.length} zips to download, for a day.`
+								: 'A zip to download, for a day.',
+						link: { href: `${resolve('/settings')}#export`, label: 'Download' }
+					}
+				: {
+						kind: 'warning',
+						title: 'The export failed',
+						text: data.error ?? undefined,
+						link: { href: `${resolve('/settings')}#export`, label: 'Details' }
 					}
 		);
 	};

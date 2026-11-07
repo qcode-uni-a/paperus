@@ -126,6 +126,11 @@
 						onclick={() => downloadCitations({ collection: id, nested: includeInside }, 'csl-json')}
 						>Export CSL-JSON</button
 					>
+					<button
+						role="menuitem"
+						onclick={() => goto(`${resolve('/settings')}?export=${id}#export`)}
+						>Export with files and notes…</button
+					>
 					{#if writable}
 						<hr />
 						<button role="menuitem" onclick={writeNote}>New note here</button>

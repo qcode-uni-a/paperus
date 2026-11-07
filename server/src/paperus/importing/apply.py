@@ -397,18 +397,7 @@ def _existing(run: _Run, paper: ExportedPaper, shas: list[bytes]) -> Item | None
         if item is not None:
             return item
     for sha in shas:
-        item = run.db.scalar(
-            select(Item)
-            .join(Version)
-            .join(File)
-            .where(
-                File.blob_sha256 == sha,
-                File.deleted_at.is_(None),
-                Item.deleted_at.is_(None),
-                Item.library_id.in_(run.access.readable),
-            )
-            .limit(1)
-        )
+        item = item_with_file(run.db, run.access.readable, sha)
         if item is not None:
             return item
     if not paper.identifiers:
@@ -433,6 +422,22 @@ def _existing(run: _Run, paper: ExportedPaper, shas: list[bytes]) -> Item | None
             if item.id not in run.added:
                 return item
     return None
+
+
+def item_with_file(
+    db: Session, libraries: list[uuid.UUID], sha: bytes, *, trash: bool = False
+) -> Item | None:
+    """A paper owned by one of the libraries with a file of this content
+    (outside the trash, unless ``trash``)."""
+    query = (
+        select(Item)
+        .join(Version)
+        .join(File)
+        .where(File.blob_sha256 == sha, Item.library_id.in_(libraries))
+    )
+    if not trash:
+        query = query.where(File.deleted_at.is_(None), Item.deleted_at.is_(None))
+    return db.scalar(query.limit(1))
 
 
 def _kind(paper: ExportedPaper) -> VersionKind:

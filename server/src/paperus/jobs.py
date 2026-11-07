@@ -32,6 +32,7 @@ from paperus import (
     system,
     trash,
 )
+from paperus import export as exports
 from paperus.access import Access
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
@@ -753,12 +754,22 @@ def import_library(job: JobContext, import_id: str) -> None:
             return
         if record.blob_sha256 is None:
             return
-        with context.blobs.local_file(record.blob_sha256) as path:
+        with contextlib.ExitStack() as stack:
+            path = stack.enter_context(context.blobs.local_file(record.blob_sha256))
+            parts = [
+                (
+                    stack.enter_context(context.blobs.local_file(part.blob_sha256)),
+                    part.filename,
+                )
+                for part in record.parts
+                if part.blob_sha256 is not None
+            ]
             run_import(
                 db,
                 context.blobs,
                 record,
                 path=path,
+                parts=parts,
                 max_file_bytes=max_upload_bytes(db, context.settings),
                 file_added=lambda file_id: queue_text_extraction(job.app, file_id),
                 http=context.http,
@@ -811,6 +822,33 @@ def queue_import(app: App, import_id: uuid.UUID, owner: uuid.UUID) -> None:
     app.configure_task("paperus:import_library", lock=f"import-{owner}").defer(
         import_id=str(import_id)
     )
+
+
+@tasks.task(name="export_library", queue="import")
+def export_library(export_id: str) -> None:
+    """Write an export someone asked for (see ``paperus.export``)."""
+    context = _worker_context()
+    exports.run(context.sessions, context.blobs, context.settings, uuid.UUID(export_id))
+
+
+def queue_export(app: App, export_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """A person's exports are written one after another."""
+    app.configure_task("paperus:export_library", lock=f"export-{user_id}").defer(
+        export_id=str(export_id)
+    )
+
+
+@tasks.periodic(cron="15 * * * *")
+@tasks.task(
+    name="remove_expired_exports", queue="backup", queueing_lock="expired-exports"
+)
+def remove_expired_exports(timestamp: int) -> None:
+    """Every hour: delete exports older than a day."""
+    context = _worker_context()
+    with context.sessions() as db:
+        removed = exports.remove_expired(db, context.settings)
+    if removed:
+        log.info("removed %d expired exports", removed)
 
 
 @tasks.task(name="backup", queue="backup", queueing_lock="backup")

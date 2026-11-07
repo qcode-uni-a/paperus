@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     storage_path: Path = Path("data/files")
     backup_path: Path = Path("data/backups")
     """Where backups go: best another disk or a network share."""
+    export_path: Path | None = None
+    """Where people's exports are written (kept for a day); by default
+    ``exports/`` beside the stored files, which it is not part of."""
     copy_path: Path = Path("data/library-copy")
     """Where the readable copy goes, if switched on (Administration →
     Settings → Storage template)."""
@@ -57,3 +60,7 @@ class Settings(BaseSettings):
     oidc_client_secret: str | None = None
     # Imports from other reference managers, files included.
     max_import_bytes: int = 20 * 1024 * 1024 * 1024
+
+    @property
+    def exports_folder(self) -> Path:
+        return self.export_path or self.storage_path / "exports"

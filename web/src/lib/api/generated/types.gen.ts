@@ -132,6 +132,16 @@ export type Backups = {
 };
 
 /**
+ * Body_add_import_parts
+ */
+export type BodyAddImportParts = {
+    /**
+     * Parts
+     */
+    parts: Array<Blob | File>;
+};
+
+/**
  * Body_set_avatar
  */
 export type BodySetAvatar = {
@@ -153,6 +163,10 @@ export type BodyStartImport = {
      * Library Id
      */
     library_id?: string | null;
+    /**
+     * Parts
+     */
+    parts?: Array<Blob | File> | null;
 };
 
 /**
@@ -605,6 +619,149 @@ export type Emptied = {
 };
 
 /**
+ * Estimate
+ */
+export type Estimate = {
+    /**
+     * Items
+     */
+    items: number;
+    /**
+     * Notes
+     */
+    notes: number;
+    /**
+     * Collections
+     */
+    collections: number;
+    /**
+     * Files
+     */
+    files: number;
+    /**
+     * Files Bytes
+     */
+    files_bytes: number;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Parts
+     */
+    parts: number;
+};
+
+/**
+ * ExportOut
+ */
+export type ExportOut = {
+    /**
+     * Id
+     */
+    id: string;
+    status: ExportStatus;
+    options: Options;
+    /**
+     * Collection Name
+     */
+    collection_name: string | null;
+    /**
+     * Done
+     */
+    done: number;
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Size
+     */
+    size: number | null;
+    /**
+     * Parts
+     */
+    parts: Array<ExportPartOut>;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Expires At
+     */
+    expires_at: string | null;
+};
+
+/**
+ * ExportOwner
+ */
+export type ExportOwner = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Items
+     */
+    items: number;
+    /**
+     * Notes
+     */
+    notes: number;
+    /**
+     * Suggested
+     */
+    suggested?: string | null;
+};
+
+/**
+ * ExportPartOut
+ */
+export type ExportPartOut = {
+    /**
+     * Part
+     */
+    part: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Size
+     */
+    size: number;
+    /**
+     * Files
+     */
+    files: number;
+};
+
+/**
+ * ExportStatus
+ */
+export type ExportStatus = 'waiting' | 'running' | 'done' | 'failed' | 'expired';
+
+/**
  * FileLink
  */
 export type FileLink = {
@@ -877,6 +1034,66 @@ export type IdentifierOut = {
 };
 
 /**
+ * ImportChoices
+ *
+ * A paperus export waiting for the person's choice of owners.
+ */
+export type ImportChoices = {
+    /**
+     * Export Id
+     */
+    export_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Parts
+     */
+    parts: number;
+    /**
+     * Exported By
+     */
+    exported_by: string;
+    /**
+     * Exported At
+     */
+    exported_at: string;
+    /**
+     * Server Url
+     */
+    server_url: string | null;
+    /**
+     * Options
+     */
+    options: {
+        [key: string]: unknown;
+    };
+    /**
+     * Uploaded
+     */
+    uploaded: Array<number>;
+    /**
+     * Missing
+     */
+    missing: Array<MissingPart>;
+    /**
+     * Refused
+     */
+    refused: Array<string>;
+    /**
+     * Owners
+     */
+    owners: Array<ExportOwner>;
+    /**
+     * Mapping
+     */
+    mapping?: {
+        [key: string]: string;
+    } | null;
+};
+
+/**
  * ImportOut
  */
 export type ImportOut = {
@@ -923,12 +1140,59 @@ export type ImportOut = {
      * Finished At
      */
     finished_at: string | null;
+    choices?: ImportChoices | null;
+};
+
+/**
+ * ImportStart
+ */
+export type ImportStart = {
+    /**
+     * Owners
+     */
+    owners?: {
+        [key: string]: string;
+    };
 };
 
 /**
  * ImportStatus
  */
-export type ImportStatus = 'waiting' | 'running' | 'done' | 'failed';
+export type ImportStatus = 'needs_choices' | 'waiting' | 'running' | 'done' | 'failed';
+
+/**
+ * Include
+ *
+ * What comes along with the papers (their versions, identifiers,
+ * favourites and archive marks always do); each can be left out. Left
+ * out, its tables stay empty.
+ */
+export type Include = {
+    /**
+     * Notes
+     */
+    notes?: boolean;
+    /**
+     * Tags
+     */
+    tags?: boolean;
+    /**
+     * Collections
+     */
+    collections?: boolean;
+    /**
+     * References
+     */
+    references?: boolean;
+    /**
+     * Files
+     */
+    files?: boolean;
+    /**
+     * Archived
+     */
+    archived?: boolean;
+};
 
 /**
  * ItemDetail
@@ -1684,6 +1948,24 @@ export type MissingPapers = {
 };
 
 /**
+ * MissingPart
+ */
+export type MissingPart = {
+    /**
+     * Part
+     */
+    part: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Files
+     */
+    files: number;
+};
+
+/**
  * MovePreview
  *
  * What moving a collection (with those inside) into a library does.
@@ -1925,6 +2207,31 @@ export type NoteOut = {
  * ``None``: the file has none.
  */
 export type OcrStatus = 'pending' | 'done' | 'skipped' | 'failed';
+
+/**
+ * Options
+ *
+ * What to export.
+ */
+export type Options = {
+    /**
+     * Format
+     */
+    format?: 'paperus' | 'zotero' | 'jabref' | 'mendeley';
+    /**
+     * Owners
+     */
+    owners?: Array<string> | null;
+    /**
+     * Collection Id
+     */
+    collection_id?: string | null;
+    include?: Include;
+    /**
+     * Trash
+     */
+    trash?: boolean;
+};
 
 /**
  * Owner
@@ -5241,30 +5548,95 @@ export type StartImportResponses = {
 
 export type StartImportResponse = StartImportResponses[keyof StartImportResponses];
 
-export type ImportArxivData = {
-    body: ArxivImportIn;
-    path?: never;
+export type AddImportPartsData = {
+    body: BodyAddImportParts;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
     query?: never;
-    url: '/api/imports/arxiv';
+    url: '/api/imports/{import_id}/parts';
 };
 
-export type ImportArxivErrors = {
+export type AddImportPartsErrors = {
     /**
      * Validation Error
      */
     422: HttpValidationError;
 };
 
-export type ImportArxivError = ImportArxivErrors[keyof ImportArxivErrors];
+export type AddImportPartsError = AddImportPartsErrors[keyof AddImportPartsErrors];
 
-export type ImportArxivResponses = {
+export type AddImportPartsResponses = {
     /**
      * Successful Response
      */
-    201: ImportOut;
+    200: ImportOut;
 };
 
-export type ImportArxivResponse = ImportArxivResponses[keyof ImportArxivResponses];
+export type AddImportPartsResponse = AddImportPartsResponses[keyof AddImportPartsResponses];
+
+export type StartPaperusImportData = {
+    body: ImportStart;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}/start';
+};
+
+export type StartPaperusImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartPaperusImportError = StartPaperusImportErrors[keyof StartPaperusImportErrors];
+
+export type StartPaperusImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportOut;
+};
+
+export type StartPaperusImportResponse = StartPaperusImportResponses[keyof StartPaperusImportResponses];
+
+export type DeleteImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}';
+};
+
+export type DeleteImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteImportError = DeleteImportErrors[keyof DeleteImportErrors];
+
+export type DeleteImportResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteImportResponse = DeleteImportResponses[keyof DeleteImportResponses];
 
 export type GetImportData = {
     body?: never;
@@ -5295,6 +5667,193 @@ export type GetImportResponses = {
 };
 
 export type GetImportResponse = GetImportResponses[keyof GetImportResponses];
+
+export type ImportArxivData = {
+    body: ArxivImportIn;
+    path?: never;
+    query?: never;
+    url: '/api/imports/arxiv';
+};
+
+export type ImportArxivErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportArxivError = ImportArxivErrors[keyof ImportArxivErrors];
+
+export type ImportArxivResponses = {
+    /**
+     * Successful Response
+     */
+    201: ImportOut;
+};
+
+export type ImportArxivResponse = ImportArxivResponses[keyof ImportArxivResponses];
+
+export type EstimateExportData = {
+    body: Options;
+    path?: never;
+    query?: never;
+    url: '/api/exports/estimate';
+};
+
+export type EstimateExportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type EstimateExportError = EstimateExportErrors[keyof EstimateExportErrors];
+
+export type EstimateExportResponses = {
+    /**
+     * Successful Response
+     */
+    200: Estimate;
+};
+
+export type EstimateExportResponse = EstimateExportResponses[keyof EstimateExportResponses];
+
+export type ListExportsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/exports';
+};
+
+export type ListExportsResponses = {
+    /**
+     * Response List Exports
+     *
+     * Successful Response
+     */
+    200: Array<ExportOut>;
+};
+
+export type ListExportsResponse = ListExportsResponses[keyof ListExportsResponses];
+
+export type StartExportData = {
+    body: Options;
+    path?: never;
+    query?: never;
+    url: '/api/exports';
+};
+
+export type StartExportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartExportError = StartExportErrors[keyof StartExportErrors];
+
+export type StartExportResponses = {
+    /**
+     * Successful Response
+     */
+    201: ExportOut;
+};
+
+export type StartExportResponse = StartExportResponses[keyof StartExportResponses];
+
+export type DeleteExportData = {
+    body?: never;
+    path: {
+        /**
+         * Export Id
+         */
+        export_id: string;
+    };
+    query?: never;
+    url: '/api/exports/{export_id}';
+};
+
+export type DeleteExportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteExportError = DeleteExportErrors[keyof DeleteExportErrors];
+
+export type DeleteExportResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteExportResponse = DeleteExportResponses[keyof DeleteExportResponses];
+
+export type GetExportData = {
+    body?: never;
+    path: {
+        /**
+         * Export Id
+         */
+        export_id: string;
+    };
+    query?: never;
+    url: '/api/exports/{export_id}';
+};
+
+export type GetExportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetExportError = GetExportErrors[keyof GetExportErrors];
+
+export type GetExportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ExportOut;
+};
+
+export type GetExportResponse = GetExportResponses[keyof GetExportResponses];
+
+export type DownloadExportData = {
+    body?: never;
+    path: {
+        /**
+         * Export Id
+         */
+        export_id: string;
+        /**
+         * Part
+         */
+        part: number;
+    };
+    query?: never;
+    url: '/api/exports/{export_id}/parts/{part}';
+};
+
+export type DownloadExportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DownloadExportError = DownloadExportErrors[keyof DownloadExportErrors];
+
+export type DownloadExportResponses = {
+    /**
+     * Successful Response
+     */
+    200: Blob | File;
+};
+
+export type DownloadExportResponse = DownloadExportResponses[keyof DownloadExportResponses];
 
 export type ListDuplicatesEverywhereData = {
     body?: never;

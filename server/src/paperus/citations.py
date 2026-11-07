@@ -20,7 +20,7 @@ from paperus.models import Item
 
 # CSL type → BibTeX entry type, as Zotero maps the matching Zotero types;
 # anything else (preprints, documents, web pages, …) is @misc.
-_ENTRY_TYPES = {
+ENTRY_TYPES = {
     "article-journal": "article",
     "article-magazine": "article",
     "article-newspaper": "article",
@@ -43,15 +43,15 @@ _KEY_SKIP = re.compile(
 )
 _KEY_CLEAN = re.compile(r"[^a-z0-9_-]")
 # Hyphens and dashes in page ranges become "--".
-_DASHES = re.compile("\\s*[-\u2010-\u2015\u2053]+\\s*")
-_MASTERS = {"master", "masters", "master's", "ms", "msc", "ma"}
+DASHES = re.compile("\\s*[-\u2010-\u2015\u2053]+\\s*")
+MASTERS = {"master", "masters", "master's", "ms", "msc", "ma"}
 
 
 def citation_key_base(csl: dict[str, Any]) -> str:
     """The paper's own key (e.g. from Better BibTeX or Zotero), or one in
     Zotero's form ``author_titleword_year``: the first creator's family
     name, the title's first word that is not an article or preposition."""
-    own = _own_key(csl)
+    own = own_key(csl)
     if own:
         return own
     names = csl.get("author") or csl.get("editor") or []
@@ -72,13 +72,13 @@ def keyed(items: list[Item]) -> list[tuple[str, dict[str, Any]]]:
     in Zotero; a paper's own key wins over a generated one of the same name
     (e.g. the same .bib imported into a private and a group library)."""
     pairs = [(item, tidy(library.citation_csl(item))) for item in items]
-    own = {key for _, csl in pairs if (key := _own_key(csl))}
+    own = {key for _, csl in pairs if (key := own_key(csl))}
     seen: set[str] = set()
     result: list[tuple[str, dict[str, Any]]] = []
     for _, csl in pairs:
         base = key = citation_key_base(csl)
         suffix = 0
-        while key in seen or (key in own and _own_key(csl) != key):
+        while key in seen or (key in own and own_key(csl) != key):
             suffix += 1
             key = f"{base}-{suffix}"
         seen.add(key)
@@ -90,7 +90,7 @@ def keyed(items: list[Item]) -> list[tuple[str, dict[str, Any]]]:
 _KEY_UNSAFE = re.compile(r"""[\s,{}()"#%'=\\~]""")
 
 
-def _own_key(csl: dict[str, Any]) -> str | None:
+def own_key(csl: dict[str, Any]) -> str | None:
     """The paper's own citation key, without characters a .bib cannot hold."""
     own = csl.get("citation-key")
     if not isinstance(own, str):
@@ -141,11 +141,11 @@ def bibtex(
 
 
 def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
-    entry = _ENTRY_TYPES.get(str(csl.get("type") or ""), "misc")
+    entry = ENTRY_TYPES.get(str(csl.get("type") or ""), "misc")
     genre = csl.get("genre")
     if entry == "phdthesis":
         kind = re.sub(r"\s|\.|thesis|unpublished", "", str(genre or "").lower())
-        if kind in _MASTERS:
+        if kind in MASTERS:
             entry, genre = "mastersthesis", None
     fields: list[tuple[str, str]] = []
 
@@ -157,10 +157,10 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
         text = (
             str(value).replace("{", "%7B").replace("}", "%7D")
             if raw
-            else _escape(str(value))
+            else escape(str(value))
         )
         if name in ("title", "type", "shorttitle", "booktitle", "series"):
-            text = _protect(text)
+            text = protect(text)
         fields.append((name, "{" + text + "}"))
 
     add("address", csl.get("publisher-place"))
@@ -194,7 +194,9 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
     for role in ("author", "editor", "translator"):
         names = csl.get(role) or []
         if names:
-            fields.append((role, "{" + " and ".join(_name(n) for n in names) + "}"))
+            fields.append(
+                (role, "{" + " and ".join(bibtex_name(n) for n in names) + "}")
+            )
     month = _month(csl)
     if month:
         fields.append(("month", month))  # a BibTeX macro: no braces
@@ -206,26 +208,27 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
         add("archiveprefix", "arXiv")
     add("keywords", ", ".join(tags))
     page = csl.get("page")
-    add("pages", _DASHES.sub("--", str(page)) if page else None)
+    add("pages", DASHES.sub("--", str(page)) if page else None)
     body = ",\n".join(f"\t{name} = {value}" for name, value in fields)
     return f"@{entry}{{{key},\n{body},\n}}"
 
 
-def _name(name: dict[str, Any]) -> str:
+def bibtex_name(name: dict[str, Any]) -> str:
+    """``Family, Given`` (``Family, Jr., Given``); one-part names in braces."""
     if name.get("literal"):
-        return "{" + _escape(str(name["literal"])) + "}"
+        return "{" + escape(str(name["literal"])) + "}"
     if not name.get("family"):  # e.g. "Plato": one name, kept whole
         whole = " ".join(str(v) for v in (name.get("given"), name.get("suffix")) if v)
-        return "{" + _escape(whole or "Anonymous") + "}"
+        return "{" + escape(whole or "Anonymous") + "}"
     family = " ".join(
         filter(None, [name.get("non-dropping-particle"), name.get("family")])
     )
     given = " ".join(filter(None, [name.get("given"), name.get("dropping-particle")]))
-    parts = [_escape(family)]
+    parts = [escape(family)]
     if name.get("suffix"):
-        parts.append(_escape(str(name["suffix"])))
+        parts.append(escape(str(name["suffix"])))
     if given:
-        parts.append(_escape(given))
+        parts.append(escape(given))
     return ", ".join(parts).replace(" and ", " {and} ")
 
 
@@ -247,16 +250,33 @@ _ESCAPES = {
 _SPECIAL = re.compile("|".join(re.escape(c) for c in _ESCAPES))
 
 
-def _escape(text: str) -> str:
+def escape(text: str) -> str:
     """LaTeX's special characters, as Zotero writes them; Unicode letters
-    stay as they are (Zotero's default, UTF-8)."""
-    return _SPECIAL.sub(lambda m: _ESCAPES[m.group()], text)
+    stay as they are (Zotero's default, UTF-8). A brace without its pair is
+    ``{\\textbraceleft}`` or ``{\\textbraceright}``: BibTeX counts ``\\{``
+    too, and the field would not end."""
+    escaped = _SPECIAL.sub(lambda m: _ESCAPES[m.group()], text)
+    if not balanced(text):
+        escaped = escaped.replace("\\{", "{\\textbraceleft}").replace(
+            "\\}", "{\\textbraceright}"
+        )
+    return escaped
+
+
+def balanced(text: str) -> bool:
+    """Whether every brace has its pair, in order."""
+    depth = 0
+    for char in text:
+        depth += {"{": 1, "}": -1}.get(char, 0)
+        if depth < 0:
+            return False
+    return depth == 0
 
 
 _WORD = re.compile(r"[^\W_]+")
 
 
-def _protect(text: str) -> str:
+def protect(text: str) -> str:
     """Zotero's case protection: every word with a capital letter in braces,
     except a first word whose only capital is its initial."""
 

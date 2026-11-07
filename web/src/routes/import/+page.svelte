@@ -3,6 +3,7 @@
 	import { errorMessage, importArxiv, listImports } from '#lib/api/client.ts';
 	import type { ImportOut } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
+	import ExportChoices from '#lib/ExportChoices.svelte';
 	import { watchImport } from '#lib/processing.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 	import {
@@ -34,6 +35,11 @@
 			steps: 'Export as RIS (.ris) or BibTeX (.bib) and choose the file here.'
 		},
 		{
+			name: 'paperus',
+			steps:
+				'Settings → Export on the other paperus. Choose all of its zips here at once (a large export comes in several); you then choose where its papers go: yours, or a group of yours.'
+		},
+		{
 			name: 'arXiv (the references of a paper)',
 			steps:
 				'Type its arXiv ID or link under “Import the references of an arXiv paper”. Or choose a LaTeX source yourself: the .tar.gz from arXiv (“TeX Source”), a zip of a LaTeX project, or a .bbl file. The papers it cites come into a collection named after it; references that cannot be recognised are listed in the report.'
@@ -53,12 +59,14 @@
 
 	let imports = $state<ImportOut[]>([]);
 	let owner = $state('');
-	let file = $state<File | null>(null);
+	let files = $state<File[]>([]);
+	const file = $derived(files[0] ?? null);
 	let over = $state(false);
 	let dropProblem = $state('');
 
 	/** A dropped export: one file (the export, or a zip of it with its
-	 * files). A folder cannot be read from a drop; it has to be zipped. */
+	 * files), or the zips of a paperus export. A folder cannot be read from
+	 * a drop; it has to be zipped. */
 	function dropped(event: DragEvent) {
 		event.preventDefault();
 		over = false;
@@ -69,12 +77,12 @@
 				'That is a folder. Zip it first (with the export file and its files folder inside), then drop or choose the zip.';
 			return;
 		}
-		const files = [...(event.dataTransfer?.files ?? [])];
-		if (files.length !== 1) {
-			dropProblem = 'Drop one file: the export, or a zip of it together with its files folder.';
+		const dropped = [...(event.dataTransfer?.files ?? [])];
+		if (!dropped.length) {
+			dropProblem = 'Drop the export, or a zip of it together with its files folder.';
 			return;
 		}
-		file = files[0];
+		files = dropped;
 	}
 	let sending = $state<number | null>(null);
 	let error = $state('');
@@ -148,6 +156,7 @@
 		error = '';
 		const body = new FormData();
 		body.append('upload', file);
+		for (const part of files.slice(1)) body.append('parts', part);
 		if (owner) body.append('library_id', owner);
 		const request = new XMLHttpRequest();
 		request.open('POST', '/api/imports');
@@ -158,13 +167,17 @@
 		request.onload = () => {
 			sending = null;
 			if (request.status === 201) {
-				started(request.response as ImportOut);
-				file = null;
+				const record = request.response as ImportOut;
+				if (record.status === 'needs_choices') load();
+				else started(record);
+				files = [];
 			} else {
 				error =
 					request.status === 413
 						? 'The file is too large for an upload. An administrator can import it on the server with “paperus import”.'
-						: `The upload failed (${request.status}).`;
+						: request.status === 422
+							? ((request.response as { detail?: string })?.detail ?? 'This cannot be imported.')
+							: `The upload failed (${request.status}).`;
 			}
 		};
 		request.onerror = () => {
@@ -215,14 +228,21 @@
 			>
 				<input
 					type="file"
+					multiple
 					accept=".rdf,.bib,.bibtex,.ris,.json,.zip,.bbl,.tex,.gz,.tgz,.tar,application/zip,application/gzip"
-					onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
+					onchange={(event) => (files = [...(event.currentTarget.files ?? [])])}
 				/>
-				<strong>{file ? file.name : 'Choose or drop the export'}</strong>
+				<strong
+					>{files.length > 1
+						? `${files.length} files`
+						: file
+							? file.name
+							: 'Choose or drop the export'}</strong
+				>
 				<span class="muted"
 					>{file
-						? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-						: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files; or a LaTeX source (.tar.gz, .bbl) for its references. A folder: zip it first.'}</span
+						? `${(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(1)} MB`
+						: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files; a LaTeX source (.tar.gz, .bbl) for its references; or a paperus export (all its zips). A folder: zip it first.'}</span
 				>
 			</label>
 			{#if dropProblem}<p class="error" role="alert">{dropProblem}</p>{/if}
@@ -275,7 +295,9 @@
 					<strong>{record.filename}</strong>
 					<span class="muted">{ago(record.created_at)}, to {libraryName(record.library_id)}</span>
 				</div>
-				{#if record.status === 'waiting'}
+				{#if record.status === 'needs_choices' && record.choices}
+					<ExportChoices {record} onchange={load} onstart={started} />
+				{:else if record.status === 'waiting'}
 					<p class="muted">Waiting to start…</p>
 				{:else if record.status === 'running'}
 					<progress value={record.done} max={record.total || 1}></progress>

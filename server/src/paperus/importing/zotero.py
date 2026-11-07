@@ -11,9 +11,10 @@ of type "document".
 Only the structure is taken from Zotero's translator (AGPL), not its code.
 """
 
+import html
 import re
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
 
 from markdownify import markdownify
 from rdflib import RDF, Graph, Literal, Namespace, URIRef
@@ -35,7 +36,7 @@ VCARD = Namespace("http://nwalsh.com/rdf/vCard#")
 BASE = "http://export.invalid/"
 
 # Zotero item type → CSL type (as Zotero's own CSL mapping does).
-_TYPES = {
+TYPES = {
     "journalArticle": "article-journal",
     "magazineArticle": "article-magazine",
     "newspaperArticle": "article-newspaper",
@@ -74,7 +75,7 @@ _TYPES = {
     "document": "document",
 }
 # Creator properties → CSL roles (others, e.g. z:translators, by name).
-_ROLES = {
+ROLES = {
     BIB.authors: "author",
     BIB.editors: "editor",
     BIB.contributors: "contributor",
@@ -106,10 +107,10 @@ def read(text: str) -> Export:
     except Exception as error:
         export.problems.append(f"The file could not be read as Zotero RDF: {error}")
         return export
-    reader = _Reader(graph)
+    reader = _Reader(graph, _document_order(text))
     export.collections, member_of = reader.collections()
     attached = set(graph.objects(None, LINK.link))
-    for subject in sorted(set(graph.subjects(Z.itemType, None)), key=str):
+    for subject in sorted(set(graph.subjects(Z.itemType, None)), key=reader.order):
         kind = str(graph.value(subject, Z.itemType))
         if kind == "attachment":
             # A file on its own in Zotero (no paper around it): a paper of
@@ -136,8 +137,13 @@ def read(text: str) -> Export:
 
 
 class _Reader:
-    def __init__(self, graph: Graph) -> None:
+    def __init__(self, graph: Graph, positions: dict[str, int]) -> None:
         self.g = graph
+        self.positions = positions
+
+    def order(self, node: Node) -> tuple[int, str]:
+        """For sorting: as in the file (the export's order), then by name."""
+        return self.positions.get(str(node), len(self.positions)), str(node)
 
     def text(self, subject: Node, predicate: URIRef) -> str | None:
         value = self.g.value(subject, predicate)
@@ -161,13 +167,15 @@ class _Reader:
             path = (*above, self.text(collection, DC.title) or "Untitled collection")
             if path not in paths:  # not for a repeated name
                 paths.append(path)
-            for part in sorted(self.g.objects(collection, DCTERMS.hasPart), key=str):
+            for part in sorted(
+                self.g.objects(collection, DCTERMS.hasPart), key=self.order
+            ):
                 if (part, RDF.type, Z.Collection) in self.g:
                     visit(part, path, {*seen, collection})
                 else:
                     holding.setdefault(part, []).append(path)
 
-        collections = sorted(self.g.subjects(RDF.type, Z.Collection), key=str)
+        collections = sorted(self.g.subjects(RDF.type, Z.Collection), key=self.order)
         inside = {
             part for c in collections for part in self.g.objects(c, DCTERMS.hasPart)
         }
@@ -180,7 +188,7 @@ class _Reader:
 
     def paper(self, subject: Node, kind: str) -> ExportedPaper:
         g = self.g
-        csl: dict[str, Any] = {"type": _TYPES.get(kind, "document")}
+        csl: dict[str, Any] = {"type": TYPES.get(kind, "document")}
         csl["title"] = self.text(subject, DC.title) or "(untitled)"
         for role, people in self._creators(subject):
             csl[role] = [self._name(person) for person in people]
@@ -295,13 +303,17 @@ class _Reader:
             keywords=automatic,
             notes=[
                 text
-                for note in sorted(g.objects(subject, DCTERMS.isReferencedBy), key=str)
+                for note in sorted(
+                    g.objects(subject, DCTERMS.isReferencedBy), key=self.order
+                )
                 if (text := self.note_text(note))
             ],
             files=_without_snapshots(
                 [
                     file
-                    for attachment in sorted(g.objects(subject, LINK.link), key=str)
+                    for attachment in sorted(
+                        g.objects(subject, LINK.link), key=self.order
+                    )
                     if (file := self._file(attachment)) is not None
                 ]
             ),
@@ -334,7 +346,7 @@ class _Reader:
             notes=[
                 text
                 for note in sorted(
-                    self.g.objects(subject, DCTERMS.isReferencedBy), key=str
+                    self.g.objects(subject, DCTERMS.isReferencedBy), key=self.order
                 )
                 if (text := self.note_text(note))
             ],
@@ -347,14 +359,14 @@ class _Reader:
         other roles (``z:castMembers``) by their name (``cast-member``)."""
         found: list[tuple[str, list[Node]]] = []
         for predicate, node in self.g.predicate_objects(subject):
-            role = _ROLES.get(predicate)
+            role = ROLES.get(predicate)
             name = str(predicate)
             if role is None and name.startswith(str(Z)) and name.endswith("s"):
                 role = re.sub(r"(?<!^)([A-Z])", r"-\1", name[len(str(Z)) : -1]).lower()
             people = self._sequence(node) if role else []
             if role and people:
                 found.append((role, people))
-        order = list(_ROLES.values())
+        order = list(ROLES.values())
         return sorted(
             found, key=lambda pair: order.index(pair[0]) if pair[0] in order else 99
         )
@@ -451,6 +463,15 @@ class _Reader:
             media_type=self.text(attachment, LINK.type),
             description=self.text(attachment, DC.title),
         )
+
+
+def _document_order(text: str) -> dict[str, int]:
+    """Each ``rdf:about`` (resolved as rdflib does) → its place in the file."""
+    found = re.finditer(r"""rdf:about=(["'])(.*?)\1""", text)
+    positions: dict[str, int] = {}
+    for n, match in enumerate(found):
+        positions.setdefault(urljoin(BASE, html.unescape(match.group(2))), n)
+    return positions
 
 
 def _without_snapshots(files: list[ExportedFile]) -> list[ExportedFile]:

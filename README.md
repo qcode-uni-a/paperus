@@ -73,6 +73,7 @@ stores, load it from the release's zips: see
 | --- | --- |
 | [Architecture](docs/architecture.md) | Components, stack, data model, scaling |
 | [Ingestion](docs/ingestion.md) | Adding items, metadata, PDFs, browser extension, versions, other sources |
+| [Export](docs/export.md) | Taking everything home: a SQLite database and the files, in zips; importing it back |
 | [Search](docs/search.md) | Chunking, embeddings, hybrid search, deduplication across versions, pgvector |
 | [Permissions](docs/permissions.md) | Who may do what with papers, tags, collections and groups |
 | [AI integration](docs/ai.md) | MCP tools, permissions, the AI inbox, skill draft |

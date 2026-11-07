@@ -320,6 +320,12 @@ and copies back files that are missing. A backup from a newer paperus is
 refused: update paperus first. Search data (passages, vectors) is in the
 backup, so search works right away.
 
+**People's exports** (Settings → Export, see [export](export.md)) are
+written to `exports/` beside the stored files (`/data/files/exports` in
+the container; `PAPERUS_EXPORT_PATH` to change it) and deleted after a
+day. They are not part of the file store and not backed up; a large
+library's export needs about its size in free space there for that day.
+
 ## Releases
 
 Pushing a tag `vX.Y.Z` (matching the versions in `server/pyproject.toml`,

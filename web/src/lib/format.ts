@@ -86,3 +86,10 @@ export function readingProblem(error: string | null | undefined): string {
 	if (!text) return 'Reading stopped without a reason; try again.';
 	return 'Reading failed.';
 }
+
+/** "820 kB", "12 MB", "1.4 GB". */
+export function fileSize(bytes: number): string {
+	if (bytes < 1024 ** 2) return `${Math.max(1, Math.round(bytes / 1024))} kB`;
+	if (bytes < 1024 ** 3) return `${Math.round(bytes / 1024 ** 2)} MB`;
+	return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
+}

@@ -1,17 +1,21 @@
 """Command line: ``paperus serve``, ``worker``, ``migrate``, ``user create``,
-``backup create|list|restore``, ``import``, ``evaluate``."""
+``backup create|list|restore``, ``import``, ``export``, ``evaluate``."""
 
 import argparse
 import getpass
 import logging
+import shutil
 import sys
+import tempfile
+import uuid
 from pathlib import Path
 
 import uvicorn
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from paperus.access import Access
+from paperus import export
+from paperus.access import Access, NotVisible
 from paperus.auth import create_user
 from paperus.backup import (
     BackupError,
@@ -23,6 +27,7 @@ from paperus.backup import (
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.evaluate import evaluate, load_questions, report
+from paperus.importing import paperus_export
 from paperus.importing.run import run_import
 from paperus.jobs import make_job_app, queue_text_extraction, run_worker
 from paperus.metadata import make_http_client
@@ -30,7 +35,7 @@ from paperus.migrate import migrate
 from paperus.ml import make_ml_client
 from paperus.models import Group, Import, ImportStatus, User
 from paperus.storage import make_blob_store
-from paperus.system import max_upload_bytes
+from paperus.system import load_config, max_upload_bytes
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -84,6 +89,44 @@ def main(argv: list[str] | None = None) -> None:
         help="give everything new to this group (default: the user's default owner)",
     )
 
+    export_ = commands.add_parser(
+        "export",
+        help="export what a user sees: library.sqlite and the files, in zips",
+    )
+    export_.add_argument(
+        "out",
+        help="the zip to write (with several parts: the first; the others "
+        "alongside, named …-part2-of-3.zip)",
+    )
+    export_.add_argument("--user", required=True, help="whose view (username)")
+    export_.add_argument(
+        "--format",
+        choices=["paperus", "zotero", "jabref", "mendeley"],
+        default="paperus",
+        help="paperus' own (complete; default), or for Zotero (RDF), "
+        "JabRef (BibTeX), Mendeley (RIS)",
+    )
+    export_.add_argument(
+        "--owner",
+        action="append",
+        help='only this owner: "Me" or a group (its name or path); repeatable',
+    )
+    export_.add_argument("--collection", help="only this collection (its id)")
+    for name, what in (
+        ("files", "the files"),
+        ("notes", "notes"),
+        ("tags", "tags and keywords"),
+        ("collections", "collections"),
+        ("references", "reference lists"),
+        ("archive", "archived papers"),
+    ):
+        export_.add_argument(
+            f"--no-{name}", action="store_true", help=f"without {what}"
+        )
+    export_.add_argument(
+        "--trash", action="store_true", help="also what is in the trash"
+    )
+
     evaluate_ = commands.add_parser(
         "evaluate", help="how well search finds papers, for a set of questions"
     )
@@ -127,6 +170,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "import":
         logging.basicConfig(level=logging.WARNING)
         sys.exit(import_command(args.path, args.user, args.group))
+    elif args.command == "export":
+        logging.basicConfig(level=logging.WARNING)
+        sys.exit(export_command(args))
     elif args.command == "evaluate":
         logging.basicConfig(level=logging.WARNING)
         rerank = None if args.rerank is None else args.rerank == "on"
@@ -267,6 +313,7 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 make_blob_store(settings),
                 record,
                 path=path,
+                parts=_other_parts(path),
                 max_file_bytes=max_upload_bytes(db, settings),
                 file_added=lambda file_id: queue_text_extraction(jobs, file_id),
                 http=make_http_client(settings),
@@ -289,6 +336,105 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
     finally:
         engine.dispose()
     return 0
+
+
+def _other_parts(path: Path) -> list[tuple[Path, str]]:
+    """The other zips of a paperus export in several, beside this one."""
+    try:
+        marker = paperus_export.read_marker(paperus_export.Upload(path, path.name))
+    except paperus_export.NotAnExport:
+        return []  # said when importing
+    if marker is None or marker.parts == 1:
+        return []
+    found = []
+    for other in sorted(path.parent.glob("*.zip")):
+        if other == path:
+            continue
+        try:
+            part = paperus_export.read_marker(paperus_export.Upload(other, other.name))
+        except paperus_export.NotAnExport:
+            continue
+        if part is not None and part.export_id == marker.export_id:
+            found.append((other, other.name))
+    return found
+
+
+def export_command(args: argparse.Namespace) -> int:
+    """Export on the server (for large libraries, or scripts)."""
+    out = Path(args.out)
+    settings = Settings()
+    engine = make_engine(settings.database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            user = db.scalar(select(User).where(User.username == args.user))
+            if user is None:
+                print(f"No user {args.user!r}.", file=sys.stderr)
+                return 1
+            access = Access.of(db, user)
+            owners = None
+            if args.owner:
+                known = export.owners_of(db, access)
+                owners = []
+                for wanted in args.owner:
+                    found = [
+                        o.id
+                        for o in known.values()
+                        if wanted in (o.name, o.name.rsplit("/", 1)[-1])
+                    ]
+                    if len(found) != 1:
+                        print(
+                            f"{args.user} sees {'no' if not found else 'several'} "
+                            f"owner {wanted!r}.",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    owners.append(found[0])
+            options = export.Options(
+                format=args.format,
+                owners=owners,
+                collection_id=uuid.UUID(args.collection) if args.collection else None,
+                include=export.Include(
+                    files=not args.no_files,
+                    notes=not args.no_notes,
+                    tags=not args.no_tags,
+                    collections=not args.no_collections,
+                    references=not args.no_references,
+                    archived=not args.no_archive,
+                ),
+                trash=args.trash,
+            )
+            config = load_config(db, settings)
+            db.commit()
+            db.connection(execution_options={"isolation_level": "REPEATABLE READ"})
+            with tempfile.TemporaryDirectory(dir=out.parent) as folder:
+                written = export.write_export(
+                    db,
+                    make_blob_store(settings),
+                    access,
+                    options,
+                    Path(folder),
+                    export_id=uuid.uuid4(),
+                    server_url=str(config.public_url) if config.public_url else None,
+                )
+                parts = written.parts
+                for n, part in enumerate(parts, 1):
+                    target = out if n == 1 else _beside(out, n, len(parts))
+                    shutil.move(Path(folder) / part.name, target)
+                    print(
+                        f"Wrote {target} ({part.size // 2**20} MB, {part.files} files)."
+                    )
+    except NotVisible:
+        print("No such collection.", file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
+    return 0
+
+
+def _beside(out: Path, part: int, parts: int) -> Path:
+    """``library.zip`` → ``library-part2-of-3.zip``, beside it."""
+    stem = out.name.removesuffix(".zip")
+    return out.with_name(f"{stem}-part{part}-of-{parts}.zip")
 
 
 def evaluate_command(

@@ -6,6 +6,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus.importing import bibtex
 from tests.people import Person
 
 ARTICLE: dict[str, Any] = {
@@ -189,3 +190,16 @@ def test_theses_reports_and_odd_shapes(client: TestClient, db: Session) -> None:
     assert "\tinstitution = {Weather Office},\n" in text
     assert "\ttype = {Technical report},\n" in text
     assert "isbn" not in text
+
+
+def test_bibtex_reads_back(client: TestClient, db: Session) -> None:
+    """LaTeX's special characters and a brace without its pair: the .bib
+    stays readable and gives the title back."""
+    ada = Person(client, db, "ada")
+    title = "Half {open, $<x>|y^2$ ~ 50% & #1_a\\b"
+    item = add(ada, {"type": "article-journal", "title": title})
+    text = ada.get("/api/citations", params={"item": item}).text
+    assert "{\\textbraceleft}" in text
+    export = bibtex.read(text)
+    assert export.problems == []
+    assert export.papers[0].csl["title"] == title
