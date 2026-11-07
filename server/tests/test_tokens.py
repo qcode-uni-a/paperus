@@ -282,6 +282,7 @@ ROUTES = {
     ("DELETE", "/api/items/{item_id}/archive"): "papers.write",
     ("PUT", "/api/items/{item_id}/archive"): "papers.write",
     ("GET", "/api/items/{item_id}/duplicates"): "papers.read",
+    ("GET", "/api/items/{item_id}/similar"): "papers.read",
     ("DELETE", "/api/items/{item_id}/favourite"): None,
     ("PUT", "/api/items/{item_id}/favourite"): None,
     ("POST", "/api/items/{item_id}/files"): "papers.write",

@@ -2285,6 +2285,92 @@ export type SetupState = {
 };
 
 /**
+ * SimilarItem
+ */
+export type SimilarItem = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Type
+     */
+    type: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Authors
+     */
+    authors: Array<string>;
+    /**
+     * Year
+     */
+    year: number | null;
+    /**
+     * Container Title
+     */
+    container_title: string | null;
+    /**
+     * Identifiers
+     */
+    identifiers: Array<IdentifierOut>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Viewed At
+     */
+    viewed_at?: string | null;
+    /**
+     * Deleted At
+     */
+    deleted_at: string | null;
+    /**
+     * Archived At
+     */
+    archived_at?: string | null;
+    /**
+     * Processing
+     */
+    processing: boolean;
+    /**
+     * Tags
+     */
+    tags: Array<ItemTagOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+    /**
+     * Favourite
+     */
+    favourite?: boolean;
+    /**
+     * Files
+     */
+    files?: Array<FileLink>;
+    /**
+     * Similarity
+     */
+    similarity: number;
+};
+
+/**
  * Stats
  */
 export type Stats = {
@@ -3795,6 +3881,43 @@ export type ListDuplicatesResponses = {
 };
 
 export type ListDuplicatesResponse = ListDuplicatesResponses[keyof ListDuplicatesResponses];
+
+export type ListSimilarData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/items/{item_id}/similar';
+};
+
+export type ListSimilarErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListSimilarError = ListSimilarErrors[keyof ListSimilarErrors];
+
+export type ListSimilarResponses = {
+    /**
+     * Response List Similar
+     *
+     * Successful Response
+     */
+    200: Array<SimilarItem>;
+};
+
+export type ListSimilarResponse = ListSimilarResponses[keyof ListSimilarResponses];
 
 export type PreviewMergeData = {
     body?: never;

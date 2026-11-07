@@ -15,12 +15,12 @@ assistant you already use.
 
 ## The idea
 
-- **One library for the group**, on a university server with university login,
-  plus private space for each member.
+- **One library for the group**, on your own server with your organisation's
+  login (OIDC), plus private space for each member.
 - **Search by meaning** across the full text of every paper, note and
   annotation, computed on the server with a small open model.
 - **Bring your own AI**: no built-in chatbot and no AI vendor. Any assistant
-  (Claude, ChatGPT, a university-hosted or local model) connects through an MCP
+  (Claude, ChatGPT, a self-hosted or local model) connects through an MCP
   server, sees only what the user may see, and cites the exact passage.
 - **Sources first**: papers, lecture notes, meeting notes and their versions,
   with notes and annotations attached to them. Not a general notes app.

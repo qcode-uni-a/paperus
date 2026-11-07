@@ -50,7 +50,8 @@ from paperus.models import (
     Tag,
     User,
 )
-from paperus.system import load_config
+from paperus.similar import similar_items
+from paperus.system import load_config, vectors_in_use
 from paperus.tokens import Scope
 
 INSTRUCTIONS = """\
@@ -539,6 +540,39 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
             )
 
     @mcp.tool(annotations=READ)
+    def find_similar(paper_id: str, ctx: Context, limit: int = 10) -> CallToolResult:
+        """Papers closest in meaning to a paper (by their full text), best
+        first, with a similarity for ordering: related work, or what else in
+        the library is about the same thing. Empty while the paper has no
+        searchable text."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            item = _item(db, access, paper_id)
+            model = load_config(db, state.settings).embedding_model
+            found = similar_items(
+                db,
+                item.id,
+                access.readable,
+                vectors_in_use(db, model),
+                max(1, min(limit, 30)),
+            )
+            papers = {
+                i.id: i
+                for i in db.scalars(
+                    select(Item).where(Item.id.in_([f[0] for f in found]))
+                )
+            }
+            return _json(
+                [
+                    {
+                        **_brief(papers[other], access, base),
+                        "similarity": round(score, 3),
+                    }
+                    for other, score in found
+                    if other in papers
+                ]
+            )
+
+    @mcp.tool(annotations=READ)
     def list_tags(ctx: Context) -> CallToolResult:
         """The tags the person can see (their own and their groups')."""
         with acting(ctx, Scope.PAPERS_READ) as (db, access, _):
@@ -760,6 +794,7 @@ TOOL_SCOPES = {
     "export_citations": Scope.PAPERS_READ,
     "list_collections": Scope.PAPERS_READ,
     "list_documents": Scope.PAPERS_READ,
+    "find_similar": Scope.PAPERS_READ,
     "list_tags": Scope.PAPERS_READ,
     "add_tags": Scope.TAGS_WRITE,
     "add_document": Scope.PAPERS_WRITE,

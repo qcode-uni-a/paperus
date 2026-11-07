@@ -34,6 +34,8 @@ from paperus.models import (
     VersionKind,
 )
 from paperus.organize import item_ids_in
+from paperus.similar import similar_items
+from paperus.system import load_config, vectors_in_use
 
 router = APIRouter(tags=["items"])
 
@@ -754,6 +756,38 @@ def list_duplicates(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[I
     item = get_readable_item(db, access, item_id)
     return [
         item_out(other, access) for other in merge.likely_duplicates(db, access, item)
+    ]
+
+
+class SimilarItem(ItemOut):
+    similarity: float
+    """Cosine similarity of the two papers' average passage vectors (1 = the
+    same direction); for ordering, not an absolute measure."""
+
+
+@router.get("/api/items/{item_id}/similar")
+def list_similar(
+    item_id: uuid.UUID,
+    request: Request,
+    db: DB,
+    access: CurrentAccess,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> list[SimilarItem]:
+    """The papers closest in meaning to this one, among those the person can
+    see (not archived); empty while it has no searchable text."""
+    item = get_readable_item(db, access, item_id)
+    model = load_config(db, request.app.state.settings).embedding_model
+    found = similar_items(
+        db, item.id, access.readable, vectors_in_use(db, model), limit
+    )
+    items = {
+        i.id: i
+        for i in db.scalars(select(Item).where(Item.id.in_([f[0] for f in found])))
+    }
+    return [
+        SimilarItem(**item_out(items[other], access).model_dump(), similarity=score)
+        for other, score in found
+        if other in items
     ]
 
 

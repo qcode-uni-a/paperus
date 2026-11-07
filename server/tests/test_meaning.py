@@ -290,3 +290,31 @@ def test_notes_are_found_by_meaning(
     # Trashed notes are not found.
     logged_in.delete(f"/api/notes/{note['id']}")
     assert search(logged_in, "gaps")[0] == []
+
+
+def test_similar_papers(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    def paper(title: str, text: bytes) -> str:
+        item = logged_in.post("/api/items", json={"metadata": {"title": title}})
+        item_id: str = item.json()["id"]
+        file = logged_in.post(
+            f"/api/items/{item_id}/files",
+            files={"upload": ("notes.md", text, "text/markdown")},
+        ).json()
+        process_file(db, blobs, uuid.UUID(file["id"]))
+        embed_file(db, fake_ml.client(), MODEL, uuid.UUID(file["id"]))
+        return item_id
+
+    rain = paper("Rain", b"Rain gauges measure rain every day in the Alps.")
+    rainfall = paper("Rainfall", b"Rainfall gauges measure rainfall daily in Bavaria.")
+    paper("Qubits", b"Spin qubits in silicon quantum dots.")
+    logged_in.post("/api/items", json={"metadata": {"title": "No text yet"}})
+
+    found = logged_in.get(f"/api/items/{rain}/similar").json()
+    assert [f["title"] for f in found] == ["Rainfall", "Qubits"]
+    assert found[0]["similarity"] > found[1]["similarity"]
+    # Archived papers are left out.
+    logged_in.put(f"/api/items/{rainfall}/archive")
+    found = logged_in.get(f"/api/items/{rain}/similar").json()
+    assert [f["title"] for f in found] == ["Qubits"]

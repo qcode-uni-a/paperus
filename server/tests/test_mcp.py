@@ -120,6 +120,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "my_access",
         "list_collections",
         "list_documents",
+        "find_similar",
         "list_tags",
         "add_tags",
         "add_document",
@@ -307,6 +308,8 @@ def test_writing(
 def test_notes(client: TestClient, ada: Person) -> None:
     assistant = Assistant(client, token(ada, *ALL))
     [paper] = assistant.call("list_documents", title="radar")["papers"]
+    # No other paper to be similar to.
+    assert assistant.call("find_similar", paper_id=paper["paper_id"]) == []
     created = assistant.call(
         "create_note",
         text="# Summary by Claude\n\nThe gaps below the beam are filled by diffusion.",

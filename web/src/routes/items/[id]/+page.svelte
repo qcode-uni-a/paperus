@@ -33,6 +33,7 @@
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
+	import SimilarPapers from '#lib/SimilarPapers.svelte';
 	import MergeDialog from '#lib/MergeDialog.svelte';
 	import ShareDialog from '#lib/ShareDialog.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
@@ -318,7 +319,7 @@
 
 		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
-		{#if !item.deleted_at}<ItemNotes item={item.id} />{/if}
+		{#if !item.deleted_at}<ItemNotes item={item.id} /><SimilarPapers item={item.id} />{/if}
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
 			<MergeDialog bind:this={mergeDialog} {item} />

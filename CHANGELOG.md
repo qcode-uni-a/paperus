@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Similar papers**: a paper's page lists the papers closest to it in
+  meaning (by their full text), under "Similar papers"; AI assistants
+  get the same with `find_similar`.
 - **Connect claude.ai, ChatGPT and other connectors** with OAuth: add
   `https://<server>/mcp` as a custom connector, log in to paperus and
   allow what it may do (reading only unless you tick changes). Settings →

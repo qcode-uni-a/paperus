@@ -1413,6 +1413,66 @@
         }
       }
     },
+    "/api/items/{item_id}/similar": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "List Similar",
+        "description": "The papers closest in meaning to this one, among those the person can\nsee (not archived); empty while it has no searchable text.",
+        "operationId": "list_similar",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SimilarItem"
+                  },
+                  "title": "Response List Similar"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/merge-preview": {
       "get": {
         "tags": [
@@ -9762,6 +9822,170 @@
           "backups"
         ],
         "title": "SetupState"
+      },
+      "SimilarItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Authors"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "container_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Title"
+          },
+          "identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/IdentifierOut"
+            },
+            "type": "array",
+            "title": "Identifiers"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "viewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewed At"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "processing": {
+            "type": "boolean",
+            "title": "Processing"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/ItemTagOut"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "collection_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Collection Ids"
+          },
+          "favourite": {
+            "type": "boolean",
+            "title": "Favourite",
+            "default": false
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileLink"
+            },
+            "type": "array",
+            "title": "Files",
+            "default": []
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "type",
+          "title",
+          "authors",
+          "year",
+          "container_title",
+          "identifiers",
+          "created_at",
+          "change",
+          "changed_at",
+          "deleted_at",
+          "processing",
+          "tags",
+          "collection_ids",
+          "similarity"
+        ],
+        "title": "SimilarItem"
       },
       "Stats": {
         "properties": {
