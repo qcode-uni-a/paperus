@@ -195,10 +195,10 @@
 		flex-direction: column;
 		gap: 2px;
 		position: sticky;
-		top: 72px;
+		top: var(--header-height, 72px);
 		/* The window's height below the header, so Manage sits at the
 		   bottom; scrolls when the window is too short for all. */
-		height: calc(100dvh - 72px);
+		height: calc(100dvh - var(--header-height, 72px));
 		overflow-y: auto;
 		padding-bottom: 16px;
 		width: 248px;

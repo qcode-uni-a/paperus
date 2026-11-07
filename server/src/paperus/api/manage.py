@@ -136,7 +136,9 @@ class MissingPaper(BaseModel):
     tried_at: datetime | None
     """The last try to download an open-access copy."""
     error: str | None
-    """Why that try found none."""
+    """Why that try found none, as noted (addresses and HTTP errors)."""
+    reason: str | None = None
+    """The same in plain words, with what to do."""
 
 
 class MissingCounts(BaseModel):
@@ -194,6 +196,7 @@ def missing_papers(
             open_access=_possible(item, journal is not None, email),
             tried_at=item.open_access_tried_at,
             error=item.open_access_error,
+            reason=missing.plain_reason(item.open_access_error, email),
         )
 
     return MissingPapers(
@@ -233,7 +236,12 @@ def download_open_access(
         user_id=access.user.id,
     )
     if file is None:
-        raise HTTPException(409, f"no open-access copy found: {item.open_access_error}")
+        email = system.load_config(db, settings).contact_email
+        raise HTTPException(
+            409,
+            missing.plain_reason(item.open_access_error, email)
+            or "No open-access copy found.",
+        )
     queue_text_extraction(request.app.state.jobs, file.id)
     return file_out(file)
 
@@ -294,21 +302,30 @@ class ProgressRequest(BaseModel):
     section: missing.Section = "file"
 
 
+class NotFound(BaseModel):
+    item_id: uuid.UUID
+    title: str
+    reason: str
+    """Why no copy was found, in plain words with what to do."""
+
+
 class Progress(BaseModel):
     tried: int
     """Of the papers, how many were tried since the start."""
     found: int
     """Of those, how many got their file."""
+    not_found: list[NotFound] = []
+    """The others: tried, and still without their file."""
 
 
 @router.post("/api/manage/missing/open-access/progress")
 def open_access_progress(
-    body: ProgressRequest, db: DB, access: CurrentAccess
+    body: ProgressRequest, request: Request, db: DB, access: CurrentAccess
 ) -> Progress:
     """How far a "Download all" has got: the papers tried since it started,
     and how many of them have their file now."""
-    tried, found = progress_of(db, access, body.item_ids, body.started_at, body.section)
-    return Progress(tried=tried, found=found)
+    email = system.load_config(db, request.app.state.settings).contact_email
+    return progress_of(db, access, body.item_ids, body.started_at, body.section, email)
 
 
 def progress_of(
@@ -317,9 +334,10 @@ def progress_of(
     item_ids: list[uuid.UUID],
     started_at: datetime,
     section: missing.Section,
-) -> tuple[int, int]:
-    """Of these papers: how many were tried since ``started_at``, and how
-    many of those have their file now."""
+    contact_email: str | None,
+) -> Progress:
+    """Of these papers: how many were tried since ``started_at``, how many
+    of those have their file now, and why the others have not."""
     items = list(
         db.scalars(
             select(Item).where(
@@ -337,7 +355,20 @@ def progress_of(
             )
         )
     )
-    return len(items), sum(item.id not in still_missing for item in items)
+    return Progress(
+        tried=len(items),
+        found=sum(item.id not in still_missing for item in items),
+        not_found=[
+            NotFound(
+                item_id=item.id,
+                title=item.title,
+                reason=missing.plain_reason(item.open_access_error, contact_email)
+                or "No open-access copy found.",
+            )
+            for item in items
+            if item.id in still_missing
+        ],
+    )
 
 
 class FileWanted(BaseModel):

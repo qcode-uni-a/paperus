@@ -31,8 +31,17 @@
 
 	$effect(() => menu.watch());
 
-	// The administration is about the installation, not the library: no search.
-	const inAdmin = $derived(page.url.pathname.startsWith(resolve('/admin')));
+	// The header's height (two rows on phones), for what sticks below it.
+	let headerHeight = $state(72);
+	$effect(() => {
+		document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+	});
+
+	// No search where it is not about finding papers: the administration (the
+	// installation, not the library) and a paper being read.
+	const noSearch = $derived(
+		page.url.pathname.startsWith(resolve('/admin')) || page.route.id === '/items/[id]'
+	);
 </script>
 
 <svelte:head>
@@ -42,7 +51,7 @@
 {#if onLoginPage}
 	<main class="login">{@render children()}</main>
 {:else}
-	<header>
+	<header bind:offsetHeight={headerHeight}>
 		<div class="start">
 			<button
 				class="burger"
@@ -57,7 +66,7 @@
 				><img src={asset('favicon.svg')} alt="" width="30" height="30" />paperus</a
 			>
 		</div>
-		{#if session.user && !inAdmin}<div class="find"><SearchBar /></div>{:else}<span class="spacer"
+		{#if session.user && !noSearch}<div class="find"><SearchBar /></div>{:else}<span class="spacer"
 			></span>{/if}
 		<div class="end">
 			{#if session.user}<AddMenu />{/if}

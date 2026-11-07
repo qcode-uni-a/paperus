@@ -402,7 +402,7 @@ def register(
                         "last_tried": item.open_access_tried_at.isoformat()
                         if item.open_access_tried_at
                         else None,
-                        "last_try": item.open_access_error,
+                        "last_try": missing.plain_reason(item.open_access_error, email),
                     }
                 )
             return json(result)
@@ -472,8 +472,9 @@ def register(
         paper_ids: list[str], started_at: str, ctx: Context, section: str = "file"
     ) -> CallToolResult:
         """How far download_all_open_access has got: of these papers, how
-        many were tried since started_at and how many got their PDF. If
-        none moves for minutes, the server's worker may not be running."""
+        many were tried since started_at, how many got their PDF, and why the
+        others did not. If none moves for minutes, the server's worker may
+        not be running."""
         which = _section(section)
         try:
             since = datetime.fromisoformat(started_at)
@@ -483,8 +484,19 @@ def register(
             ) from error
         ids = [parse_id(paper_id) for paper_id in paper_ids[:10_000]]
         with acting(ctx, Scope.PAPERS_READ) as (db, access, _):
-            tried, found = progress_of(db, access, ids, since, which)
-            return json({"papers": len(ids), "tried": tried, "found": found})
+            email = load_config(db, state.settings).contact_email
+            progress = progress_of(db, access, ids, since, which, email)
+            return json(
+                {
+                    "papers": len(ids),
+                    "tried": progress.tried,
+                    "found": progress.found,
+                    "not_found": [
+                        {"paper_id": str(n.item_id), "title": n.title, "why": n.reason}
+                        for n in progress.not_found
+                    ],
+                }
+            )
 
     # Files
 

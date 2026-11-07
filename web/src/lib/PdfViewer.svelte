@@ -286,7 +286,7 @@
 	}
 	.toolbar {
 		position: sticky;
-		top: 56px;
+		top: var(--header-height, 72px);
 		z-index: 5;
 		display: flex;
 		justify-content: space-between;

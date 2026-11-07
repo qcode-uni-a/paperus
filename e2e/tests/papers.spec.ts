@@ -27,6 +27,8 @@ test('an uploaded PDF is read by the worker and found by its words', async ({ pa
 	await expect(page.locator('mark').first()).toHaveText(new RegExp(paper.word, 'i'));
 	await result.click();
 	await expect(page).toHaveURL(new RegExp(`/items/${paper.id}`));
+	// Reading a paper: no search bar.
+	await expect(page.getByRole('searchbox', { name: 'Search the library' })).toHaveCount(0);
 
 	// A word in no paper finds nothing.
 	await page.goto('/?q=zzzxqvnotthere');

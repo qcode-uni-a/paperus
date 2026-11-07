@@ -11,7 +11,8 @@
 		uploadToItem,
 		uploadToVersion
 	} from '#lib/api/client.ts';
-	import type { MissingPaper } from '#lib/api/generated/types.gen.ts';
+	import type { MissingPaper, NotFound } from '#lib/api/generated/types.gen.ts';
+	import { resolve } from '$app/paths';
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { packUp } from '#lib/transitions.ts';
@@ -273,6 +274,8 @@
 		movedAt: number;
 	};
 	let batches = $state<Partial<Record<Section, Batch>>>({});
+	/** The papers the last "Download all" found nothing for, and why. */
+	let missed = $state<Partial<Record<Section, NotFound[]>>>({});
 	const STALLED_MS = 60_000;
 	let now = $state(Date.now());
 
@@ -287,6 +290,7 @@
 			});
 			return;
 		}
+		missed[section] = undefined;
 		batches[section] = {
 			ids,
 			startedAt: data.started_at,
@@ -314,15 +318,17 @@
 				}
 				if (batch.tried >= batch.ids.length) {
 					batches[section] = undefined;
+					missed[section] = data.not_found?.length ? data.not_found : undefined;
 					load(section);
+					const none = data.not_found?.length ?? 0;
 					notify({
-						kind: data.found ? 'success' : 'info',
+						kind: none ? 'warning' : 'success',
 						title: data.found
 							? `${data.found} of ${batch.ids.length} open-access ${batch.ids.length === 1 ? 'copy' : 'copies'} found`
 							: 'No open-access copies found',
-						text: data.found
-							? 'Their PDFs were added and are being read.'
-							: 'Publishers often refuse such downloads; the browser extension can get them with your own access.'
+						text: none
+							? `For ${none === 1 ? 'one paper' : `${none} papers`} none was found; why is listed on the page.`
+							: 'Their PDFs were added and are being read.'
 					});
 				}
 			}
@@ -396,12 +402,40 @@
 			{#if problems[paper.item.id]}
 				<p class="error">{problems[paper.item.id]}</p>
 			{:else if paper.tried_at && paper.error && section !== null}
-				<p class="muted small" title={paper.error}>
-					No open-access copy found {ago(paper.tried_at)}.
+				<p class="error" title={paper.error}>
+					Tried {ago(paper.tried_at)}: {paper.reason ?? 'no open-access copy found.'}
 				</p>
 			{/if}
 		{/snippet}
 	</ItemRow>
+{/snippet}
+
+{#snippet notFound(section: Section)}
+	{@const papers = missed[section]}
+	{#if papers}
+		<div class="missed" role="status">
+			<div class="row">
+				<strong
+					>No open-access copy found for {papers.length === 1
+						? 'one paper'
+						: `${papers.length} papers`}</strong
+				>
+				<button class="quiet" onclick={() => (missed[section] = undefined)}>Hide</button>
+			</div>
+			<ul>
+				{#each papers as paper (paper.item_id)}
+					<li>
+						<a href={resolve('/items/[id]', { id: paper.item_id })}>{plainTitle(paper.title)}</a>
+						<span>{paper.reason}</span>
+					</li>
+				{/each}
+			</ul>
+			<p class="small">
+				They stay in the list below: get them with the browser extension, at the publisher, or
+				upload the PDF.
+			</p>
+		</div>
+	{/if}
 {/snippet}
 
 {#snippet list(found: List, empty: string, section: Section | null)}
@@ -496,6 +530,7 @@
 			{/if}
 		</div>
 		{@render progress(batches.file)}
+		{@render notFound('file')}
 		{@render list(lists.file, 'Every paper has a file.', 'file')}
 	</section>
 
@@ -520,6 +555,7 @@
 			here means the journal's own copy.
 		</p>
 		{@render progress(batches.journal)}
+		{@render notFound('journal')}
 		{@render list(lists.journal, 'No published paper misses its journal version.', 'journal')}
 	</section>
 {/if}
@@ -622,6 +658,32 @@
 	}
 	.error {
 		margin: 4px 0 0;
+	}
+	.missed {
+		display: grid;
+		gap: 8px;
+		margin: 8px 0 12px;
+		padding: 12px 16px;
+		border: 1px solid var(--danger);
+		border-left-width: 4px;
+		border-radius: 8px;
+	}
+	.missed .row {
+		justify-content: space-between;
+	}
+	.missed ul {
+		display: grid;
+		gap: 6px;
+		margin: 0;
+		padding-left: 1.2em;
+	}
+	.missed li span {
+		display: block;
+		color: var(--danger);
+		font-size: var(--step--1);
+	}
+	.missed .small {
+		color: var(--muted);
 	}
 	.saved {
 		color: var(--success);

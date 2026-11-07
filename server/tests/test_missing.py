@@ -190,11 +190,25 @@ def test_no_copy_found(
     published(doi_registry)
     ada = Person(site, db, "ada")
     paper = ada.post("/api/items", json={"doi": PUBLISHED}).json()
-    # Not on arXiv, and no contact email for Unpaywall.
+    # Not on arXiv, and no contact email for Unpaywall: said in plain words,
+    # with what would help.
+    queued = ada.post("/api/manage/missing/open-access").json()
     response = ada.post(f"/api/items/{paper['id']}/open-access")
     assert response.status_code == 409
+    assert "contact email" in response.json()["detail"]
     [entry] = listed(ada)["papers"]
     assert entry["tried_at"] is not None and entry["error"]
+    assert entry["reason"] == response.json()["detail"]
+    # "Download all" names the papers it found nothing for, and why.
+    body = {"item_ids": queued["item_ids"], "started_at": queued["started_at"]}
+    progress = ada.post("/api/manage/missing/open-access/progress", body).json()
+    assert progress == {
+        "tried": 1,
+        "found": 0,
+        "not_found": [
+            {"item_id": paper["id"], "title": paper["title"], "reason": entry["reason"]}
+        ],
+    }
     # Others may see but not change a person's papers.
     eve = Person(site, db, "eve")
     assert eve.post(f"/api/items/{paper['id']}/open-access").status_code == 404
@@ -225,7 +239,7 @@ def test_try_all_and_the_background_sweep(
         result: dict[str, int] = response.json()
         return result
 
-    assert progress() == {"tried": 0, "found": 0}
+    assert progress() == {"tried": 0, "found": 0, "not_found": []}
     assert isinstance(job_app.connector, InMemoryConnector)
     jobs = [
         job
@@ -244,7 +258,33 @@ def test_try_all_and_the_background_sweep(
 
     # Tried (here by hand, as the job would) and found.
     assert ada.post(f"/api/items/{on_arxiv['id']}/open-access").status_code == 200
-    assert progress() == {"tried": 1, "found": 1}
+    assert progress() == {"tried": 1, "found": 1, "not_found": []}
+
+
+@pytest.mark.parametrize(
+    ("error", "email", "says"),
+    [
+        (None, None, None),
+        ("no open-access source is known for this paper", None, "contact email"),
+        ("no open-access source is known for this paper", "a@b.c", "neither OpenAlex"),
+        ("no open copy of the journal's version", "a@b.c", "neither OpenAlex"),
+        ("unpaywall:10.1/x: no open-access PDF", "a@b.c", "paywall"),
+        ("https://arxiv.org/pdf/1: Client error '404 Not Found'", None, "is gone"),
+        ("https://x.org/a.pdf: Client error '403 Forbidden' for url", None, "refused"),
+        ("https://x.org/a: not a PDF (probably a web page)", None, "web page instead"),
+        ("https://x.org/a.pdf: larger than the upload limit", None, "upload limit"),
+        ("https://x.org/a.pdf: timed out", None, "try again later"),
+        ("https://x.org/a.pdf: Server error '503 Service Unavailable'", None, "later"),
+        ("no published version with a DOI lacks its file", None, "no published"),
+        ("the paper has no version", None, "no published"),
+        ("https://x.org/a?k=1: something odd", None, "failed (https://x.org/a"),
+    ],
+)
+def test_reasons_in_plain_words(
+    error: str | None, email: str | None, says: str | None
+) -> None:
+    reason = missing.plain_reason(error, email)
+    assert (reason is None) if says is None else (says in (reason or ""))
 
 
 def test_only_the_preprint(
@@ -369,9 +409,9 @@ def test_an_assistant_can_do_what_the_page_does(
         )
         return result
 
-    assert progress() == {"papers": 1, "tried": 0, "found": 0}
+    assert progress() == {"papers": 1, "tried": 0, "found": 0, "not_found": []}
     ai.call("download_open_access", paper_id=on_arxiv["id"])  # as the job would
-    assert progress() == {"papers": 1, "tried": 1, "found": 1}
+    assert progress() == {"papers": 1, "tried": 1, "found": 1, "not_found": []}
     assert ai.call("list_missing_pdfs") == []
     with pytest.raises(ToolFailed, match="started_at"):
         ai.call("open_access_progress", paper_ids=[], started_at="yesterday")

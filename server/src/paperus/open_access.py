@@ -23,6 +23,10 @@ OPENALEX = "https://api.openalex.org/works/doi:"
 _ARXIV_URL = re.compile(r"arxiv\.org/(?:abs|pdf)/(.+?)(?:v\d+)?(?:\.pdf)?/?$")
 
 
+# How a download larger than the upload limit is noted.
+TOO_LARGE = "larger than the upload limit"
+
+
 class NoSource(Exception):
     """No open-access PDF is known for the paper."""
 
@@ -107,7 +111,9 @@ def fetch(
             return _download(http, blobs, url, max_bytes), url
         except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
             log.info("no PDF from %s: %s", url, error)
-            tried.append(f"{url}: {error}")
+            tried.append(
+                f"{url}: {TOO_LARGE if isinstance(error, TooLarge) else error}"
+            )
     raise NoSource("; ".join(tried) or "no open-access source is known for this paper")
 
 
@@ -158,7 +164,9 @@ def fetch_journal_copy(
             return _download(http, blobs, url, max_bytes)
         except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
             log.info("no PDF from %s: %s", url, error)
-            tried.append(f"{url}: {error}")
+            tried.append(
+                f"{url}: {TOO_LARGE if isinstance(error, TooLarge) else error}"
+            )
     if not tried and not contact_email:
         raise NoSource(
             "no open copy of the journal's version is known (Unpaywall would be "

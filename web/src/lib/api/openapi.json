@@ -10158,6 +10158,17 @@
               }
             ],
             "title": "Error"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "type": "object",
@@ -10375,6 +10386,30 @@
           "password"
         ],
         "title": "NewUser"
+      },
+      "NotFound": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "title",
+          "reason"
+        ],
+        "title": "NotFound"
       },
       "NoteChange": {
         "properties": {
@@ -11125,6 +11160,14 @@
           "found": {
             "type": "integer",
             "title": "Found"
+          },
+          "not_found": {
+            "items": {
+              "$ref": "#/components/schemas/NotFound"
+            },
+            "type": "array",
+            "title": "Not Found",
+            "default": []
           }
         },
         "type": "object",

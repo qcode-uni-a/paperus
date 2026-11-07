@@ -2012,6 +2012,10 @@ export type MissingPaper = {
      * Error
      */
     error: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
 };
 
 /**
@@ -2137,6 +2141,24 @@ export type NewUser = {
      * Is Admin
      */
     is_admin?: boolean;
+};
+
+/**
+ * NotFound
+ */
+export type NotFound = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Reason
+     */
+    reason: string;
 };
 
 /**
@@ -2574,6 +2596,10 @@ export type Progress = {
      * Found
      */
     found: number;
+    /**
+     * Not Found
+     */
+    not_found?: Array<NotFound>;
 };
 
 /**

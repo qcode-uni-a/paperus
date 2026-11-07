@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Why no open copy was found**, in plain words with what to do: after
+  "Download all open-access copies", the papers without one are listed
+  with the reason (no open copy known, the site refused, a login page
+  instead of the PDF, …), and each paper on Manage → Missing says it in
+  red. Without a contact email, it says that Unpaywall is not asked.
+  AI assistants get the same reasons.
+- **Reading a paper**: no search bar at the top; the bar with the page
+  number sticks fully below the header (it was partly hidden).
 - **Back keeps your place**: going back from a paper to the library, a
   collection, Recent, Favourites or the Archive returns to where you were
   in the list, with as many papers loaded as before, instead of the top.

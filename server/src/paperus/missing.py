@@ -126,6 +126,57 @@ def never_tried(
     return [(item_id, added_by) for item_id, added_by in rows]
 
 
+# What helps when the server finds no copy itself.
+_BY_HAND = (
+    "Get it with the browser extension (it uses your own access, e.g. your "
+    "library's subscription), or upload the PDF."
+)
+
+
+def plain_reason(error: str | None, contact_email: str | None) -> str | None:
+    """Why a try found no open-access copy, in plain words with what to do
+    (``error`` is what the try noted, with addresses and HTTP errors)."""
+    if not error:
+        return None
+    if "no published version" in error or "has no version" in error:
+        return "There is no published version with a DOI to look for."
+    if re.search(r"\b40[13]\b", error):
+        return (
+            "An open copy is listed, but its site refused the download: "
+            "publishers often refuse servers, even for open papers. " + _BY_HAND
+        )
+    if "not a PDF" in error:
+        return (
+            "An open copy is listed, but its address gave a web page instead of "
+            "the PDF (often a login or cookie page). " + _BY_HAND
+        )
+    if open_access.TOO_LARGE in error:
+        return (
+            "The PDF is larger than the upload limit; an administrator can raise "
+            "it (Administration → Settings)."
+        )
+    if re.search(r"time(d )?out|ConnectError|Server error|\b5\d\d\b", error):
+        return "The site holding the copy did not answer properly; try again later."
+    if re.search(r"\b404\b|\b410\b", error):
+        return "The open copy listed for it is gone from its address. " + _BY_HAND
+    if "no open-access" in error or "no open copy" in error:
+        if contact_email:
+            return (
+                "No open copy exists as far as anyone knows: it is not on arXiv, "
+                "and neither OpenAlex nor Unpaywall (which track open copies "
+                "worldwide) lists one, so it is probably only behind the "
+                "publisher's paywall. " + _BY_HAND
+            )
+        return (
+            "No open copy is known: it is not on arXiv, and OpenAlex lists no "
+            "open PDF. Unpaywall, which knows many more, is asked only once an "
+            "administrator sets a contact email (Administration → Settings). "
+            + _BY_HAND
+        )
+    detail = re.sub(r"\?\S*", "", error.split("; ")[-1])[:200]
+    return f"The download failed ({detail}). " + _BY_HAND
+
+
 def may_have_copy(item: Item, contact_email: str | None) -> bool:
     """Whether the server may find an open-access copy: an arXiv ID, or a
     DOI (its arXiv version via OpenAlex, or Unpaywall with a contact
