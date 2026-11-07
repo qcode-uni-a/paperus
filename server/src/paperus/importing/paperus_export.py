@@ -36,7 +36,7 @@ from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -53,6 +53,7 @@ from paperus.export import (
 )
 from paperus.identifiers import Scheme
 from paperus.importing.apply import Report, _reason, item_with_file
+from paperus.importing.choices import Choices, GroupSuggestion
 from paperus.models import (
     Blob,
     Collection,
@@ -105,9 +106,12 @@ class ExportOwner(BaseModel):
     role: str | None
     items: int
     notes: int
-    suggested: uuid.UUID | None = None
-    """A group here of the same name the person may add to (only offered,
-    never chosen by itself)."""
+    can_create: bool = False
+    """A group: whether the person may create it here (with the levels
+    above it that are missing)."""
+    suggestions: list[GroupSuggestion] = []
+    """Groups here of the same or a similar name the person may add papers
+    to: only offered, never chosen by itself."""
 
 
 class MissingPart(BaseModel):
@@ -134,8 +138,38 @@ class ImportChoices(BaseModel):
     refused: list[str]
     """Uploaded files left out: of another export, or no part of one."""
     owners: list[ExportOwner]
-    mapping: dict[str, uuid.UUID] | None = None
-    """The choice: owner id in the export → library here."""
+    mapping: Choices | None = None
+    """What the person chose (once the import starts)."""
+
+    @field_validator("mapping", mode="before")
+    @classmethod
+    def _older(cls, value: object) -> object:
+        """Imports started before the choices grew: owner id → library."""
+        if isinstance(value, dict) and value and "owners" not in value:
+            return {
+                "owners": {
+                    key: {"action": "into", "library_id": target}
+                    for key, target in value.items()
+                }
+            }
+        return value
+
+
+@dataclass
+class Plan:
+    """What the import does with the export's owners, tags and collections
+    (``paperus.importing.mapping.prepare``)."""
+
+    owners: dict[str, uuid.UUID]
+    """Owner id in the export → library here."""
+    holding: dict[str, uuid.UUID] = field(default_factory=dict)
+    """Owner id → the holding collection its papers and collections go into."""
+    tags: dict[str, tuple[str, uuid.UUID | str | None]] = field(default_factory=dict)
+    """Tag id → ("merge" or "map", the tag here) or ("new", its name)."""
+    collections: dict[str, tuple[str, uuid.UUID | str | None]] = field(
+        default_factory=dict
+    )
+    """Collection id → as for tags."""
 
 
 @dataclass
@@ -444,7 +478,7 @@ class _Run:
     blobs: BlobStore
     access: Access
     opened: Opened
-    owners: dict[str, uuid.UUID]
+    plan: Plan
     max_file_bytes: int
     report: Report
     file_added: Callable[[uuid.UUID], None]
@@ -469,7 +503,12 @@ class _Run:
         return self.users.get(str(value), self.me)
 
     def owner(self, value: object) -> uuid.UUID:
-        return self.owners[str(value)]
+        return self.plan.owners[str(value)]
+
+    def holding(self, value: object) -> Collection | None:
+        """The holding collection of the owner's things, if it has one."""
+        collection_id = self.plan.holding.get(str(value))
+        return self.db.get(Collection, collection_id) if collection_id else None
 
 
 def keep_id(db: Session, model: type[Any], value: object) -> dict[str, uuid.UUID]:
@@ -488,17 +527,14 @@ def apply_export(
     access: Access,
     opened: Opened,
     *,
-    mapping: dict[str, uuid.UUID],
-    default: uuid.UUID,
+    plan: Plan,
     max_file_bytes: int,
     progress: Callable[[int, int], None] = lambda done, total: None,
     file_added: Callable[[uuid.UUID], None] = lambda file_id: None,
 ) -> Report:
-    """Add the export for the person: each of its owners' things to the
-    library ``mapping`` names (else ``default``), which they must be able
-    to add to. Commits after each paper and note."""
-    owners = {o.id: mapping.get(o.id, default) for o in opened.choices.owners}
-    for target in set(owners.values()):
+    """Add the export for the person as ``plan`` says (each owner's things
+    to a library they may add to). Commits after each paper and note."""
+    for target in set(plan.owners.values()):
         access.require_write(target)
     total_items = next(iter(_query(opened.database, "SELECT count(*) FROM items")))[0]
     run = _Run(
@@ -506,7 +542,7 @@ def apply_export(
         blobs,
         access,
         opened,
-        owners,
+        plan,
         max_file_bytes,
         Report(papers=total_items),
         file_added,
@@ -595,17 +631,24 @@ def _parents_first(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
 
 def _tag(run: _Run, row: sqlite3.Row) -> None:
     db, target = run.db, run.owner(row["library_id"])
+    name = organize.clean_name(_text(row["name"]))[:100]
     # The same tag if the person sees it (imported before), wherever it is.
     tag = db.get(Tag, _uuid(row["id"]))
     if tag is None or not run.access.can_read(tag.library_id):
-        tag = organize.find_tag(db, target, _text(row["name"]))
+        decided, value = run.plan.tags.get(str(row["id"]), ("", None))
+        if decided in ("merge", "map"):
+            tag = db.get(Tag, value)
+        elif decided == "new":
+            name, tag = str(value)[:100], None
+        else:
+            tag = organize.find_tag(db, target, name)
     if tag is None:
         color = _choice(row["color"], TagColor, TagColor.GRAY) if row["color"] else None
         tag = Tag(
             **keep_id(db, Tag, row["id"]),
             created_at=_time(row["created_at"]),
             library_id=target,
-            name=organize.clean_name(_text(row["name"]))[:100],
+            name=name,
             color=color,
             description=_optional_text(row["description"]),
             change=0,
@@ -622,8 +665,18 @@ def _collection(run: _Run, row: sqlite3.Row) -> None:
     parent = db.get(Collection, parent_id) if parent_id else None
     if parent is not None and (parent.library_id != target or parent.rules is not None):
         parent = None
+    if parent is None:
+        # A group's collections in its holding collection (if it has one).
+        parent = run.holding(row["library_id"])
     found = db.get(Collection, _uuid(row["id"]))
-    if found is None or not run.access.can_read(found.library_id):
+    decided, value = run.plan.collections.get(str(row["id"]), ("", None))
+    if found is not None and run.access.can_read(found.library_id):
+        pass  # imported before
+    elif decided in ("merge", "map"):
+        found = db.get(Collection, value)
+    elif decided == "new":
+        found, name = None, str(value)[:200]
+    else:
         place = (
             Collection.parent_id == parent.id
             if parent
@@ -668,7 +721,9 @@ def _rules(run: _Run, value: object) -> dict[str, Any] | None:
             [tags[str(t)] for t in getattr(rules, name) if str(t) in tags],
         )
     rules.owners = list(
-        dict.fromkeys(run.owners[str(o)] for o in rules.owners if str(o) in run.owners)
+        dict.fromkeys(
+            run.plan.owners[str(o)] for o in rules.owners if str(o) in run.plan.owners
+        )
     )
     return rules.model_dump(mode="json")
 
@@ -769,6 +824,16 @@ def _item(run: _Run, row: sqlite3.Row) -> None:
         _files(run, item, file_rows, version_map)
     _item_tags(run, item, row["id"])
     _item_collections(run, item, row["id"])
+    holding = run.holding(row["library_id"])
+    if (
+        holding is not None
+        and item.library_id == holding.library_id
+        and not any(c.collection_id == holding.id for c in item.collection_links)
+    ):
+        # A group's papers kept in the person's library, in its collection.
+        item.collection_links.append(
+            CollectionItem(collection_id=holding.id, added_by=run.me)
+        )
     for star in run.rows("SELECT * FROM favourites WHERE item_id = ?", row["id"]):
         if run.db.get(Favourite, (run.me, item.id)) is None:
             item.favourites.append(
@@ -1053,6 +1118,15 @@ def _note(run: _Run, row: sqlite3.Row) -> None:
                     created_at=_time(link["created_at"]),
                 )
             )
+    holding = run.holding(row["library_id"])
+    if (
+        holding is not None
+        and note.library_id == holding.library_id
+        and not any(c.collection_id == holding.id for c in note.collection_links)
+    ):
+        note.collection_links.append(
+            CollectionNote(collection_id=holding.id, added_by=run.me)
+        )
     for link in run.rows("SELECT * FROM collection_notes WHERE note_id = ?", row["id"]):
         collection_id = run.collections.get(str(link["collection_id"]))
         collection = db.get(Collection, collection_id) if collection_id else None

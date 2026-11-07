@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Smart collections by dates**: "Published from … to …" with date
+  pickers; a paper counts by the days its date stands for (a day, a month,
+  a year), so "March 2024" papers are in a 1–31 March collection and a
+  "2024" paper in any range touching 2024. Older year rules keep working.
+  The new-collection dialog fits a phone's screen again.
+- The contents of a PDF open unfolded; fold chapters by hand.
 - **Export everything you can see** (Settings → Export): your papers and
   your groups' (each marked with its owner), with their versions, files,
   notes, tags and keywords, collections, reference lists, stars and the
@@ -13,8 +19,13 @@
   Mendeley: their file (RDF, BibTeX, RIS) with the files beside it. On the
   server: `paperus export --user NAME library.zip`.
 - **Import a paperus export** on the import page (all its zips at once):
-  you choose where its papers go, yours or a group's; nothing is lost,
-  papers you have already are found, and importing it again adds nothing.
+  for each group in it, choose a group here, create the group (if you
+  may), or keep its papers in your library in a collection named after it
+  (the default; give that collection to the group later to move them).
+  Tags and collections whose names are already there (or nearly: "ToRead"
+  and "to read") are merged unless you choose otherwise; similar ones are
+  suggested. Nothing is lost, papers you have already are found, and
+  importing it again adds nothing.
 
 ## 0.0.13 (2026-11-07)
 

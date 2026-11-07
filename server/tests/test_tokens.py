@@ -279,6 +279,7 @@ ROUTES = {
     ("DELETE", "/api/imports/{import_id}"): None,
     ("POST", "/api/imports/{import_id}/parts"): None,
     ("POST", "/api/imports/{import_id}/start"): None,
+    ("POST", "/api/imports/{import_id}/preview"): None,
     ("GET", "/api/exports"): None,
     ("POST", "/api/exports"): None,
     ("POST", "/api/exports/estimate"): None,

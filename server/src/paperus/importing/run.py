@@ -35,6 +35,7 @@ from paperus.importing import (
     bbl,
     bibtex,
     csljson,
+    mapping,
     paperus_export,
     references,
     ris,
@@ -42,6 +43,7 @@ from paperus.importing import (
 )
 from paperus.importing.apply import Files as FileSource
 from paperus.importing.apply import FolderFiles, NoFiles, Report, ZipFiles, apply
+from paperus.importing.choices import ExportNames
 from paperus.models import Blob, File, Import, ImportPart, ImportStatus, User
 from paperus.storage import BlobStore
 
@@ -479,23 +481,33 @@ def _run_paperus_export(
     max_file_bytes: int,
     file_added: Callable[[uuid.UUID], None],
 ) -> None:
-    """A paperus export, its owners going where the person chose."""
+    """A paperus export, its owners, tags and collections going where the
+    person chose (``paperus.importing.mapping``)."""
     record.format = paperus_export.NAME
-    choices = (record.choices or {}).get("mapping") or {}
-    mapping = {key: uuid.UUID(str(value)) for key, value in choices.items()}
+    stored = record.choices or {}
+    chosen = (
+        paperus_export.ImportChoices.model_validate(stored).mapping if stored else None
+    )
 
     def work(
         access: Access, started: Callable[[int], None], progress: Progress
     ) -> Report:
         with paperus_export.opened(uploads, blobs.temp_dir) as opened:
+            names = (
+                ExportNames.model_validate(stored["names"])
+                if "names" in stored
+                else mapping.read_names(opened)
+            )
+            plan = mapping.prepare(
+                db, access, opened.choices, names, chosen, default=record.library_id
+            )
             started(sum(o.items + o.notes for o in opened.choices.owners))
             return paperus_export.apply_export(
                 db,
                 blobs,
-                access,
+                Access.of(db, access.user),  # with the groups it created
                 opened,
-                mapping=mapping,
-                default=record.library_id,
+                plan=plan,
                 max_file_bytes=max_file_bytes,
                 progress=progress,
                 file_added=file_added,

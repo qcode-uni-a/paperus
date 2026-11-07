@@ -145,7 +145,7 @@ def test_round_trip_into_an_empty_server(
     choices = record["choices"]
     assert [o["name"] for o in choices["owners"]] == ["Me", "Uni", "Uni/QCode Lab"]
     assert choices["missing"] == [] and choices["refused"] == []
-    started = carol.post(f"/api/imports/{record['id']}/start", json={"owners": {}})
+    started = start(carol, record)
     assert started.status_code == 200, started.text
     queued = run_imports(db, blobs, job_app)
     done = carol.get(f"/api/imports/{record['id']}").json()
@@ -166,15 +166,33 @@ def test_round_trip_into_an_empty_server(
     after.close()
 
 
+def plainly(record: dict[str, Any]) -> dict[str, Any]:
+    """Every group of the export into the person's library, without a
+    holding collection (1d of docs/import-mapping.md)."""
+    return {
+        owner["id"]: {"action": "library"}
+        for owner in record["choices"]["owners"]
+        if owner["kind"] == "group"
+    }
+
+
+def start(
+    person: Person, record: dict[str, Any], body: dict[str, Any] | None = None
+) -> httpx2.Response:
+    """Start an import waiting for choices: by default everything into the
+    person's library (``plainly``)."""
+    return person.post(
+        f"/api/imports/{record['id']}/start",
+        json=body if body is not None else {"owners": plainly(record)},
+    )
+
+
 def import_into(
-    person: Person, parts: list[Path], owners: dict[str, str] | None = None
+    person: Person, parts: list[Path], body: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     response = upload_export(person, parts)
     assert response.status_code == 201, response.text
-    record = response.json()
-    started = person.post(
-        f"/api/imports/{record['id']}/start", json={"owners": owners or {}}
-    )
+    started = start(person, response.json(), body)
     assert started.status_code == 200, started.text
     result: dict[str, Any] = started.json()
     return result
@@ -250,27 +268,41 @@ def test_owners_go_where_the_person_chooses(
     record = upload_export(erin, parts).json()
     owners = {o["name"]: o for o in record["choices"]["owners"]}
     # The same group here is offered, never chosen by itself.
-    assert owners["Uni/QCode Lab"]["suggested"] == str(rich.ids["lab"])
-    assert owners["Uni"]["suggested"] is None  # a reader may not add there
+    assert owners["Uni/QCode Lab"]["suggestions"] == [
+        {
+            "library_id": str(rich.ids["lab"]),
+            "name": "Uni/QCode Lab",
+            "likeness": "same",
+        }
+    ]
+    assert owners["Uni"]["suggestions"] == []  # a reader may not add there
     assert owners["Me"]["items"] == 2 and owners["Me"]["notes"] == 2
-    start = f"/api/imports/{record['id']}/start"
     lab_key, uni_key = owners["Uni/QCode Lab"]["id"], owners["Uni"]["id"]
+
+    def choose(owners: dict[str, Any]) -> int:
+        return start(erin, record, {"owners": owners}).status_code
+
+    into = "into"
     assert (
-        erin.post(start, json={"owners": {uni_key: str(rich.ids["uni"])}}).status_code
-        == 403
+        choose({uni_key: {"action": into, "library_id": str(rich.ids["uni"])}}) == 403
     )
     assert (
-        erin.post(start, json={"owners": {uni_key: str(rich.ids["mine"])}}).status_code
-        == 404
+        choose({uni_key: {"action": into, "library_id": str(rich.ids["mine"])}}) == 404
     )
-    assert (
-        erin.post(start, json={"owners": {"nobody": str(rich.ids["lab"])}}).status_code
-        == 422
+    assert choose({"nobody": {"action": "library"}}) == 422
+    assert start(rich.ada, record, {}).status_code == 404
+    response = start(
+        erin,
+        record,
+        {
+            "owners": {
+                lab_key: {"action": into, "library_id": str(rich.ids["lab"])},
+                uni_key: {"action": "library"},
+            }
+        },
     )
-    assert rich.ada.post(start, json={}).status_code == 404
-    response = erin.post(start, json={"owners": {lab_key: str(rich.ids["lab"])}})
     assert response.status_code == 200
-    assert erin.post(start, json={}).status_code == 409
+    assert start(erin, record, {}).status_code == 409
     report = finished(erin, db, blobs, job_app, record["id"])["report"]
     # The group's papers she sees are found; ada's private ones are new
     # (with new ids: those are taken by papers she does not see).
@@ -390,7 +422,7 @@ def test_parts_together_and_one_added_later(
     assert added.status_code == 200, added.text
     assert added.json()["choices"]["missing"] == []
     assert len(db.get_one(Import, uuid.UUID(record["id"])).parts) == 2
-    carol.post(f"/api/imports/{record['id']}/start", json={})
+    start(carol, record)
     report = finished(carol, db, blobs, job_app, record["id"])["report"]
     assert report["files"] == 4 and report["problems"] == []
     assert report["missing_files"] == []
@@ -864,7 +896,7 @@ def test_odd_values_in_the_database(
     carol = on_a_new_server(db, engine, client)
     record = upload_export(carol, [odd]).json()
     assert record["choices"]["options"] == {}
-    carol.post(f"/api/imports/{record['id']}/start", json={})
+    start(carol, record)
     report = finished(carol, db, blobs, job_app, record["id"])["report"]
     assert report["added"] == 2
     assert sorted(report["problems"]) == [
@@ -898,7 +930,7 @@ def test_files_too_large_here(
     (part,) = exported(rich.ada, job_app, engine, blobs, settings, tmp_path)
     carol = on_a_new_server(db, engine, client)
     record = upload_export(carol, [part]).json()
-    carol.post(f"/api/imports/{record['id']}/start", json={})
+    start(carol, record)
     row = db.get_one(Import, uuid.UUID(record["id"]))
     assert row.blob_sha256 is not None
     with blobs.local_file(row.blob_sha256) as path:

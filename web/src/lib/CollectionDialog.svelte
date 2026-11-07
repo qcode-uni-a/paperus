@@ -257,6 +257,8 @@
 	.kind {
 		display: grid;
 		gap: 6px;
+		/* A fieldset is otherwise as wide as its longest line (phones). */
+		min-width: 0;
 		margin: 0;
 		padding: 0;
 		border: none;

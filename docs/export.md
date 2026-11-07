@@ -165,7 +165,10 @@ imports, written by `paperus.formats`:
 
 The import page takes the zips (all parts at once, in any order), and so
 does `paperus import part1.zip --user NAME` (it finds the other parts
-beside it). See also [ingestion](ingestion.md#import-from-other-reference-managers).
+beside it; "Me" to their library, each group into a collection named
+after it, or everything into `--group`; clashing names take their
+defaults). See also [ingestion](ingestion.md#import-from-other-reference-managers)
+and [import-mapping](import-mapping.md).
 
 1. **Checked first**: part 1's database says how many parts there are;
    each part's `part.json` says which export it belongs to. Missing parts
@@ -174,11 +177,14 @@ beside it). See also [ingestion](ingestion.md#import-from-other-reference-manage
    files"); they can be added before starting. Zips of another export are
    left out by name. Without part 1: "Part 1 holds the database: add it".
    Exports of a newer format are refused ("update paperus here first").
-2. **Where each owner goes**: the person chooses for each owner in the
-   export: their own library (the default for all), or a group here they
-   may add papers to. A group of the same name is suggested but never
-   chosen by itself; nothing goes into a group without the person's
-   choice.
+2. **Where things go**: "Me" goes to the person's library; for each group
+   of the export the person chooses: into a group here, create the group
+   here (where they may), into their library in a collection named after
+   the group (the default), or into their library without one. Then the
+   tags and collections whose names clash with (or are like) those where
+   they go are listed, each with a choice: merge, make new, or map to
+   another. The rules, defaults and name likeness are in
+   [import-mapping](import-mapping.md).
 3. **Applied**, paper by paper, like other imports (a report at the end):
    - Papers already here are found, not added again: the same id (if the
      person sees it), else the same DOI, arXiv ID or other identifier, else

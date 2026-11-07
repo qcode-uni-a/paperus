@@ -3385,13 +3385,67 @@
         }
       }
     },
+    "/api/imports/{import_id}/preview": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Preview Paperus Import",
+        "description": "For these owner choices: the export's tags and collections whose\nnames clash with (or are like) those where they go, each with its\ndefault and suggestions (docs/import-mapping.md).",
+        "operationId": "preview_paperus_import",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Choices"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/imports/{import_id}/start": {
       "post": {
         "tags": [
           "imports"
         ],
         "summary": "Start Paperus Import",
-        "description": "Import a paperus export, its owners where the person chose.",
+        "description": "Import a paperus export as the person chose: where its owners go,\nand what its clashing tags and collections become (what is not named\ntakes its default).",
         "operationId": "start_paperus_import",
         "parameters": [
           {
@@ -3410,7 +3464,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ImportStart"
+                "$ref": "#/components/schemas/Choices"
               }
             }
           }
@@ -6825,6 +6879,118 @@
         ],
         "title": "Body_upload_to_version"
       },
+      "Choices": {
+        "properties": {
+          "owners": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/OwnerChoice"
+            },
+            "type": "object",
+            "title": "Owners",
+            "default": {}
+          },
+          "tags": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NameChoice"
+            },
+            "type": "object",
+            "title": "Tags",
+            "default": {}
+          },
+          "collections": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NameChoice"
+            },
+            "type": "object",
+            "title": "Collections",
+            "default": {}
+          },
+          "all_new": {
+            "type": "boolean",
+            "title": "All New",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "Choices",
+        "description": "The person's choices (what is not named takes its default)."
+      },
+      "Clash": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "collection"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "smart": {
+            "type": "boolean",
+            "title": "Smart",
+            "default": false
+          },
+          "default": {
+            "$ref": "#/components/schemas/NameChoice"
+          },
+          "chosen": {
+            "$ref": "#/components/schemas/NameChoice"
+          },
+          "new_name": {
+            "type": "string",
+            "title": "New Name"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "may_map": {
+            "type": "boolean",
+            "title": "May Map",
+            "default": true
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "name",
+          "library_id",
+          "default",
+          "chosen",
+          "new_name",
+          "suggestions"
+        ],
+        "title": "Clash",
+        "description": "A tag or collection of the export with the same or a similar name\nas one where it goes."
+      },
       "CollectionChange": {
         "properties": {
           "name": {
@@ -7738,17 +7904,18 @@
             "type": "integer",
             "title": "Notes"
           },
-          "suggested": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Suggested"
+          "can_create": {
+            "type": "boolean",
+            "title": "Can Create",
+            "default": false
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/GroupSuggestion"
+            },
+            "type": "array",
+            "title": "Suggestions",
+            "default": []
           }
         },
         "type": "object",
@@ -8231,6 +8398,35 @@
         ],
         "title": "GroupOut"
       },
+      "GroupSuggestion": {
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "likeness": {
+            "type": "string",
+            "enum": [
+              "same",
+              "nearly",
+              "similar"
+            ],
+            "title": "Likeness"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id",
+          "name",
+          "likeness"
+        ],
+        "title": "GroupSuggestion"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -8378,17 +8574,12 @@
           "mapping": {
             "anyOf": [
               {
-                "additionalProperties": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "type": "object"
+                "$ref": "#/components/schemas/Choices"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Mapping"
+            ]
           }
         },
         "type": "object",
@@ -8512,21 +8703,6 @@
           "finished_at"
         ],
         "title": "ImportOut"
-      },
-      "ImportStart": {
-        "properties": {
-          "owners": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Owners",
-            "default": {}
-          }
-        },
-        "type": "object",
-        "title": "ImportStart"
       },
       "ImportStatus": {
         "type": "string",
@@ -9997,6 +10173,37 @@
         "title": "MovePreview",
         "description": "What moving a collection (with those inside) into a library does."
       },
+      "NameChoice": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "new",
+              "map"
+            ],
+            "title": "Action"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "NameChoice",
+        "description": "What a tag or collection of the export becomes where one of the\nsame or a similar name exists here."
+      },
       "NewItemUpload": {
         "properties": {
           "item_id": {
@@ -10475,6 +10682,36 @@
         ],
         "title": "Owner"
       },
+      "OwnerChoice": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "library",
+              "into",
+              "create",
+              "collection"
+            ],
+            "title": "Action",
+            "default": "collection"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "title": "OwnerChoice",
+        "description": "Where one owner of the export goes."
+      },
       "Pair": {
         "properties": {
           "a": {
@@ -10715,6 +10952,43 @@
           "username"
         ],
         "title": "Person"
+      },
+      "Preview": {
+        "properties": {
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/Clash"
+            },
+            "type": "array",
+            "title": "Tags",
+            "default": []
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/Clash"
+            },
+            "type": "array",
+            "title": "Collections",
+            "default": []
+          },
+          "targets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/components/schemas/Target"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Targets",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "title": "Preview",
+        "description": "The clashes for the owner choices given."
       },
       "Private": {
         "properties": {
@@ -11287,6 +11561,30 @@
             "title": "Types",
             "default": []
           },
+          "published_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published From"
+          },
+          "published_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published To"
+          },
           "year_from": {
             "anyOf": [
               {
@@ -11735,6 +12033,40 @@
           "disk_free"
         ],
         "title": "Storage"
+      },
+      "Suggestion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "likeness": {
+            "type": "string",
+            "enum": [
+              "same",
+              "nearly",
+              "similar"
+            ],
+            "title": "Likeness"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "likeness",
+          "papers"
+        ],
+        "title": "Suggestion"
       },
       "SystemConfig": {
         "properties": {
@@ -12243,6 +12575,36 @@
         ],
         "title": "TagSource",
         "description": "Who put a tag on an item (Zotero keeps manual and automatic apart)."
+      },
+      "Target": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          },
+          "smart": {
+            "type": "boolean",
+            "title": "Smart",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "papers"
+        ],
+        "title": "Target",
+        "description": "A tag or collection here an imported one may be mapped to."
       },
       "TemplateIn": {
         "properties": {

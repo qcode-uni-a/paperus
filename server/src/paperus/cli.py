@@ -86,7 +86,9 @@ def main(argv: list[str] | None = None) -> None:
     import_.add_argument("--user", required=True, help="who imports (username)")
     import_.add_argument(
         "--group",
-        help="give everything new to this group (default: the user's default owner)",
+        help="give everything new to this group (default: the user's default "
+        "owner; for a paperus export: their own library, each of its groups "
+        "in a collection named after it)",
     )
 
     export_ = commands.add_parser(
@@ -289,6 +291,11 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
             access = Access.of(db, user)
             # In person (not through a token): never refused.
             owner = access.target_library(None)
+            parts = _other_parts(path)
+            if parts or _is_paperus_export(path):
+                # "Me" to their library, each group into a collection named
+                # after it there (docs/import-mapping.md), unless --group.
+                owner = access.own_library
             if group is not None:
                 # Group names repeat in different places: look among theirs.
                 found = db.scalars(
@@ -313,7 +320,7 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
                 make_blob_store(settings),
                 record,
                 path=path,
-                parts=_other_parts(path),
+                parts=parts,
                 max_file_bytes=max_upload_bytes(db, settings),
                 file_added=lambda file_id: queue_text_extraction(jobs, file_id),
                 http=make_http_client(settings),
@@ -336,6 +343,14 @@ def import_command(path_text: str, username: str, group: str | None) -> int:
     finally:
         engine.dispose()
     return 0
+
+
+def _is_paperus_export(path: Path) -> bool:
+    try:
+        marker = paperus_export.read_marker(paperus_export.Upload(path, path.name))
+    except paperus_export.NotAnExport:
+        return True  # said when importing
+    return marker is not None
 
 
 def _other_parts(path: Path) -> list[tuple[Path, str]]:

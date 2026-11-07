@@ -1,10 +1,12 @@
 """Smart collections: papers found by rules instead of added by hand."""
 
+from datetime import date
 from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus.library import issued_range
 from tests.people import Person, group
 
 
@@ -129,3 +131,75 @@ def test_a_groups_smart_collection_holds_its_papers(
     assert ada.titles(collection=mine["id"]) == ["Mine", "The chair's"]
     only = smart(ada, {"owners": [chair["library_id"]]})
     assert ada.titles(collection=only["id"]) == ["The chair's"]
+
+
+def dated(person: Person, title: str, *parts: list[int]) -> dict[str, Any]:
+    response = person.post(
+        "/api/items",
+        json={"metadata": {"title": title, "issued": {"date-parts": list(parts)}}},
+    )
+    assert response.status_code == 201, response.text
+    item: dict[str, Any] = response.json()
+    return item
+
+
+def test_published_between_days(client: TestClient, db: Session) -> None:
+    """A date range: papers count by the days their date stands for (a day,
+    a month, a year), when those touch the range."""
+    ada = Person(client, db, "ada")
+    dated(ada, "Mid March", [2024, 3, 15])
+    dated(ada, "Some day in May", [2024, 5])
+    dated(ada, "Some day in 2024", [2024])
+    dated(ada, "New year", [2025, 1, 1])
+    dated(ada, "Spring range", [2023, 12], [2024, 2])
+    dated(ada, "Undated")
+
+    def between(start: str | None, end: str | None) -> list[str]:
+        rules = {"published_from": start, "published_to": end}
+        return ada.titles(collection=smart(ada, rules)["id"])
+
+    assert between("2024-03-01", "2024-03-31") == ["Mid March", "Some day in 2024"]
+    assert between("2024-04-01", "2024-06-30") == [
+        "Some day in 2024",
+        "Some day in May",
+    ]
+    assert between("2024-12-01", None) == ["New year", "Some day in 2024"]
+    assert between(None, "2024-01-15") == ["Some day in 2024", "Spring range"]
+    # Years, as older rules give them: 1 January to 31 December.
+    years = ada.titles(collection=smart(ada, {"year_from": 2025})["id"])
+    assert years == ["New year"]
+
+    # Changing a paper's date moves it in or out at once.
+    item = dated(ada, "Moved", [2010])
+    march = smart(ada, {"published_from": "2024-03-01", "published_to": "2024-03-31"})
+    assert "Moved" not in ada.titles(collection=march["id"])
+    etag = ada.get(f"/api/items/{item['id']}").headers["ETag"]
+    response = client.put(
+        f"/api/items/{item['id']}/overrides",
+        json={"issued": {"date-parts": [[2024, 3, 2]]}},
+        headers={**ada.headers, "If-Match": etag},
+    )
+    assert response.status_code == 200, response.text
+    assert "Moved" in ada.titles(collection=march["id"])
+
+
+def test_issued_range() -> None:
+    assert issued_range({"issued": {"date-parts": [[2024, 2]]}}) == (
+        date(2024, 2, 1),
+        date(2024, 2, 29),
+    )
+    assert issued_range({"published-online": {"date-parts": [["2023", "7", "4"]]}}) == (
+        date(2023, 7, 4),
+        date(2023, 7, 4),
+    )
+    # Odd parts: the precision that is right is kept.
+    assert issued_range({"issued": {"date-parts": [[2021, 13, 40]]}}) == (
+        date(2021, 1, 1),
+        date(2021, 12, 31),
+    )
+    assert issued_range({"issued": {"date-parts": [[2021, 2, 30]]}}) == (
+        date(2021, 2, 1),
+        date(2021, 2, 28),
+    )
+    assert issued_range({"issued": {"raw": "spring 2020"}}) is None
+    assert issued_range({"issued": {"date-parts": [[0]]}}) is None

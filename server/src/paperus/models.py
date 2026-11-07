@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -353,6 +353,10 @@ class Item(Record, Trashable, Base):
     title: Mapped[str]
     year: Mapped[int | None] = mapped_column(index=True)
     """Of publication, as cited (for smart collections' rules)."""
+    issued_from: Mapped[date | None] = mapped_column(index=True)
+    issued_to: Mapped[date | None] = mapped_column(index=True)
+    """The days the publication date stands for: one day, a month (March
+    2024: 1 to 31 March) or a year, as precisely as it is known."""
     file_wanted: Mapped[bool] = mapped_column(server_default=text("true"))
     """False: no file is needed (a web page, a book on the shelf); not
     listed under Manage → Missing."""

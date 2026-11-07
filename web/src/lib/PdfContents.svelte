@@ -34,13 +34,14 @@
 	});
 	const hasChildren = $derived(new Set(parents.filter((parent) => parent >= 0)));
 
-	/** Folded chapters and sections: at first all but the one being read. */
+	/** Folded chapters and sections: none at first, folded by hand (a new
+	 * PDF starts unfolded again). */
 	let folded = $state<Set<number>>(new Set());
 	let foldedFor = $state<Section[] | null>(null);
 	$effect(() => {
 		if (foldedFor === sections) return;
 		foldedFor = sections;
-		folded = new Set(hasChildren);
+		folded = new Set();
 	});
 
 	function ancestors(index: number): number[] {

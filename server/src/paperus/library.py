@@ -1,8 +1,9 @@
 """Items, versions and identifiers: the rules that keep them consistent."""
 
+import calendar
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -98,13 +99,45 @@ def issued_year(csl: dict[str, Any]) -> int | None:
     return None
 
 
+def issued_range(csl: dict[str, Any]) -> tuple[date, date] | None:
+    """The first and last day the publication date stands for: a day, a
+    month or a year, as precisely as the first date there is gives it
+    (a range of dates: from its start to its end)."""
+    for key in ("issued", "published-print", "published-online"):
+        try:
+            parts = csl[key]["date-parts"]
+            start = _day_range([int(p) for p in parts[0]])
+            end = _day_range([int(p) for p in parts[-1]])
+        except (KeyError, IndexError, TypeError, ValueError):
+            continue
+        if start and end:
+            return start[0], max(start[1], end[1])
+    return None
+
+
+def _day_range(parts: list[int]) -> tuple[date, date] | None:
+    if not parts or not 1 <= parts[0] <= 9999:
+        return None
+    year = parts[0]
+    month = parts[1] if len(parts) > 1 and 1 <= parts[1] <= 12 else None
+    if month is None:
+        return date(year, 1, 1), date(year, 12, 31)
+    last = calendar.monthrange(year, month)[1]
+    day = parts[2] if len(parts) > 2 and 1 <= parts[2] <= last else None
+    if day is None:
+        return date(year, month, 1), date(year, month, last)
+    return date(year, month, day), date(year, month, day)
+
+
 def refresh_item(item: Item) -> None:
-    """Update the cached type, title and year after versions or overrides
-    change."""
+    """Update the cached type, title, year and dates after versions or
+    overrides change."""
     csl = citation_csl(item)
     item.type = csl_type(csl)
     item.title = csl_title(csl)
     item.year = issued_year(csl)
+    issued = issued_range(csl)
+    item.issued_from, item.issued_to = issued or (None, None)
 
 
 def find_identifier(

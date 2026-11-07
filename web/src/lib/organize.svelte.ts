@@ -107,6 +107,44 @@ export function isSmart(collection: Collection | undefined): boolean {
 }
 
 /** A smart collection's rules in words: "tagged radar, from 2020, books". */
+/** "published 2020–2025", "published in March 2024", "published 15 March
+ * 2024 – 30 June 2025", "published on 1 May 2024 or later". */
+function publishedWords(rules: Rules): string | null {
+	const from =
+		rules.published_from ?? (rules.year_from != null ? `${rules.year_from}-01-01` : null);
+	const to = rules.published_to ?? (rules.year_to != null ? `${rules.year_to}-12-31` : null);
+	if (!from && !to) return null;
+	const year = (iso: string) => iso.slice(0, 4).replace(/^0+/, '');
+	const wholeYears = (!from || from.endsWith('-01-01')) && (!to || to.endsWith('-12-31'));
+	if (wholeYears) {
+		if (from && to)
+			return year(from) === year(to)
+				? `published in ${year(from)}`
+				: `published ${year(from)}–${year(to)}`;
+		return from ? `published in ${year(from)} or later` : `published in ${year(to!)} or earlier`;
+	}
+	const day = (iso: string) =>
+		new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric',
+			timeZone: 'UTC'
+		});
+	const month = (iso: string) =>
+		new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+			month: 'long',
+			year: 'numeric',
+			timeZone: 'UTC'
+		});
+	if (from && to) {
+		const last = new Date(Date.UTC(+to.slice(0, 4), +to.slice(5, 7), 0)).getUTCDate();
+		if (from.slice(0, 7) === to.slice(0, 7) && from.endsWith('-01') && +to.slice(8) === last)
+			return `published in ${month(from)}`;
+		return `published ${day(from)} – ${day(to)}`;
+	}
+	return from ? `published on ${day(from)} or later` : `published on ${day(to!)} or earlier`;
+}
+
 export function describeRules(rules: Rules): string {
 	const tagNames = (ids: string[] | undefined) =>
 		(ids ?? []).map((id) => organize.tags.find((t) => t.id === id)?.name ?? '?');
@@ -117,11 +155,8 @@ export function describeRules(rules: Rules): string {
 	if (rules.tags_any?.length) parts.push(`tagged ${and(tagNames(rules.tags_any), 'or')}`);
 	if (rules.tags_none?.length) parts.push(`not tagged ${and(tagNames(rules.tags_none), 'or')}`);
 	if (rules.types?.length) parts.push(and(rules.types.map(plural), 'or'));
-	const { year_from: from, year_to: to } = rules;
-	if (from != null && to != null)
-		parts.push(from === to ? `published in ${from}` : `published ${from}–${to}`);
-	else if (from != null) parts.push(`published in ${from} or later`);
-	else if (to != null) parts.push(`published in ${to} or earlier`);
+	const published = publishedWords(rules);
+	if (published) parts.push(published);
 	if (rules.owners?.length) parts.push(`owned by ${and(rules.owners.map(libraryName), 'or')}`);
 	if (rules.added_days != null)
 		parts.push(

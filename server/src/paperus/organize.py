@@ -2,7 +2,7 @@
 
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Select, func, select
@@ -31,9 +31,15 @@ class Rules(BaseModel):
     """With none of these tags."""
     types: list[str] = []
     """Of one of these types (CSL: article-journal, book, …)."""
+    published_from: date | None = None
+    published_to: date | None = None
+    """Published between these days (both included). A paper whose date
+    is known only to the month or year counts if that month or year
+    touches the range."""
     year_from: int | None = Field(None, ge=0, le=9999)
     year_to: int | None = Field(None, ge=0, le=9999)
-    """Published in these years (both included)."""
+    """Published in these years (both included); older rules, the same as
+    the dates 1 January and 31 December."""
     owners: list[uuid.UUID] = []
     """Owned by one of these libraries (a person's or a group's). A group's
     smart collection holds only that group's papers anyway."""
@@ -225,6 +231,16 @@ def item_ids_in(
     return select(CollectionItem.item_id).where(CollectionItem.collection_id.in_(ids))
 
 
+def published_between(rules: Rules) -> tuple[date | None, date | None]:
+    """The first and last day of the rules' publication range (years as
+    from 1 January to 31 December); None where open."""
+    start = rules.published_from or (
+        date(rules.year_from, 1, 1) if rules.year_from else None
+    )
+    end = rules.published_to or (date(rules.year_to, 12, 31) if rules.year_to else None)
+    return start, end
+
+
 def matching(db: Session, collection: Collection) -> list[ColumnElement[bool]]:
     """Conditions on items for a smart collection's rules (who may see
     which item is up to the caller)."""
@@ -242,10 +258,11 @@ def matching(db: Session, collection: Collection) -> list[ColumnElement[bool]]:
         conditions.append(Item.id.not_in(tagged(rules.tags_none)))
     if rules.types:
         conditions.append(Item.type.in_(rules.types))
-    if rules.year_from is not None:
-        conditions.append(Item.year >= rules.year_from)
-    if rules.year_to is not None:
-        conditions.append(Item.year <= rules.year_to)
+    start, end = published_between(rules)
+    if start is not None:
+        conditions.append(Item.issued_to >= start)
+    if end is not None:
+        conditions.append(Item.issued_from <= end)
     if rules.owners:
         conditions.append(Item.library_id.in_(rules.owners))
     if rules.added_days is not None:

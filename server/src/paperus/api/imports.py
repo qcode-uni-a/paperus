@@ -20,11 +20,11 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import export
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.identifiers import InvalidIdentifier, normalize_arxiv
-from paperus.importing import paperus_export
+from paperus.importing import mapping, paperus_export
+from paperus.importing.choices import Choices, ExportNames, Preview
 from paperus.importing.run import forget_upload
 from paperus.jobs import queue_import
 from paperus.models import Blob, Import, ImportPart, ImportStatus
@@ -196,6 +196,7 @@ def _take(
                 return False
             with paperus_export.opened(uploads, blobs.temp_dir) as opened:
                 choices = opened.choices
+                names = mapping.read_names(opened)
         except paperus_export.NotAnExport as error:
             raise HTTPException(422, str(error)) from error
         parts: list[tuple[int, bytes, str]] = []
@@ -211,10 +212,14 @@ def _take(
             else:
                 parts.append((marker.part, sha, name))
     parts.sort()
-    _suggest(db, access, choices)
+    mapping.describe_owners(db, access, choices)
     record.format = paperus_export.NAME
     record.status = ImportStatus.NEEDS_CHOICES
-    record.choices = choices.model_dump(mode="json")
+    # The export's tags and collections are kept for comparing (not shown).
+    record.choices = {
+        **choices.model_dump(mode="json"),
+        "names": names.model_dump(mode="json"),
+    }
     record.blob_sha256 = parts[0][1]
     record.filename = parts[0][2]
     record.parts = [
@@ -224,27 +229,6 @@ def _take(
     db.commit()
     _forget(request, db, [sha for sha in dropped if sha not in {p[1] for p in parts}])
     return True
-
-
-def _suggest(
-    db: Session, access: Access, choices: paperus_export.ImportChoices
-) -> None:
-    """A group here of the same name (path, else name) for each of the
-    export's groups, if the person may add to it."""
-    here = [
-        owner
-        for owner in export.owners_of(db, access).values()
-        if owner.kind == "group" and access.can_write(owner.id)
-    ]
-    for owner in choices.owners:
-        if owner.kind != "group":
-            continue
-        same = [h.id for h in here if h.name == owner.name] or [
-            h.id
-            for h in here
-            if h.name.rsplit("/", 1)[-1] == owner.name.rsplit("/", 1)[-1]
-        ]
-        owner.suggested = same[0] if len(same) == 1 else None
 
 
 def _own_import(db: Session, access: Access, import_id: uuid.UUID) -> Import:
@@ -287,37 +271,60 @@ def add_import_parts(
     return import_out(record)
 
 
-class ImportStart(BaseModel):
-    owners: dict[str, uuid.UUID] = {}
-    """Where each owner of the export goes: its id in the export → a
-    library here the person may add to; "Me" and groups not named go to the
-    person's own library."""
+def _stored(record: Import) -> tuple[paperus_export.ImportChoices, ExportNames]:
+    stored = record.choices or {}
+    return (
+        paperus_export.ImportChoices.model_validate(stored),
+        ExportNames.model_validate(stored.get("names") or {}),
+    )
+
+
+def _answer(error: Exception) -> HTTPException:
+    """A choice that cannot be followed, as the API says it."""
+    if isinstance(error, mapping.Refused):
+        return HTTPException(403, str(error))
+    if isinstance(error, LookupError):
+        return HTTPException(404, str(error).strip("'\""))
+    return HTTPException(422, str(error))
+
+
+@router.post("/api/imports/{import_id}/preview")
+def preview_paperus_import(
+    import_id: uuid.UUID, body: Choices, db: DB, access: CurrentAccess
+) -> Preview:
+    """For these owner choices: the export's tags and collections whose
+    names clash with (or are like) those where they go, each with its
+    default and suggestions (docs/import-mapping.md)."""
+    record = _waiting_for_choices(db, access, import_id)
+    export_choices, names = _stored(record)
+    try:
+        return mapping.preview(db, access, export_choices, names, body)
+    except (mapping.Refused, LookupError, ValueError) as error:
+        raise _answer(error) from error
 
 
 @router.post("/api/imports/{import_id}/start")
 def start_paperus_import(
     import_id: uuid.UUID,
-    body: ImportStart,
+    body: Choices,
     request: Request,
     db: DB,
     access: CurrentAccess,
 ) -> ImportOut:
-    """Import a paperus export, its owners where the person chose."""
+    """Import a paperus export as the person chose: where its owners go,
+    and what its clashing tags and collections become (what is not named
+    takes its default)."""
     record = _waiting_for_choices(db, access, import_id)
-    choices = paperus_export.ImportChoices.model_validate(record.choices)
-    known = {owner.id for owner in choices.owners}
-    for key, target in body.owners.items():
-        if key not in known:
-            raise HTTPException(422, f"the export has no owner {key}")
-        if not access.can_read(target):
-            raise HTTPException(404, "library not found")
-        if not access.can_write(target):
-            raise HTTPException(403, "you may not add papers there")
-    choices.mapping = {
-        owner.id: body.owners.get(owner.id, access.own_library)
-        for owner in choices.owners
+    export_choices, names = _stored(record)
+    try:
+        mapping.check(db, access, export_choices, names, body)
+    except (mapping.Refused, LookupError, ValueError) as error:
+        raise _answer(error) from error
+    export_choices.mapping = body
+    record.choices = {
+        **export_choices.model_dump(mode="json"),
+        "names": names.model_dump(mode="json"),
     }
-    record.choices = choices.model_dump(mode="json")
     record.library_id = access.own_library
     record.status = ImportStatus.WAITING
     db.commit()

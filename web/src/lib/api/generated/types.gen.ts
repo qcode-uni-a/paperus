@@ -206,6 +206,83 @@ export type BodyUploadToVersion = {
 };
 
 /**
+ * Choices
+ *
+ * The person's choices (what is not named takes its default).
+ */
+export type Choices = {
+    /**
+     * Owners
+     */
+    owners?: {
+        [key: string]: OwnerChoice;
+    };
+    /**
+     * Tags
+     */
+    tags?: {
+        [key: string]: NameChoice;
+    };
+    /**
+     * Collections
+     */
+    collections?: {
+        [key: string]: NameChoice;
+    };
+    /**
+     * All New
+     */
+    all_new?: boolean;
+};
+
+/**
+ * Clash
+ *
+ * A tag or collection of the export with the same or a similar name
+ * as one where it goes.
+ */
+export type Clash = {
+    /**
+     * Kind
+     */
+    kind: 'tag' | 'collection';
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Smart
+     */
+    smart?: boolean;
+    default: NameChoice;
+    chosen: NameChoice;
+    /**
+     * New Name
+     */
+    new_name: string;
+    /**
+     * Suggestions
+     */
+    suggestions: Array<Suggestion>;
+    /**
+     * May Map
+     */
+    may_map?: boolean;
+    /**
+     * Note
+     */
+    note?: string | null;
+};
+
+/**
  * CollectionChange
  *
  * Only the fields given are changed; ``parent_id: null`` moves to the top.
@@ -729,9 +806,13 @@ export type ExportOwner = {
      */
     notes: number;
     /**
-     * Suggested
+     * Can Create
      */
-    suggested?: string | null;
+    can_create?: boolean;
+    /**
+     * Suggestions
+     */
+    suggestions?: Array<GroupSuggestion>;
 };
 
 /**
@@ -986,6 +1067,24 @@ export type GroupOut = {
 };
 
 /**
+ * GroupSuggestion
+ */
+export type GroupSuggestion = {
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Likeness
+     */
+    likeness: 'same' | 'nearly' | 'similar';
+};
+
+/**
  * HTTPValidationError
  */
 export type HttpValidationError = {
@@ -1085,12 +1184,7 @@ export type ImportChoices = {
      * Owners
      */
     owners: Array<ExportOwner>;
-    /**
-     * Mapping
-     */
-    mapping?: {
-        [key: string]: string;
-    } | null;
+    mapping?: Choices | null;
 };
 
 /**
@@ -1141,18 +1235,6 @@ export type ImportOut = {
      */
     finished_at: string | null;
     choices?: ImportChoices | null;
-};
-
-/**
- * ImportStart
- */
-export type ImportStart = {
-    /**
-     * Owners
-     */
-    owners?: {
-        [key: string]: string;
-    };
 };
 
 /**
@@ -1982,6 +2064,23 @@ export type MovePreview = {
 };
 
 /**
+ * NameChoice
+ *
+ * What a tag or collection of the export becomes where one of the
+ * same or a similar name exists here.
+ */
+export type NameChoice = {
+    /**
+     * Action
+     */
+    action: 'merge' | 'new' | 'map';
+    /**
+     * Target Id
+     */
+    target_id?: string | null;
+};
+
+/**
  * NewItemUpload
  */
 export type NewItemUpload = {
@@ -2244,6 +2343,22 @@ export type Owner = {
 };
 
 /**
+ * OwnerChoice
+ *
+ * Where one owner of the export goes.
+ */
+export type OwnerChoice = {
+    /**
+     * Action
+     */
+    action?: 'library' | 'into' | 'create' | 'collection';
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
  * Pair
  */
 export type Pair = {
@@ -2371,6 +2486,30 @@ export type Person = {
      * Avatar Url
      */
     avatar_url?: string | null;
+};
+
+/**
+ * Preview
+ *
+ * The clashes for the owner choices given.
+ */
+export type Preview = {
+    /**
+     * Tags
+     */
+    tags?: Array<Clash>;
+    /**
+     * Collections
+     */
+    collections?: Array<Clash>;
+    /**
+     * Targets
+     */
+    targets?: {
+        [key: string]: {
+            [key: string]: Array<Target>;
+        };
+    };
 };
 
 /**
@@ -2714,6 +2853,14 @@ export type Rules = {
      */
     types?: Array<string>;
     /**
+     * Published From
+     */
+    published_from?: string | null;
+    /**
+     * Published To
+     */
+    published_to?: string | null;
+    /**
      * Year From
      */
     year_from?: number | null;
@@ -2947,6 +3094,28 @@ export type Storage = {
      * Disk Free
      */
     disk_free: number | null;
+};
+
+/**
+ * Suggestion
+ */
+export type Suggestion = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Likeness
+     */
+    likeness: 'same' | 'nearly' | 'similar';
+    /**
+     * Papers
+     */
+    papers: number;
 };
 
 /**
@@ -3191,6 +3360,30 @@ export type TagOut = {
  * Who put a tag on an item (Zotero keeps manual and automatic apart).
  */
 export type TagSource = 'manual' | 'automatic' | 'ai';
+
+/**
+ * Target
+ *
+ * A tag or collection here an imported one may be mapped to.
+ */
+export type Target = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Papers
+     */
+    papers: number;
+    /**
+     * Smart
+     */
+    smart?: boolean;
+};
 
 /**
  * TemplateIn
@@ -5578,8 +5771,38 @@ export type AddImportPartsResponses = {
 
 export type AddImportPartsResponse = AddImportPartsResponses[keyof AddImportPartsResponses];
 
+export type PreviewPaperusImportData = {
+    body: Choices;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}/preview';
+};
+
+export type PreviewPaperusImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PreviewPaperusImportError = PreviewPaperusImportErrors[keyof PreviewPaperusImportErrors];
+
+export type PreviewPaperusImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: Preview;
+};
+
+export type PreviewPaperusImportResponse = PreviewPaperusImportResponses[keyof PreviewPaperusImportResponses];
+
 export type StartPaperusImportData = {
-    body: ImportStart;
+    body: Choices;
     path: {
         /**
          * Import Id

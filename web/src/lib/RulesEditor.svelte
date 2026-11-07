@@ -44,6 +44,18 @@
 			? current.filter((v) => v !== value)
 			: [...current, value];
 	}
+	// Older rules give years: shown (and saved) as their first and last day.
+	$effect.pre(() => {
+		if (rules.year_from != null && !rules.published_from)
+			rules.published_from = `${String(rules.year_from).padStart(4, '0')}-01-01`;
+		if (rules.year_to != null && !rules.published_to)
+			rules.published_to = `${String(rules.year_to).padStart(4, '0')}-12-31`;
+		if (rules.year_from != null || rules.year_to != null) {
+			rules.year_from = null;
+			rules.year_to = null;
+		}
+	});
+
 	/** Empty fields: no rule. */
 	function number(value: string): number | null {
 		const parsed = Number.parseInt(value, 10);
@@ -100,27 +112,21 @@
 
 	<div class="row">
 		<span class="name">Published</span>
-		<div class="years">
+		<div class="dates">
 			<label
 				>from <input
-					type="number"
-					inputmode="numeric"
-					min="0"
-					max="9999"
-					placeholder="any"
-					value={rules.year_from ?? ''}
-					oninput={(event) => (rules.year_from = number(event.currentTarget.value))}
+					type="date"
+					max={rules.published_to ?? undefined}
+					value={rules.published_from ?? ''}
+					oninput={(event) => (rules.published_from = event.currentTarget.value || null)}
 				/></label
 			>
 			<label
 				>to <input
-					type="number"
-					inputmode="numeric"
-					min="0"
-					max="9999"
-					placeholder="any"
-					value={rules.year_to ?? ''}
-					oninput={(event) => (rules.year_to = number(event.currentTarget.value))}
+					type="date"
+					min={rules.published_from ?? undefined}
+					value={rules.published_to ?? ''}
+					oninput={(event) => (rules.published_to = event.currentTarget.value || null)}
 				/></label
 			>
 		</div>
@@ -163,6 +169,8 @@
 	.rules {
 		display: grid;
 		gap: 12px;
+		/* A fieldset is otherwise as wide as its longest line (phones). */
+		min-width: 0;
 		margin: 0;
 		padding: 12px 14px;
 		border: 1px solid var(--rule);
@@ -175,6 +183,7 @@
 	}
 	.row {
 		display: grid;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 6px;
 	}
 	.name {
@@ -212,6 +221,8 @@
 	.chips select {
 		width: auto;
 		min-width: 9rem;
+		/* Long tag names would widen the dialog past a phone's screen. */
+		max-width: 100%;
 	}
 	.check {
 		display: inline-flex;
@@ -223,7 +234,7 @@
 		width: auto;
 		margin: 0;
 	}
-	.years,
+	.dates,
 	.days {
 		display: flex;
 		flex-wrap: wrap;
@@ -231,10 +242,14 @@
 		gap: 8px;
 		font-weight: 400;
 	}
-	.years label {
+	.dates label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+	}
+	input[type='date'] {
+		width: auto;
+		max-width: 11rem;
 	}
 	input[type='number'] {
 		width: 6.5rem;
