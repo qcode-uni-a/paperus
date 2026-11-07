@@ -1,21 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.0.12 (2026-11-07)
 
-- **Similar papers**: a paper's page lists the papers closest to it in
-  meaning (by their full text), under "Similar papers"; AI assistants
-  get the same with `find_similar`.
+AI assistants on the web connect by signing in (claude.ai, ChatGPT),
+preprints find their published versions, papers can be archived, and a
+paper's page shows the papers most like it.
+
 - **Connect claude.ai, ChatGPT and other connectors** with OAuth: add
   `https://<server>/mcp` as a custom connector, log in to paperus and
   allow what it may do (reading only unless you tick changes). Settings →
   Connected apps lists them and disconnects them. Tokens last an hour and
   renew themselves; paperus follows the MCP authorization specification
   (dynamic client registration, PKCE).
-- **Archive**: papers kept for good, but left out of the library, search
-  and Manage (a paper's menu → Archive; for everyone who sees it, like
-  the trash). Manage → Archive lists them; search can include them
-  ("Include archived papers" in the search options). AI assistants:
-  `archive_papers`, and `archived` for `search` and `list_documents`.
 - **Published versions of preprints**, found by themselves: every hour a
   few dozen preprints are looked up at arXiv (the DOI the authors entered)
   and OpenAlex; a published version found is added (only if its title
@@ -23,6 +19,14 @@
   55 of 130 preprints got theirs. Administration → Server → Published
   versions (on by default); Jobs → "Look for published versions" starts
   it at once. With open-access copies on, the journal's PDF is tried too.
+- **Archive**: papers kept for good, but left out of the library, search
+  and Manage (a paper's menu → Archive; for everyone who sees it, like
+  the trash). Manage → Archive lists them; search can include them
+  ("Include archived papers" in the search options). AI assistants:
+  `archive_papers`, and `archived` for `search` and `list_documents`.
+- **Similar papers**: a paper's page lists the papers closest to it in
+  meaning (by their full text), under "Similar papers"; AI assistants
+  get the same with `find_similar`.
 - Formulas in titles from Crossref (MathML) are kept as LaTeX (`$g$`)
   and typeset, instead of markup in the title.
 - A paper's page shows its image file (a photographed note, a scan),
