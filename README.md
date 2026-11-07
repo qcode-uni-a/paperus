@@ -35,15 +35,25 @@ by meaning takes 2–3 GB).
 1. Download [`deploy/compose.yaml`](deploy/compose.yaml) and
    [`deploy/example.env`](deploy/example.env) into a new folder; rename
    `example.env` to `.env`.
-2. In `.env`, set `DB_PASSWORD` and `ML_TOKEN` (e.g. `openssl rand -hex 32`),
-   and the folders for files, database, backups and models.
+2. In `.env`, set the folders for files, database, backups and models, and
+   `CONTACT_EMAIL` (metadata services ask for one). Random secrets for
+   `DB_PASSWORD` and `ML_TOKEN` in one go:
+   ```sh
+   sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(openssl rand -hex 16)/; s/^ML_TOKEN=.*/ML_TOKEN=$(openssl rand -hex 32)/" .env
+   ```
 3. Put a reverse proxy with HTTPS in front of port 8000, on a (sub)domain of its
    own; examples for Caddy and nginx are in
    [operations](docs/operations.md#reverse-proxy).
 4. Start: `docker compose up -d`. The first start downloads the model (about
    2.3 GB).
 5. Open paperus in the browser: create the administrator account, or restore
-   a backup found in the backup folder (for moving to a new server).
+   a backup found in the backup folder (for moving to a new server). The
+   library page then lists the first steps: backups, adding people, the
+   browser extension, connecting an AI assistant.
+
+Just trying it out, without HTTPS? Open `http://localhost:8000` on the same
+machine; from another computer on the network, set `COOKIE_SECURE=false` in
+`.env` first (the login cookie is otherwise sent over HTTPS only).
 
 Back up from Administration → Backups (now, or daily or weekly), into
 `BACKUP_LOCATION` on another disk; restoring is described in

@@ -6,6 +6,7 @@
 	import { untrack } from 'svelte';
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import { organize } from '#lib/organize.svelte.ts';
+	import GettingStarted from '#lib/GettingStarted.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { shortAuthors } from '#lib/format.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -37,6 +38,8 @@
 	}
 
 	let items = $state<Item[]>([]);
+	/** The getting-started steps are shown (they say how to add papers). */
+	let starting = $state(false);
 	let more = $state(false);
 	// The search lives in the address (?q=…), typed in the top bar
 	// (SearchBar), so Back and links keep it.
@@ -174,6 +177,7 @@
 </script>
 
 <div class="library">
+	{#if !searched && !tagIds.length}<GettingStarted bind:shown={starting} />{/if}
 	{#if searched}
 		<div class="results-head row">
 			<h1 class="count">
@@ -242,6 +246,8 @@
 	{:else if items.length === 0 && tagIds.length}
 		{@render filterHead()}
 		<p class="muted">No items with these tags.</p>
+	{:else if items.length === 0 && starting}
+		<!-- The getting-started steps say how to add papers. -->
 	{:else if items.length === 0}
 		<div class="empty">
 			<h2>Nothing in the library yet</h2>

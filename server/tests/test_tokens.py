@@ -218,6 +218,7 @@ ROUTES = {
     ("POST", "/api/admin/users"): None,
     ("PATCH", "/api/admin/users/{user_id}"): None,
     ("PUT", "/api/auth/hints/{hint}"): None,
+    ("GET", "/api/me/getting-started"): None,
     ("POST", "/api/auth/login"): None,
     ("GET", "/api/auth/methods"): None,
     ("GET", "/api/auth/oidc/start"): None,

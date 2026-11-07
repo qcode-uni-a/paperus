@@ -2,7 +2,13 @@
 	import { goto } from '$app/navigation';
 	import { asset, resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { login as apiLogin, errorMessage, loginMethods, setupState } from '#lib/api/client.ts';
+	import {
+		login as apiLogin,
+		errorMessage,
+		loginMethods,
+		me,
+		setupState
+	} from '#lib/api/client.ts';
 	import type { LoginMethods } from '#lib/api/generated/types.gen.ts';
 	import { session } from '#lib/session.svelte.ts';
 
@@ -44,6 +50,13 @@
 		busy = false;
 		if (!data) {
 			error = response?.status === 403 ? errorMessage(failure) : 'Wrong username or password.';
+			return;
+		}
+		// The login cookie is HTTPS-only by default: over plain HTTP the
+		// browser drops it, and the next page would ask to log in again.
+		if (location.protocol === 'http:' && !(await me()).data) {
+			error =
+				'The password was right, but this browser did not keep the login: paperus is set to log in over HTTPS only. Open it through its https:// address, or, to try it on a local network, set COOKIE_SECURE=false in the server’s .env.';
 			return;
 		}
 		session.user = data.user;

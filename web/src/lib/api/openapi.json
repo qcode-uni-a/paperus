@@ -5798,6 +5798,28 @@
           }
         }
       }
+    },
+    "/api/me/getting-started": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Getting Started",
+        "description": "Which of the first steps the person has taken.",
+        "operationId": "getting_started",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GettingStarted"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6937,6 +6959,45 @@
           "wanted"
         ],
         "title": "FileWanted"
+      },
+      "GettingStarted": {
+        "properties": {
+          "papers": {
+            "type": "boolean",
+            "title": "Papers"
+          },
+          "imported": {
+            "type": "boolean",
+            "title": "Imported"
+          },
+          "extension": {
+            "type": "boolean",
+            "title": "Extension"
+          },
+          "assistant": {
+            "type": "boolean",
+            "title": "Assistant"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServerSteps"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "papers",
+          "imported",
+          "extension",
+          "assistant",
+          "server"
+        ],
+        "title": "GettingStarted"
       },
       "GroupChange": {
         "properties": {
@@ -9789,6 +9850,35 @@
         },
         "type": "object",
         "title": "Secret"
+      },
+      "ServerSteps": {
+        "properties": {
+          "backups": {
+            "type": "boolean",
+            "title": "Backups"
+          },
+          "contact_email": {
+            "type": "boolean",
+            "title": "Contact Email"
+          },
+          "search": {
+            "type": "boolean",
+            "title": "Search"
+          },
+          "people": {
+            "type": "boolean",
+            "title": "People"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backups",
+          "contact_email",
+          "search",
+          "people"
+        ],
+        "title": "ServerSteps",
+        "description": "What an administrator should set up before others rely on paperus."
       },
       "SetupState": {
         "properties": {

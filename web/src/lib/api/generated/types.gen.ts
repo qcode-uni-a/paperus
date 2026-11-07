@@ -677,6 +677,29 @@ export type FileWanted = {
 };
 
 /**
+ * GettingStarted
+ */
+export type GettingStarted = {
+    /**
+     * Papers
+     */
+    papers: boolean;
+    /**
+     * Imported
+     */
+    imported: boolean;
+    /**
+     * Extension
+     */
+    extension: boolean;
+    /**
+     * Assistant
+     */
+    assistant: boolean;
+    server: ServerSteps | null;
+};
+
+/**
  * GroupChange
  */
 export type GroupChange = {
@@ -2264,6 +2287,30 @@ export type Secret = {
      * Secret
      */
     secret?: string | null;
+};
+
+/**
+ * ServerSteps
+ *
+ * What an administrator should set up before others rely on paperus.
+ */
+export type ServerSteps = {
+    /**
+     * Backups
+     */
+    backups: boolean;
+    /**
+     * Contact Email
+     */
+    contact_email: boolean;
+    /**
+     * Search
+     */
+    search: boolean;
+    /**
+     * People
+     */
+    people: boolean;
 };
 
 /**
@@ -6679,3 +6726,19 @@ export type DisconnectAppResponses = {
 };
 
 export type DisconnectAppResponse = DisconnectAppResponses[keyof DisconnectAppResponses];
+
+export type GettingStartedData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/getting-started';
+};
+
+export type GettingStartedResponses = {
+    /**
+     * Successful Response
+     */
+    200: GettingStarted;
+};
+
+export type GettingStartedResponse = GettingStartedResponses[keyof GettingStartedResponses];

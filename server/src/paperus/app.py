@@ -33,6 +33,7 @@ from paperus.api import (
     organize,
     search,
     setup,
+    start,
     trash,
     users,
 )
@@ -120,6 +121,7 @@ def create_app(
     app.include_router(setup.router)
     app.include_router(token_api.router)
     app.include_router(oauth.router)
+    app.include_router(start.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:

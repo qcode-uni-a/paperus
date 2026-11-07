@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Getting started** on the library page: the first steps, each ticked
+  off once done (a paper added, a library imported, the browser extension
+  connected, an AI assistant connected), and for administrators what the
+  server still needs (backups on, a contact email, the machine learning
+  service answering, other people). Hide it any time.
+- **Logging in over plain HTTP** with the default HTTPS-only login cookie
+  now says so (and what to change), instead of returning to the login
+  page without a word.
 - **Postgres gets 1 GB of shared memory** (`shm_size` in compose; Docker
   gives 64 MB): enough for parallel queries and for building a vector
   index in parallel later. Only used while needed; takes effect when the
