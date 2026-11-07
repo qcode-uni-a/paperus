@@ -203,6 +203,14 @@
 					target="_blank"
 					rel="noopener">On an NVIDIA GPU</a
 				>).
+			{:else if admin.ml.service.device !== 'cuda'}
+				The ML service can also run on another machine, such as a workstation with an NVIDIA GPU
+				(see
+				<a
+					href="https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-another-machine"
+					target="_blank"
+					rel="noopener">On another machine</a
+				>).
 			{/if}
 		</p>
 	{/if}

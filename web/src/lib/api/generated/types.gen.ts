@@ -2378,6 +2378,10 @@ export type ServerSteps = {
      */
     people: boolean;
     gpu: GpuStep | null;
+    /**
+     * Ml Device
+     */
+    ml_device: 'cpu' | 'cuda' | null;
 };
 
 /**

@@ -7,6 +7,10 @@
   on the CPU, whether the machine has a suitable NVIDIA card and what to
   do: switch to the `-cuda` image, pass the GPU to its container, or
   install or update the driver (580 or newer; RTX 20xx generation on).
+- **The ML service on another machine**, e.g. a workstation with a GPU
+  while paperus stays on a small server: `ML_URLS` in `.env` (documented
+  under docs/operations.md, "On another machine"). On the CPU, Getting
+  started and the machine learning settings point there.
 
 - **Daily backups from the start**: a new server (or one where backups were
   never set up) backs up its database every night at 03:00 UTC and keeps

@@ -169,6 +169,47 @@ another name (`arctic-embed-m-v2@fp16`) and a switch between CPU and GPU
 re-embeds the library like a change of model (minutes on a GPU). All
 addresses in `PAPERUS_ML_URLS` should run on the same kind of hardware.
 
+### On another machine
+
+The ML service can run elsewhere, for example on a workstation with an
+NVIDIA GPU, while paperus stays on a small server: on the CPU, reading a
+large library for search by meaning takes hours, on a GPU minutes. On that
+machine, with Docker (and, for the GPU, the setup above), a `compose.yaml`
+with the ML service only:
+
+```yaml
+services:
+  ml:
+    image: ghcr.io/qcode-uni-a/paperus-ml:release-cuda  # or release (CPU)
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      PAPERUS_ML_TOKEN: the-same-ML_TOKEN-as-paperus
+    ports:
+      - "3003:3003"
+    volumes:
+      - ./model-cache:/cache
+    restart: unless-stopped
+```
+
+Then, in paperus' `.env`, its address, and `docker compose up -d`:
+
+```sh
+ML_URLS='["http://192.168.1.20:3003"]'
+```
+
+- The texts of the papers travel to it: keep it on a network you trust
+  (the same LAN, a VPN), or put it behind a reverse proxy with HTTPS and
+  use its `https://` address. The token keeps others from using it.
+- paperus' own `ml` container then has nothing to do; take it out of
+  `compose.yaml` to save its memory.
+- Several addresses (`["http://a:3003", "http://b:3003"]`) are tried in
+  order, so a second machine can stand in for the first; they should run
+  on the same kind of hardware (see above: CPU and GPU vectors differ).
+- Moving from a CPU to a GPU re-embeds the library once.
+- Administration → Server shows whether the service answers; Settings →
+  Machine learning, where it runs.
+
 ### OCR
 
 Scanned pages (PDF pages without text) and images are read by the ML

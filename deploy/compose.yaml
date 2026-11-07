@@ -5,7 +5,9 @@ name: paperus
 
 x-paperus-env: &paperus-env
   PAPERUS_DATABASE_URL: postgresql+psycopg://${DB_USERNAME}:${DB_PASSWORD}@db:5432/${DB_DATABASE_NAME}
-  PAPERUS_ML_URLS: '["http://ml:3003"]'
+  # The ML service: this file's own, or one on another machine (ML_URLS
+  # in .env; see docs/operations.md, "On another machine").
+  PAPERUS_ML_URLS: '${ML_URLS:-["http://ml:3003"]}'
   PAPERUS_ML_TOKEN: ${ML_TOKEN}
   PAPERUS_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
   PAPERUS_COOKIE_SECURE: ${COOKIE_SECURE:-true}

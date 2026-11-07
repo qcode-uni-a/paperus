@@ -9994,6 +9994,21 @@
                 "type": "null"
               }
             ]
+          },
+          "ml_device": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "cpu",
+                  "cuda"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ml Device"
           }
         },
         "type": "object",
@@ -10002,7 +10017,8 @@
           "contact_email",
           "search",
           "people",
-          "gpu"
+          "gpu",
+          "ml_device"
         ],
         "title": "ServerSteps",
         "description": "What an administrator should set up before others rely on paperus."

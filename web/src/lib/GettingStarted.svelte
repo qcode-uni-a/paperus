@@ -13,6 +13,8 @@
 	const EXTENSION_HELP = 'https://github.com/qcode-uni-a/paperus/tree/main/extension#readme';
 	const GPU_HELP =
 		'https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-an-nvidia-gpu';
+	const ELSEWHERE_HELP =
+		'https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-another-machine';
 
 	/** Whether the steps are shown (the page leaves out its own hint then). */
 	let { shown = $bindable(false) }: { shown?: boolean } = $props();
@@ -56,7 +58,7 @@
 					done: false,
 					title: 'Use the GPU for machine learning',
 					text: `${has}, but the ML service runs its CPU image. With the -cuda image, ${faster}.`,
-					links
+					links: [...links, [ELSEWHERE_HELP, 'Or on another machine']]
 				};
 			case 'pass_gpu':
 				return {
@@ -175,6 +177,14 @@
 		{#if server.length}
 			<h3>Your server</h3>
 			{@render list(server)}
+			{#if steps?.server?.ml_device === 'cpu' && !steps.server.gpu}
+				<p class="tip">
+					Machine learning runs on the CPU: fine for a small library, but reading a large one for
+					search by meaning takes hours. The ML service can also run on another machine, such as a
+					workstation with an NVIDIA GPU.
+					<a href={ELSEWHERE_HELP} target="_blank" rel="noopener">On another machine</a>
+				</p>
+			{/if}
 		{/if}
 	</section>
 {/if}
@@ -278,6 +288,12 @@
 		margin: 2px 0 0;
 		color: var(--muted);
 		overflow-wrap: anywhere;
+	}
+	.tip {
+		margin: 4px 0 12px;
+		padding-top: 10px;
+		border-top: 1px solid var(--rule);
+		font-size: var(--step--1);
 	}
 	.links {
 		display: flex;

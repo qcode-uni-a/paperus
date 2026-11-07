@@ -64,6 +64,7 @@ def test_the_servers_steps(client: TestClient, db: Session, fake_ml: FakeML) -> 
         "search": True,
         "people": False,
         "gpu": None,
+        "ml_device": "cpu",
     }
 
     response = root.put(
@@ -85,6 +86,7 @@ def test_the_servers_steps(client: TestClient, db: Session, fake_ml: FakeML) -> 
         "search": False,
         "people": True,
         "gpu": None,
+        "ml_device": None,
     }
 
 
@@ -114,6 +116,8 @@ def test_using_the_gpu(client: TestClient, db: Session, fake_ml: FakeML) -> None
     assert (step["done"], step["advice"], step["card"]) == (True, "in_use", RTX["name"])
     step = advice("cuda")
     assert step is not None and step["card"] == "an NVIDIA GPU"
+    server = root.get("/api/me/getting-started").json()["server"]
+    assert server["ml_device"] == "cuda"
     # The CPU image on a machine with a suitable card: the GPU image.
     step = advice(gpus=[RTX], driver=615, gpu_problem="no CUDA support")
     assert step is not None

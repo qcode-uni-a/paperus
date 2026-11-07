@@ -52,6 +52,8 @@ class ServerSteps(BaseModel):
     """Others can log in: more accounts, or OIDC login on."""
     gpu: GPUStep | None
     """Only where the machine has a suitable NVIDIA GPU (or uses one)."""
+    ml_device: Literal["cpu", "cuda"] | None
+    """Where the ML service runs its models; None if it does not answer."""
 
 
 class GettingStarted(BaseModel):
@@ -90,6 +92,7 @@ def getting_started(request: Request, db: DB, user: SessionUser) -> GettingStart
 def _server_steps(request: Request, db: DB) -> ServerSteps:
     config = system.load_config(db, request.app.state.settings)
     ml: MLClient = request.app.state.ml
+    state = _ml_state(ml)
     people = (
         db.scalar(
             select(func.count()).select_from(User).where(User.deactivated_at.is_(None))
@@ -101,15 +104,19 @@ def _server_steps(request: Request, db: DB) -> ServerSteps:
         contact_email=bool(config.contact_email),
         search=any(error is None for _, error in ml.status()),
         people=people > 1 or config.oidc_enabled,
-        gpu=_gpu_step(ml),
+        gpu=_gpu_step(state) if state else None,
+        ml_device=("cuda" if state.device == "cuda" else "cpu") if state else None,
     )
 
 
-def _gpu_step(ml: MLClient) -> GPUStep | None:
+def _ml_state(ml: MLClient) -> MLServiceState | None:
     try:
-        state = MLServiceState.model_validate(ml.service_config())
+        return MLServiceState.model_validate(ml.service_config())
     except (MLUnavailable, MLRejected, ValueError):
         return None
+
+
+def _gpu_step(state: MLServiceState) -> GPUStep | None:
     supported = [gpu.name for gpu in state.gpus if gpu.supported]
     if state.device == "cuda":
         names = supported or [gpu.name for gpu in state.gpus] or ["an NVIDIA GPU"]
