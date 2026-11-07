@@ -15,14 +15,16 @@ export function unique(prefix: string): string {
 export type Paper = { id: string; title: string; word: string };
 
 /** Uploads a PDF through Add → Upload files, opens it and waits until the
- * worker has read it (its embedded title replaces the file name). */
-export async function uploadPaper(page: Page, name: string): Promise<Paper> {
+ * worker has read it (its embedded title replaces the file name); ``more``:
+ * further pages, a list of lines each. */
+export async function uploadPaper(page: Page, name: string, more: string[][] = []): Promise<Paper> {
 	const word = unique(name.toLowerCase());
 	const title = `On the ${word} problem in end-to-end testing`;
 	const pdf = makePdf(
 		[
 			[title, 'A. Tester', '', `Abstract. We study the ${word} effect in libraries.`],
-			['Results', `The ${word} effect is real and measurable.`]
+			['Results', `The ${word} effect is real and measurable.`],
+			...more
 		],
 		title
 	);

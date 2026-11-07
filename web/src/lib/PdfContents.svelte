@@ -163,8 +163,11 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-		max-width: min(46ch, 52vw);
+		max-width: min(46ch, 100%);
 		padding: 3px 12px 3px 9px;
+	}
+	.toggle :global(svg) {
+		flex-shrink: 0;
 	}
 	.toggle.open {
 		background: var(--rail);
@@ -203,7 +206,11 @@
 		display: flex;
 		align-items: baseline;
 		gap: 12px;
-		width: 100%;
+		flex: 1 1 0;
+		min-width: 0;
+		/* Long names wrap within the panel. */
+		white-space: normal;
+		overflow-wrap: anywhere;
 		padding: 6px 10px;
 		border: none;
 		border-left: 3px solid transparent;

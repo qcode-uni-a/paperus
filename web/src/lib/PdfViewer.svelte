@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { mdiOpenInNew } from '@mdi/js';
+	import Icon from '#lib/Icon.svelte';
 	import 'pdfjs-dist/web/pdf_viewer.css';
 	import {
 		getDocument,
@@ -249,18 +251,28 @@
 				<span class="muted">{current} / {pdf.numPages}</span>
 			</div>
 			<div class="row">
-				<button
-					onclick={() => (zoomIndex = Math.max(0, zoomIndex - 1))}
-					disabled={zoomIndex === 0}
-					aria-label="Zoom out">−</button
+				<!-- Phones zoom by pinching. -->
+				<div class="row zoom">
+					<button
+						onclick={() => (zoomIndex = Math.max(0, zoomIndex - 1))}
+						disabled={zoomIndex === 0}
+						aria-label="Zoom out">−</button
+					>
+					<span class="muted">{Math.round(ZOOMS[zoomIndex] * 100)}%</span>
+					<button
+						onclick={() => (zoomIndex = Math.min(ZOOMS.length - 1, zoomIndex + 1))}
+						disabled={zoomIndex === ZOOMS.length - 1}
+						aria-label="Zoom in">+</button
+					>
+				</div>
+				<a
+					class="open"
+					href={url}
+					target="_blank"
+					rel="noreferrer"
+					title="Open the PDF in a new tab"
+					aria-label="Open the PDF in a new tab"><Icon path={mdiOpenInNew} size={20} /></a
 				>
-				<span class="muted">{Math.round(ZOOMS[zoomIndex] * 100)}%</span>
-				<button
-					onclick={() => (zoomIndex = Math.min(ZOOMS.length - 1, zoomIndex + 1))}
-					disabled={zoomIndex === ZOOMS.length - 1}
-					aria-label="Zoom in">+</button
-				>
-				<a href={url} target="_blank" rel="noreferrer">Open file</a>
 			</div>
 		</div>
 		<div class="pages">
@@ -299,7 +311,30 @@
 	.toolbar button {
 		padding: 2px 10px;
 	}
+	/* One line: the chapter's name takes what the rest leaves, cut with "…". */
+	.toolbar .row {
+		flex-wrap: nowrap;
+		white-space: nowrap;
+	}
+	.open {
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		color: var(--muted);
+	}
+	.open:hover {
+		color: var(--royal);
+		background: var(--rail);
+	}
+	@media (max-width: 720px) {
+		.zoom {
+			display: none;
+		}
+	}
 	.where {
+		flex: 1 1 auto;
 		min-width: 0;
 		gap: 12px;
 	}

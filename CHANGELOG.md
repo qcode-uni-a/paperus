@@ -9,7 +9,10 @@
   red. Without a contact email, it says that Unpaywall is not asked.
   AI assistants get the same reasons.
 - **Reading a paper**: no search bar at the top; the bar with the page
-  number sticks fully below the header (it was partly hidden).
+  number sticks fully below the header (it was partly hidden) and stays
+  one line, a long chapter name cut short with "…". "Open file" is an
+  icon; phones have no zoom buttons (they zoom by pinching). Long chapter
+  names wrap inside the contents instead of running off the screen.
 - **Back keeps your place**: going back from a paper to the library, a
   collection, Recent, Favourites or the Archive returns to where you were
   in the list, with as many papers loaded as before, instead of the top.
