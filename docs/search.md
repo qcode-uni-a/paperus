@@ -199,3 +199,43 @@ One question is 0.023. Compared question by question with the default:
 
 Not adopted yet: overlap (50–100 words) is the candidate, to be confirmed
 with real questions from the group, more of them vague and German.
+
+### Vector index (#37, 2026-11-07)
+
+Search by meaning compares the question with every visible passage's
+vector (exact). Measured with pgvector 0.8.7 in the development database
+(Ryzen 9 3900XT, Postgres defaults, up to 4 parallel workers): 341,650
+real passage vectors from the trials above (arctic-embed-m-v2, 768
+dimensions, `halfvec`), grown to a million with slightly varied copies;
+the 44 questions' vectors; the best 40 passages, as search takes them.
+"Filtered" keeps a tenth of the rows (one person's share of a large
+server). Recall is the share of the exact best 40 found.
+
+| passages | table | exact | exact, filtered | HNSW build | index |
+| -------- | ----- | ----- | --------------- | ---------- | ----- |
+| 100,000 | 156 MB | 27 ms | 19 ms | 34 s | 195 MB |
+| 300,000 | 469 MB | 69 ms | 49 ms | 106 s | 585 MB |
+| 1,000,000 | 1.6 GB | 241 ms | 177 ms | 9 min | 2.0 GB |
+
+HNSW (`m = 16`, `ef_construction = 64`), median time and recall by
+`hnsw.ef_search`; filtered with `hnsw.iterative_scan = relaxed_order`:
+
+| passages | ef 40 | ef 100 | ef 200 | ef 400 | filtered, ef 100 | filtered, ef 400 |
+| -------- | ----- | ------ | ------ | ------ | ---------------- | ---------------- |
+| 100,000 | 0.87, 2 ms | 0.94, 1 ms | 0.99, 2 ms | 1.00, 4 ms | 0.93, 6 ms | 0.95, 7 ms |
+| 300,000 | 0.82, 3 ms | 0.94, 3 ms | 0.97, 4 ms | 1.00, 6 ms | 0.93, 9 ms | 0.94, 9 ms |
+| 1,000,000 | 0.85, 4 ms | 0.95, 3 ms | 0.97, 5 ms | 0.97, 9 ms | 0.93, 11 ms | 0.95, 13 ms |
+
+- One physicist's 376 papers are 40,000 passages (about 100 a paper), so
+  exact search stays under a tenth of a second up to about 3,000 papers a
+  person can see, and a quarter second at 10,000. No index needed for a
+  group; for a department-sized server, HNSW is 20–50 times faster and
+  misses about 1 in 20 of the best 40 (the reranker then orders them).
+- The index is larger than the vectors (2 GB a million) and should fit
+  in memory. Built in one process it takes 9 minutes a million; Docker
+  gives Postgres only 64 MB of shared memory (`/dev/shm`), too little
+  for a parallel build (`shm_size` in compose would allow one).
+- Not yet built: search's query joins the passages a person can see
+  first, which an HNSW index cannot serve as it is; it would need to ask
+  the index for the nearest passages of one model and filter after
+  (iterative scan), with a partial index per model.
