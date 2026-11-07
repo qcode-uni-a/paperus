@@ -31,6 +31,7 @@ from paperus.api import (
     notes,
     oauth,
     organize,
+    references,
     search,
     setup,
     start,
@@ -105,6 +106,7 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(avatars.router)
     app.include_router(items.router)
+    app.include_router(references.router)
     app.include_router(files.router)
     app.include_router(search.router)
     app.include_router(citations.router)

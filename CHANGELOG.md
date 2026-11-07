@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **Reference lists**: each paper's page lists its references, found by
+  themselves in the background: from arXiv's LaTeX source for arXiv
+  papers, else from Crossref by the DOI, else read from the PDF. References
+  that are in your library link to them; others have their DOI or arXiv
+  link and an Import button (or Import all, into a collection named after
+  the paper); text-only ones a Find button that looks them up on Crossref.
+  "Cited by" shows which papers in your library cite the one you are
+  reading. AI assistants read both (`get_references`, `cited_by`). Switch
+  under Administration → Settings → Server. References a publisher
+  deposited as bare DOIs get their title, authors and journal from
+  OpenAlex.
+- **Contents of a PDF** in the viewer: a Contents button names the chapter
+  being read and opens the chapters, foldable, from the PDF's bookmarks or
+  else its headings; a click jumps there.
+- BibTeX files that start with an Emacs-style `@Comment` line (no braces)
+  are read again; they failed before.
+
 - **Keywords kept apart from tags**: what came with a paper's details
   (Zotero's automatic tags such as arXiv categories and publishers'
   subjects; Mendeley's author keywords) is imported as the paper's

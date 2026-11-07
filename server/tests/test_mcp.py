@@ -121,6 +121,8 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "list_collections",
         "list_documents",
         "find_similar",
+        "get_references",
+        "cited_by",
         "list_tags",
         "add_tags",
         "add_document",

@@ -95,7 +95,7 @@
 	const rate = $derived(perMinute(history.samples, Date.now()));
 
 	async function run(
-		job: 'text' | 'embeddings' | 'ocr' | 'published' | 'text-all' | 'text-failed'
+		job: 'text' | 'embeddings' | 'ocr' | 'published' | 'references' | 'text-all' | 'text-failed'
 	) {
 		if (
 			job === 'text-all' &&
@@ -203,6 +203,11 @@
 						onclick={() => run('published')}
 						title="Ask arXiv and OpenAlex for the published versions of preprints (a few dozen at a time)"
 						>Look for published versions</button
+					>
+					<button
+						onclick={() => run('references')}
+						title="Find papers' reference lists: arXiv's LaTeX sources, Crossref, the PDFs (a few dozen at a time)"
+						>Look for reference lists</button
 					>
 					<button onclick={() => run('text-all')}>Read all files again</button>
 				</div>

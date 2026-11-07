@@ -278,6 +278,17 @@ def _find_identifiers(
     return doi, arxiv
 
 
+_TEXT_URL = re.compile(r"https?://[^\s\"<>{}]+", re.IGNORECASE)
+
+
+def identifiers_in(text: str) -> tuple[str | None, str | None, str | None]:
+    """The first DOI, arXiv ID and other link in a reference's plain text
+    (e.g. one read from a PDF)."""
+    links = [m.group().rstrip(".,;:)]}'") for m in _TEXT_URL.finditer(text)]
+    doi, arxiv = _find_identifiers(links, text)
+    return doi, arxiv, _url(links)
+
+
 def _url(links: list[str]) -> str | None:
     """A link that is not a DOI's or arXiv's (those become identifiers)."""
     for link in links:

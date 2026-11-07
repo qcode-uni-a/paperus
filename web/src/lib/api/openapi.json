@@ -1581,6 +1581,254 @@
         }
       }
     },
+    "/api/items/{item_id}/references": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "List References",
+        "description": "The paper's reference list, each reference with the paper in the\nlibrary that has its DOI or arXiv ID (if the person can see one).",
+        "operationId": "list_references",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/cited-by": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "List Citing",
+        "description": "Papers the person can see whose reference lists have this paper (by\nits DOI or arXiv ID); not those in the trash or archive.",
+        "operationId": "list_citing",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemOut"
+                  },
+                  "title": "Response List Citing"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/references/{position}/find": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Find Reference",
+        "description": "Look a reference without DOI or arXiv ID up on Crossref; taken only\nif the match is certain (its first author, and its title or year,\nvolume and page, in the reference), else 422.",
+        "operationId": "find_reference",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Position"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/references/refresh": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Refresh References",
+        "description": "Look for the paper's reference list again now, in the background\n(``checked_at`` changes when done).",
+        "operationId": "refresh_references",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/references/import": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Import References",
+        "description": "Add the paper's references that have a DOI or arXiv ID, as an import\n(followed under ``/api/imports``) into a collection \"References of \u2026\";\nthose already in the library go into it too. New papers belong to\n``library_id`` (default: the person's default owner).",
+        "operationId": "import_references",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "library_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads/{sha256}": {
       "get": {
         "tags": [
@@ -3717,7 +3965,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again), ``ocr`` (read scans waiting\nfor OCR), ``published`` (look for preprints' published versions),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again), ``ocr`` (read scans waiting\nfor OCR), ``published`` (look for preprints' published versions),\n``references`` (look for papers' reference lists),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -9747,6 +9995,165 @@
         ],
         "title": "Redirect"
       },
+      "ReferenceOut": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "authors": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authors"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "container": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "arxiv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arxiv"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "text",
+          "title",
+          "authors",
+          "year",
+          "container",
+          "doi",
+          "arxiv",
+          "url",
+          "item"
+        ],
+        "title": "ReferenceOut"
+      },
+      "ReferencesOut": {
+        "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "arxiv",
+                  "crossref",
+                  "pdf"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "references": {
+            "items": {
+              "$ref": "#/components/schemas/ReferenceOut"
+            },
+            "type": "array",
+            "title": "References"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "checked_at",
+          "references"
+        ],
+        "title": "ReferencesOut"
+      },
       "RemovedTags": {
         "properties": {
           "links": {
@@ -10501,6 +10908,11 @@
           "find_published": {
             "type": "boolean",
             "title": "Find Published",
+            "default": true
+          },
+          "find_references": {
+            "type": "boolean",
+            "title": "Find References",
             "default": true
           },
           "open_access_auto": {

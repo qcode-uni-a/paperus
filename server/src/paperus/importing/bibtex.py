@@ -95,8 +95,11 @@ def read(text: str) -> Export:
 
 
 def _without_comments(text: str) -> str:
-    """pybtex reads @Comment blocks as entries in some versions."""
-    return re.sub(r"@comment\s*\{jabref-meta:.*?\n\}", "", text, flags=re.I | re.S)
+    """pybtex reads @Comment blocks as entries in some versions, and fails
+    on a one-line ``@Comment`` without braces (Emacs's bibtex-mode writes
+    them; BibTeX skips them)."""
+    text = re.sub(r"@comment\s*\{jabref-meta:.*?\n\}", "", text, flags=re.I | re.S)
+    return re.sub(r"^[ \t]*@comment(?![ \t]*[{(]).*$", "", text, flags=re.I | re.M)
 
 
 def _parse_leniently(text: str, export: Export) -> BibliographyData | None:

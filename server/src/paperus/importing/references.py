@@ -43,7 +43,7 @@ def complete(
 ) -> None:
     """Metadata for the export's references (none looked up without
     ``http``); references still unknown are dropped and listed as problems."""
-    pacer = _Pacer(PAUSE if pause is None else pause)
+    pacer = Pacer(PAUSE if pause is None else pause)
     kept = []
     for paper in export.papers:
         if not isinstance(paper, Reference):
@@ -72,8 +72,9 @@ def short(text: str) -> str:
     return text[:SHORT].rsplit(" ", 1)[0] + " …"
 
 
-class _Pacer:
-    """Waits between requests (not before the first)."""
+class Pacer:
+    """Waits between requests (not before the first); one per service, so
+    requests to it keep their distance."""
 
     def __init__(self, pause: float) -> None:
         self.pause = pause
@@ -85,7 +86,7 @@ class _Pacer:
         self.last = time.monotonic()
 
 
-def _complete(paper: Reference, http: httpx2.Client, pacer: _Pacer) -> None:
+def _complete(paper: Reference, http: httpx2.Client, pacer: Pacer) -> None:
     dois = [v for s, v in paper.identifiers if s == Scheme.DOI]
     dois += [f"10.48550/arxiv.{v}" for s, v in paper.identifiers if s == Scheme.ARXIV]
     for doi in dict.fromkeys(dois):
@@ -135,7 +136,7 @@ def search_crossref(http: httpx2.Client, text: str) -> dict[str, Any] | None:
             params={
                 "query.bibliographic": text[:1000],
                 "rows": 1,
-                "select": "DOI,title,author,issued,volume,page,score",
+                "select": "DOI,title,author,issued,container-title,volume,page,score",
             },
             timeout=30,
         )

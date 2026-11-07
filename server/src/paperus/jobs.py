@@ -10,6 +10,7 @@ import logging
 import signal
 import uuid
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -17,10 +18,21 @@ import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
 from procrastinate.exceptions import AlreadyEnqueued
 from procrastinate.types import JSONValue
-from sqlalchemy import Engine, func, make_url, select
+from sqlalchemy import Engine, exists, func, make_url, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import auth, integrity, missing, ocr, published, readable, system, trash
+from paperus import (
+    auth,
+    integrity,
+    item_references,
+    missing,
+    ocr,
+    published,
+    readable,
+    system,
+    trash,
+)
+from paperus.access import Access
 from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -30,10 +42,13 @@ from paperus.embedding import (
     files_missing_embeddings,
     notes_missing_embeddings,
 )
-from paperus.importing.run import run_import
+from paperus.importing import Export
+from paperus.importing.apply import Files as FileSource
+from paperus.importing.references import complete
+from paperus.importing.run import run_export, run_import
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLRejected, MLUnavailable, make_ml_client
-from paperus.models import Import, ImportStatus, Item
+from paperus.models import File, FileChunk, Import, ImportStatus, Item, User, Version
 from paperus.processing import pending_files, process_file
 from paperus.storage import BlobStore, make_blob_store
 from paperus.system import (
@@ -99,9 +114,28 @@ def extract_text(job: JobContext, file_id: str) -> None:
         scans = process_file(
             db, context.blobs, uuid.UUID(file_id), context.http, ocr=config.ocr
         )
+        # A paper without reference list: never looked at, or its file has one.
+        item_id = db.scalar(
+            select(Version.item_id)
+            .join(File)
+            .join(Item, Item.id == Version.item_id)
+            .where(
+                File.id == uuid.UUID(file_id),
+                Item.references_source.is_(None),
+                or_(
+                    Item.references_checked_at.is_(None),
+                    exists().where(
+                        FileChunk.file_id == File.id, FileChunk.in_references
+                    ),
+                ),
+            )
+        )
     queue_embedding(job.app, uuid.UUID(file_id))
     if scans:
         queue_ocr(job.app, uuid.UUID(file_id))
+    if item_id is not None and config.find_references:
+        # Its PDF may have the reference list the paper has none of yet.
+        queue_references(job.app, item_id)
 
 
 # Scanned pages, one file at a time (a few seconds per page on a CPU), in a
@@ -315,6 +349,69 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
 
 def queue_published_check(app: App) -> None:
     _queue(app, "find_published_versions", "find-published", timestamp=0)
+
+
+# Papers' reference lists (Administration → Settings → Server). One job at a
+# time (the lock), so the pauses between requests to arXiv hold.
+REFERENCES_LOCK = "find-references"
+
+
+@tasks.periodic(cron="40 * * * *")
+@tasks.task(
+    name="find_reference_lists",
+    queue="text",
+    lock=REFERENCES_LOCK,
+    queueing_lock="find-reference-lists",
+    pass_context=True,
+)
+def find_reference_lists(job: JobContext, timestamp: int) -> None:
+    """A few dozen papers an hour, never looked at first: their reference
+    lists from arXiv, Crossref or their PDFs (``paperus.item_references``)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.find_references:
+            return
+        looked, found = item_references.check_waiting(
+            db, context.http, contact_email=config.contact_email
+        )
+    log.info("reference lists: %d found for %d papers", found, looked)
+
+
+@tasks.task(
+    name="find_item_references",
+    queue="text",
+    lock=REFERENCES_LOCK,
+    pass_context=True,
+)
+def find_item_references(job: JobContext, item_id: str, again: bool = False) -> None:
+    """One paper's reference list: after its file was read (if it has none
+    yet, and the setting is on), or ``again`` when someone asks."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        item = db.get(Item, uuid.UUID(item_id))
+        if item is None or not (
+            again or (config.find_references and item.references_source is None)
+        ):
+            return
+        item_references.check(
+            db, context.http, item, contact_email=config.contact_email
+        )
+
+
+def queue_reference_lists(app: App) -> None:
+    _queue(app, "find_reference_lists", "find-reference-lists", timestamp=0)
+
+
+def queue_references(app: App, item_id: uuid.UUID, *, again: bool = False) -> None:
+    _queue(
+        app,
+        "find_item_references",
+        f"references-{item_id}",
+        item_id=str(item_id),
+        again=again,
+    )
 
 
 # Administration → Settings → Server: open-access copies by themselves.
@@ -666,6 +763,46 @@ def import_library(job: JobContext, import_id: str) -> None:
                 file_added=lambda file_id: queue_text_extraction(job.app, file_id),
                 http=context.http,
             )
+
+
+@tasks.task(name="import_references", queue="import", pass_context=True)
+def import_references(job: JobContext, import_id: str, item_id: str) -> None:
+    """Add a paper's references that have a DOI or arXiv ID (``Import all``
+    on its page), as an import into a collection named after it."""
+    context = _worker_context()
+    with context.sessions() as db:
+        record = db.get(Import, uuid.UUID(import_id))
+        if record is None or record.status not in (
+            ImportStatus.WAITING,
+            ImportStatus.RUNNING,
+        ):
+            return
+
+        def read() -> AbstractContextManager[tuple[Export, FileSource]]:
+            # run_export has checked that the person is there and may log in.
+            return item_references.reading_for_import(
+                db,
+                Access.of(db, db.get_one(User, record.user_id)),
+                uuid.UUID(item_id),
+                lambda export: complete(export, context.http),
+            )
+
+        run_export(
+            db,
+            context.blobs,
+            record,
+            read,
+            max_file_bytes=max_upload_bytes(db, context.settings),
+        )
+
+
+def queue_reference_import(
+    app: App, import_id: uuid.UUID, owner: uuid.UUID, item_id: uuid.UUID
+) -> None:
+    """Like other imports, one after another per owner."""
+    app.configure_task("paperus:import_references", lock=f"import-{owner}").defer(
+        import_id=str(import_id), item_id=str(item_id)
+    )
 
 
 def queue_import(app: App, import_id: uuid.UUID, owner: uuid.UUID) -> None:

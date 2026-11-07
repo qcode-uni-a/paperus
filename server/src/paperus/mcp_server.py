@@ -29,7 +29,16 @@ from mcp_types import (
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from paperus import __version__, citations, library, mcp_manage, notes, organize, tokens
+from paperus import (
+    __version__,
+    citations,
+    item_references,
+    library,
+    mcp_manage,
+    notes,
+    organize,
+    tokens,
+)
 from paperus.access import Access, Forbidden, NotVisible
 from paperus.api.citations import export_items, render
 from paperus.api.items import ItemIn, add_or_find
@@ -581,6 +590,55 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
             )
 
     @mcp.tool(annotations=READ)
+    def get_references(paper_id: str, ctx: Context) -> CallToolResult:
+        """A paper's reference list, in order. Each reference has `kind`:
+        "paper" (in the library: its `paper_id` and `link`), "link" (not in
+        the library: its `doi`, `arxiv` or `url`; adding it needs the
+        person's yes) or "text" (nothing recognised). `source` says where
+        the list came from (arXiv's LaTeX source, Crossref, or read from
+        the PDF); missing, with no references, while none is found."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            item = find_paper(db, access, paper_id)
+            references = []
+            for row, other in item_references.references_of(db, access, item):
+                entry: dict[str, Any] = {
+                    "position": row.position,
+                    "text": row.text,
+                    "title": row.title,
+                    "year": row.year,
+                    "doi": row.doi,
+                    "arxiv": row.arxiv,
+                    "url": row.url,
+                }
+                if other is not None:
+                    entry |= {
+                        "kind": "paper",
+                        "paper_id": str(other.id),
+                        "title": other.title,
+                        "link": _link(base, other.id, None),
+                    }
+                else:
+                    entry["kind"] = (
+                        "link" if row.doi or row.arxiv or row.url else "text"
+                    )
+                references.append(entry)
+            return _json({"source": item.references_source, "references": references})
+
+    @mcp.tool(annotations=READ)
+    def cited_by(paper_id: str, ctx: Context) -> CallToolResult:
+        """Papers in the library whose reference lists have this paper (by
+        its DOI or arXiv ID), newest first: who here builds on it. Only
+        papers whose reference lists were found count."""
+        with acting(ctx, Scope.PAPERS_READ) as (db, access, base):
+            item = find_paper(db, access, paper_id)
+            return _json(
+                [
+                    _brief(other, access, base)
+                    for other in item_references.citing(db, access, item)
+                ]
+            )
+
+    @mcp.tool(annotations=READ)
     def list_tags(ctx: Context) -> CallToolResult:
         """The tags the person can see (their own and their groups').
         `keyword`: only one of the papers' keywords (from their details on
@@ -811,6 +869,8 @@ TOOL_SCOPES = {
     "list_collections": Scope.PAPERS_READ,
     "list_documents": Scope.PAPERS_READ,
     "find_similar": Scope.PAPERS_READ,
+    "get_references": Scope.PAPERS_READ,
+    "cited_by": Scope.PAPERS_READ,
     "list_tags": Scope.PAPERS_READ,
     "add_tags": Scope.TAGS_WRITE,
     "add_document": Scope.PAPERS_WRITE,

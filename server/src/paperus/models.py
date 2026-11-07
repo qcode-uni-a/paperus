@@ -367,6 +367,13 @@ class Item(Record, Trashable, Base):
     """A preprint: when paperus last looked for its published version."""
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Kept for good, but left out of lists and search unless asked for."""
+    references_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    """When paperus last looked for the paper's reference list."""
+    references_source: Mapped[str | None] = mapped_column(String(16))
+    """Where its reference list came from (``arxiv``, ``crossref``, ``pdf``);
+    None: none found (yet)."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )
@@ -396,6 +403,30 @@ class Item(Record, Trashable, Base):
         cascade="all, delete-orphan", lazy="selectin"
     )
     """Who starred it (lists show each person only their own star)."""
+
+
+class ItemReference(Base):
+    """One entry of a paper's reference list (see ``paperus.item_references``),
+    with the identifiers found in it, normalized like ``Identifier``'s."""
+
+    __tablename__ = "item_references"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(Integer, primary_key=True)
+    """From 1, in the order of the list."""
+    text: Mapped[str]
+    """The reference as printed, without LaTeX."""
+    title: Mapped[str | None]
+    authors: Mapped[str | None]
+    """Short: "Smith et al.", "Smith and Jones"."""
+    year: Mapped[int | None]
+    container: Mapped[str | None]
+    """The journal or book it appeared in."""
+    doi: Mapped[str | None] = mapped_column(index=True)
+    arxiv: Mapped[str | None] = mapped_column(index=True)
+    url: Mapped[str | None]
 
 
 class ItemView(Base):

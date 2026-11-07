@@ -53,6 +53,9 @@ class SystemConfig(BaseModel):
     find_published: bool = True
     """Look for the published versions of preprints (by their arXiv IDs, at
     arXiv and OpenAlex) and add those found; a few dozen papers an hour."""
+    find_references: bool = True
+    """Look for papers' reference lists (arXiv's LaTeX sources, Crossref,
+    the PDF's own list); a few dozen papers an hour."""
     open_access_auto: bool = False
     """Papers added without a file get an open-access copy by themselves, in
     the background: their arXiv version (found via OpenAlex), else one

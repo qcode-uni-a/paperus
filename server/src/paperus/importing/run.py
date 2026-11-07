@@ -18,7 +18,7 @@ import uuid
 import zipfile
 import zlib
 from collections.abc import Callable, Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -322,6 +322,17 @@ def _latex(members: list[tuple[str, str]]) -> Opened:
     )
 
 
+def read_opened(opened: Opened) -> Export:
+    """The export in what was opened; of a LaTeX source's .bib only the
+    entries it cites."""
+    export = READERS[opened.format](opened.text)
+    if opened.cited is not None:
+        export.papers = [
+            p for p in export.papers if p.source_key.lower() in opened.cited
+        ]
+    return export
+
+
 # arXiv's names: "arXiv:2401.12345" (imports by arXiv ID), "2401.12345v2.tar.gz".
 _ARXIV_NAME = re.compile(
     r"^(?:arxiv[:_ -]?)?(\d{4}\.\d{4,5}(?:v\d+)?|[a-z-]+(?:\.[A-Z]{2})?/\d{7}(?:v\d+)?)"
@@ -368,6 +379,48 @@ def run_import(
 ) -> None:
     """Run the import described by ``record`` from the export at ``path``;
     with ``http``, references from LaTeX sources are looked up online."""
+
+    @contextmanager
+    def read() -> Generator[tuple[Export, FileSource]]:
+        with open_upload(path, record.filename) as opened:
+            record.format = opened.format
+            db.commit()  # the format shows while references are looked up
+            export = read_opened(opened)
+            if opened.format == "bbl":
+                references.complete(export, http)
+            if opened.latex and export.papers:
+                into_collection(export, _collection_name(opened, record.filename, http))
+            yield export, opened.files
+
+    run_export(
+        db,
+        blobs,
+        record,
+        read,
+        max_file_bytes=max_file_bytes,
+        file_added=file_added,
+    )
+
+
+def into_collection(export: Export, name: str) -> None:
+    """All the export's papers into a new collection of this name."""
+    collection = (name,)
+    export.collections.append(collection)
+    for paper in export.papers:
+        paper.collections.append(collection)
+
+
+def run_export(
+    db: Session,
+    blobs: BlobStore,
+    record: Import,
+    read: Callable[[], AbstractContextManager[tuple[Export, FileSource]]],
+    *,
+    max_file_bytes: int,
+    file_added: Callable[[uuid.UUID], None] = lambda file_id: None,
+) -> None:
+    """Add what ``read`` gives (an export and its files) for the person who
+    started the import, keeping ``record`` up to date."""
     record.status = ImportStatus.RUNNING
     db.commit()
     user = db.get(User, record.user_id)
@@ -375,21 +428,7 @@ def run_import(
         if user is None or user.deactivated_at is not None:
             raise NotAnExport("The person who started the import cannot log in.")
         access = Access.of(db, user)
-        with open_upload(path, record.filename) as opened:
-            record.format = opened.format
-            db.commit()  # the format shows while references are looked up
-            export = READERS[opened.format](opened.text)
-            if opened.cited is not None:
-                export.papers = [
-                    p for p in export.papers if p.source_key.lower() in opened.cited
-                ]
-            if opened.format == "bbl":
-                references.complete(export, http)
-            if opened.latex and export.papers:
-                collection = (_collection_name(opened, record.filename, http),)
-                export.collections.append(collection)
-                for paper in export.papers:
-                    paper.collections.append(collection)
+        with read() as (export, files):
             record.total = len(export.papers) + len(export.notes)
             db.commit()
             row_id = record.id
@@ -407,7 +446,7 @@ def run_import(
                 blobs,
                 access,
                 export,
-                opened.files,
+                files,
                 owner=record.library_id,
                 max_file_bytes=max_file_bytes,
                 progress=progress,

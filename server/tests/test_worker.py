@@ -15,10 +15,12 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.orm import Session
 
-from paperus import integrity, jobs, ml, readable, system
+from paperus import integrity, item_references, jobs, ml, readable, system
 from paperus.backup import list_backups
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
+from paperus.importing.references import Pacer
+from paperus.item_references import Pacers
 from paperus.jobs import WorkerContext, tasks
 from paperus.models import (
     Embedding,
@@ -122,6 +124,8 @@ def worker(
         settings=settings,
     )
     monkeypatch.setattr(jobs, "_context", context)
+    # No pauses between requests to arXiv and Crossref.
+    monkeypatch.setattr(item_references, "PACERS", Pacers(Pacer(0), Pacer(0)))
     # The fake ML service changes between jobs: always asked anew.
     monkeypatch.setattr(ml, "VECTORS_TTL", 0)
     return job_app
@@ -195,6 +199,8 @@ def test_an_upload_is_read_scanned_and_embedded(
         "ocr_file succeeded": 1,
         "embed_file succeeded": 2,
         "embed_note succeeded": 1,
+        # A paper's file read: its reference list looked for.
+        "find_item_references succeeded": 1,
     }
     assert file_status(db, file_id) == (TextStatus.DONE, OcrStatus.DONE)
     assert len(fake_ml.read) == 1
@@ -215,6 +221,7 @@ def test_ocr_switched_off_and_on(
     assert run_jobs(worker) == {
         "extract_text succeeded": 1,
         "embed_file succeeded": 1,
+        "find_item_references succeeded": 1,
     }
     assert file_status(db, file_id) == (TextStatus.DONE, OcrStatus.SKIPPED)
     # The sweep, by hand, does nothing while OCR is off.
@@ -328,6 +335,7 @@ def test_open_access_copies_and_published_versions(
         "fetch_open_access succeeded": 1,
         "extract_text succeeded": 1,
         "embed_file succeeded": 1,
+        "find_item_references succeeded": 1,
     }
     [preprint] = ada.get(f"/api/items/{paper['id']}").json()["versions"]
     assert len(preprint["files"]) == 1
@@ -544,6 +552,7 @@ def test_jobs_of_a_stopped_worker_run_again(
         "tidy succeeded": 1,
         "extract_text succeeded": 1,
         "embed_file succeeded": 1,
+        "find_item_references succeeded": 1,
     }
     assert file_status(db, file_id) == (TextStatus.DONE, None)
 

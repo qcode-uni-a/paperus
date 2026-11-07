@@ -2186,6 +2186,67 @@ export type Redirect = {
 };
 
 /**
+ * ReferenceOut
+ */
+export type ReferenceOut = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Title
+     */
+    title: string | null;
+    /**
+     * Authors
+     */
+    authors: string | null;
+    /**
+     * Year
+     */
+    year: number | null;
+    /**
+     * Container
+     */
+    container: string | null;
+    /**
+     * Doi
+     */
+    doi: string | null;
+    /**
+     * Arxiv
+     */
+    arxiv: string | null;
+    /**
+     * Url
+     */
+    url: string | null;
+    item: ItemOut | null;
+};
+
+/**
+ * ReferencesOut
+ */
+export type ReferencesOut = {
+    /**
+     * Source
+     */
+    source: 'arxiv' | 'crossref' | 'pdf' | null;
+    /**
+     * Checked At
+     */
+    checked_at: string | null;
+    /**
+     * References
+     */
+    references: Array<ReferenceOut>;
+};
+
+/**
  * RemovedTags
  */
 export type RemovedTags = {
@@ -2621,6 +2682,10 @@ export type SystemConfig = {
      * Find Published
      */
     find_published?: boolean;
+    /**
+     * Find References
+     */
+    find_references?: boolean;
     /**
      * Open Access Auto
      */
@@ -4129,6 +4194,165 @@ export type MergeItemResponses = {
 };
 
 export type MergeItemResponse = MergeItemResponses[keyof MergeItemResponses];
+
+export type ListReferencesData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/references';
+};
+
+export type ListReferencesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListReferencesError = ListReferencesErrors[keyof ListReferencesErrors];
+
+export type ListReferencesResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReferencesOut;
+};
+
+export type ListReferencesResponse = ListReferencesResponses[keyof ListReferencesResponses];
+
+export type ListCitingData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/cited-by';
+};
+
+export type ListCitingErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListCitingError = ListCitingErrors[keyof ListCitingErrors];
+
+export type ListCitingResponses = {
+    /**
+     * Response List Citing
+     *
+     * Successful Response
+     */
+    200: Array<ItemOut>;
+};
+
+export type ListCitingResponse = ListCitingResponses[keyof ListCitingResponses];
+
+export type FindReferenceData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+        /**
+         * Position
+         */
+        position: number;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/references/{position}/find';
+};
+
+export type FindReferenceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FindReferenceError = FindReferenceErrors[keyof FindReferenceErrors];
+
+export type FindReferenceResponses = {
+    /**
+     * Successful Response
+     */
+    200: ReferenceOut;
+};
+
+export type FindReferenceResponse = FindReferenceResponses[keyof FindReferenceResponses];
+
+export type RefreshReferencesData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/references/refresh';
+};
+
+export type RefreshReferencesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RefreshReferencesError = RefreshReferencesErrors[keyof RefreshReferencesErrors];
+
+export type RefreshReferencesResponses = {
+    /**
+     * Successful Response
+     */
+    202: unknown;
+};
+
+export type ImportReferencesData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: {
+        /**
+         * Library Id
+         */
+        library_id?: string | null;
+    };
+    url: '/api/items/{item_id}/references/import';
+};
+
+export type ImportReferencesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ImportReferencesError = ImportReferencesErrors[keyof ImportReferencesErrors];
+
+export type ImportReferencesResponses = {
+    /**
+     * Successful Response
+     */
+    201: ImportOut;
+};
+
+export type ImportReferencesResponse = ImportReferencesResponses[keyof ImportReferencesResponses];
 
 export type FindUploadData = {
     body?: never;

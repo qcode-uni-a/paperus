@@ -135,6 +135,46 @@ suggestion with a confidence score, never added automatically.
   carried over to a newer version on request.
 - Internal drafts: private to authors or the group by default.
 
+### Reference lists of papers
+
+**Built** (`server/src/paperus/item_references.py`, Administration →
+Server → Reference lists, on by default): every hour up to 40 papers
+(never looked at first), and each paper right after its file is read, get
+their reference list, from the best source there is:
+
+1. a paper with an arXiv ID: arXiv's LaTeX source (one request to
+   `arxiv.org/e-print/`, at least 3 s apart), read as the import of LaTeX
+   sources reads it: the `.bbl`, else `thebibliography`, else the `.bib`
+   entries the `.tex` cites;
+2. a paper with a DOI: Crossref's record (`api.crossref.org/works/{doi}`),
+   with the references its publisher deposited (some deposit DOIs only);
+3. else the PDF's own list, from its stored text: split where references
+   are numbered (`[12]`, `12.`, AIP's `12A. Name`, counted up from 1),
+   else, best effort, where an author-year entry starts (`Smith, J.` after
+   the end of the one before). Not split: other layouts (initials first
+   without numbers, `1)`); a page's running head or footer may stay in a
+   reference.
+
+Only identifiers are taken in the background: DOIs, arXiv IDs and links
+in the references (no searching). A reference matches a paper the person
+can see by its DOI or arXiv ID (not in the trash; archived papers too,
+since adding them would find them). The paper's page lists the references:
+papers in the library as links, the others with their DOI or arXiv link
+and **Import** (adds it as Add → DOI does), text-only ones with **Find**
+(Crossref's search, taken only if certain, as in the LaTeX import);
+**Import all** adds every reference with an identifier into a collection
+"References of …", as an import. "Cited by" lists the papers whose
+references have the paper's DOI or arXiv ID. A paper without list is
+looked at again when it gets a version or file, or when someone asks
+("Look again"); a list found stays until one is found again.
+
+Checked on three papers of a physicist's library (2026-11-07): an arXiv
+paper with a `.bib` (376 references, 315 with a DOI or arXiv ID; the
+source's Emacs-style `@Comment` line first broke the BibTeX reader, now
+fixed), an APS paper via Crossref (50 references, 48 with DOIs, deposited
+without text), and an IOP paper's PDF (69 references, numbered, split
+right; IOP prints no DOIs, so 1 identifier: Find helps there).
+
 ## Other kinds of sources
 
 Everything is an item with a type and a source; same pipeline, no separate

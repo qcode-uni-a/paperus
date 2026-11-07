@@ -10,6 +10,7 @@
 	let uploadMb = $state(512);
 	let openAccess = $state(false);
 	let findPublished = $state(true);
+	let findReferences = $state(true);
 	let saving = $state(false);
 
 	function reset() {
@@ -18,6 +19,7 @@
 		uploadMb = config?.max_upload_mb ?? 512;
 		openAccess = config?.open_access_auto ?? false;
 		findPublished = config?.find_published ?? true;
+		findReferences = config?.find_references ?? true;
 	}
 	// The page reloads its data every few seconds: start over only when the
 	// saved values change (not while someone is typing).
@@ -29,7 +31,8 @@
 			config.contact_email,
 			config.max_upload_mb,
 			config.open_access_auto,
-			config.find_published
+			config.find_published,
+			config.find_references
 		]);
 		if (saved === seen) return;
 		seen = saved;
@@ -42,7 +45,8 @@
 				email !== (config.contact_email ?? '') ||
 				uploadMb !== config.max_upload_mb ||
 				openAccess !== (config.open_access_auto ?? false) ||
-				findPublished !== (config.find_published ?? true))
+				findPublished !== (config.find_published ?? true) ||
+				findReferences !== (config.find_references ?? true))
 	);
 
 	async function save() {
@@ -53,7 +57,8 @@
 				contact_email: email.trim() || null,
 				max_upload_mb: uploadMb,
 				open_access_auto: openAccess,
-				find_published: findPublished
+				find_published: findPublished,
+				find_references: findReferences
 			},
 			'Server settings'
 		);
@@ -82,6 +87,15 @@
 >
 	<label class="check"
 		><input id="find-published" type="checkbox" bind:checked={findPublished} /> Look for them</label
+	>
+</SettingRow>
+<SettingRow
+	id="find-references"
+	title="Reference lists"
+	description="Each paper's reference list, shown on its page with links to the papers in the library (and which papers here cite it): from arXiv's LaTeX source for arXiv papers, else from Crossref by the DOI, else read from the PDF. A few dozen papers an hour, and each paper once its file is read. Only DOIs and arXiv IDs are sent; looking a single reference up on Crossref is left to the person."
+>
+	<label class="check"
+		><input id="find-references" type="checkbox" bind:checked={findReferences} /> Look for them</label
 	>
 </SettingRow>
 <SettingRow

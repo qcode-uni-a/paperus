@@ -124,6 +124,19 @@ def test_bibtex_broken_entries() -> None:
     assert len(mixed.problems) == 2
 
 
+def test_bibtex_one_line_comments() -> None:
+    # Emacs's bibtex-mode starts files so; BibTeX skips such a line (a
+    # real arXiv source failed to import).
+    found = bibtex.read(
+        "@Comment -*- bibtex-align-at-equal-sign: t; fill-column: nil; -*-\n"
+        "@comment{kept apart}\n@string{PRL={Phys. Rev. Lett.}}\n"
+        "@article{a, title={Scaling theory}, journal=PRL, year={1979}}\n"
+    )
+    assert found.problems == []
+    [paper] = found.papers
+    assert paper.csl["container-title"] == "Phys. Rev. Lett."
+
+
 def test_bibtex_jabref_groups() -> None:
     export = bibtex.read(
         """@article{a, title={A}, groups={Inner, Elsewhere}}

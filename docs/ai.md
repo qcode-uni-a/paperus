@@ -25,7 +25,10 @@ person ticks changes. See "Connected apps" below. Tools: `search`
 abstracts), `get_abstracts`, `get_passage`, `get_document` (details with file download links, or text by
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 `list_collections`, `list_documents`, `find_similar` (papers closest in
-meaning, by the average of their passages' vectors), `list_tags`, `my_access` (who the
+meaning, by the average of their passages' vectors), `get_references` (a
+paper's reference list, each reference a `paper` in the library, a `link`
+(DOI, arXiv ID or URL) or `text`), `cited_by` (papers in the library whose
+reference lists have it), `list_tags`, `my_access` (who the
 token acts for, its rights and the tools they allow, groups with
 `groups.read`), `export_citations` (BibTeX or CSL-JSON); with write
 scopes `add_tags` and `add_document`. **Tidying** (what Manage does in the
