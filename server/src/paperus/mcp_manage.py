@@ -8,6 +8,7 @@ import re
 import uuid
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -74,6 +75,7 @@ TOOL_SCOPES = {
     "list_missing_pdfs": Scope.PAPERS_READ,
     "download_open_access": Scope.PAPERS_WRITE,
     "mark_file_not_needed": Scope.PAPERS_WRITE,
+    "archive_papers": Scope.PAPERS_WRITE,
     "remove_tags": Scope.TAGS_WRITE,
     "rename_tag": Scope.TAGS_WRITE,
     "create_collection": Scope.COLLECTIONS_WRITE,
@@ -239,6 +241,7 @@ def register(
                 .where(
                     access.item_filter(),
                     Item.deleted_at.is_(None),
+                    Item.archived_at.is_(None),
                     *unsorted_conditions(),
                 )
                 .order_by(Item.id.desc())
@@ -439,6 +442,23 @@ def register(
                 changed.append(str(item.id))
             db.commit()
             return json({"changed": changed, "file_needed": needed})
+
+    @mcp.tool(annotations=WRITE)
+    def archive_papers(
+        paper_ids: list[str], ctx: Context, archived: bool = True
+    ) -> CallToolResult:
+        """Put papers in the archive: kept, but left out of lists, search
+        and Manage (for everyone who sees them); archived=false takes them
+        out again. list_documents(archived=true) lists the archive."""
+        with acting(ctx, Scope.PAPERS_WRITE) as (db, access, _):
+            changed = []
+            for paper_id in paper_ids[:MAX_LIST]:
+                item = paper(db, access, paper_id, write=True)
+                if (item.archived_at is not None) != archived:
+                    item.archived_at = datetime.now(UTC) if archived else None
+                changed.append(str(item.id))
+            db.commit()
+            return json({"changed": changed, "archived": archived})
 
     # Tags
 

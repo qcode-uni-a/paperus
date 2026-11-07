@@ -535,7 +535,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead. ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them) and ``collection`` (with its subcollections unless\n``nested=false``) filter the list, and ``title`` to items with all of its\nwords in their title (any case). ``X-Total-Count`` is the number of\nmatching items, for showing the total while paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -575,6 +575,16 @@
               "type": "boolean",
               "default": false,
               "title": "Trashed"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           },
           {
@@ -1102,6 +1112,78 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/archive": {
+      "put": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Archive Item",
+        "description": "Put the paper in the archive: kept, but left out of lists and search\nunless asked for (for everyone who sees it).",
+        "operationId": "archive_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Unarchive Item",
+        "description": "Take the paper out of the archive.",
+        "operationId": "unarchive_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1925,7 +2007,7 @@
           "search"
         ],
         "summary": "Search",
-        "description": "Passages for ``q`` in the libraries the person can read (or one\n``library``): its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items.\n``per_item`` keeps the best few per paper or note, so more papers fit;\n``item`` searches within one paper. The ``X-Search-Mode`` header says\nwhat was used: without the ML service, hybrid search falls back to\nkeywords.",
+        "description": "Passages for ``q`` in the libraries the person can read (or one\n``library``): its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items.\n``per_item`` keeps the best few per paper or note, so more papers fit;\n``item`` searches within one paper; ``archived=true`` includes the\narchive. The ``X-Search-Mode`` header says\nwhat was used: without the ML service, hybrid search falls back to\nkeywords.",
         "operationId": "search",
         "parameters": [
           {
@@ -2035,6 +2117,16 @@
                 }
               ],
               "title": "Item"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
             }
           }
         ],
@@ -6896,6 +6988,18 @@
             ],
             "title": "Deleted At"
           },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
           "processing": {
             "type": "boolean",
             "title": "Processing"
@@ -7173,6 +7277,18 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
           },
           "processing": {
             "type": "boolean",

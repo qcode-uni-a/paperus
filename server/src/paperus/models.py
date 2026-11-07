@@ -309,6 +309,8 @@ class Item(Record, Trashable, Base):
         DateTime(timezone=True)
     )
     """A preprint: when paperus last looked for its published version."""
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """Kept for good, but left out of lists and search unless asked for."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )

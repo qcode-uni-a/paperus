@@ -6,6 +6,8 @@
 		words: boolean;
 		meaning: boolean;
 		types: string[];
+		/** Archived papers too. */
+		archived: boolean;
 	}
 
 	let { filters, onchange }: { filters: Filters; onchange: (next: Filters) => void } = $props();
@@ -17,7 +19,9 @@
 		if (open) return closeOnScroll(() => (open = false));
 	});
 
-	const changed = $derived(!filters.words || !filters.meaning || filters.types.length > 0);
+	const changed = $derived(
+		!filters.words || !filters.meaning || filters.types.length > 0 || filters.archived
+	);
 
 	/** At least one way of searching stays on. */
 	function toggleMethod(method: 'words' | 'meaning') {
@@ -34,7 +38,7 @@
 	}
 
 	function reset() {
-		onchange({ words: true, meaning: true, types: [] });
+		onchange({ words: true, meaning: true, types: [], archived: false });
 	}
 </script>
 
@@ -105,6 +109,18 @@
 					{/each}
 				</div>
 				<p class="hint">{filters.types.length ? 'Only the chosen types.' : 'All types.'}</p>
+			</fieldset>
+
+			<fieldset>
+				<legend>Archive</legend>
+				<div class="chips">
+					<button
+						class="chip small"
+						aria-pressed={filters.archived}
+						onclick={() => onchange({ ...filters, archived: !filters.archived })}
+						>Include archived papers</button
+					>
+				</div>
 			</fieldset>
 
 			<div class="foot">

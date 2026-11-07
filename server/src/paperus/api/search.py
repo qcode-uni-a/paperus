@@ -79,6 +79,8 @@ _SEARCH = text(
              JOIN versions v ON v.id = f.version_id
              JOIN items i ON i.id = v.item_id
         WHERE f.deleted_at IS NULL AND i.deleted_at IS NULL
+          -- The archive only if asked for (or within one of its papers).
+          AND (i.archived_at IS NULL OR :archived OR CAST(:item AS uuid) IS NOT NULL)
           -- Only libraries the person can read.
           AND i.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
@@ -191,11 +193,13 @@ def run_search(
     per_item: int | None = None,
     item_id: uuid.UUID | None = None,
     rerank: bool | None = None,
+    archived: bool = False,
 ) -> tuple[Mode, list[Passage]]:
     """Passages for ``q`` that the person may read, and the mode used
     (hybrid falls back to keywords without the ML service). ``per_item``:
     at most that many per paper or note (more candidates are looked at, so
     more papers fill the list); ``item_id``: within that paper only;
+    ``archived``: archived papers too;
     ``rerank``: overrides the administration's setting (for evaluating)."""
     started = time.perf_counter()
     config = load_config(db, settings)
@@ -228,6 +232,7 @@ def run_search(
                 "types": types or [],
                 "libraries": libraries,
                 "item": item_id,
+                "archived": archived,
                 "per_item": per_item or limit,
                 "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
             },
@@ -345,12 +350,14 @@ def search(
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
     per_item: Annotated[int | None, Query(ge=1, le=100)] = None,
     item: uuid.UUID | None = None,
+    archived: bool = False,
 ) -> list[Passage]:
     """Passages for ``q`` in the libraries the person can read (or one
     ``library``): its words (quotes for phrases, ``-`` to exclude), its
     meaning, or both; ``type`` (repeatable, CSL types) limits the items.
     ``per_item`` keeps the best few per paper or note, so more papers fit;
-    ``item`` searches within one paper. The ``X-Search-Mode`` header says
+    ``item`` searches within one paper; ``archived=true`` includes the
+    archive. The ``X-Search-Mode`` header says
     what was used: without the ML service, hybrid search falls back to
     keywords."""
     used, passages = run_search(
@@ -365,6 +372,7 @@ def search(
         library_id=library_id,
         per_item=per_item,
         item_id=item,
+        archived=archived,
     )
     response.headers["X-Search-Mode"] = used
     return passages

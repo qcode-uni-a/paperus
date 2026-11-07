@@ -29,7 +29,8 @@ needs looking at, with the tools for it), `list_duplicates`,
 `merge_papers`, `not_duplicates`, `list_unsorted` (with the beginning of
 each file's text, to recognise the paper), `set_doi`,
 `list_unreadable_files`, `retry_file`, `list_missing_pdfs`,
-`download_open_access`, `mark_file_not_needed`, `remove_tags`,
+`download_open_access`, `mark_file_not_needed`, `archive_papers`,
+`remove_tags`,
 `rename_tag` (merges into an existing tag of that name),
 `create_collection`, `add_to_collection`, `remove_from_collection`,
 `list_trash`, `restore_papers`. Not for AI assistants: groups and their

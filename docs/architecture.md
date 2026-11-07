@@ -185,6 +185,10 @@ The full list of who may do what is in [permissions](permissions.md).
 - **Trash**: deleting moves items and files to the trash (`deleted_at`);
   sync clients see that as a change. Emptying the trash later must leave
   tombstones (id + change number) so sync clients learn about it.
+- **Archive**: items kept for good but left out of lists, search and
+  Manage (`archived_at`), unless asked for (`archived=true`); listed by
+  id and searched within one paper as usual. Like the trash it is per
+  item, for everyone who sees it, and changing it needs write access.
 
 ## Scaling notes
 

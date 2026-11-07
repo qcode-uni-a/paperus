@@ -138,6 +138,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "list_missing_pdfs",
         "download_open_access",
         "mark_file_not_needed",
+        "archive_papers",
         "remove_tags",
         "rename_tag",
         "create_collection",

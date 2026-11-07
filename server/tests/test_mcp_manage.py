@@ -117,6 +117,13 @@ def test_missing_files_tags_and_collections(
     assert next(m for m in missing if m["title"] == "Floquet qubits")["doi"] == DOI
     ai.call("mark_file_not_needed", paper_ids=[page["id"]])
     assert [m["title"] for m in ai.call("list_missing_pdfs")] == ["Floquet qubits"]
+    # Archived: off every list until taken out again.
+    ai.call("archive_papers", paper_ids=[page["id"]], archived=False)
+    ai.call("archive_papers", paper_ids=[paper["paper_id"]])
+    assert ai.call("list_missing_pdfs") == []
+    listed = ai.call("list_documents", archived=True)["papers"]
+    assert [p["title"] for p in listed] == ["Floquet qubits"]
+    ai.call("archive_papers", paper_ids=[paper["paper_id"]], archived=False)
 
     # An unreadable file, read again.
     broken = ada.post(

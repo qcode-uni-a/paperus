@@ -792,6 +792,10 @@ export type ItemDetail = {
      */
     deleted_at: string | null;
     /**
+     * Archived At
+     */
+    archived_at?: string | null;
+    /**
      * Processing
      */
     processing: boolean;
@@ -929,6 +933,10 @@ export type ItemOut = {
      * Deleted At
      */
     deleted_at: string | null;
+    /**
+     * Archived At
+     */
+    archived_at?: string | null;
     /**
      * Processing
      */
@@ -3119,6 +3127,10 @@ export type ListItemsData = {
          */
         trashed?: boolean;
         /**
+         * Archived
+         */
+        archived?: boolean;
+        /**
          * Since
          */
         since?: number | null;
@@ -3431,6 +3443,66 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type UnarchiveItemData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/archive';
+};
+
+export type UnarchiveItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UnarchiveItemError = UnarchiveItemErrors[keyof UnarchiveItemErrors];
+
+export type UnarchiveItemResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UnarchiveItemResponse = UnarchiveItemResponses[keyof UnarchiveItemResponses];
+
+export type ArchiveItemData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/archive';
+};
+
+export type ArchiveItemErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ArchiveItemError = ArchiveItemErrors[keyof ArchiveItemErrors];
+
+export type ArchiveItemResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ArchiveItemResponse = ArchiveItemResponses[keyof ArchiveItemResponses];
 
 export type UnstarItemData = {
     body?: never;
@@ -4000,6 +4072,10 @@ export type SearchData = {
          * Item
          */
         item?: string | null;
+        /**
+         * Archived
+         */
+        archived?: boolean;
     };
     url: '/api/search';
 };

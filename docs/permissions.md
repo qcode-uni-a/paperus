@@ -37,6 +37,7 @@ because of it; they need a membership like everyone else.
 | See, search, open files | yes | yes | yes |
 | Change details, versions, files | yes | no | yes |
 | Move to the trash, restore | yes | no | yes |
+| Archive, take out of the archive | yes | no | yes |
 | Give to a group I may add to | yes | no | yes |
 | Take for myself | (already mine) | no | yes |
 | Merge into another paper (this one goes to the trash) | yes | no | yes |

@@ -23,7 +23,14 @@
 	async function showMore(itemId: string) {
 		loadingMore = itemId;
 		const { data } = await search({
-			query: { q: searched, item: itemId, limit: 50, mode, type: types.length ? types : undefined }
+			query: {
+				q: searched,
+				item: itemId,
+				limit: 50,
+				mode,
+				type: types.length ? types : undefined,
+				archived: archived || undefined
+			}
 		});
 		loadingMore = null;
 		allOf[itemId] = data ?? [];
@@ -38,6 +45,7 @@
 		(page.url.searchParams.get('mode') ?? 'hybrid') as 'hybrid' | 'keyword' | 'meaning'
 	);
 	const types = $derived(page.url.searchParams.getAll('type'));
+	const archived = $derived(page.url.searchParams.has('archived'));
 	let passages = $state<Passage[] | null>(null);
 
 	/** Passages grouped by paper or note, in the order of their best passage. */
@@ -136,7 +144,8 @@
 		const q = searched;
 		const options = {
 			mode,
-			type: types.length ? types : undefined
+			type: types.length ? types : undefined,
+			archived: archived || undefined
 		};
 		allOf = {};
 		if (!q) {

@@ -1,13 +1,12 @@
 # Changelog
 
-## 0.0.11 (2026-11-07)
+## Unreleased
 
-Search finds more: scanned pages are read (OCR), a reranker puts the best
-hits first, and the ML service runs on NVIDIA GPUs. Papers without PDFs
-get them (open copies by the server, the rest with the browser
-extension), smart collections fill themselves, and AI assistants can tidy
-the library.
-
+- **Archive**: papers kept for good, but left out of the library, search
+  and Manage (a paper's menu → Archive; for everyone who sees it, like
+  the trash). Manage → Archive lists them; search can include them
+  ("Include archived papers" in the search options). AI assistants:
+  `archive_papers`, and `archived` for `search` and `list_documents`.
 - **Published versions of preprints**, found by themselves: every hour a
   few dozen preprints are looked up at arXiv (the DOI the authors entered)
   and OpenAlex; a published version found is added (only if its title
@@ -17,6 +16,17 @@ the library.
   it at once. With open-access copies on, the journal's PDF is tried too.
 - Formulas in titles from Crossref (MathML) are kept as LaTeX (`$g$`)
   and typeset, instead of markup in the title.
+- A paper's page shows its image file (a photographed note, a scan),
+  not only its text.
+
+## 0.0.11 (2026-11-07)
+
+Search finds more: scanned pages are read (OCR), a reranker puts the best
+hits first, and the ML service runs on NVIDIA GPUs. Papers without PDFs
+get them (open copies by the server, the rest with the browser
+extension), smart collections fill themselves, and AI assistants can tidy
+the library.
+
 - **Tidying with AI assistants** (MCP): the Manage pages as tools.
   `library_checkup` says what needs looking at; duplicates (list, merge,
   keep apart), papers without details (list with the beginning of their

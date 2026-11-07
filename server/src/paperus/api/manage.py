@@ -53,7 +53,13 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
     missing a file the person can see."""
     return ManageCounts(
         duplicates=len(duplicates.find(db, access)),
-        unsorted=_count(db, access, Item.deleted_at.is_(None), *unsorted_conditions()),
+        unsorted=_count(
+            db,
+            access,
+            Item.deleted_at.is_(None),
+            Item.archived_at.is_(None),
+            *unsorted_conditions(),
+        ),
         unreadable=len(unreadable(db, access)),
         missing=_count(db, access, *missing.conditions("file")),
         missing_journal=_count(db, access, *missing.conditions("journal")),

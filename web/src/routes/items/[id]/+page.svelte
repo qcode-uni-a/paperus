@@ -6,6 +6,7 @@
 	import { page } from '$app/state';
 	import {
 		addVersion,
+		archiveItem,
 		errorMessage,
 		etagOf,
 		FILE_ROLES,
@@ -20,6 +21,7 @@
 		setOverrides,
 		trashFile,
 		trashItem,
+		unarchiveItem,
 		uploadToVersion,
 		VERSION_KINDS,
 		type FileRole,
@@ -245,6 +247,15 @@
 			<span>This item is in the trash.</span>
 			<button onclick={() => act(() => restoreItem({ path: { item_id: id } }))}>Restore</button>
 		</div>
+	{:else if item.archived_at}
+		<div class="card row trashed">
+			<span>This paper is in the archive: kept, but left out of lists and search.</span>
+			{#if writable}
+				<button onclick={() => act(() => unarchiveItem({ path: { item_id: id } }))}
+					>Take out of the archive</button
+				>
+			{/if}
+		</div>
 	{/if}
 
 	<header>
@@ -273,6 +284,13 @@
 						</button>
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" onclick={() => mergeDialog?.open()}>Merge into…</button>
+						{#if !item.archived_at}
+							<button
+								role="menuitem"
+								title="Kept, but left out of lists and search"
+								onclick={() => act(() => archiveItem({ path: { item_id: id } }))}>Archive</button
+							>
+						{/if}
 						<button role="menuitem" class="danger" onclick={moveToTrash}>Move to trash</button>
 					{/if}
 				</MenuButton>

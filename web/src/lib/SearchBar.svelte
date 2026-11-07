@@ -19,7 +19,8 @@
 	const filters = $derived<Filters>({
 		words: mode !== 'meaning',
 		meaning: mode !== 'keyword',
-		types: params.getAll('type')
+		types: params.getAll('type'),
+		archived: params.has('archived')
 	});
 
 	/** What the search options say, in the empty field: "Search preprints
@@ -47,6 +48,7 @@
 		if (!next.meaning) search.set('mode', 'keyword');
 		else if (!next.words) search.set('mode', 'meaning');
 		for (const type of next.types) search.append('type', type);
+		if (next.archived) search.set('archived', '1');
 		const text = search.toString();
 		return text ? `${library}?${text}` : library;
 	}

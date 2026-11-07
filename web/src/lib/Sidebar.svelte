@@ -4,6 +4,7 @@
 	import {
 		mdiAccountGroupOutline,
 		mdiAccountMultipleOutline,
+		mdiArchiveOutline,
 		mdiArrowLeft,
 		mdiBackupRestore,
 		mdiBookshelf,
@@ -68,6 +69,7 @@
 		[resolve('/manage/duplicates'), 'Duplicates', mdiContentDuplicate],
 		[resolve('/manage/unsorted'), 'Unsorted', mdiFileQuestionOutline],
 		[resolve('/manage/missing'), 'Missing', mdiFileDownloadOutline],
+		[resolve('/archive'), 'Archive', mdiArchiveOutline],
 		[resolve('/trash'), 'Trash', mdiTrashCanOutline]
 	] as const;
 

@@ -54,9 +54,13 @@ def _journal_without_file() -> Select[uuid.UUID]:
 def conditions(
     section: Section = "file", *, wanted: bool = True
 ) -> list[ColumnElement[bool]]:
-    """Papers (not in the trash) missing a file of the section's kind;
+    """Papers (not in the trash or the archive) missing a file of the section's kind;
     ``wanted=False``: those marked as needing no (further) file instead."""
-    found = [Item.deleted_at.is_(None), Item.file_wanted.is_(wanted)]
+    found = [
+        Item.deleted_at.is_(None),
+        Item.archived_at.is_(None),
+        Item.file_wanted.is_(wanted),
+    ]
     if section == "file":
         return [*found, Item.id.not_in(_with_files())]
     return [
@@ -70,6 +74,7 @@ def hidden_conditions() -> list[ColumnElement[bool]]:
     """Papers marked as needing no (further) file, of either section."""
     return [
         Item.deleted_at.is_(None),
+        Item.archived_at.is_(None),
         Item.file_wanted.is_(False),
         or_(Item.id.not_in(_with_files()), Item.id.in_(_journal_without_file())),
     ]

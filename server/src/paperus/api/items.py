@@ -1,7 +1,7 @@
 """Items and their versions: adding by identifier or by hand, reading."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal, Self
 
 import httpx2
@@ -115,6 +115,8 @@ class ItemOut(BaseModel):
     viewed_at: datetime | None = None
     """When the reader last opened it (only in ``sort=recent`` lists)."""
     deleted_at: datetime | None
+    archived_at: datetime | None = None
+    """In the archive: left out of lists and search unless asked for."""
     processing: bool
     """Files are still being read (text, and metadata for uploads)."""
     tags: list[ItemTagOut]
@@ -175,6 +177,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
         change=item.change,
         changed_at=item.changed_at,
         deleted_at=item.deleted_at,
+        archived_at=item.archived_at,
         tags=item_tags(item, access),
         collection_ids=[
             link.collection_id
@@ -538,6 +541,7 @@ def list_items(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     before: uuid.UUID | None = None,
     trashed: bool = False,
+    archived: bool = False,
     since: Annotated[int | None, Query(ge=0)] = None,
     tag: Annotated[list[uuid.UUID] | None, Query()] = None,
     collection: uuid.UUID | None = None,
@@ -556,7 +560,9 @@ def list_items(
     newest first, paged with ``offset`` instead of ``before``;
     ``sort=opened``: only items the reader opened, by when.
 
-    ``trashed=true`` lists the trash instead. ``unsorted=true``: only papers
+    ``trashed=true`` lists the trash instead, ``archived=true`` the archive
+    (archived papers are otherwise left out, except when asked for by
+    ``id``). ``unsorted=true``: only papers
     with a PDF whose details could not be found (all guessed from the file;
     papers still being read, and notes or other files without a DOI to
     find, are left out). ``tag`` (repeatable: items
@@ -585,6 +591,10 @@ def list_items(
         in_libraries,
         Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None),
     ]
+    if archived:
+        conditions.append(Item.archived_at.is_not(None))
+    elif not trashed and not id:
+        conditions.append(Item.archived_at.is_(None))
     for tag_id in tag or []:
         conditions.append(
             Item.id.in_(select(ItemTag.item_id).where(ItemTag.tag_id == tag_id))
@@ -643,6 +653,27 @@ def list_items(
     if before is not None:
         query = query.where(Item.id < before)
     return [item_out(item, access) for item in db.scalars(query)]
+
+
+@router.put("/api/items/{item_id}/archive", status_code=204)
+def archive_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Put the paper in the archive: kept, but left out of lists and search
+    unless asked for (for everyone who sees it)."""
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    if item.archived_at is None:
+        item.archived_at = datetime.now(UTC)
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/api/items/{item_id}/archive", status_code=204)
+def unarchive_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
+    """Take the paper out of the archive."""
+    item = get_readable_item(db, access, item_id, write=True)
+    if item.archived_at is not None:
+        item.archived_at = None
+        db.commit()
+    return Response(status_code=204)
 
 
 @router.put("/api/items/{item_id}/favourite", status_code=204)
