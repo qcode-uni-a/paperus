@@ -25,6 +25,7 @@ from sqlalchemy import Engine, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from paperus import pdf
 from paperus.app import create_app
 from paperus.auth import create_user
 from paperus.config import Settings
@@ -54,6 +55,15 @@ def _recreate_database(url: str) -> None:
             connection.execute(text(f'CREATE DATABASE "{name}"'))
     finally:
         admin.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def pdf_helpers() -> Iterator[None]:
+    yield
+    # The PDF helper processes end (and save their coverage) before the
+    # report.
+    if pdf._pool is not None:
+        pdf._pool.shutdown()
 
 
 @pytest.fixture(scope="session")
