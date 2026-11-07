@@ -301,6 +301,18 @@ def upload_to_item(
     return _store_upload(version, upload, role, request, db, access.user.id)
 
 
+# Saved web pages (Zotero's snapshots) and SVG: shown in a sandbox without
+# scripts, and only with what the file holds itself (images, styles, fonts
+# inside it): nothing is loaded from elsewhere, so opening one tells no
+# publisher about it. Only paperus' own pages may show them in a frame.
+WEB_PAGES = {"text/html", "application/xhtml+xml", "image/svg+xml"}
+WEB_PAGE_POLICY = (
+    "sandbox; default-src 'none'; img-src data: blob:; "
+    "style-src 'unsafe-inline' data:; font-src data:; media-src data:; "
+    "frame-ancestors 'self'"
+)
+
+
 @router.get("/api/files/{file_id}/content")
 def download_file(
     file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
@@ -311,7 +323,9 @@ def download_file(
     # must not run scripts there, so everything but PDFs (which browsers
     # will not show sandboxed) opens in a sandbox; the type is never guessed.
     safety = {"X-Content-Type-Options": "nosniff"}
-    if file.media_type != PDF:
+    if file.media_type in WEB_PAGES:
+        safety["Content-Security-Policy"] = WEB_PAGE_POLICY
+    elif file.media_type != PDF:
         safety["Content-Security-Policy"] = "sandbox"
     if isinstance(blobs, FilesystemStore):
         # Supports range requests, which PDF.js uses for large files.

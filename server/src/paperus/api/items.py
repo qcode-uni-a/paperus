@@ -452,7 +452,7 @@ def set_overrides(
     last read, so concurrent edits are not lost (412 if the item changed).
     """
     expected = _parse_if_match(if_match)
-    item = db.get(Item, item_id, with_for_update=True)
+    item = db.get(Item, item_id, with_for_update={"of": Item})
     if item is None or not access.can_read_item(item):
         raise HTTPException(404, "item not found")
     access.require_write_item(item)

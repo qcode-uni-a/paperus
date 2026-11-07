@@ -3,7 +3,9 @@
 		downloadAllOpenAccess,
 		downloadOpenAccess,
 		errorMessage,
+		manageCounts,
 		missingPapers,
+		trashSnapshots,
 		setFileWanted,
 		uploadToItem,
 		uploadToVersion
@@ -15,6 +17,26 @@
 	import { libraryById, loadOrganize } from '#lib/organize.svelte.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
+
+	/** Web pages Zotero saved next to a paper's PDF (from older imports). */
+	let snapshots = $state(0);
+	$effect(() => {
+		manageCounts().then(({ data }) => (snapshots = data?.snapshots ?? 0));
+	});
+
+	async function tidySnapshots() {
+		const { data, error: failure } = await trashSnapshots();
+		if (!data) {
+			notify({ kind: 'warning', title: 'Web pages not removed', text: errorMessage(failure) });
+			return;
+		}
+		snapshots = 0;
+		notify({
+			kind: 'success',
+			title: `${data.trashed} saved ${data.trashed === 1 ? 'web page' : 'web pages'} moved to the trash`,
+			text: 'Their papers keep their PDFs. Restore them from the trash if needed.'
+		});
+	}
 
 	/** Papers missing a file: none at all, or only their preprint's while
 	 * the published version has none. An open-access copy the server
@@ -337,6 +359,20 @@
 		save its PDF with the paperus browser extension, or upload the file.
 	</p>
 </header>
+
+{#if snapshots}
+	<aside class="extension snapshots">
+		<strong
+			>{snapshots}
+			{snapshots === 1 ? 'paper has' : 'papers have'} both a PDF and a saved web page</strong
+		>
+		<p>
+			Zotero saves the publisher's page ("snapshot") with a paper; older imports brought these
+			along. Next to a PDF they add nothing but noise in search.
+		</p>
+		<button onclick={tidySnapshots}>Move the web pages to the trash</button>
+	</aside>
+{/if}
 
 {#if !extension}
 	<aside class="extension">

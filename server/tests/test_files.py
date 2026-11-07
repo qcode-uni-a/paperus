@@ -142,7 +142,8 @@ def test_uploaded_html_cannot_run_scripts(logged_in: TestClient, item_id: str) -
     page = b"<script>fetch('/api/items')</script>"
     file = upload(logged_in, item_id, page, "notes.html", "text/html")
     response = logged_in.get(f"/api/files/{file['id']}/content")
-    assert response.headers["content-security-policy"] == "sandbox"
+    # A sandbox without scripts (and, for web pages, nothing from elsewhere).
+    assert response.headers["content-security-policy"].startswith("sandbox;")
     assert response.headers["x-content-type-options"] == "nosniff"
 
 

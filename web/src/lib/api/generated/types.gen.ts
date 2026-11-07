@@ -1862,6 +1862,10 @@ export type ManageCounts = {
      * Missing Journal
      */
     missing_journal?: number;
+    /**
+     * Snapshots
+     */
+    snapshots?: number;
 };
 
 /**
@@ -3450,6 +3454,16 @@ export type TokenOut = {
      * Last Used At
      */
     last_used_at: string | null;
+};
+
+/**
+ * Trashed
+ */
+export type Trashed = {
+    /**
+     * Trashed
+     */
+    trashed: number;
 };
 
 /**
@@ -6136,6 +6150,22 @@ export type ManageCountsResponses = {
 };
 
 export type ManageCountsResponse = ManageCountsResponses[keyof ManageCountsResponses];
+
+export type TrashSnapshotsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/manage/snapshots/trash';
+};
+
+export type TrashSnapshotsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Trashed;
+};
+
+export type TrashSnapshotsResponse = TrashSnapshotsResponses[keyof TrashSnapshotsResponses];
 
 export type MissingPapersData = {
     body?: never;

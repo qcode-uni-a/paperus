@@ -255,6 +255,7 @@ ROUTES = {
     ("GET", "/api/manage/counts"): None,
     ("GET", "/api/manage/missing"): None,
     ("POST", "/api/manage/missing/open-access"): None,
+    ("POST", "/api/manage/snapshots/trash"): None,
     ("DELETE", "/api/files/{file_id}"): "papers.write",
     ("GET", "/api/files/{file_id}/passages/{position}"): "papers.read",
     ("GET", "/api/files/unreadable"): None,

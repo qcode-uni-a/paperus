@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Saved web pages** (Zotero's snapshots) show on a paper's page as
+  pages, not as their source text, in a frame that runs no scripts and
+  loads nothing from the web (also when opened on their own, so no
+  publisher learns about it). Manage → Missing offers to move the web
+  pages that sit next to a PDF to the trash (from imports before 0.0.10).
+- Fixed: adding a file whose content paperus already had, while the
+  worker was still reading the first one, could fail with a server error
+  (two locks taken in opposite order).
 - **Smart collections by dates**: "Published from … to …" with date
   pickers; a paper counts by the days its date stands for (a day, a month,
   a year), so "March 2024" papers are in a 1–31 March collection and a

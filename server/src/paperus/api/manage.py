@@ -9,13 +9,14 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy.orm import aliased
 
 from paperus import duplicates, library, missing, system
 from paperus.api.deps import DB, CurrentAccess
-from paperus.api.files import FileOut, file_out, unreadable
+from paperus.api.files import PDF, FileOut, file_out, unreadable
 from paperus.api.items import ItemOut, get_readable_item, item_out, unsorted_conditions
 from paperus.jobs import queue_open_access, queue_text_extraction
-from paperus.models import Item
+from paperus.models import File, Item, Version
 
 router = APIRouter(tags=["manage"])
 
@@ -34,6 +35,9 @@ class ManageCounts(BaseModel):
     """Papers without a file (and not marked as needing none)."""
     missing_journal: int = 0
     """Published papers with only their preprint's file."""
+    snapshots: int = 0
+    """Saved web pages next to a PDF of the same version, which the person
+    may remove (see ``POST /api/manage/snapshots/trash``)."""
 
 
 def _count(db: DB, access: CurrentAccess, *conditions: ColumnElement[bool]) -> int:
@@ -63,7 +67,53 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
         unreadable=len(unreadable(db, access)),
         missing=_count(db, access, *missing.conditions("file")),
         missing_journal=_count(db, access, *missing.conditions("journal")),
+        snapshots=len(_snapshots(db, access)),
     )
+
+
+# Web pages Zotero saved with a paper ("snapshots"): with a PDF of the same
+# version they add nothing but noise in search.
+SNAPSHOT_TYPES = ("text/html", "application/xhtml+xml")
+
+
+def _snapshots(db: DB, access: CurrentAccess) -> list[File]:
+    """Saved web pages next to a PDF of the same version, on papers the
+    person may change."""
+    pdf = aliased(File)
+    files = db.scalars(
+        select(File)
+        .join(Version, Version.id == File.version_id)
+        .join(Item, Item.id == Version.item_id)
+        .where(
+            File.media_type.in_(SNAPSHOT_TYPES),
+            File.deleted_at.is_(None),
+            Item.deleted_at.is_(None),
+            access.item_filter(access.readable),
+            select(pdf.id)
+            .where(
+                pdf.version_id == File.version_id,
+                pdf.media_type == PDF,
+                pdf.deleted_at.is_(None),
+            )
+            .exists(),
+        )
+    )
+    return [file for file in files if access.can_write_item(file.version.item)]
+
+
+class Trashed(BaseModel):
+    trashed: int
+
+
+@router.post("/api/manage/snapshots/trash")
+def trash_snapshots(db: DB, access: CurrentAccess) -> Trashed:
+    """Move saved web pages that sit next to a PDF to the trash (they can
+    be restored from there)."""
+    files = _snapshots(db, access)
+    for file in files:
+        library.trash(file, access.user.id)
+    db.commit()
+    return Trashed(trashed=len(files))
 
 
 class MissingPaper(BaseModel):

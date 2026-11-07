@@ -155,7 +155,9 @@ def process_file(
     (``paperus.ocr``) if ``ocr``, and the file is read again once they are
     read. Returns whether pages wait for OCR.
     """
-    file = db.get(File, file_id, with_for_update=True)
+    # Only the file's row: its content (joined in) is shared with other
+    # files, and locking it too made uploads of the same file deadlock.
+    file = db.get(File, file_id, with_for_update={"of": File})
     if file is None or file.text_status != TextStatus.PENDING:
         return False
     if _copy_manifest(db, file):

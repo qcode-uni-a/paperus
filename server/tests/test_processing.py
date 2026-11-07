@@ -5,10 +5,12 @@ import uuid
 from typing import Any
 
 import httpx2
+import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
+from paperus import processing
 from paperus.models import Chunk, File, FileChunk, TextStatus
 from paperus.processing import process_file
 from paperus.storage import BlobStore
@@ -66,3 +68,43 @@ def test_a_failed_lookup_keeps_the_text(
     assert file is not None and file.text_status == TextStatus.DONE
     assert "Drought indices" in passages(db, file_id)[0]
     assert ada.get(f"/api/items/{uploaded['item_id']}").json()["title"] == "drought"
+
+
+def test_reading_a_file_does_not_block_others_with_its_content(
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    engine: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """While the worker reads a file, another file with the same content can
+    be added (the worker once locked the shared content too, and an upload
+    of the same file deadlocked with it)."""
+    ada = Person(client, db, "ada")
+    page = b"<html><body><h1>Radar gaps</h1></body></html>"
+    file_id = upload(ada, "page.html", page, "text/html")
+    other = ada.add("Another paper")
+    version_id = ada.get(f"/api/items/{other['id']}").json()["versions"][0]["id"]
+    added: list[str] = []
+    read = processing._read
+
+    def read_while_someone_adds(db: Session, file: File, blobs: BlobStore) -> Any:  # noqa: ANN401
+        # The worker holds its lock now; another connection adds a file with
+        # the same content and must not have to wait.
+        with engine.begin() as connection:
+            connection.execute(text("SET LOCAL lock_timeout = '2s'"))
+            connection.execute(
+                text(
+                    "INSERT INTO files (id, version_id, blob_sha256, role, filename,"
+                    " media_type, source, text_status, created_at)"
+                    " VALUES (gen_random_uuid(), :version, :sha, 'main', 'copy.html',"
+                    " 'text/html', 'upload', 'done', now())"
+                ),
+                {"version": version_id, "sha": file.blob_sha256},
+            )
+            added.append("ok")
+        return read(db, file, blobs)
+
+    monkeypatch.setattr(processing, "_read", read_while_someone_adds)
+    assert process_file(db, blobs, file_id) is False
+    assert added == ["ok"]

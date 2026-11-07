@@ -152,6 +152,7 @@ def test_unsorted(client: TestClient, db: Session) -> None:
         "unreadable": 1,
         "missing": 0,
         "missing_journal": 0,
+        "snapshots": 0,
     }
     bob = Person(client, db, "bob")
     assert bob.get("/api/manage/counts").json() == {
@@ -160,6 +161,7 @@ def test_unsorted(client: TestClient, db: Session) -> None:
         "unreadable": 0,
         "missing": 0,
         "missing_journal": 0,
+        "snapshots": 0,
     }
 
 

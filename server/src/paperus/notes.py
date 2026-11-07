@@ -48,7 +48,7 @@ def save(
     """Replace the text if it is still the version ``expected`` (from
     ``etag``); locks the note, so two saves from the same version cannot both
     pass. Raises ``Conflict`` otherwise. Callers check rights first."""
-    note = db.get(Note, note_id, with_for_update=True, populate_existing=True)
+    note = db.get(Note, note_id, with_for_update={"of": Note}, populate_existing=True)
     if note is None:
         raise LookupError(note_id)
     if etag(note) != expected:

@@ -3930,6 +3930,28 @@
         }
       }
     },
+    "/api/manage/snapshots/trash": {
+      "post": {
+        "tags": [
+          "manage"
+        ],
+        "summary": "Trash Snapshots",
+        "description": "Move saved web pages that sit next to a PDF to the trash (they can\nbe restored from there).",
+        "operationId": "trash_snapshots",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trashed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/manage/missing": {
       "get": {
         "tags": [
@@ -9786,6 +9808,11 @@
             "type": "integer",
             "title": "Missing Journal",
             "default": 0
+          },
+          "snapshots": {
+            "type": "integer",
+            "title": "Snapshots",
+            "default": 0
           }
         },
         "type": "object",
@@ -12737,6 +12764,19 @@
           "last_used_at"
         ],
         "title": "TokenOut"
+      },
+      "Trashed": {
+        "properties": {
+          "trashed": {
+            "type": "integer",
+            "title": "Trashed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trashed"
+        ],
+        "title": "Trashed"
       },
       "UnreadableFile": {
         "properties": {

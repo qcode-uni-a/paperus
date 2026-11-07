@@ -112,20 +112,33 @@
 			.filter((f) => !f.deleted_at && isText(f.media_type, f.filename));
 		return texts.find((f) => f.role === 'main') ?? texts[0] ?? null;
 	});
+	/** Without a PDF or text: a saved web page, shown in a frame that runs
+	 * no scripts and loads nothing from elsewhere (the server says so too). */
+	const webFile = $derived.by(() => {
+		if (!item || pdfFile || textFile) return null;
+		const pages = item.versions
+			.flatMap((v) => v.files)
+			.filter((f) => !f.deleted_at && WEB_PAGES.includes(f.media_type));
+		return pages.find((f) => f.role === 'main') ?? pages[0] ?? null;
+	});
 	/** Without a PDF or text: an image (a photographed note, a scan). */
 	const SHOWN_IMAGES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 	const imageFile = $derived.by(() => {
-		if (!item || pdfFile || textFile) return null;
+		if (!item || pdfFile || textFile || webFile) return null;
 		const images = item.versions
 			.flatMap((v) => v.files)
 			.filter((f) => !f.deleted_at && f.media_type.startsWith('image/'));
 		return images.find((f) => f.role === 'main') ?? images[0] ?? null;
 	});
-	const viewed = $derived(pdfFile ?? textFile ?? imageFile);
+	const viewed = $derived(pdfFile ?? textFile ?? webFile ?? imageFile);
 	// Readers of a group see its papers but change nothing of them.
 	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
 
+	/** Saved web pages (Zotero's snapshots): shown as pages, not as text. */
+	const WEB_PAGES = ['text/html', 'application/xhtml+xml'];
+
 	function isText(mediaType: string, filename: string): boolean {
+		if (WEB_PAGES.includes(mediaType)) return false;
 		return (
 			mediaType.startsWith('text/') ||
 			['application/json', 'application/x-tex'].includes(mediaType) ||
@@ -480,6 +493,21 @@
 			mediaType={textFile.media_type}
 			filename={textFile.filename}
 		/>
+	{:else if webFile}
+		<figure class="web">
+			<iframe
+				title="Saved web page: {webFile.filename}"
+				src="/api/files/{webFile.id}/content"
+				sandbox=""
+				referrerpolicy="no-referrer"
+				loading="lazy"
+			></iframe>
+			<figcaption class="muted">
+				A web page saved with the paper ({webFile.filename}), shown without its scripts and without
+				loading anything from the web, so parts may be missing.
+				<a href="/api/files/{webFile.id}/content" target="_blank" rel="noreferrer">Open it alone</a>
+			</figcaption>
+		</figure>
 	{:else if imageFile}
 		<figure class="image">
 			{#if SHOWN_IMAGES.includes(imageFile.media_type)}
@@ -497,6 +525,22 @@
 {/if}
 
 <style>
+	.web {
+		display: grid;
+		gap: 8px;
+		margin: 0;
+	}
+	.web iframe {
+		width: 100%;
+		height: min(80vh, 900px);
+		border: 1px solid var(--rule);
+		border-radius: 12px;
+		/* The page brings its own colours (or none: then white like paper). */
+		background: white;
+	}
+	.web figcaption {
+		font-size: var(--step--1);
+	}
 	.image {
 		margin: 0;
 		padding: 12px;
