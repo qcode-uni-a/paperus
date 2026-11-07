@@ -165,3 +165,37 @@ answer) and 3 German pages with umlauts and ß, each clean and as a "scan"
   steps in `ml/src/paperus_ml/ocr.py` (no RapidOCR dependency; the same
   model handling, CPU or GPU, as the other models). Handwriting is read
   poorly.
+
+### Passage size and overlap (#11, 2026-11-07)
+
+The same 44 questions on a copy of the library, with arctic-embed-m-v2
+(fp16, GPU), each variant re-cut and re-embedded; "overlap" repeats the
+previous passage's last words at the start of the next (within a page):
+
+| passages (words)        | passages | hybrid hit@1 / hit@5 / MRR | with reranking     |
+| ----------------------- | -------- | -------------------------- | ------------------ |
+| **200, at most 350**    | 40,470   | 0.82 / 0.98 / 0.87         | 0.82 / 0.98 / 0.90 |
+| 120                     | 65,979   | 0.91 / 0.98 / 0.95         | 0.82 / 1.00 / 0.89 |
+| 150                     | 53,013   | 0.89 / 0.95 / 0.92         | 0.77 / 1.00 / 0.86 |
+| 300                     | 28,538   | 0.80 / 0.98 / 0.87         | 0.84 / 0.98 / 0.91 |
+| 400                     | 22,262   | 0.80 / 0.98 / 0.88         | 0.84 / 0.98 / 0.90 |
+| 200 across pages        | 39,467   | 0.82 / 0.98 / 0.87         | 0.84 / 0.98 / 0.91 |
+| 200, overlap 50         | 40,470   | 0.82 / 0.98 / 0.89         | 0.89 / 1.00 / 0.93 |
+| 200, overlap 100        | 40,470   | 0.91 / 0.98 / 0.94         | 0.84 / 1.00 / 0.91 |
+| 120, overlap 40         | 65,979   | 0.89 / 0.98 / 0.92         | 0.89 / 1.00 / 0.93 |
+| 150, overlap 50         | 53,013   | 0.80 / 0.98 / 0.88         | 0.86 / 1.00 / 0.92 |
+
+One question is 0.023. Compared question by question with the default:
+
+- Without reranking, overlap 100 puts 4 more papers first and none fewer
+  (7 better, 1 worse); 120-word passages 5 more and 1 fewer. With
+  reranking these gains mostly vanish (overlap 100: 3 better, 2 worse).
+- With reranking, overlap 50 puts 4 more first and 1 fewer; 120 words with
+  overlap 40 is as good, but needs 63% more vectors.
+- No variant is better in both modes, and 7 of 1 is not yet sure (a sign
+  test gives about 0.07). Larger passages and joining pages change little.
+- Overlap adds no vectors, only a quarter to half more words to embed and
+  store; it repeats text in results (to be trimmed when showing them).
+
+Not adopted yet: overlap (50–100 words) is the candidate, to be confirmed
+with real questions from the group, more of them vague and German.
