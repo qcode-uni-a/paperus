@@ -118,6 +118,12 @@
 	.find {
 		max-width: 720px;
 	}
+	/* The menu is a drawer (lib/menu.svelte.ts): no sidebar to line up with. */
+	@media (max-width: 900px) {
+		header {
+			grid-template-columns: auto minmax(0, 1fr) auto;
+		}
+	}
 	@media (max-width: 720px) {
 		header {
 			grid-template-columns: 1fr auto;

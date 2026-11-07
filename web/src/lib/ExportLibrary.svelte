@@ -163,7 +163,7 @@
 		{#each FORMATS as option (option.value)}
 			<label class="check"
 				><input type="radio" bind:group={format} value={option.value} />
-				<span>{option.label}<small> — {option.help}</small></span></label
+				<span>{option.label}{' '}<small>— {option.help}</small></span></label
 			>
 		{/each}
 	</fieldset>
@@ -191,8 +191,8 @@
 					onchange={(event) => (include[part.key] = event.currentTarget.checked)}
 				/>
 				<span
-					>{part.label}{#if cannot}<small> — {cannot}</small>{:else if part.help}<small>
-							— {part.help}</small
+					>{part.label}{#if cannot}{' '}<small>— {cannot}</small>{:else if part.help}{' '}<small
+							>— {part.help}</small
 						>{/if}</span
 				></label
 			>

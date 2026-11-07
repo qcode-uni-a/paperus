@@ -3,7 +3,8 @@
  * Narrow screens: a drawer over the content, closed until opened. */
 
 const STORAGE_KEY = 'paperus.menu';
-const NARROW = '(max-width: 720px)';
+// Phones and tablets held upright: the content needs the whole width.
+const NARROW = '(max-width: 900px)';
 
 function storedOpen(): boolean {
 	try {

@@ -43,7 +43,11 @@
 			open={open.includes(slug)}
 			ontoggle={(opened) => toggle(slug, opened)}
 		>
-			{#if slug === 'ml'}
+			{#if !admin.config}
+				<!-- The forms start from the saved settings: a choice made before
+				     they arrive would be undone. -->
+				<p class="muted">Loading the settings…</p>
+			{:else if slug === 'ml'}
 				<MlSettings />
 			{:else if slug === 'integrity'}
 				<IntegritySettings />

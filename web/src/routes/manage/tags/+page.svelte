@@ -302,6 +302,11 @@
 		align-items: flex-end;
 		gap: 16px;
 		margin-bottom: 20px;
+		flex-wrap: wrap;
+	}
+	/* Phones: the buttons below the text when it needs the width. */
+	.head > div:first-child {
+		flex: 1 1 18rem;
 	}
 	h1 {
 		margin: 0 0 4px;
@@ -405,7 +410,8 @@
 	.chip {
 		padding: 2px 10px;
 		border: none;
-		border-radius: 999px;
+		/* Round as a pill on one line; long names wrap into a soft box. */
+		border-radius: 14px;
 		background: var(--tag-bg, var(--rail));
 		color: var(--tag-ink, var(--ink));
 		font-size: 0.95em;

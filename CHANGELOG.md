@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Phones and tablets**: on tablets held upright (up to 900 px) the menu
+  is a drawer, so lists and tables get the whole width (Manage → Tags and
+  Administration → Users ran off the screen); page headings put their
+  buttons below the text when it needs the room; long tag names wrap
+  into a soft box; the search field says "Search the library" (the
+  longer text was cut off); the hints of Settings → Export are spaced
+  from their labels again. Administration → Settings shows its forms once
+  the saved settings are there (a choice made earlier was undone).
 - **Filter the library**: a Filter button beside the number of papers
   opens the rules of smart collections (with all, any or none of some
   tags or keywords, types, publication dates, owners, recently added);

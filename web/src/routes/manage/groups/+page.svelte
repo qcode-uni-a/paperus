@@ -315,6 +315,11 @@
 		align-items: flex-end;
 		gap: 16px;
 		margin-bottom: 24px;
+		flex-wrap: wrap;
+	}
+	/* Phones: the buttons below the text when it needs the width. */
+	.head > div:first-child {
+		flex: 1 1 18rem;
 	}
 	h1 {
 		margin: 0 0 4px;

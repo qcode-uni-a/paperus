@@ -58,6 +58,7 @@
 		align-items: center;
 		gap: 12px;
 		margin-bottom: 8px;
+		flex-wrap: wrap;
 	}
 	h1 {
 		margin: 0;

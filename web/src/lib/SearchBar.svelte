@@ -24,10 +24,11 @@
 	});
 
 	/** What the search options say, in the empty field: "Search preprints
-	 * by meaning". */
+	 * by meaning"; short when both ways are on (phones have little room). */
 	const placeholder = $derived.by(() => {
-		const how =
-			filters.words && filters.meaning ? 'words or meaning' : filters.words ? 'words' : 'meaning';
+		const both = filters.words && filters.meaning;
+		if (both && !filters.types.length) return 'Search the library';
+		const how = both ? '' : filters.words ? 'by words' : 'by meaning';
 		const kinds = filters.types.map(plural);
 		const what =
 			kinds.length === 0
@@ -35,7 +36,7 @@
 				: kinds.length <= 2
 					? `${kinds.join(' and ')} `
 					: `${kinds.length} types `;
-		return `Search ${what}by ${how}`;
+		return `Search ${what}${how}`.trim();
 	});
 
 	let query = $state(untrack(() => searched));

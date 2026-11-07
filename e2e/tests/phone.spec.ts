@@ -10,6 +10,22 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 	expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
+/** Pages with a heading, wide tables or long forms. */
+const PAGES = [
+	'/collections',
+	'/settings',
+	'/trash',
+	'/import',
+	'/notes',
+	'/manage/tags',
+	'/manage/collections',
+	'/manage/groups',
+	'/manage/missing',
+	'/admin/users',
+	'/admin/settings',
+	'/admin/jobs'
+];
+
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
 
@@ -39,7 +55,7 @@ test.describe('on a phone', () => {
 		await expect(page.getByRole('heading', { level: 1 })).toHaveText(paper.title);
 		await expectNoHorizontalScroll(page);
 
-		for (const path of ['/collections', '/settings', '/trash']) {
+		for (const path of PAGES) {
 			await page.goto(path);
 			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 			await expectNoHorizontalScroll(page);
@@ -83,5 +99,22 @@ test.describe('on a phone', () => {
 		}
 		await expectNoHorizontalScroll(page);
 		await page.screenshot({ path: process.env.TOOLBAR_SHOT ?? 'test-results/toolbar.png' });
+	});
+});
+
+test.describe('on a tablet held upright', () => {
+	test.use({ viewport: { width: 768, height: 1024 }, isMobile: true, hasTouch: true });
+
+	test('the menu is a drawer and pages fit', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByRole('heading', { name: /^\d+ items?$/ })).toBeVisible();
+		// The content has the whole width: the menu opens over it.
+		await expect(page.getByRole('navigation', { name: 'Menu' })).toBeHidden();
+		await expectNoHorizontalScroll(page);
+		for (const path of PAGES) {
+			await page.goto(path);
+			await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+			await expectNoHorizontalScroll(page);
+		}
 	});
 });

@@ -87,6 +87,7 @@
 		justify-content: space-between;
 		align-items: center;
 		gap: 12px;
+		flex-wrap: wrap;
 	}
 	.danger-button {
 		border-color: var(--danger);

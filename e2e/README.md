@@ -43,7 +43,8 @@ something already listens on its port.
   expiry; set back to the browser's at the end.
 - `oauth`: an app registers, the consent page, the code traded for a token,
   disconnecting; an unknown app refused.
-- `phone`: on a phone-sized screen, pages have no sideways scroll; the menu
+- `phone`: on a phone-sized screen (and a tablet held upright), pages have no
+  sideways scroll; the menu
   drawer; a long chapter name keeps the PDF toolbar on one line and wraps in
   the contents.
 - `sharing` (runs last: groups change what dialogs ask): two people, a group,
