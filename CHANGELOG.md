@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.14 (2026-11-07)
 
 - **Phones and tablets**: on tablets held upright (up to 900 px) the menu
   is a drawer, so lists and tables get the whole width (Manage → Tags and
