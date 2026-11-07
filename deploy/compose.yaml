@@ -59,6 +59,9 @@ services:
 
   db:
     image: pgvector/pgvector:pg18
+    # Shared memory for parallel queries and index builds (Docker's
+    # default, 64 MB, is too small); only used while needed.
+    shm_size: 1gb
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}

@@ -6,6 +6,7 @@ name: paperus-dev
 services:
   db:
     image: pgvector/pgvector:pg18
+    shm_size: 1gb
     environment:
       POSTGRES_USER: paperus
       POSTGRES_PASSWORD: paperus

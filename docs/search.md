@@ -232,9 +232,14 @@ HNSW (`m = 16`, `ef_construction = 64`), median time and recall by
   group; for a department-sized server, HNSW is 20–50 times faster and
   misses about 1 in 20 of the best 40 (the reranker then orders them).
 - The index is larger than the vectors (2 GB a million) and should fit
-  in memory. Built in one process it takes 9 minutes a million; Docker
-  gives Postgres only 64 MB of shared memory (`/dev/shm`), too little
-  for a parallel build (`shm_size` in compose would allow one).
+  in memory. Built in one process it takes 9 minutes a million. A
+  parallel build needs its graph in shared memory (`/dev/shm`), which
+  Docker limits to 64 MB; compose now gives Postgres 1 GB
+  (`shm_size`). With 4 workers 300,000 passages take 29 s instead of
+  106 s; a million needs about 2.2 GB (`shm_size` and
+  `maintenance_work_mem` both raised), otherwise the build falls back
+  to adding passages one by one when the graph outgrows memory and is
+  no faster (10 minutes with 900 MB).
 - Not yet built: search's query joins the passages a person can see
   first, which an HNSW index cannot serve as it is; it would need to ask
   the index for the nearest passages of one model and filter after

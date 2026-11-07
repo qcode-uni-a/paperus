@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Postgres gets 1 GB of shared memory** (`shm_size` in compose; Docker
+  gives 64 MB): enough for parallel queries and for building a vector
+  index in parallel later. Only used while needed; takes effect when the
+  database container is recreated (`docker compose up -d`).
+
 ## 0.0.12 (2026-11-07)
 
 AI assistants on the web connect by signing in (claude.ai, ChatGPT),
