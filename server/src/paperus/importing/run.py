@@ -34,6 +34,7 @@ from paperus.importing import (
     Export,
     bbl,
     bibtex,
+    by_title,
     csljson,
     mapping,
     paperus_export,
@@ -417,6 +418,7 @@ def run_import(
             if opened.format == "bbl":
                 references.complete(export, http)
             web_pages.complete(export, http)
+            by_title.complete(export, http)
             if opened.latex and export.papers:
                 into_collection(export, _collection_name(opened, record.filename, http))
             yield export, opened.files

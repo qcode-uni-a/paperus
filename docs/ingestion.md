@@ -248,6 +248,13 @@ earlier import took as tags. (Stored as tags with the source
   tags too), citation keys (Better BibTeX, JabRef), notes (HTML converted to
   Markdown), the metadata as exported (no lookups that could overwrite it;
   missing identifiers can be looked up later as for uploads).
+- **DOIs found by title** (`paperus.importing.by_title`): a paper without a
+  DOI or arXiv ID (and with a title of four words or more; not web pages)
+  is searched on Crossref by its title, first author and year, and its DOI
+  taken only for the same title (case, accents and punctuation aside), the
+  same first author's family name and a year at most one apart. The paper
+  keeps its details; with the DOI, OpenAlex knows its authors, and its
+  open-access copy and references are found as for any paper.
 - **Files** are stored like uploads (deduplicated by content) and read for
   search; a missing file is listed in the report, not an error.
 - **Report** at the end: how many papers were added, found already, and
