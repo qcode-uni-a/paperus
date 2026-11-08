@@ -104,6 +104,13 @@
 </script>
 
 <div class="organize">
+	{#if item.container_title || item.year}
+		<div class="line">
+			<span class="label">{item.container_title ? 'Journal' : 'Year'}</span>
+			{#if item.container_title}<span class="chip journal">{item.container_title}</span>{/if}
+			{#if item.year}<span class="chip">{item.year}</span>{/if}
+		</div>
+	{/if}
 	<div class="line">
 		<span class="label">Tags</span>
 		{#each item.tags.filter((t) => t.source !== 'automatic') as tag (tag.id)}
@@ -261,6 +268,9 @@
 	}
 	.chip:not(:has(button)) {
 		padding-right: 10px;
+	}
+	.journal {
+		font-style: italic;
 	}
 	.lock {
 		width: 13px;

@@ -204,6 +204,7 @@
 	}
 	li .go {
 		display: flex;
+		justify-content: space-between;
 		align-items: baseline;
 		gap: 12px;
 		flex: 1 1 0;
@@ -280,11 +281,14 @@
 		text-decoration: underline;
 	}
 	.title {
-		flex: 1;
+		flex: 1 1 auto;
 		min-width: 0;
 	}
+	/* Always at the right edge, however the title wraps. */
 	.page {
 		flex: none;
+		margin-left: auto;
+		text-align: right;
 		color: var(--faint);
 		font-size: var(--step--1);
 		font-variant-numeric: tabular-nums;

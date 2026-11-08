@@ -318,9 +318,8 @@
 					class="person"
 					href={authorHref(item, i)}
 					title="Papers by {writtenName(author)} in the library">{writtenName(author)}</a
-				>{/each}{#if item.year}{' '}({item.year}){/if}
+				>{/each}
 		</p>
-		{#if item.container_title}<p class="muted journal"><em>{item.container_title}</em></p>{/if}
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
@@ -529,9 +528,6 @@
 {/if}
 
 <style>
-	.journal {
-		margin-top: -0.3em;
-	}
 	.person {
 		color: inherit;
 		text-decoration: none;

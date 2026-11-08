@@ -8,6 +8,9 @@
   OpenAlex is asked without a contact email too. Copies whose sites
   refuse the server (publishers often do) are handed to the browser
   extension from Manage → Missing, which fetches them first.
+- **A paper's journal and year** are a row of their own on its page, like
+  its tags and collections (no longer in brackets after the authors).
+- **PDF contents**: page numbers always at the right edge.
 - **Imports find missing DOIs by title**: a paper without a DOI or arXiv
   ID gets one from Crossref when the title, first author and year agree,
   so its authors, open-access copy and references are found too.
