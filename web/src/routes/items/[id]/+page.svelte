@@ -46,7 +46,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Avatar from '#lib/Avatar.svelte';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
-	import { nameSeparator, writtenName } from '#lib/names.svelte.ts';
+	import { nameSeparator, shownName, writtenName } from '#lib/names.svelte.ts';
 
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
@@ -324,12 +324,12 @@
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
-					name={item.added_by.username}
+					name={shownName(item.added_by)}
 					url={item.added_by.avatar_url}
 					size={20}
 					tone="desk"
 				/>
-				Added by {item.added_by.id === session.user?.id ? 'you' : item.added_by.username}, {ago(
+				Added by {item.added_by.id === session.user?.id ? 'you' : shownName(item.added_by)}, {ago(
 					item.created_at
 				)}
 			</p>

@@ -78,6 +78,10 @@ class User(Record, Base):
     handed_over: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """The last hand-over of their own library while they were deactivated
     (``at``, ``to``, ``by``, ``papers``), shown to them if they come back."""
+    display_name: Mapped[str | None] = mapped_column(String(100))
+    """Shown to others instead of the username, if set."""
+    orcid: Mapped[str | None] = mapped_column(String(19))
+    """Their own ORCID iD: the author with it is them (seen only by them)."""
     name_format: Mapped[str] = mapped_column(
         String(16), server_default=text("'family-given'")
     )

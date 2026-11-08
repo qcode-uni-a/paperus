@@ -2130,6 +2130,10 @@ export type MemberOut = {
      * Username
      */
     username: string;
+    /**
+     * Display Name
+     */
+    display_name?: string | null;
     role: Role;
     direct_role: Role | null;
     /**
@@ -2776,6 +2780,10 @@ export type Person = {
      */
     username: string;
     /**
+     * Display Name
+     */
+    display_name?: string | null;
+    /**
      * Avatar Url
      */
     avatar_url?: string | null;
@@ -2849,6 +2857,20 @@ export type Problem = {
      * Title
      */
     title: string;
+};
+
+/**
+ * ProfileIn
+ */
+export type ProfileIn = {
+    /**
+     * Display Name
+     */
+    display_name?: string | null;
+    /**
+     * Orcid
+     */
+    orcid?: string | null;
 };
 
 /**
@@ -3909,6 +3931,10 @@ export type UserBrief = {
      * Username
      */
     username: string;
+    /**
+     * Display Name
+     */
+    display_name?: string | null;
 };
 
 /**
@@ -3943,6 +3969,18 @@ export type UserOut = {
      * Username
      */
     username: string;
+    /**
+     * Display Name
+     */
+    display_name?: string | null;
+    /**
+     * Orcid
+     */
+    orcid?: string | null;
+    /**
+     * Author Id
+     */
+    author_id?: string | null;
     /**
      * Is Admin
      */
@@ -3982,6 +4020,10 @@ export type UserRow = {
      * Username
      */
     username: string;
+    /**
+     * Display Name
+     */
+    display_name?: string | null;
     /**
      * Is Admin
      */
@@ -4394,6 +4436,31 @@ export type SetNameFormatResponses = {
 };
 
 export type SetNameFormatResponse = SetNameFormatResponses[keyof SetNameFormatResponses];
+
+export type SetProfileData = {
+    body: ProfileIn;
+    path?: never;
+    query?: never;
+    url: '/api/auth/profile';
+};
+
+export type SetProfileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetProfileError = SetProfileErrors[keyof SetProfileErrors];
+
+export type SetProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserOut;
+};
+
+export type SetProfileResponse = SetProfileResponses[keyof SetProfileResponses];
 
 export type RemoveAvatarData = {
     body?: never;

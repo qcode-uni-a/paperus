@@ -5,6 +5,7 @@
 	import type { UserRow } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { shownName } from '#lib/names.svelte.ts';
 
 	let users = $state<UserRow[]>([]);
 	let error = $state('');
@@ -108,8 +109,10 @@
 			{@const me = user.id === session.user?.id}
 			<tr class:inactive={user.deactivated_at}>
 				<td class="person">
-					<Avatar name={user.username} url={user.avatar_url} size={28} tone="desk" />
-					<strong>{user.username}</strong>
+					<Avatar name={shownName(user)} url={user.avatar_url} size={28} tone="desk" />
+					<strong>{user.username}</strong>{#if user.display_name}<span class="muted"
+							>{user.display_name}</span
+						>{/if}
 					{#if user.is_admin}<span class="badge">Administrator</span>{/if}
 					{#if user.deactivated_at}<span class="badge off">Deactivated</span>{/if}
 					{#if me}<span class="muted">(you)</span>{/if}

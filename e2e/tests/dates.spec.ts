@@ -68,7 +68,7 @@ test('dates in the European form, typed and shown', async ({ page }) => {
 
 		// A list's dates: when an access token expires.
 		const token = unique('Expiring ');
-		await page.goto('/settings');
+		await page.goto('/settings?open=tokens');
 		await page.getByRole('button', { name: 'New token' }).click();
 		const create = page.getByRole('dialog', { name: 'New access token' });
 		await create.getByLabel('Name').fill(token);

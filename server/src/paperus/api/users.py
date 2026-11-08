@@ -26,6 +26,7 @@ Password = Annotated[str, Field(min_length=8, max_length=200)]
 class UserRow(BaseModel):
     id: uuid.UUID
     username: str
+    display_name: str | None = None
     is_admin: bool
     created_at: datetime
     last_login_at: datetime | None
@@ -74,6 +75,7 @@ def _rows(db: DB, only: uuid.UUID | None = None) -> list[UserRow]:
         UserRow(
             id=user.id,
             username=user.username,
+            display_name=user.display_name,
             is_admin=user.is_admin,
             created_at=user.created_at,
             last_login_at=user.last_login_at,
@@ -220,13 +222,13 @@ def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Priva
             # Being an administrator reads no library: not this way either.
             raise HTTPException(422, "not to yourself: hand over to someone else")
         target = _own_library(db, receiver)
-        to = receiver.username
+        to = receiver.display_name or receiver.username
     moved = handover.hand_over(db, _own_library(db, user), target)
     # Kept, and shown to them should they come back.
     user.handed_over = {
         "at": datetime.now(UTC).isoformat(),
         "to": to,
-        "by": admin.username,
+        "by": admin.display_name or admin.username,
         "papers": moved.items,
     }
     user.seen_hints = [h for h in user.seen_hints if h != HANDED_OVER]

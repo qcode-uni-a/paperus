@@ -9,9 +9,10 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Path, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import auth, oidc
+from paperus import auth, authors, oidc
 from paperus.api.deps import (
     DB,
     SESSION_COOKIE,
@@ -20,6 +21,7 @@ from paperus.api.deps import (
     request_token,
 )
 from paperus.avatars import avatar_url
+from paperus.models import Author
 from paperus.system import DateFormat, SystemConfig, load_config, oidc_secret
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -36,6 +38,12 @@ NameFormat = Literal["family-given", "given-family"]
 class UserOut(BaseModel):
     id: uuid.UUID
     username: str
+    display_name: str | None = None
+    """Shown to others instead of the username, if set."""
+    orcid: str | None = None
+    """Their own ORCID iD (only they see it)."""
+    author_id: uuid.UUID | None = None
+    """The author with that iD, if one is known: them."""
     is_admin: bool
     seen_hints: list[str]
     """Tutorial hints already shown to the person."""
@@ -70,10 +78,15 @@ class LoginResponse(BaseModel):
     user: UserOut
 
 
-def user_out(user: auth.User, date_format: DateFormat) -> UserOut:
+def user_out(
+    user: auth.User, date_format: DateFormat, author_id: uuid.UUID | None = None
+) -> UserOut:
     return UserOut(
         id=user.id,
         username=user.username,
+        display_name=user.display_name,
+        orcid=user.orcid,
+        author_id=author_id,
         is_admin=user.is_admin,
         seen_hints=user.seen_hints,
         oidc_linked=user.oidc_subject is not None,
@@ -86,8 +99,14 @@ def user_out(user: auth.User, date_format: DateFormat) -> UserOut:
 
 def session_user_out(user: auth.User, db: Session, request: Request) -> UserOut:
     """The person as the website keeps them, with the installation's date
-    format."""
-    return user_out(user, load_config(db, request.app.state.settings).date_format)
+    format and the author they are."""
+    author_id = (
+        db.scalar(select(Author.id).where(Author.orcid == user.orcid))
+        if user.orcid
+        else None
+    )
+    date_format = load_config(db, request.app.state.settings).date_format
+    return user_out(user, date_format, author_id)
 
 
 @router.post("/login")
@@ -104,7 +123,7 @@ def login(
     token = auth.start_session(db, user, timedelta(days=config.session_days))
     db.commit()
     set_session_cookie(request, response, token, config.session_days)
-    return LoginResponse(token=token, user=user_out(user, config.date_format))
+    return LoginResponse(token=token, user=session_user_out(user, db, request))
 
 
 def set_session_cookie(
@@ -329,3 +348,26 @@ def set_name_format(body: NameFormatIn, db: DB, user: CurrentUser) -> None:
     Mónica" (family-given) or "Mónica Benito" (given-family)."""
     user.name_format = body.name_format
     db.commit()
+
+
+class ProfileIn(BaseModel):
+    display_name: Annotated[str, Field(max_length=100)] | None = None
+    """Empty: the username is shown."""
+    orcid: str | None = None
+    """"0000-0002-1825-0097" or its link; empty: none."""
+
+
+@router.put("/profile")
+def set_profile(
+    body: ProfileIn, request: Request, db: DB, user: CurrentUser
+) -> UserOut:
+    """One's display name and ORCID iD (Settings → Account)."""
+    orcid = None
+    if body.orcid and body.orcid.strip():
+        orcid = authors.orcid_of(body.orcid)
+        if orcid is None or not authors.valid_orcid(orcid):
+            raise HTTPException(422, "not an ORCID iD (0000-0002-1825-0097)")
+    user.display_name = (body.display_name or "").strip() or None
+    user.orcid = orcid
+    db.commit()
+    return session_user_out(user, db, request)

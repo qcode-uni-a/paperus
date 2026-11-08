@@ -61,7 +61,7 @@
 		<p>
 			The paperus extension asks to connect to your library. It may then add papers (with their
 			PDFs) and see which papers you have, nothing else. You can end it any time under
-			<a href={resolve('/settings')}>Settings → Access tokens</a>.
+			<a href="{resolve('/settings')}?open=tokens">Settings → Access tokens</a>.
 		</p>
 		{#if error}<p class="error">{error}</p>{/if}
 		<button class="primary" onclick={connect} disabled={busy}>Connect the extension</button>

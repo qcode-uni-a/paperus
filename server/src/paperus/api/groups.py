@@ -11,7 +11,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from paperus import organize
 from paperus.access import Access, Forbidden
@@ -90,6 +90,7 @@ class GroupChange(BaseModel):
 class MemberOut(BaseModel):
     user_id: uuid.UUID
     username: str
+    display_name: str | None = None
     role: Role
     """Effective role: the highest of the direct and inherited ones."""
     direct_role: Role | None
@@ -106,6 +107,7 @@ class MemberIn(BaseModel):
 class UserBrief(BaseModel):
     id: uuid.UUID
     username: str
+    display_name: str | None = None
 
 
 def _ancestors(db: DB, group: Group) -> list[Group]:
@@ -351,17 +353,18 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
     chain = [group, *_ancestors(db, group)]
     names = {g.id: g.name for g in chain}
     rows = db.execute(
-        select(Membership, User.username, User.avatar_version)
+        select(Membership, User.username, User.display_name, User.avatar_version)
         .join(User, User.id == Membership.user_id)
         .where(Membership.group_id.in_(names))
     )
     members: dict[uuid.UUID, MemberOut] = {}
-    for membership, username, avatar_version in rows:
+    for membership, username, display_name, avatar_version in rows:
         role = Role(membership.role)
         here = membership.group_id == group.id
         current = members.get(membership.user_id) or MemberOut(
             user_id=membership.user_id,
             username=username,
+            display_name=display_name,
             role=role,
             direct_role=None,
             inherited_from=None,
@@ -476,11 +479,20 @@ def find_users(
     access: CurrentAccess,
     q: Annotated[str, Query(max_length=64)] = "",
 ) -> list[UserBrief]:
-    """People to add to a group, by username; for site administrators and
-    group admins."""
+    """People to add to a group, by username or display name; for site
+    administrators and group admins."""
     if not (access.site_admin or Role.ADMIN in access.roles.values()):
         raise HTTPException(403, "only admins look up people")
     query = select(User).order_by(func.lower(User.username)).limit(20)
     if q.strip():
-        query = query.where(User.username.icontains(q.strip(), autoescape=True))
-    return [UserBrief(id=user.id, username=user.username) for user in db.scalars(query)]
+        words = q.strip()
+        query = query.where(
+            or_(
+                User.username.icontains(words, autoescape=True),
+                User.display_name.icontains(words, autoescape=True),
+            )
+        )
+    return [
+        UserBrief(id=user.id, username=user.username, display_name=user.display_name)
+        for user in db.scalars(query)
+    ]

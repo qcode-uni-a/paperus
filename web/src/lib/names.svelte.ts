@@ -32,3 +32,8 @@ export function personName(person: { name: string; written?: string }): string {
 export function nameSeparator(): string {
 	return nameFormat() === 'family-given' ? '; ' : ', ';
 }
+
+/** A user as others see them: their display name, else their username. */
+export function shownName(user: { username: string; display_name?: string | null }): string {
+	return user.display_name || user.username;
+}

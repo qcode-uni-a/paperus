@@ -93,9 +93,9 @@ class RevisionOut(BaseModel):
 
 
 def _username(db: DB, user_id: uuid.UUID | None) -> str | None:
-    return (
-        db.scalar(select(User.username).where(User.id == user_id)) if user_id else None
-    )
+    """How the person is shown: their display name, else username."""
+    user = db.get(User, user_id) if user_id else None
+    return (user.display_name or user.username) if user else None
 
 
 def _excerpt(note: Note) -> str:

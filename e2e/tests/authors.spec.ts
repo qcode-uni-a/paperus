@@ -180,7 +180,7 @@ test('names written family name first, or as one chooses', async ({ page, browse
 	await own.goto(`/items/${id}`);
 	await expect(own.getByRole('link', { name: `${family}, Daniel` })).toBeVisible();
 
-	await own.goto('/settings');
+	await own.goto('/settings?open=appearance');
 	await own.getByRole('radio', { name: /Given name first/ }).check();
 	await expect(own.getByText('Saved.')).toBeVisible();
 	await own.goto(`/items/${id}`);

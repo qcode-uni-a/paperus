@@ -138,6 +138,7 @@ class ItemOut(BaseModel):
 class Person(BaseModel):
     id: uuid.UUID
     username: str
+    display_name: str | None = None
     avatar_url: str | None = None
 
 
@@ -244,6 +245,7 @@ def item_detail(
         added_by=Person(
             id=adder.id,
             username=adder.username,
+            display_name=adder.display_name,
             avatar_url=avatar_url(adder.id, adder.avatar_version),
         )
         if adder

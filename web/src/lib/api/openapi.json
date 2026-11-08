@@ -423,6 +423,48 @@
         }
       }
     },
+    "/api/auth/profile": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Set Profile",
+        "description": "One's display name and ORCID iD (Settings \u2192 Account).",
+        "operationId": "set_profile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/avatar": {
       "put": {
         "tags": [
@@ -6544,7 +6586,7 @@
           "groups"
         ],
         "summary": "Find Users",
-        "description": "People to add to a group, by username; for site administrators and\ngroup admins.",
+        "description": "People to add to a group, by username or display name; for site\nadministrators and group admins.",
         "operationId": "find_users",
         "parameters": [
           {
@@ -11049,6 +11091,17 @@
             "type": "string",
             "title": "Username"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "role": {
             "$ref": "#/components/schemas/Role"
           },
@@ -12239,6 +12292,17 @@
             "type": "string",
             "title": "Username"
           },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
           "avatar_url": {
             "anyOf": [
               {
@@ -12351,6 +12415,35 @@
           "title"
         ],
         "title": "Problem"
+      },
+      "ProfileIn": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid"
+          }
+        },
+        "type": "object",
+        "title": "ProfileIn"
       },
       "Progress": {
         "properties": {
@@ -14348,6 +14441,17 @@
           "username": {
             "type": "string",
             "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           }
         },
         "type": "object",
@@ -14409,6 +14513,40 @@
           "username": {
             "type": "string",
             "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "orcid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orcid"
+          },
+          "author_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Id"
           },
           "is_admin": {
             "type": "boolean",
@@ -14488,6 +14626,17 @@
           "username": {
             "type": "string",
             "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
           },
           "is_admin": {
             "type": "boolean",

@@ -358,6 +358,7 @@ ROUTES = {
     ("GET", "/api/storage"): None,
     ("DELETE", "/api/trash"): None,
     ("PUT", "/api/auth/name-format"): None,
+    ("PUT", "/api/auth/profile"): None,
     ("GET", "/api/trash"): None,
     ("POST", "/api/uploads"): "papers.write",
     ("GET", "/api/uploads/{sha256}"): "papers.read",

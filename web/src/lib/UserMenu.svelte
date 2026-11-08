@@ -6,12 +6,13 @@
 	import Avatar from '#lib/Avatar.svelte';
 	import Icon from '#lib/Icon.svelte';
 	import { logout, session } from '#lib/session.svelte.ts';
+	import { shownName } from '#lib/names.svelte.ts';
 
 	let menu = $state<HTMLElement>();
 
 	$effect(() => closeOnScroll(() => menu?.hidePopover()));
 
-	const name = $derived(session.user?.username ?? '');
+	const name = $derived(session.user ? shownName(session.user) : '');
 
 	async function signOut() {
 		menu?.hidePopover();

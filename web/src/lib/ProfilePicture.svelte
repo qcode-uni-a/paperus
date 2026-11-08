@@ -4,6 +4,7 @@
 	import AvatarEditor from '#lib/AvatarEditor.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import { shownName } from '#lib/names.svelte.ts';
 
 	/** One's profile picture: placed in the circle in an editor here, then
 	 * only the small result is sent. */
@@ -41,7 +42,11 @@
 {/if}
 
 <div class="picture">
-	<Avatar name={session.user?.username ?? ''} url={session.user?.avatar_url} size={88} />
+	<Avatar
+		name={session.user ? shownName(session.user) : ''}
+		url={session.user?.avatar_url}
+		size={88}
+	/>
 	<div class="actions">
 		<p class="muted">Shown next to your name in the menu, in groups and to administrators.</p>
 		<div class="buttons">

@@ -116,13 +116,13 @@ export function watchExport(exportId: string): void {
 							data.parts.length > 1
 								? `${data.parts.length} zips to download, for a day.`
 								: 'A zip to download, for a day.',
-						link: { href: `${resolve('/settings')}#export`, label: 'Download' }
+						link: { href: `${resolve('/settings')}?open=export`, label: 'Download' }
 					}
 				: {
 						kind: 'warning',
 						title: 'The export failed',
 						text: data.error ?? undefined,
-						link: { href: `${resolve('/settings')}#export`, label: 'Details' }
+						link: { href: `${resolve('/settings')}?open=export`, label: 'Details' }
 					}
 		);
 	};

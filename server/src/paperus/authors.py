@@ -85,6 +85,16 @@ def orcid_of(value: object) -> str | None:
     return match.group(1).upper() if match else None
 
 
+def valid_orcid(orcid: str) -> bool:
+    """Whether an iD's check digit fits (ISO 7064 MOD 11-2)."""
+    digits = orcid.replace("-", "")
+    total = 0
+    for digit in digits[:-1]:
+        total = (total + int(digit)) * 2
+    check = (12 - total % 11) % 11
+    return digits[-1] == ("X" if check == 10 else str(check))
+
+
 def written_authors(csl: dict[str, Any]) -> list[Written]:
     """The authors in CSL-JSON, in order (entries without a name left out)."""
     found = []

@@ -42,7 +42,7 @@
 			</li>
 		</ol>
 		<div class="buttons">
-			<button onclick={() => close(resolve('/settings'))}>Settings</button>
+			<button onclick={() => close(`${resolve('/settings')}?open=owner`)}>Settings</button>
 			<button onclick={() => close(resolve('/items/[id]', { id: hint.itemId }))}
 				>Open the paper</button
 			>

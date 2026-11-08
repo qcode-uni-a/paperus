@@ -6,7 +6,10 @@ test('export the library and download it', async ({ page }) => {
 	await uploadPaper(page, 'Export');
 	await page.goto('/settings#export');
 	const section = page.locator('section#export');
-	await expect(section.getByRole('heading', { name: 'Export' })).toBeVisible();
+	await expect(section.getByRole('button', { name: /^Export Your papers/ })).toHaveAttribute(
+		'aria-expanded',
+		'true'
+	);
 	// The size is estimated before exporting.
 	await expect(section.getByText(/\d+ papers?, \d+ notes?, \d+ files?: about/)).toBeVisible();
 	await section.getByRole('button', { name: 'Export', exact: true }).click();

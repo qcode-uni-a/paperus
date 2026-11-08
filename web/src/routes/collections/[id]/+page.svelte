@@ -128,7 +128,7 @@
 					>
 					<button
 						role="menuitem"
-						onclick={() => goto(`${resolve('/settings')}?export=${id}#export`)}
+						onclick={() => goto(`${resolve('/settings')}?open=export&export=${id}`)}
 						>Export with files and notes…</button
 					>
 					{#if writable}

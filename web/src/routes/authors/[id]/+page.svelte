@@ -16,6 +16,7 @@
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import { ago } from '#lib/format.ts';
 	import { personName } from '#lib/names.svelte.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { writableLibraries } from '#lib/organize.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
@@ -164,6 +165,9 @@
 	<header class="head">
 		<p class="kicker"><a href={resolve('/manage/authors')}>Authors</a></p>
 		<h1>{personName(author)}</h1>
+		{#if author.id === session.user?.author_id}<p class="you">
+				This is you (your ORCID iD, in <a href="{resolve('/settings')}?open=account">Settings</a>).
+			</p>{/if}
 		<p class="meta">
 			{author.papers}
 			{author.papers === 1 ? 'paper' : 'papers'} in your library{#if author.orcid}
@@ -340,6 +344,11 @@
 <CollectionDialog bind:this={collectionDialog} />
 
 <style>
+	.you {
+		margin: 0 0 6px;
+		color: var(--success);
+		font-weight: 600;
+	}
 	.head {
 		display: grid;
 		gap: 4px;

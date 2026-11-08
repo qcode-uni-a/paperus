@@ -78,7 +78,7 @@ test('an app connects through the consent page', async ({ page, playwright, base
 	expect((await api.get('/api/items', { headers: asApp })).status()).toBe(200);
 
 	// Settings shows the app; disconnecting ends its access.
-	await page.goto('/settings');
+	await page.goto('/settings?open=tokens');
 	const app = page.getByRole('listitem').filter({ hasText: clientName });
 	await expect(app).toBeVisible();
 	page.once('dialog', (confirm) => confirm.accept());

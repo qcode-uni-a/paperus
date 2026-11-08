@@ -3,7 +3,7 @@ import { unique } from './helpers.ts';
 
 test('create an access token, use it, revoke it', async ({ page, playwright, baseURL }) => {
 	const name = unique('Script ');
-	await page.goto('/settings');
+	await page.goto('/settings?open=tokens');
 	await expect(page.getByRole('heading', { name: 'Access tokens' })).toBeVisible();
 	await page.getByRole('button', { name: 'New token' }).click();
 	const dialog = page.getByRole('dialog', { name: 'New access token' });

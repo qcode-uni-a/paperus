@@ -155,6 +155,8 @@ def upgrade() -> None:
         sa.Column(
             "handed_over", postgresql.JSONB(astext_type=sa.Text()), nullable=True
         ),
+        sa.Column("display_name", sa.String(length=100), nullable=True),
+        sa.Column("orcid", sa.String(length=19), nullable=True),
         sa.Column(
             "name_format",
             sa.String(length=16),

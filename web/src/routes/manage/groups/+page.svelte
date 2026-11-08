@@ -18,6 +18,7 @@
 	import IconButton from '#lib/IconButton.svelte';
 	import { loadOrganize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { shownName } from '#lib/names.svelte.ts';
 
 	const ROLES: { value: Role; label: string; help: string }[] = [
 		{ value: 'reader', label: 'Reader', help: 'reads and searches' },
@@ -184,9 +185,11 @@
 			<ul class="members">
 				{#each members as member (member.user_id)}
 					<li>
-						<Avatar name={member.username} url={member.avatar_url} size={30} tone="desk" />
+						<Avatar name={shownName(member)} url={member.avatar_url} size={30} tone="desk" />
 						<span class="who">
-							<strong>{member.username}</strong>
+							<strong>{shownName(member)}</strong>{#if member.display_name}<span class="muted"
+									>{member.username}</span
+								>{/if}
 							{#if member.inherited_from}
 								<small>{roleLabel(member.role)} through {member.inherited_from}</small>
 							{/if}
@@ -194,7 +197,7 @@
 						{#if selected.can_manage}
 							<select
 								value={member.direct_role ?? ''}
-								aria-label="Role of {member.username}"
+								aria-label="Role of {shownName(member)}"
 								onchange={async (event) => {
 									const role = event.currentTarget.value as Role | '';
 									await changed(
@@ -219,7 +222,7 @@
 							{#if member.direct_role}
 								<IconButton
 									icon="delete"
-									label="Remove {member.username} from {selected.name}"
+									label="Remove {shownName(member)} from {selected.name}"
 									onclick={async () =>
 										changed(
 											await removeMember({
@@ -249,7 +252,7 @@
 					/>
 					<datalist id="group-people">
 						{#each people.filter((p) => !members.some((m) => m.user_id === p.id && m.direct_role)) as person (person.id)}
-							<option value={person.username}></option>
+							<option value={person.username}>{person.display_name ?? ''}</option>
 						{/each}
 					</datalist>
 					<select bind:value={newRole} aria-label="Role">
