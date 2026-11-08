@@ -343,12 +343,13 @@ Variables):
   (owner `qcode-uni-a`, repository `paperus`, workflow `release.yml`,
   environment `pypi` for `paperus` and `pypi-ml` for `paperus-ml`), then
   `PUBLISH_PYPI` = `true`.
-- npm (`paperus`): a secret `NPM_TOKEN` for the first release (a granular
-  token that may publish, valid for a few days), then `PUBLISH_NPM` =
-  `true`. After the first release, set up trusted publishing in the
-  package's settings on npmjs.com (GitHub Actions, owner `qcode-uni-a`,
-  repository `paperus`, workflow `release.yml`, environment `npm`), then
-  delete the token and the secret.
+- npm (`paperus`): trusted publishing, no token (set up 2026-11-08 in the
+  package's settings on npmjs.com: GitHub Actions, owner `qcode-uni-a`,
+  repository `paperus`, workflow `release.yml`, environment `npm`; staged
+  only, and two-factor authentication without bypass tokens), and
+  `PUBLISH_NPM` = `true`. A release stages the new version; it goes live
+  once a maintainer approves it with their two-factor code (npmjs.com →
+  Staged Packages, or `npm stage approve <id>`).
 
 - Firefox add-on (addons.mozilla.org, listed since 0.0.10): an API key
   from <https://addons.mozilla.org/developers/addon/api/key/> as the
