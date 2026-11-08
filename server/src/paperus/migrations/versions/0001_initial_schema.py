@@ -493,6 +493,7 @@ def upgrade() -> None:
         sa.Column("authors_key", sa.String(length=64), nullable=True),
         sa.Column("authors_linked", sa.String(length=64), nullable=True),
         sa.Column("authors_checked_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("abstract", sa.Text(), nullable=True),
         sa.Column(
             "overrides",
             postgresql.JSONB(astext_type=sa.Text()),

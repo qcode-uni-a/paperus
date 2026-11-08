@@ -1,5 +1,6 @@
 """Turning stored files into searchable chunks."""
 
+import dataclasses
 import hashlib
 import logging
 import uuid
@@ -10,6 +11,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import abstracts
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
 from paperus.storage import BlobStore
@@ -43,6 +45,8 @@ class _Text:
     """Pages (from 0) without text that OCR has not read yet."""
     with_ocr: bool = False
     """Some pages' text comes from OCR."""
+    first_pages: list[str] = dataclasses.field(default_factory=list)
+    """A PDF's first pages as read (for its abstract)."""
 
 
 def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
@@ -74,7 +78,7 @@ def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
         else:
             scans.append(index)
     with_ocr = any(index in read for index in range(len(pages)))
-    return _Text(chunk_pages(pages), scans, with_ocr)
+    return _Text(chunk_pages(pages), scans, with_ocr, pages[:2])
 
 
 def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
@@ -186,6 +190,10 @@ def process_file(
         _store_manifest(db, file, chunks)
         file.text_status = TextStatus.DONE
         _identify(db, blobs, http, file)
+        # Without one in its details: the abstract the PDF begins with.
+        if file.version is not None:
+            found = abstracts.from_pages(read.first_pages)
+            abstracts.take(file.version.item, found, replace=False)
     db.commit()
     return file.ocr_status == OcrStatus.PENDING
 

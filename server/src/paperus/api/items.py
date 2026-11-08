@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
 
-from paperus import changes, library, merge, metadata
+from paperus import abstracts, changes, library, merge, metadata
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
@@ -147,6 +147,9 @@ class ItemDetail(ItemOut):
     """Who brought the paper in (None if unknown or the account is gone)."""
     csl: dict[str, Any]
     """Metadata for citing: the preferred version's plus manual edits."""
+    abstract: str | None = None
+    """As text (Crossref's markup taken out), paragraphs between blank
+    lines; one found elsewhere if the details have none."""
     overrides: dict[str, Any]
     preferred_version_id: uuid.UUID | None
     versions: list[VersionOut]
@@ -250,7 +253,8 @@ def item_detail(
         )
         if adder
         else None,
-        csl=library.citation_csl(item),
+        csl=(csl := library.citation_csl(item)),
+        abstract=abstracts.plain(str(csl["abstract"])) if csl.get("abstract") else None,
         overrides=item.overrides,
         preferred_version_id=preferred.id if preferred else None,
         versions=[version_out(v) for v in item.versions],

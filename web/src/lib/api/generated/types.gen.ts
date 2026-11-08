@@ -1583,6 +1583,10 @@ export type ItemDetail = {
         [key: string]: unknown;
     };
     /**
+     * Abstract
+     */
+    abstract?: string | null;
+    /**
      * Overrides
      */
     overrides: {

@@ -320,6 +320,12 @@
 					title="Papers by {writtenName(author)} in the library">{writtenName(author)}</a
 				>{/each}
 		</p>
+		{#if item.abstract}
+			<details class="abstract">
+				<summary>Abstract</summary>
+				{#each item.abstract.split('\n\n') as paragraph, i (i)}<p>{paragraph}</p>{/each}
+			</details>
+		{/if}
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
@@ -528,6 +534,19 @@
 {/if}
 
 <style>
+	.abstract {
+		max-width: 75ch;
+		margin: 4px 0 0;
+	}
+	.abstract summary {
+		color: var(--muted);
+		font-size: var(--step--1);
+		cursor: pointer;
+	}
+	.abstract p {
+		margin: 6px 0 0;
+		line-height: 1.55;
+	}
 	.person {
 		color: inherit;
 		text-decoration: none;

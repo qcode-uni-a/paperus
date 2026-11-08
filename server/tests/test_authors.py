@@ -407,6 +407,7 @@ class FakeOpenAlex:
 
     def __init__(self) -> None:
         self.works: dict[str, list[tuple[str, str, str | None, str | None]]] = {}
+        self.abstracts: dict[str, dict[str, list[int]]] = {}
         self.status = 200
         self.asked: list[str] = []
 
@@ -419,6 +420,7 @@ class FakeOpenAlex:
         results = [
             {
                 "doi": f"https://doi.org/{doi}",
+                "abstract_inverted_index": self.abstracts.get(doi),
                 "authorships": [
                     {
                         "author": {

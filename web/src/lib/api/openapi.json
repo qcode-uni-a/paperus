@@ -10193,6 +10193,17 @@
             "type": "object",
             "title": "Csl"
           },
+          "abstract": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abstract"
+          },
           "overrides": {
             "additionalProperties": true,
             "type": "object",

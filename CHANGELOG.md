@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Abstracts**: shown (folded) on a paper's page. A paper whose details
+  have none gets OpenAlex's (asked anyway for its authors), else the
+  paragraph after the "Abstract" heading of its PDF; its details' own,
+  and one removed by hand, always win (`items.abstract`, added to the one
+  migration).
+
 ## 0.0.16 (2026-11-09)
 
 - **Database**: the one migration (`0001`) gained the columns

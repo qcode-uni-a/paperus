@@ -33,7 +33,7 @@ import httpx2
 from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from paperus import library
+from paperus import abstracts, library
 from paperus.identifiers import Scheme
 from paperus.importing.references import Pacer
 from paperus.models import (
@@ -348,7 +348,8 @@ def look_up(
 ) -> int:
     """Each paper's authors as OpenAlex knows the paper (by its DOI, 50 to
     a request): their OpenAlex ids, ORCID iDs and affiliations on it; then
-    linked again (ids win over names). Returns how many papers OpenAlex
+    linked again (ids win over names). Its abstract too, if its details
+    have none (``paperus.abstracts``). Returns how many papers OpenAlex
     knew. Does not commit."""
     now = datetime.now(UTC)
     by_doi: dict[str, list[Item]] = {}
@@ -362,7 +363,7 @@ def look_up(
         params = {
             "filter": "doi:" + "|".join(dois[start : start + OPENALEX_BATCH]),
             "per-page": str(OPENALEX_BATCH),
-            "select": "doi,authorships",
+            "select": "doi,authorships,abstract_inverted_index",
         }
         if contact_email:
             params["mailto"] = contact_email
@@ -378,6 +379,8 @@ def look_up(
             doi = str(work.get("doi") or "").removeprefix("https://doi.org/").lower()
             for item in by_doi.get(doi, []):
                 _take(db, item, work.get("authorships") or [])
+                found = abstracts.from_openalex(work.get("abstract_inverted_index"))
+                abstracts.take(item, found, replace=True)
                 known += 1
     db.flush()
     return known

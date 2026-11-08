@@ -408,6 +408,9 @@ class Item(Record, Trashable, Base):
     authors_linked: Mapped[str | None] = mapped_column(String(64))
     authors_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """When its authors were looked up at OpenAlex (``paperus.authors``)."""
+    abstract: Mapped[str | None] = mapped_column(Text)
+    """Found elsewhere while its details have none: OpenAlex's, else the
+    PDF's (``paperus.abstracts``)."""
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )

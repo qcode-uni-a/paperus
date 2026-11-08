@@ -67,7 +67,8 @@ def preferred_of(versions: Sequence[Version]) -> Version | None:
 
 
 def citation_csl(item: Item) -> dict[str, Any]:
-    """The preferred version's metadata with the item's manual edits applied."""
+    """The preferred version's metadata with the item's manual edits
+    applied; without an abstract, the one found for it (``paperus.abstracts``)."""
     version = preferred_version(item)
     csl = dict(version.csl) if version else {}
     for key, value in item.overrides.items():
@@ -75,6 +76,8 @@ def citation_csl(item: Item) -> dict[str, Any]:
             csl.pop(key, None)
         else:
             csl[key] = value
+    if item.abstract and "abstract" not in csl and "abstract" not in item.overrides:
+        csl["abstract"] = item.abstract
     return csl
 
 
