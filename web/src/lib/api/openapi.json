@@ -11268,6 +11268,14 @@
               }
             ],
             "title": "Reason"
+          },
+          "refused": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Refused",
+            "default": []
           }
         },
         "type": "object",

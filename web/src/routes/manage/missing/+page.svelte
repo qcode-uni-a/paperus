@@ -127,12 +127,14 @@
 	/** Ask the extension to get these papers' PDFs at their publishers. */
 	function getWithExtension(papers: MissingPaper[], section: Section) {
 		const wanted = papers
-			.filter((p) => writable(p) && publisherLink(p))
+			.filter((p) => writable(p) && (publisherLink(p) || p.refused?.length))
 			.map((p) => ({
 				item_id: p.item.id,
 				version_id: section === 'journal' ? p.version_id : null,
 				title: plainTitle(p.item.title),
-				url: publisherLink(p)!
+				url: publisherLink(p) ?? '',
+				// Open copies that refused the server: the browser may get them.
+				copies: p.refused ?? []
 			}));
 		if (!wanted.length) return;
 		for (const p of wanted) problems[p.item_id] = '';

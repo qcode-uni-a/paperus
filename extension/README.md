@@ -13,7 +13,8 @@ does the same; a full one with a check means you have it already.
 - **Many PDFs at once**: paperus' Manage → Missing page asks the extension
   to get the PDFs of papers it lacks: each opened at its publisher in a
   background tab, its PDF saved into the paper. The first time, a small
-  window asks for access to publisher sites (the browser's prompt). A
+  window asks for access to publisher sites (the browser's prompt). Open
+  copies whose sites refused paperus' server are fetched first. A
   paper that fails says why: a check for robots (a captcha), no access (a
   login or paywall), or no PDF on the page. The result shows in paperus.
 

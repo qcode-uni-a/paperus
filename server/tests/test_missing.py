@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from paperus import missing
@@ -152,6 +153,23 @@ def test_missing_lists_papers_without_files(
     ]
     assert [p["open_access"] for p in found["papers"]] == [False, True]
     assert ada.get("/api/manage/counts").json()["missing"] == 2
+    # Copies that refused the server: for the browser extension to try.
+    db.execute(
+        update(Item)
+        .where(Item.id == uuid.UUID(paper["id"]))
+        .values(
+            open_access_error=(
+                "https://journal.example/x.pdf: Client error '403 Forbidden' for url "
+                "'https://journal.example/x.pdf'; https://repo.example/y.pdf: not a "
+                "PDF (probably a web page); https://gone.example/z.pdf: 404"
+            )
+        )
+    )
+    db.commit()
+    assert listed(ada)["papers"][1]["refused"] == [
+        "https://journal.example/x.pdf",
+        "https://repo.example/y.pdf",
+    ]
 
     # No file needed: it leaves the list, and comes back.
     url = f"/api/items/{page['id']}/file-wanted"

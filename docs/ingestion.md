@@ -42,10 +42,12 @@ background with Administration → Server → Open-access copies):
 1. **Server, open access only** (done): the journal's own open copy where
    OpenAlex lists one (published or accepted version), else the paper's
    arXiv version (found via OpenAlex by its DOI; added as the paper's
-   preprint version, with its details from arXiv's DOI), else what
-   Unpaywall knows (with the contact email). Publishers often refuse
-   downloads by servers even of open papers (ACS answered 403 in a test);
-   then the browser gets them. Manage → Missing also lists published
+   preprint version, with its details from arXiv's DOI), else every
+   open copy OpenAlex and Unpaywall (with the contact email) list:
+   repositories before publishers. Publishers often refuse downloads by
+   servers even of open papers (ACS answered 403 in a test); Manage →
+   Missing then hands those copies to the extension, which fetches them
+   first. Manage → Missing also lists published
    papers with only their preprint's PDF ("Only the preprint"); open
    access there means the journal's copy only. Later: re-check
    periodically, since open versions often appear later.

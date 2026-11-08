@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Open-access PDFs from every open copy**: the server tries all the open
+  copies OpenAlex and Unpaywall list (arXiv first, then repositories such
+  as a university's, the publisher last), not only Unpaywall's best one;
+  OpenAlex is asked without a contact email too. Copies whose sites
+  refuse the server (publishers often do) are handed to the browser
+  extension from Manage → Missing, which fetches them first.
+
 ## 0.0.15 (2026-11-08)
 
 - **Authors as people** (#35, first part): each paper's authors are linked

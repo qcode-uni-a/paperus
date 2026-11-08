@@ -2257,6 +2257,10 @@ export type MissingPaper = {
      * Reason
      */
     reason?: string | null;
+    /**
+     * Refused
+     */
+    refused?: Array<string>;
 };
 
 /**

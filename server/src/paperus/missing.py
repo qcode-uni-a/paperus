@@ -179,11 +179,8 @@ def plain_reason(error: str | None, contact_email: str | None) -> str | None:
 
 def may_have_copy(item: Item, contact_email: str | None) -> bool:
     """Whether the server may find an open-access copy: an arXiv ID, or a
-    DOI (its arXiv version via OpenAlex, or Unpaywall with a contact
-    email)."""
-    return bool(open_access.sources(item, contact_email)) or bool(
-        _identifiers(item, Scheme.DOI)
-    )
+    DOI (the open copies OpenAlex and Unpaywall list)."""
+    return bool(open_access.sources(item, contact_email))
 
 
 def add_journal_copy(

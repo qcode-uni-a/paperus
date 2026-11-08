@@ -196,9 +196,86 @@ def test_unpaywall_without_a_copy(blobs: BlobStore) -> None:
                 contact_email="lab@example.org",
                 max_bytes=10**6,
             )
-    # Without a contact email Unpaywall is not asked.
-    with pytest.raises(open_access.NoSource, match="no open-access source"):
-        open_access.fetch(web(down), blobs, item, contact_email=None, max_bytes=10)
+    # Without a contact email Unpaywall is not asked (OpenAlex is).
+    asked: list[str] = []
+
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        asked.append(str(request.url.host))
+        return httpx2.Response(404)
+
+    with pytest.raises(open_access.NoSource, match="no open-access PDF"):
+        open_access.fetch(web(answer), blobs, item, contact_email=None, max_bytes=10)
+    assert asked == ["api.openalex.org"]
+
+
+def test_every_open_copy_is_tried(blobs: BlobStore) -> None:
+    """arXiv, then repositories, the publisher last; one refusing copy (as
+    publishers refuse servers) does not end the search."""
+    tried: list[str] = []
+    openalex = [
+        {"is_oa": True, "pdf_url": "https://journal.example/x.pdf"},
+        {
+            "is_oa": True,
+            "pdf_url": "https://repo.example/x.pdf",
+            "source": {"type": "repository"},
+        },
+        {"is_oa": False, "pdf_url": "https://closed.example/x.pdf"},
+        {"is_oa": True, "pdf_url": "http://plain.example/x.pdf"},
+        {"is_oa": True, "source": None},
+    ]
+    unpaywall = {
+        "best_oa_location": {
+            "url_for_pdf": "https://journal.example/x.pdf",
+            "host_type": "publisher",
+        },
+        "oa_locations": [
+            {"url_for_pdf": "https://csic.example/x.pdf", "host_type": "repository"},
+            "not a location",
+        ],
+    }
+
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "api.openalex.org":
+            return httpx2.Response(200, json={"locations": openalex})
+        if request.url.host == "api.unpaywall.org":
+            return httpx2.Response(200, json=unpaywall)
+        tried.append(str(request.url))
+        if request.url.host == "csic.example":
+            return httpx2.Response(200, content=GOOD)
+        return httpx2.Response(403)
+
+    doi = "10.1103/physrevb.1.2"
+    assert open_access.open_copies(web(answer), doi, "a@b.org") == [
+        "https://repo.example/x.pdf",
+        "https://csic.example/x.pdf",
+        "https://journal.example/x.pdf",
+    ]
+    _, url = open_access.fetch(
+        web(answer),
+        blobs,
+        paper(Scheme.DOI, doi),
+        contact_email="a@b.org",
+        max_bytes=10**6,
+    )
+    assert url == "https://csic.example/x.pdf"
+    assert tried == ["https://repo.example/x.pdf", "https://csic.example/x.pdf"]
+
+    # Unpaywall unreachable or failing: OpenAlex's copies still count.
+    def no_unpaywall(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "api.unpaywall.org":
+            raise httpx2.ConnectError("down", request=request)
+        return answer(request)
+
+    def unpaywall_fails(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "api.unpaywall.org":
+            return httpx2.Response(500)
+        return answer(request)
+
+    for handler in (no_unpaywall, unpaywall_fails):
+        assert open_access.open_copies(web(handler), doi, "a@b.org") == [
+            "https://repo.example/x.pdf",
+            "https://journal.example/x.pdf",
+        ]
 
 
 def test_too_large_is_not_stored(blobs: BlobStore) -> None:

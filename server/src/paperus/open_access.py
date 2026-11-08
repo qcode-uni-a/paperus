@@ -1,5 +1,6 @@
-"""Open-access PDFs fetched by the server: from arXiv by arXiv ID, and from
-Unpaywall's best open location by DOI. Never from publishers' own pages
+"""Open-access PDFs fetched by the server: from arXiv by arXiv ID, and by DOI
+from the open copies OpenAlex and Unpaywall list (repositories before
+publishers). Never from publishers' own pages
 behind a login (see docs/ingestion.md). OpenAlex says whether a paper known
 by its DOI is on arXiv too."""
 
@@ -32,20 +33,20 @@ class NoSource(Exception):
 
 
 def sources(item: Item, contact_email: str | None) -> list[str]:
-    """Where an open-access PDF of the paper may be: arXiv first, then
-    Unpaywall (asked only with a contact email, as it requires one)."""
+    """Where an open-access PDF of the paper may be: arXiv first, then the
+    open copies OpenAlex and Unpaywall list for its DOI (``doi:…``;
+    Unpaywall is asked only with a contact email, as it requires one)."""
     found: list[str] = []
     for version in item.versions:
         for identifier in version.identifiers:
             if identifier.scheme == Scheme.ARXIV:
                 found.append(f"https://arxiv.org/pdf/{identifier.value}")
-    if contact_email:
-        for version in item.versions:
-            for identifier in version.identifiers:
-                if identifier.scheme == Scheme.DOI and not identifier.value.startswith(
-                    "10.48550/"
-                ):
-                    found.append(f"unpaywall:{identifier.value}")
+    for version in item.versions:
+        for identifier in version.identifiers:
+            if identifier.scheme == Scheme.DOI and not identifier.value.startswith(
+                "10.48550/"
+            ):
+                found.append(f"doi:{identifier.value}")
     return list(dict.fromkeys(found))
 
 
@@ -101,29 +102,82 @@ def fetch(
     NoSource if none does."""
     tried: list[str] = []
     for source in sources(item, contact_email):
-        url = source
-        if source.startswith("unpaywall:"):
-            url = _unpaywall_pdf(http, source.removeprefix("unpaywall:"), contact_email)
-            if url is None:
+        urls = [source]
+        if source.startswith("doi:"):
+            urls = open_copies(http, source.removeprefix("doi:"), contact_email)
+            if not urls:
                 tried.append(f"{source}: no open-access PDF")
                 continue
-        try:
-            return _download(http, blobs, url, max_bytes), url
-        except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
-            log.info("no PDF from %s: %s", url, error)
-            tried.append(
-                f"{url}: {TOO_LARGE if isinstance(error, TooLarge) else error}"
-            )
+        for url in urls:
+            try:
+                return _download(http, blobs, url, max_bytes), url
+            except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
+                log.info("no PDF from %s: %s", url, error)
+                tried.append(
+                    f"{url}: {TOO_LARGE if isinstance(error, TooLarge) else error}"
+                )
     raise NoSource("; ".join(tried) or "no open-access source is known for this paper")
 
 
-def _unpaywall_pdf(http: httpx2.Client, doi: str, email: str | None) -> str | None:
-    response = http.get(f"{UNPAYWALL}{doi}", params={"email": email}, timeout=15)
+def open_copies(http: httpx2.Client, doi: str, contact_email: str | None) -> list[str]:
+    """Every open PDF of the paper that OpenAlex or Unpaywall lists, arXiv
+    first, then repositories (a university's, a funder's), the publisher
+    last: publishers often refuse servers, so one refusing copy does not
+    end the search. Unpaywall only with a contact email."""
+    found: list[tuple[int, object]] = []
+    for location in _openalex_locations(http, doi, contact_email):
+        source = location.get("source") or {}
+        if location.get("is_oa"):
+            kind = source.get("type") if isinstance(source, dict) else None
+            found.append(
+                (_rank(location.get("pdf_url"), kind), location.get("pdf_url"))
+            )
+    if contact_email:
+        for location in _unpaywall_locations(http, doi, contact_email):
+            kind = location.get("host_type")
+            found.append(
+                (_rank(location.get("url_for_pdf"), kind), location.get("url_for_pdf"))
+            )
+    urls = [
+        url
+        for _, url in sorted(found, key=lambda pair: pair[0])
+        if isinstance(url, str) and url.startswith("https://")
+    ]
+    return list(dict.fromkeys(urls))
+
+
+def refused(error: str | None) -> list[str]:
+    """The copies a try noted as refusing the download or giving a web page
+    (``url: reason; …``, as ``fetch`` notes them): open, so a browser may
+    still get them where the server may not."""
+    return [
+        url
+        for url, reason in re.findall(r"(https://[^\s;]+): ([^;]*)", error or "")
+        if re.search(r"\b40[13]\b|not a PDF", reason)
+    ]
+
+
+def _rank(url: object, kind: object) -> int:
+    if isinstance(url, str) and _ARXIV_URL.search(url):
+        return 0
+    return 1 if kind == "repository" else 2
+
+
+def _unpaywall_locations(
+    http: httpx2.Client, doi: str, email: str
+) -> list[dict[str, Any]]:
+    """Unpaywall's open copies of the paper, its best first."""
+    try:
+        response = http.get(f"{UNPAYWALL}{doi}", params={"email": email}, timeout=15)
+    except httpx2.HTTPError as error:
+        log.info("Unpaywall did not answer for %s: %s", doi, error)
+        return []
     if response.status_code != 200:
-        return None
-    best = (response.json() or {}).get("best_oa_location") or {}
-    url = best.get("url_for_pdf")
-    return url if isinstance(url, str) and url.startswith("https://") else None
+        return []
+    found = response.json() or {}
+    best = found.get("best_oa_location")
+    locations = [best, *(found.get("oa_locations") or [])]
+    return [location for location in locations if isinstance(location, dict)]
 
 
 JOURNAL_VERSIONS = ("publishedVersion", "acceptedVersion")

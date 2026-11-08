@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from paperus import authors, duplicates, library, missing, system
+from paperus import authors, duplicates, library, missing, open_access, system
 from paperus.access import Access
 from paperus.api.authors import changeable_papers
 from paperus.api.deps import DB, CurrentAccess
@@ -154,6 +154,9 @@ class MissingPaper(BaseModel):
     """Why that try found none, as noted (addresses and HTTP errors)."""
     reason: str | None = None
     """The same in plain words, with what to do."""
+    refused: list[str] = []
+    """Open copies whose sites refused the server (publishers often refuse
+    servers): the browser extension tries them first."""
 
 
 class MissingCounts(BaseModel):
@@ -212,6 +215,7 @@ def missing_papers(
             tried_at=item.open_access_tried_at,
             error=item.open_access_error,
             reason=missing.plain_reason(item.open_access_error, email),
+            refused=open_access.refused(item.open_access_error),
         )
 
     return MissingPapers(
