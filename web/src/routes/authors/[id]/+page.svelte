@@ -8,11 +8,14 @@
 		listItems,
 		mergeAuthors,
 		splitAuthor,
+		undoAuthorChange,
 		type Item
 	} from '#lib/api/client.ts';
-	import type { AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
+	import type { AuthorChangeOut, AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
+	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import { writableLibraries } from '#lib/organize.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	/** An author as a person: their papers here, who they wrote with, where
@@ -118,6 +121,26 @@
 		load(id);
 	}
 
+	// Fixes by hand: who is who is shared by everyone, so each is kept and
+	// can be taken back.
+	const DONE: Record<AuthorChangeOut['kind'], string> = {
+		split: 'Papers moved to another',
+		merge: 'Merged with',
+		apart: 'Said to be different from'
+	};
+
+	async function undo(change: AuthorChangeOut) {
+		const { data, error } = await undoAuthorChange({ path: { change_id: change.id } });
+		if (!data) {
+			notify({ kind: 'warning', title: 'Not undone', text: errorMessage(error) });
+			return;
+		}
+		notify({ kind: 'success', title: 'Undone' });
+		load(id);
+	}
+
+	const mayChoose = (item: Item) => writableLibraries().some((l) => l.id === item.library_id);
+
 	const years = (first: number | null, last: number | null) =>
 		!first ? '' : first === last ? String(first) : `${first}–${last}`;
 </script>
@@ -187,7 +210,9 @@
 					<li>
 						<a href={resolve('/authors/[id]', { id: other.id })}>{other.name}</a>
 						<span class="muted">{other.papers} {other.papers === 1 ? 'paper' : 'papers'}</span>
-						<button class="link" onclick={() => merge(other)}>The same person</button>
+						{#if author.may_change}
+							<button class="link" onclick={() => merge(other)}>The same person</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>
@@ -198,10 +223,10 @@
 		<div class="papers-head">
 			<h2>Papers</h2>
 			<div class="row">
-				{#if !splitting && author.papers > 1}
+				{#if author.may_change && !splitting && author.papers > 1}
 					<button onclick={() => (splitting = true)}>Some are by someone else</button>
 				{/if}
-				{#if !merging}
+				{#if author.may_change && !merging}
 					<button onclick={() => (merging = true)}>Same person as…</button>
 				{/if}
 				<button
@@ -260,7 +285,7 @@
 			{#each items as item (item.id)}
 				<ItemRow {item}>
 					{#snippet actions()}
-						{#if splitting}
+						{#if splitting && mayChoose(item)}
 							<label class="choose"
 								><input type="checkbox" bind:group={chosen} value={item.id} /> By someone else</label
 							>
@@ -273,6 +298,33 @@
 			<div class="more"><button onclick={more}>Show more</button></div>
 		{/if}
 	</section>
+
+	{#if author.changes.length}
+		<section class="changes">
+			<h2>Changed by hand</h2>
+			<ul>
+				{#each author.changes as change (change.id)}
+					<li class:undone={change.undone}>
+						<span
+							>{DONE[change.kind]}
+							{#if change.other_id}<a href={resolve('/authors/[id]', { id: change.other_id })}
+									>{change.other_name}</a
+								>{:else}{change.other_name}{/if}{#if change.papers}{' '}({change.papers}
+								{change.papers === 1 ? 'paper' : 'papers'}){/if}</span
+						>
+						<span class="muted"
+							>{change.by_you ? 'by you' : 'by someone else'}, {ago(
+								change.at
+							)}{#if change.undone}{' '}· undone{/if}</span
+						>
+						{#if change.may_undo}
+							<button class="link" onclick={() => undo(change)}>Undo</button>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		</section>
+	{/if}
 {:else}
 	<p class="muted">Loading…</p>
 {/if}
@@ -305,6 +357,7 @@
 	}
 	.places,
 	.namesakes ul,
+	.changes ul,
 	.found {
 		display: grid;
 		gap: 6px;
@@ -318,11 +371,16 @@
 		gap: 4px 12px;
 	}
 	.namesakes li,
+	.changes li,
 	.found li {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
 		gap: 4px 12px;
+	}
+	.changes .undone > span:first-child {
+		text-decoration: line-through;
+		color: var(--muted);
 	}
 	.chips {
 		display: flex;

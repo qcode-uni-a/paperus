@@ -87,6 +87,50 @@ export type Authentication = {
 };
 
 /**
+ * AuthorChangeKind
+ */
+export type AuthorChangeKind = 'split' | 'merge' | 'apart';
+
+/**
+ * AuthorChangeOut
+ */
+export type AuthorChangeOut = {
+    /**
+     * Id
+     */
+    id: string;
+    kind: AuthorChangeKind;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * By You
+     */
+    by_you: boolean;
+    /**
+     * Other Name
+     */
+    other_name: string;
+    /**
+     * Other Id
+     */
+    other_id: string | null;
+    /**
+     * Papers
+     */
+    papers: number;
+    /**
+     * Undone
+     */
+    undone: boolean;
+    /**
+     * May Undo
+     */
+    may_undo: boolean;
+};
+
+/**
  * AuthorOut
  */
 export type AuthorOut = {
@@ -126,6 +170,14 @@ export type AuthorOut = {
      * Namesakes
      */
     namesakes: Array<AuthorRow>;
+    /**
+     * May Change
+     */
+    may_change: boolean;
+    /**
+     * Changes
+     */
+    changes: Array<AuthorChangeOut>;
 };
 
 /**
@@ -5428,6 +5480,36 @@ export type KeepApartResponses = {
 };
 
 export type KeepApartResponse = KeepApartResponses[keyof KeepApartResponses];
+
+export type UndoAuthorChangeData = {
+    body?: never;
+    path: {
+        /**
+         * Change Id
+         */
+        change_id: string;
+    };
+    query?: never;
+    url: '/api/author-changes/{change_id}/undo';
+};
+
+export type UndoAuthorChangeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UndoAuthorChangeError = UndoAuthorChangeErrors[keyof UndoAuthorChangeErrors];
+
+export type UndoAuthorChangeResponses = {
+    /**
+     * Successful Response
+     */
+    200: AuthorRow;
+};
+
+export type UndoAuthorChangeResponse = UndoAuthorChangeResponses[keyof UndoAuthorChangeResponses];
 
 export type FindUploadData = {
     body?: never;

@@ -9,18 +9,25 @@ does not exist for them.
 
 import uuid
 from collections import Counter
+from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from paperus import authors
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.items import ItemOut, get_readable_item, item_out
-from paperus.models import Author, Authorship, Item
+from paperus.models import (
+    Author,
+    AuthorChange,
+    AuthorChangeKind,
+    Authorship,
+    Item,
+)
 
 router = APIRouter(tags=["authors"])
 
@@ -50,6 +57,26 @@ class AuthorOut(AuthorRow):
     """Where they were, from their papers; the newest first ("latest known")."""
     namesakes: list[AuthorRow]
     """Other people of the same name."""
+    may_change: bool
+    """Whether the person may split, merge or keep apart this author: one of
+    their papers is the person's to change (author records are shared)."""
+    changes: list["AuthorChangeOut"]
+    """Fixes by hand, the newest first."""
+
+
+class AuthorChangeOut(BaseModel):
+    id: uuid.UUID
+    kind: AuthorChangeKind
+    at: datetime
+    by_you: bool
+    """Who else made it is not said (it would tell what papers they have)."""
+    other_name: str
+    other_id: uuid.UUID | None
+    """The other person, if they are still there and seen."""
+    papers: int
+    """Of the papers whose author changed person, those one may see."""
+    undone: bool
+    may_undo: bool
 
 
 def visible_papers(access: Access) -> list[ColumnElement[bool]]:
@@ -76,6 +103,85 @@ def _counts(
 
 def _row(author: Author, papers: int) -> AuthorRow:
     return AuthorRow(id=author.id, name=author.name, papers=papers, orcid=author.orcid)
+
+
+def changeable_papers(access: Access) -> list[ColumnElement[bool]]:
+    """Papers whose authors the person may fix: their own to change, not in
+    the trash or the archive."""
+    return [
+        Item.deleted_at.is_(None),
+        Item.archived_at.is_(None),
+        access.item_filter(access.writable),
+    ]
+
+
+def may_change(db: Session, access: Access, author_id: uuid.UUID) -> bool:
+    """Whether the person may fix this author by hand: a paper of theirs is
+    the person's to change."""
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    Authorship.author_id == author_id,
+                    Authorship.item_id == Item.id,
+                    Item.deleted_at.is_(None),
+                    access.item_filter(access.writable),
+                )
+            )
+        )
+    )
+
+
+def _changeable(db: Session, access: Access, *people: Author) -> None:
+    for person in people:
+        if not may_change(db, access, person.id):
+            raise HTTPException(
+                403, f"none of {person.name}'s papers is yours to change"
+            )
+
+
+def _changes(db: Session, access: Access, author: Author) -> list[AuthorChangeOut]:
+    changes = list(
+        db.scalars(
+            select(AuthorChange)
+            .where(
+                or_(
+                    AuthorChange.author_id == author.id,
+                    AuthorChange.other_id == author.id,
+                )
+            )
+            .order_by(AuthorChange.id.desc())
+            .limit(20)
+        )
+    )
+    moved = {uuid.UUID(i) for c in changes for i, _ in c.moved}
+    seen = set(
+        db.scalars(select(Item.id).where(Item.id.in_(moved), *visible_papers(access)))
+    )
+    others = {c.other_id for c in changes} | {c.author_id for c in changes}
+    counts = _counts(db, access, list(others))
+    mine = may_change(db, access, author.id)
+    return [
+        AuthorChangeOut(
+            id=c.id,
+            kind=AuthorChangeKind(c.kind),
+            at=c.created_at,
+            by_you=c.user_id == access.user.id,
+            other_name=c.other_name,
+            other_id=next(
+                (
+                    i
+                    for i in (c.other_id, c.author_id)
+                    if i != author.id and i in counts
+                ),
+                None,
+            ),
+            papers=sum(uuid.UUID(i) in seen for i, _ in c.moved),
+            undone=c.undone_at is not None,
+            may_undo=c.undone_at is None and c.author_id == author.id and mine,
+        )
+        for c in changes
+    ]
 
 
 def visible_author(db: Session, access: Access, author_id: uuid.UUID) -> Author:
@@ -180,6 +286,8 @@ def get_author(author_id: uuid.UUID, db: DB, access: CurrentAccess) -> AuthorOut
         coauthors=[_row(named[i], together[i]) for i in coauthor_ids if i in named],
         affiliations=affiliations,
         namesakes=[_row(a, counts[a.id]) for a in namesakes if a.id in counts],
+        may_change=may_change(db, access, author.id),
+        changes=_changes(db, access, author),
     )
 
 
@@ -197,13 +305,13 @@ def authors_to_check(
     access: CurrentAccess,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[AuthorToCheck]:
-    """Authors of the person's papers not linked to anyone: a name several
-    people share, with nothing to tell which one."""
+    """Authors of the papers the person may change not linked to anyone: a
+    name several people share, with nothing to tell which one."""
     rows = list(
         db.execute(
             select(Authorship, Item)
             .join(Item, Item.id == Authorship.item_id)
-            .where(Authorship.author_id.is_(None), *visible_papers(access))
+            .where(Authorship.author_id.is_(None), *changeable_papers(access))
             .order_by(Item.id.desc(), Authorship.position)
             .limit(limit)
         )
@@ -237,9 +345,9 @@ def split_author(
     different (matching by name never joins them again)."""
     author = visible_author(db, access, author_id)
     for item_id in body.item_ids:
-        get_readable_item(db, access, item_id)
+        get_readable_item(db, access, item_id, write=True)
     try:
-        other = authors.split(db, author, body.item_ids)
+        other = authors.split(db, author, body.item_ids, by=access.user.id)
     except authors.Refused as error:
         raise HTTPException(422, str(error)) from error
     return _row(other, _counts(db, access, [other.id]).get(other.id, 0))
@@ -256,8 +364,9 @@ def merge_authors(
 ) -> AuthorRow:
     keep = visible_author(db, access, author_id)
     other = visible_author(db, access, body.other_id)
+    _changeable(db, access, keep, other)
     try:
-        authors.merge(db, keep, other)
+        authors.merge(db, keep, other, by=access.user.id)
     except authors.Refused as error:
         raise HTTPException(409, str(error)) from error
     return _row(keep, _counts(db, access, [keep.id]).get(keep.id, 0))
@@ -274,7 +383,7 @@ def assign_author(
 ) -> AuthorRow:
     """Which person a paper's author is, by hand (later automatic passes
     keep it)."""
-    item = get_readable_item(db, access, item_id)
+    item = get_readable_item(db, access, item_id, write=True)
     authorship = db.get(Authorship, (item.id, position))
     if authorship is None:
         raise HTTPException(404, "no such author on this paper")
@@ -302,10 +411,10 @@ def author_suggestions(
     access: CurrentAccess,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[LikelyOut]:
-    """People among the authors of one's papers who are probably one: the
-    same family name, given names that fit ("M." and "Mónica"), not said to
-    be different; most co-authors in common first."""
-    pairs = authors.likely_the_same(db, visible_papers(access), limit=limit)
+    """People among the authors of the papers one may change who are
+    probably one: the same family name, given names that fit ("M." and
+    "Mónica"), not said to be different; most co-authors in common first."""
+    pairs = authors.likely_the_same(db, changeable_papers(access), limit=limit)
     ids = {p.one for p in pairs} | {p.other for p in pairs}
     people = {a.id: a for a in db.scalars(select(Author).where(Author.id.in_(ids)))}
     counts = _counts(db, access, list(ids))
@@ -328,6 +437,25 @@ def keep_apart(
     other = visible_author(db, access, body.other_id)
     if one.id == other.id:
         raise HTTPException(422, "the same person")
-    authors.apart(db, one.id, other.id)
-    db.commit()
+    _changeable(db, access, one, other)
+    authors.keep_apart(db, one, other, by=access.user.id)
     return Response(status_code=204)
+
+
+@router.post("/api/author-changes/{change_id}/undo")
+def undo_author_change(
+    change_id: uuid.UUID, db: DB, access: CurrentAccess
+) -> AuthorRow:
+    """Take back a split, merge or "different people" (see
+    ``authors.undo``): by anyone who may fix that author."""
+    change = db.get(AuthorChange, change_id)
+    if change is None:
+        raise HTTPException(404, "no such change")
+    author = visible_author(db, access, change.author_id)
+    _changeable(db, access, author)
+    try:
+        authors.undo(db, change)
+    except authors.Refused as error:
+        db.rollback()
+        raise HTTPException(409, str(error)) from error
+    return _row(author, _counts(db, access, [author.id]).get(author.id, 0))

@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from paperus import authors, jobs
 from paperus.config import Settings
-from paperus.models import Author, Authorship, Item
+from paperus.models import Author, AuthorChange, Authorship, Item
 from paperus.system import load_config, save_config
-from tests.people import Person
+from tests.people import Person, group
 from tests.test_jobs import worker  # noqa: F401 (fixture)
 from tests.test_mcp import ALL, Assistant, ToolFailed, token
 
@@ -571,3 +571,157 @@ def test_assistants_find_authors(client: TestClient, db: Session) -> None:
         {"name": "Benito, Mónica", "author_id": str(benito)},
         {"name": "Platero, Gloria", "author_id": str(platero)},
     ]
+
+
+def test_who_may_fix_authors(client: TestClient, db: Session) -> None:
+    """Author records are shared: fixing one needs a paper of theirs that is
+    one's own to change, not only to read."""
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    library = ada.libraries()["Chair"]["id"]
+    added = ada.post(
+        "/api/items",
+        json={
+            "metadata": {
+                "title": "Shared",
+                "author": [{"family": "Benito", "given": "M."}],
+            },
+            "library_id": library,
+        },
+    )
+    shared = added.json()["id"]
+    mine = paper(ada, "Mine", "Benito, Mónica")
+    authors.link_waiting(db)
+    [m] = people(db, shared)
+    [monica] = people(db, mine)
+    assert bob.get(f"/api/authors/{m}").json()["may_change"] is False
+    assert ada.get(f"/api/authors/{m}").json()["may_change"] is True
+    # Bob only reads the group's paper.
+    for url, body in (
+        (f"/api/authors/{m}/split", {"item_ids": [shared]}),
+        (f"/api/authors/{m}/apart", {"other_id": str(m)}),
+    ):
+        assert bob.post(url, body).status_code in (403, 422)
+    assert (
+        bob.put(f"/api/items/{shared}/authors/1", {"author_id": None}).status_code
+        == 403
+    )
+    # He cannot see Ada's own Mónica; were she his too, still not his to change.
+    assert (
+        bob.post(f"/api/authors/{m}/merge", {"other_id": str(monica)}).status_code
+        == 404
+    )
+    bobs = paper(bob, "Bob's", "Benito, Mónica")
+    authors.link_waiting(db)
+    assert people(db, bobs) == [monica]
+    # Suggested to the one who may merge them, not to him.
+    assert len(ada.get("/api/authors-suggestions").json()) == 1
+    assert bob.get("/api/authors-suggestions").json() == []
+    refused = bob.post(f"/api/authors/{monica}/merge", {"other_id": str(m)})
+    assert refused.status_code == 403 and "M. Benito" in refused.text
+    assert (
+        bob.post(f"/api/authors/{monica}/apart", {"other_id": str(m)}).status_code
+        == 403
+    )
+
+
+def test_fixes_are_logged_and_undone(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    first = paper(ada, "First", "Benito, Mónica", "Platero, Gloria")
+    second = paper(ada, "Second", "Benito, Mónica")
+    short = paper(ada, "Short", "Benito, M.")
+    authors.link_waiting(db)
+    [monica, _] = people(db, first)
+    [m] = people(db, short)
+    assert monica is not None and m is not None
+
+    def changes(author: uuid.UUID, person: Person = ada) -> list[dict[str, Any]]:
+        response = person.get(f"/api/authors/{author}")
+        assert response.status_code == 200, response.text
+        return [
+            {k: c[k] for k in ("kind", "by_you", "other_name", "other_id", "papers")}
+            | {"undone": c["undone"], "may_undo": c["may_undo"], "id": c["id"]}
+            for c in response.json()["changes"]
+        ]
+
+    def undo(change: dict[str, Any]) -> int:
+        return ada.post(f"/api/author-changes/{change['id']}/undo").status_code
+
+    # A merge, logged, and undone: "M. Benito" is someone again.
+    ada.post(f"/api/authors/{monica}/merge", {"other_id": str(m)})
+    [merged] = changes(monica)
+    assert {k: merged[k] for k in merged if k != "id"} == {
+        "kind": "merge",
+        "by_you": True,
+        "other_name": "M. Benito",
+        "other_id": None,
+        "papers": 1,
+        "undone": False,
+        "may_undo": True,
+    }
+    assert undo(merged) == 200
+    [back] = people(db, short)
+    assert back is not None and back != monica
+    assert authors.are_apart(db, monica, back)
+    assert changes(monica)[0]["undone"] and undo(merged) == 409
+
+    # A split, seen from both people, undone from the one split.
+    response = ada.post(f"/api/authors/{monica}/split", {"item_ids": [second]})
+    other = uuid.UUID(response.json()["id"])
+    [split, _] = changes(monica)
+    assert (split["kind"], split["other_id"], split["papers"]) == (
+        "split",
+        str(other),
+        1,
+    )
+    [seen] = changes(other)
+    assert (seen["other_id"], seen["may_undo"]) == (str(monica), False)
+    assert undo(split) == 200
+    assert people(db, second)[0] == monica
+    db.expire_all()
+    assert db.get(Author, other) is None
+    # Bob sees none of it: he has no paper of theirs.
+    assert bob.get(f"/api/authors/{monica}").status_code == 404
+
+    # Kept apart: suggested again once undone.
+    ada.post(f"/api/authors/{monica}/apart", {"other_id": str(back)})
+    assert authors.are_apart(db, monica, back)
+    apart = changes(monica)[0]
+    assert apart["kind"] == "apart" and undo(apart) == 200
+    assert not authors.are_apart(db, monica, back)
+    assert ada.post(f"/api/author-changes/{uuid.uuid4()}/undo").status_code == 404
+
+
+def test_what_cannot_be_undone(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    full = paper(ada, "Full", "Benito, Mónica")
+    short = paper(ada, "Short", "Benito, M.")
+    authors.link_waiting(db)
+    [monica] = people(db, full)
+    [m] = people(db, short)
+    keep, other = db.get(Author, monica), db.get(Author, m)
+    assert keep is not None and other is not None
+    authors.merge(db, keep, other)
+    merged = db.scalars(select(AuthorChange)).one()
+    assert merged.user_id is None
+    # Its paper went to someone else since.
+    authorship = db.get(Authorship, (uuid.UUID(short), 1))
+    assert authorship is not None
+    authors.assign(db, authorship, None)
+    with pytest.raises(authors.Refused, match="none of those papers"):
+        authors.undo(db, merged)
+    db.rollback()
+    # A split whose new person is gone; a change whose person is gone.
+    new = authors.split(db, keep, [uuid.UUID(full)])
+    split = db.scalars(select(AuthorChange).where(AuthorChange.kind == "split")).one()
+    db.delete(new)
+    db.commit()
+    with pytest.raises(authors.Refused, match="other person"):
+        authors.undo(db, split)
+    db.rollback()
+    db.delete(keep)
+    db.commit()
+    with pytest.raises(authors.Refused, match="no longer there"):
+        authors.undo(db, split)

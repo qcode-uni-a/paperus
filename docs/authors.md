@@ -39,6 +39,22 @@ Fixes by hand, which later automatic passes keep:
   those may be merged).
 - **Decide** a paper's author under "To check", or someone new.
 
+Author records are shared, so a fix changes them for everyone who has
+papers by that author. Hence:
+
+- **Who may fix**: someone with a paper of each person concerned that is
+  theirs to change (their own library, or a group where they are a
+  member, not a reader); splitting and deciding need the right to change
+  each paper concerned. "To check", "Probably the same" and their number
+  in the menu list only what the person may fix.
+- **Every fix is kept** (`author_changes`): what was done, by whom, which
+  papers' authors moved. The author's page lists them under "Changed by
+  hand" ("by you", or "by someone else": who it was would tell what
+  papers they have), and anyone who may fix that author can undo one: a
+  merge gives the other person's papers back to a new person of that
+  name (kept apart), a split joins the two again, "different people" may
+  be suggested again.
+
 ## Ids and affiliations from OpenAlex
 
 For papers with a DOI (or an arXiv ID), an hourly job asks OpenAlex for the

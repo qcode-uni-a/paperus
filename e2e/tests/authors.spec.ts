@@ -84,6 +84,18 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 		client: document.documentElement.clientWidth
 	}));
 	expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+
+	// Each fix is kept, and the merge can be taken back.
+	const changes = page.locator('section').filter({ hasText: 'Changed by hand' });
+	const merged = changes.getByRole('listitem').filter({ hasText: 'Merged with' });
+	await expect(merged).toContainText('by you');
+	await expect(
+		changes.getByRole('listitem').filter({ hasText: 'Papers moved to another' })
+	).toBeVisible();
+	await merged.getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByText('3 papers in your library')).toBeVisible();
+	await expect(merged).toContainText('undone');
+	await expect(merged.getByRole('button', { name: 'Undo' })).toHaveCount(0);
 });
 
 test('probably the same person: merged, or kept apart', async ({ page }) => {

@@ -38,6 +38,8 @@ from paperus.identifiers import Scheme
 from paperus.importing.references import Pacer
 from paperus.models import (
     Author,
+    AuthorChange,
+    AuthorChangeKind,
     AuthorsApart,
     Authorship,
     AuthorSource,
@@ -559,14 +561,29 @@ def apart(db: Session, one: uuid.UUID, other: uuid.UUID) -> None:
         db.add(AuthorsApart(first=first, second=second))
 
 
+def keep_apart(
+    db: Session, one: Author, other: Author, *, by: uuid.UUID | None = None
+) -> None:
+    """Two people, not one, said by hand (logged). Commits."""
+    apart(db, one.id, other.id)
+    _log(db, AuthorChangeKind.APART, by, one, other, [])
+    db.commit()
+
+
 def are_apart(db: Session, one: uuid.UUID, other: uuid.UUID) -> bool:
     first, second = sorted([one, other])
     return db.get(AuthorsApart, (first, second)) is not None
 
 
-def split(db: Session, author: Author, item_ids: list[uuid.UUID]) -> Author:
+def split(
+    db: Session,
+    author: Author,
+    item_ids: list[uuid.UUID],
+    *,
+    by: uuid.UUID | None = None,
+) -> Author:
     """These papers are by someone else of the same name: a new person, who
-    stays apart from this one. Commits."""
+    stays apart from this one (logged as done ``by`` someone). Commits."""
     moving = list(
         db.scalars(
             select(Authorship).where(
@@ -585,13 +602,41 @@ def split(db: Session, author: Author, item_ids: list[uuid.UUID]) -> Author:
     if author.orcid and all(a.orcid == author.orcid for a in moving):
         other.orcid, author.orcid = author.orcid, None
     apart(db, author.id, other.id)
+    _log(db, AuthorChangeKind.SPLIT, by, author, other, moving)
     db.commit()
     return other
 
 
-def merge(db: Session, keep: Author, other: Author) -> None:
-    """The same person: ``other``'s papers go to ``keep``. Refused for two
-    different ORCID iDs. Commits."""
+def _log(
+    db: Session,
+    kind: AuthorChangeKind,
+    by: uuid.UUID | None,
+    author: Author,
+    other: Author,
+    moved: list[Authorship],
+) -> AuthorChange:
+    change = AuthorChange(
+        kind=kind,
+        user_id=by,
+        author_id=author.id,
+        other_id=other.id,
+        other_name=other.name,
+        moved=[[str(a.item_id), a.position] for a in moved],
+    )
+    db.add(change)
+    return change
+
+
+def merge(
+    db: Session,
+    keep: Author,
+    other: Author,
+    *,
+    by: uuid.UUID | None = None,
+    logged: bool = True,
+) -> None:
+    """The same person: ``other``'s papers go to ``keep`` (logged as done
+    ``by`` someone). Refused for two different ORCID iDs. Commits."""
     if keep.id == other.id:
         raise Refused("the same person already")
     # Two ORCID iDs are two people; OpenAlex has duplicate profiles, so
@@ -604,10 +649,11 @@ def merge(db: Session, keep: Author, other: Author) -> None:
             setattr(other, column, None)
             db.flush()
             setattr(keep, column, value)
+    moved = list(db.scalars(select(Authorship).where(Authorship.author_id == other.id)))
+    if logged:
+        _log(db, AuthorChangeKind.MERGE, by, keep, other, moved)
     _better_name(keep, other.name)
-    for authorship in db.scalars(
-        select(Authorship).where(Authorship.author_id == other.id)
-    ):
+    for authorship in moved:
         authorship.author_id = keep.id
         authorship.source = AuthorSource.HAND
     db.execute(
@@ -630,4 +676,49 @@ def assign(db: Session, authorship: Authorship, author: Author | None) -> None:
         db.add(author)
         db.flush()
     authorship.author_id, authorship.source = author.id, AuthorSource.HAND
+    db.commit()
+
+
+def undo(db: Session, change: AuthorChange) -> None:
+    """Take back a fix by hand. A merge: the papers that came from the other
+    person go to a new person of that name, apart from this one (ids
+    OpenAlex or ORCID gave stay here). A split: the two are one again. Kept
+    apart: they may be suggested as one again. Refused when it can no
+    longer be undone (undone already; one of them gone since). Commits."""
+    if change.undone_at is not None:
+        raise Refused("undone already")
+    author = db.get(Author, change.author_id)
+    if author is None:
+        raise Refused("this person is no longer there")
+    if change.kind == AuthorChangeKind.MERGE:
+        moved = [
+            authorship
+            for item_id, position in change.moved
+            if (authorship := db.get(Authorship, (uuid.UUID(item_id), position)))
+            is not None
+            and authorship.author_id == author.id
+        ]
+        if not moved:
+            raise Refused("none of those papers is by this person now")
+        other = Author(name=change.other_name, key=moved[0].key)
+        db.add(other)
+        db.flush()
+        for authorship in moved:
+            authorship.author_id = other.id
+        apart(db, author.id, other.id)
+    else:
+        other = db.get(Author, change.other_id)
+        if other is None:
+            raise Refused("the other person is no longer there")
+        first, second = sorted([author.id, other.id])
+        db.execute(
+            delete(AuthorsApart).where(
+                AuthorsApart.first == first, AuthorsApart.second == second
+            )
+        )
+        if change.kind == AuthorChangeKind.SPLIT:
+            change.undone_at = datetime.now(UTC)
+            merge(db, author, other, logged=False)  # commits
+            return
+    change.undone_at = datetime.now(UTC)
     db.commit()

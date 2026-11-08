@@ -37,6 +37,12 @@
   the thirty before it. An installation of 0.0.14 (with the authors
   migrations of main, `0030`) is marked as up to date by hand, once:
   `UPDATE alembic_version SET version_num = '0001';`
+- **Fixing authors needs the right to change their papers**, since author
+  records are shared by everyone: splitting, merging and "different
+  people" need a paper of each person that is yours to change (a reader
+  in a group can no longer change who is who for the whole group). Every
+  fix is kept, listed on the author's page ("Changed by hand"), and can
+  be undone.
 - Manage → Authors shows in the menu how many authors there are to check
   and pairs that are probably one person.
 

@@ -2139,7 +2139,7 @@
           "authors"
         ],
         "summary": "Authors To Check",
-        "description": "Authors of the person's papers not linked to anyone: a name several\npeople share, with nothing to tell which one.",
+        "description": "Authors of the papers the person may change not linked to anyone: a\nname several people share, with nothing to tell which one.",
         "operationId": "authors_to_check",
         "parameters": [
           {
@@ -2359,7 +2359,7 @@
           "authors"
         ],
         "summary": "Author Suggestions",
-        "description": "People among the authors of one's papers who are probably one: the\nsame family name, given names that fit (\"M.\" and \"M\u00f3nica\"), not said to\nbe different; most co-authors in common first.",
+        "description": "People among the authors of the papers one may change who are\nprobably one: the same family name, given names that fit (\"M.\" and\n\"M\u00f3nica\"), not said to be different; most co-authors in common first.",
         "operationId": "author_suggestions",
         "parameters": [
           {
@@ -2436,6 +2436,50 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/author-changes/{change_id}/undo": {
+      "post": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Undo Author Change",
+        "description": "Take back a split, merge or \"different people\" (see\n``authors.undo``): by anyone who may fix that author.",
+        "operationId": "undo_author_change",
+        "parameters": [
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Change Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorRow"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -7387,6 +7431,77 @@
         ],
         "title": "Authentication"
       },
+      "AuthorChangeKind": {
+        "type": "string",
+        "enum": [
+          "split",
+          "merge",
+          "apart"
+        ],
+        "title": "AuthorChangeKind"
+      },
+      "AuthorChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AuthorChangeKind"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "by_you": {
+            "type": "boolean",
+            "title": "By You"
+          },
+          "other_name": {
+            "type": "string",
+            "title": "Other Name"
+          },
+          "other_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Id"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          },
+          "undone": {
+            "type": "boolean",
+            "title": "Undone"
+          },
+          "may_undo": {
+            "type": "boolean",
+            "title": "May Undo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "at",
+          "by_you",
+          "other_name",
+          "other_id",
+          "papers",
+          "undone",
+          "may_undo"
+        ],
+        "title": "AuthorChangeOut"
+      },
       "AuthorOut": {
         "properties": {
           "id": {
@@ -7451,6 +7566,17 @@
             },
             "type": "array",
             "title": "Namesakes"
+          },
+          "may_change": {
+            "type": "boolean",
+            "title": "May Change"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/AuthorChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
           }
         },
         "type": "object",
@@ -7461,7 +7587,9 @@
           "spellings",
           "coauthors",
           "affiliations",
-          "namesakes"
+          "namesakes",
+          "may_change",
+          "changes"
         ],
         "title": "AuthorOut"
       },

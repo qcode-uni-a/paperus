@@ -954,6 +954,34 @@ def upgrade() -> None:
         ["chunk_sha256"],
         unique=False,
     )
+    op.create_table(
+        "author_changes",
+        sa.Column("id", sa.Uuid(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("kind", sa.String(length=16), nullable=False),
+        sa.Column("user_id", sa.Uuid(), nullable=True),
+        sa.Column("author_id", sa.Uuid(), nullable=False),
+        sa.Column("other_id", sa.Uuid(), nullable=False),
+        sa.Column("other_name", sa.String(), nullable=False),
+        sa.Column(
+            "moved",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'[]'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column("undone_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(
+        op.f("ix_author_changes_author_id"), "author_changes", ["author_id"]
+    )
+    op.create_index(op.f("ix_author_changes_other_id"), "author_changes", ["other_id"])
     # Users and libraries refer to each other: this one once both exist.
     op.create_foreign_key(
         "fk_users_default_library_id_libraries",
@@ -971,6 +999,7 @@ def downgrade() -> None:
     op.drop_constraint(
         "fk_users_default_library_id_libraries", "users", type_="foreignkey"
     )
+    op.drop_table("author_changes")
     op.drop_index(op.f("ix_file_chunks_chunk_sha256"), table_name="file_chunks")
     op.drop_table("file_chunks")
     op.drop_index(op.f("ix_identifiers_version_id"), table_name="identifiers")

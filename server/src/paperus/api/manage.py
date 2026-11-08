@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, aliased
 
 from paperus import authors, duplicates, library, missing, system
 from paperus.access import Access
-from paperus.api.authors import visible_papers
+from paperus.api.authors import changeable_papers
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import PDF, FileOut, file_out, unreadable
 from paperus.api.items import ItemOut, get_readable_item, item_out, unsorted_conditions
@@ -78,11 +78,11 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
             select(func.count())
             .select_from(Authorship)
             .join(Item, Item.id == Authorship.item_id)
-            .where(Authorship.author_id.is_(None), *visible_papers(access))
+            .where(Authorship.author_id.is_(None), *changeable_papers(access))
         )
         or 0,
         authors_likely=len(
-            authors.likely_the_same(db, visible_papers(access), limit=None)
+            authors.likely_the_same(db, changeable_papers(access), limit=None)
         ),
     )
 

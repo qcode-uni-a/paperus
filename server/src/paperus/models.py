@@ -516,6 +516,38 @@ class AuthorsApart(Base):
     )
 
 
+class AuthorChangeKind(StrEnum):
+    SPLIT = "split"
+    """Papers went to a new person of the same name (``other_id``)."""
+    MERGE = "merge"
+    """The other person's papers came to this one; the other is gone."""
+    APART = "apart"
+    """Two people said to be different."""
+
+
+class AuthorChange(Record, Base):
+    """A fix by hand of who is who, so it can be traced and undone (author
+    records are shared by everyone). See ``paperus.authors``."""
+
+    __tablename__ = "author_changes"
+
+    kind: Mapped[str] = mapped_column(String(16))
+    """An ``AuthorChangeKind``."""
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    """The person split, kept or said to be different (no foreign key: the
+    log outlives them)."""
+    other_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    other_name: Mapped[str]
+    moved: Mapped[list[list[str]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """The papers' authors that changed person: [item id, position]."""
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ItemView(Base):
     """When a person last opened an item, for their recent papers."""
 
