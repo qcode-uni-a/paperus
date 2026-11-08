@@ -226,8 +226,20 @@ def list_authors(
         .where(*visible_papers(access))
         .group_by(Author.id)
     )
+    # Any spelling on their papers: "michel" finds "M. Pioro-Ladrière" too.
+    spelled = aliased(Authorship)
     for word in authors.fold(q or "").split():
-        query = query.where(Author.key.contains(word, autoescape=True))
+        query = query.where(
+            or_(
+                Author.key.contains(word, autoescape=True),
+                select(spelled.item_id)
+                .where(
+                    spelled.author_id == Author.id,
+                    spelled.key.contains(word, autoescape=True),
+                )
+                .exists(),
+            )
+        )
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     response.headers["X-Total-Count"] = str(total)
     # By name: as the person reads names, family names first or not.

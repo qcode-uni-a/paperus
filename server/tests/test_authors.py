@@ -271,6 +271,30 @@ def test_undoing_a_merge_gives_the_old_name_back(
     assert record is not None and record.name == "M. Benito"
 
 
+def test_a_merge_keeps_the_fuller_name_and_finds_every_spelling(
+    client: TestClient, db: Session
+) -> None:
+    ada = Person(client, db, "ada")
+    short = paper(ada, "Short", "Pioro-Ladrière, M.")
+    full = paper(ada, "Full", "Pioro-Ladrière, Michel")
+    authors.link_waiting(db)
+    [keep] = people(db, short)
+    [other] = people(db, full)
+    response = ada.post(f"/api/authors/{keep}/merge", {"other_id": str(other)})
+    assert response.json()["name"] == "Michel Pioro-Ladrière"
+    for words in ("michel", "m pioro", "ladriere"):
+        found = ada.get("/api/authors", params={"q": words}).json()
+        assert [a["id"] for a in found] == [str(keep)], words
+    # Given names that do not fit keep the name as it was.
+    qian = paper(ada, "Qian's", "Dong, Qian")
+    shi = paper(ada, "Shi-Hai's", "Dong, Shi-Hai")
+    authors.link_waiting(db)
+    [first] = people(db, qian)
+    [second] = people(db, shi)
+    merged = ada.post(f"/api/authors/{first}/merge", {"other_id": str(second)})
+    assert merged.json()["name"] == "Qian Dong"
+
+
 def test_names_written_as_the_person_chooses(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     paper(ada, "One", "Zeller, Anna", "Albers, Zoe", "Mitte")

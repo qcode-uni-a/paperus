@@ -122,9 +122,22 @@ def _accents(name: str) -> int:
     return sum(1 for c in name if ord(c) > 127)
 
 
-def _better_name(author: Author, shown: str) -> None:
-    """Keep the fuller spelling of the same name (with its accents)."""
+def _better_name(author: Author, written: str) -> None:
+    """Keep the fuller spelling: with its accents, else the longer one of
+    the same family name and fitting given names ("Michel Pioro-Ladrière",
+    not "M. Pioro-Ladrière"; never "Qian Dong" for "Shi-Hai Dong", whom an
+    id may have joined by mistake). ``written``: "Family, Given"."""
+    shown = _shown(written)
     if _accents(shown) > _accents(author.name):
+        author.name = shown
+        return
+    family, _, given = written.partition(",")
+    mine, _, my_given = (author.written or "").partition(",")
+    if (
+        len(shown) > len(author.name)
+        and fold(family) == fold(mine)
+        and _given_fits(given, my_given)
+    ):
         author.name = shown
 
 
@@ -192,7 +205,7 @@ def _resolve(
             setattr(author, column.key, value)
             db.flush()
         _take_ids(db, author, authorship)
-        _better_name(author, shown)
+        _better_name(author, authorship.written)
         authorship.author_id, authorship.source = author.id, source
         db.flush()
         return
@@ -204,7 +217,7 @@ def _resolve(
         author = Author(name=shown, key=authorship.key)
         db.add(author)
         db.flush()
-    _better_name(author, shown)
+    _better_name(author, authorship.written)
     authorship.author_id, authorship.source = author.id, AuthorSource.NAME
 
 
@@ -661,7 +674,7 @@ def merge(
             setattr(keep, column, value)
     moved = list(db.scalars(select(Authorship).where(Authorship.author_id == other.id)))
     before = keep.name
-    _better_name(keep, other.name)
+    _better_name(keep, other.written or other.name)
     if logged:
         change = _log(db, AuthorChangeKind.MERGE, by, keep, other, moved)
         change.renamed_from = before if keep.name != before else None

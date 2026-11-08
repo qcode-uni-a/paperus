@@ -14,6 +14,9 @@
 - **Imports find missing DOIs by title**: a paper without a DOI or arXiv
   ID gets one from Crossref when the title, first author and year agree,
   so its authors, open-access copy and references are found too.
+- **Authors under their fullest name**: a person is shown with given names
+  written out when one of their papers has them ("Michel Pioro-Ladrière",
+  not "M. Pioro-Ladrière"), and found by any spelling on their papers.
 - **Settings in sections**, like the administration's: Account (a display
   name others see instead of the username, the profile picture, one's
   ORCID iD), Login, New papers, Appearance (theme and names), Access
