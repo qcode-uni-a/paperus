@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.15 (2026-11-08)
 
 - **Authors as people** (#35, first part): each paper's authors are linked
   to people (the same ORCID or OpenAlex id, else the same full name; a
@@ -33,9 +33,10 @@
   (`journals.aps.org/prb/pdf/10.1103/…`) and looks up the paper's
   details, so the page comes in as the paper (or joins the one already
   in the library), and its open-access copy is looked for.
-- **The database migrations are one again** (`0001`), the same schema as
-  the thirty before it. An installation of 0.0.14 (with the authors
-  migrations of main, `0030`) is marked as up to date by hand, once:
+- **The database migrations are one again** (`0001`), with this release's
+  changes in it. An installation of 0.0.14 (none exist besides the
+  developer's) needs the table `author_changes` and the column
+  `users.handed_over` added as in that migration, then, once:
   `UPDATE alembic_version SET version_num = '0001';`
 - **Fixing authors needs the right to change their papers**, since author
   records are shared by everyone: splitting, merging and "different
