@@ -12,22 +12,26 @@ from collections import Counter
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from paperus import authors
+from paperus import authors, works
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.items import ItemOut, get_readable_item, item_out
+from paperus.identifiers import Scheme
 from paperus.models import (
     Author,
     AuthorChange,
     AuthorChangeKind,
     Authorship,
+    Identifier,
     Item,
+    Version,
 )
+from paperus.system import load_config
 
 router = APIRouter(tags=["authors"])
 
@@ -492,3 +496,76 @@ def undo_author_change(
         db.rollback()
         raise HTTPException(409, str(error)) from error
     return _row(author, _counts(db, access, [author.id]).get(author.id, 0))
+
+
+class WorkOut(BaseModel):
+    doi: str
+    title: str
+    year: int | None
+    journal: str | None
+    item_id: uuid.UUID | None
+    """The paper in the library with this DOI or one of its copies', if one
+    sees one (not in the trash: adding it again restores it)."""
+
+
+def _works(
+    request: Request,
+    db: Session,
+    access: Access,
+    *,
+    orcid: str | None,
+    openalex_id: str | None,
+) -> list[WorkOut]:
+    config = load_config(db, request.app.state.settings)
+    try:
+        found = works.works_of(
+            request.app.state.http,
+            orcid=orcid,
+            openalex_id=openalex_id,
+            contact_email=config.contact_email,
+        )
+    except works.Unavailable as error:
+        raise HTTPException(502, "OpenAlex did not answer; try again later") from error
+    known = dict(
+        db.execute(
+            select(Identifier.value, Version.item_id)
+            .join(Version, Version.id == Identifier.version_id)
+            .join(Item, Item.id == Version.item_id)
+            .where(
+                Identifier.scheme == Scheme.DOI,
+                Identifier.value.in_([d for w in found for d in [w.doi, *w.copies]]),
+                Item.library_id.in_(access.readable),
+                Item.deleted_at.is_(None),
+            )
+        ).all()
+    )
+    return [
+        WorkOut(
+            doi=w.doi,
+            title=w.title,
+            year=w.year,
+            journal=w.journal,
+            item_id=next((known[d] for d in [w.doi, *w.copies] if d in known), None),
+        )
+        for w in found
+    ]
+
+
+@router.get("/api/authors/{author_id}/works")
+def author_works(
+    author_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> list[WorkOut]:
+    """The author's works as OpenAlex knows them (by their ORCID iD, else
+    their OpenAlex id; none without either), newest first, each with the
+    paper in the library if there is one. Sends the id to OpenAlex."""
+    author = visible_author(db, access, author_id)
+    return _works(
+        request, db, access, orcid=author.orcid, openalex_id=author.openalex_id
+    )
+
+
+@router.get("/api/me/works")
+def my_works(request: Request, db: DB, access: CurrentAccess) -> list[WorkOut]:
+    """One's own works, by one's ORCID iD (Settings → Account): as for an
+    author's page."""
+    return _works(request, db, access, orcid=access.user.orcid, openalex_id=None)

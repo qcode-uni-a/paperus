@@ -4156,6 +4156,32 @@ export type VersionOut = {
     created_at: string;
 };
 
+/**
+ * WorkOut
+ */
+export type WorkOut = {
+    /**
+     * Doi
+     */
+    doi: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Year
+     */
+    year: number | null;
+    /**
+     * Journal
+     */
+    journal: string | null;
+    /**
+     * Item Id
+     */
+    item_id: string | null;
+};
+
 export type HealthData = {
     body?: never;
     path?: never;
@@ -5669,6 +5695,56 @@ export type UndoAuthorChangeResponses = {
 };
 
 export type UndoAuthorChangeResponse = UndoAuthorChangeResponses[keyof UndoAuthorChangeResponses];
+
+export type AuthorWorksData = {
+    body?: never;
+    path: {
+        /**
+         * Author Id
+         */
+        author_id: string;
+    };
+    query?: never;
+    url: '/api/authors/{author_id}/works';
+};
+
+export type AuthorWorksErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AuthorWorksError = AuthorWorksErrors[keyof AuthorWorksErrors];
+
+export type AuthorWorksResponses = {
+    /**
+     * Response Author Works
+     *
+     * Successful Response
+     */
+    200: Array<WorkOut>;
+};
+
+export type AuthorWorksResponse = AuthorWorksResponses[keyof AuthorWorksResponses];
+
+export type MyWorksData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/works';
+};
+
+export type MyWorksResponses = {
+    /**
+     * Response My Works
+     *
+     * Successful Response
+     */
+    200: Array<WorkOut>;
+};
+
+export type MyWorksResponse = MyWorksResponses[keyof MyWorksResponses];
 
 export type FindUploadData = {
     body?: never;

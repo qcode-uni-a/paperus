@@ -11,6 +11,12 @@
 - **A paper's journal and year** are a row of their own on its page, like
   its tags and collections (no longer in brackets after the authors).
 - **PDF contents**: page numbers always at the right edge.
+- **Add someone's papers**: an author's page with an ORCID iD or OpenAlex
+  id lists their papers at OpenAlex ("Add their papers…"); those not in
+  the library can be chosen and added by DOI, all at once. A paper's
+  copies (arXiv, SSRN, repositories) are one entry, under the journal's
+  DOI. Manage → Missing does the same for one's own papers, by one's ORCID
+  iD (Settings → Account).
 - **Imports find missing DOIs by title**: a paper without a DOI or arXiv
   ID gets one from Crossref when the title, first author and year agree,
   so its authors, open-access copy and references are found too.

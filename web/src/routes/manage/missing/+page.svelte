@@ -4,6 +4,7 @@
 		downloadOpenAccess,
 		errorMessage,
 		manageCounts,
+		myWorks,
 		missingPapers,
 		openAccessProgress,
 		trashSnapshots,
@@ -15,6 +16,8 @@
 	import { resolve } from '$app/paths';
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
+	import WorksDialog from '#lib/WorksDialog.svelte';
+	import { session } from '#lib/session.svelte.ts';
 	import { packUp } from '#lib/transitions.ts';
 	import { libraryById, loadOrganize } from '#lib/organize.svelte.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
@@ -22,6 +25,7 @@
 
 	/** Web pages Zotero saved next to a paper's PDF (from older imports). */
 	let snapshots = $state(0);
+	let worksDialog = $state<WorksDialog>();
 	$effect(() => {
 		manageCounts().then(({ data }) => (snapshots = data?.snapshots ?? 0));
 	});
@@ -469,6 +473,35 @@
 	</p>
 </header>
 
+{#if session.user?.orcid}
+	<aside class="extension mine">
+		<strong>Your own papers</strong>
+		<p>
+			Which of your papers are not in the library yet: OpenAlex lists them by your ORCID iD. Choose
+			those to add.
+		</p>
+		<button onclick={() => worksDialog?.open()}>Find your papers…</button>
+	</aside>
+	<WorksDialog
+		bind:this={worksDialog}
+		title="Your papers"
+		load={async () => {
+			const { data, error } = await myWorks();
+			return data ? { works: data } : { error: errorMessage(error) };
+		}}
+		onadded={() => {
+			load('file');
+			load('journal');
+		}}
+	/>
+{:else}
+	<p class="muted mine-hint">
+		Your own papers missing here: add your ORCID iD in <a href="{resolve('/settings')}?open=account"
+			>Settings → Account</a
+		>, and they can be found and added.
+	</p>
+{/if}
+
 {#if snapshots}
 	<aside class="extension snapshots">
 		<strong
@@ -573,6 +606,9 @@
 {/if}
 
 <style>
+	.mine-hint {
+		margin: 0 0 16px;
+	}
 	.head {
 		margin-bottom: 12px;
 	}

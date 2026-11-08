@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import {
 		errorMessage,
+		authorWorks,
 		getAuthor,
 		listAuthors,
 		listItems,
@@ -13,6 +14,7 @@
 	} from '#lib/api/client.ts';
 	import type { AuthorChangeOut, AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
 	import AuthorCompare from '#lib/AuthorCompare.svelte';
+	import WorksDialog from '#lib/WorksDialog.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import { ago } from '#lib/format.ts';
 	import { personName } from '#lib/names.svelte.ts';
@@ -30,6 +32,7 @@
 
 	let author = $state<AuthorOut | null>(null);
 	let collectionDialog = $state<CollectionDialog>();
+	let worksDialog = $state<WorksDialog>();
 	let missing = $state(false);
 	let items = $state<Item[]>([]);
 	let total = $state(0);
@@ -246,6 +249,12 @@
 						collectionDialog?.open(undefined, true, { authors: [author.id] }, personName(author))}
 					>Smart collection</button
 				>
+				{#if author.orcid || author.openalex_id}
+					<button
+						title="Their papers OpenAlex knows, to add those not in your library"
+						onclick={() => worksDialog?.open()}>Add their papers…</button
+					>
+				{/if}
 			</div>
 		</div>
 		{#if merging}
@@ -342,6 +351,17 @@
 {/if}
 
 <CollectionDialog bind:this={collectionDialog} />
+{#if author}
+	<WorksDialog
+		bind:this={worksDialog}
+		title="Papers by {personName(author)}"
+		load={async () => {
+			const { data, error } = await authorWorks({ path: { author_id: id } });
+			return data ? { works: data } : { error: errorMessage(error) };
+		}}
+		onadded={() => load(id)}
+	/>
+{/if}
 
 <style>
 	.you {

@@ -2571,6 +2571,80 @@
         }
       }
     },
+    "/api/authors/{author_id}/works": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "Author Works",
+        "description": "The author's works as OpenAlex knows them (by their ORCID iD, else\ntheir OpenAlex id; none without either), newest first, each with the\npaper in the library if there is one. Sends the id to OpenAlex.",
+        "operationId": "author_works",
+        "parameters": [
+          {
+            "name": "author_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Author Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkOut"
+                  },
+                  "title": "Response Author Works"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/works": {
+      "get": {
+        "tags": [
+          "authors"
+        ],
+        "summary": "My Works",
+        "description": "One's own works, by one's ORCID iD (Settings \u2192 Account): as for an\nauthor's page.",
+        "operationId": "my_works",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Works"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/uploads/{sha256}": {
       "get": {
         "tags": [
@@ -14881,6 +14955,61 @@
           "created_at"
         ],
         "title": "VersionOut"
+      },
+      "WorkOut": {
+        "properties": {
+          "doi": {
+            "type": "string",
+            "title": "Doi"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          },
+          "journal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Journal"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "doi",
+          "title",
+          "year",
+          "journal",
+          "item_id"
+        ],
+        "title": "WorkOut"
       }
     }
   }

@@ -68,6 +68,18 @@ papers by that author. Hence:
   the two again, "different people" may
   be suggested again.
 
+## Their papers elsewhere
+
+An author's page with an ORCID iD or OpenAlex id offers "Add their
+papers…" (`paperus.works`, `GET /api/authors/{id}/works`): one request to
+OpenAlex for their works with a DOI (200 at most, newest first; errata,
+reviews and the like left out), each marked if a paper with that DOI or
+one of its copies is in the library. Copies of one paper (the journal's,
+arXiv's, SSRN's, a repository's) are one entry under the journal's DOI.
+Those chosen are added by DOI as from "Add" (details, open-access copy,
+authors and references follow). Manage → Missing does the same for one's
+own ORCID iD (`GET /api/me/works`). Only the iD or id is sent to OpenAlex.
+
 ## Ids and affiliations from OpenAlex
 
 For papers with a DOI (or an arXiv ID), an hourly job asks OpenAlex for the

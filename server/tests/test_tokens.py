@@ -240,6 +240,8 @@ ROUTES = {
     ("POST", "/api/auth/password"): None,
     ("GET", "/api/authors"): "papers.read",
     ("GET", "/api/authors/{author_id}"): "papers.read",
+    ("GET", "/api/authors/{author_id}/works"): "papers.read",
+    ("GET", "/api/me/works"): None,
     ("POST", "/api/authors/{author_id}/merge"): None,
     ("POST", "/api/authors/{author_id}/split"): None,
     ("GET", "/api/authors-to-check"): None,
