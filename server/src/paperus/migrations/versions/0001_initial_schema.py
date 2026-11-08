@@ -1,4 +1,4 @@
-"""Initial schema (the migrations up to 0.0.15, in one)
+"""Initial schema (the migrations up to 0.0.16, in one)
 
 Revision ID: 0001
 Revises:

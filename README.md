@@ -9,7 +9,7 @@
 with group sharing, search by meaning and integration with whatever AI
 assistant you already use.
 
-> Status: early version (0.0.15) for a pilot. It works, with private papers
+> Status: early version (0.0.16) for a pilot. It works, with private papers
 > and nested groups, but the data format may still change. See the
 > [changelog](CHANGELOG.md) for what is there and what is missing.
 

@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.0.16 (2026-11-09)
 
+- **Database**: the one migration (`0001`) gained the columns
+  `users.display_name`, `users.orcid`, `users.name_format` and
+  `author_changes.renamed_from`. An installation of 0.0.15 (none exist
+  besides the developer's) adds them as in that migration.
 - **Open-access PDFs from every open copy**: the server tries all the open
   copies OpenAlex and Unpaywall list (arXiv first, then repositories such
   as a university's, the publisher last), not only Unpaywall's best one;
