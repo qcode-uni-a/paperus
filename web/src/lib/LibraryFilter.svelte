@@ -9,7 +9,7 @@
 	import { fromAddress, isEmpty, toAddress, type Filter } from '#lib/libraryFilter.ts';
 	import { describeRules } from '#lib/organize.svelte.ts';
 	import RulesEditor from '#lib/RulesEditor.svelte';
-	import { fullName } from '#lib/format.ts';
+	import { writtenName } from '#lib/names.svelte.ts';
 
 	/** The library's filter: a button opening the rules of smart collections
 	 * (tags and keywords, types, dates, owners, when added), and what is
@@ -57,9 +57,11 @@
 
 	const summary = $derived.by(() => {
 		const rules = isEmpty({ rules: filter.rules, author: '' }) ? '' : describeRules(filter.rules);
-		const by = filter.author ? `by ${fullName(filter.author)}` : '';
+		const by = filter.author ? `by ${writtenName(filter.author)}` : '';
 		if (!by) return rules;
-		return rules ? `${rules.slice(0, -1)}, ${by}.` : `Papers ${by}.`;
+		// "by Benito, M." ends with its own full stop.
+		const end = by.endsWith('.') ? '' : '.';
+		return rules ? `${rules.slice(0, -1)}, ${by}${end}` : `Papers ${by}${end}`;
 	});
 </script>
 
@@ -87,7 +89,7 @@
 			<RulesEditor bind:rules={draft} library="" />
 			{#if filter.author}
 				<p class="author">
-					By {fullName(filter.author)}
+					By {writtenName(filter.author)}
 					<button
 						class="link"
 						onclick={() => show({ rules: filter.rules, author: '' })}

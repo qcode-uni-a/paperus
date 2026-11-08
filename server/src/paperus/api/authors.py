@@ -35,6 +35,9 @@ router = APIRouter(tags=["authors"])
 class AuthorRow(BaseModel):
     id: uuid.UUID
     name: str
+    """"Mónica Benito"."""
+    written: str
+    """The same, as on their papers: "Benito, Mónica" ("Family, Given")."""
     papers: int
     """Of the papers the person may see."""
     orcid: str | None = None
@@ -105,7 +108,13 @@ def _counts(
 
 
 def _row(author: Author, papers: int) -> AuthorRow:
-    return AuthorRow(id=author.id, name=author.name, papers=papers, orcid=author.orcid)
+    return AuthorRow(
+        id=author.id,
+        name=author.name,
+        written=author.written or author.name,
+        papers=papers,
+        orcid=author.orcid,
+    )
 
 
 def changeable_papers(access: Access) -> list[ColumnElement[bool]]:
@@ -221,9 +230,13 @@ def list_authors(
         query = query.where(Author.key.contains(word, autoescape=True))
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     response.headers["X-Total-Count"] = str(total)
-    order = (
-        [papers.desc(), Author.key] if sort == "papers" else [Author.key, papers.desc()]
+    # By name: as the person reads names, family names first or not.
+    by_name = (
+        func.lower(Author.written)
+        if access.user.name_format == "family-given"
+        else Author.key
     )
+    order = [papers.desc(), by_name] if sort == "papers" else [by_name, papers.desc()]
     rows = db.execute(query.order_by(*order, Author.id).offset(offset).limit(limit))
     return [_row(author, count) for author, count in rows]
 
@@ -283,6 +296,7 @@ def get_author(author_id: uuid.UUID, db: DB, access: CurrentAccess) -> AuthorOut
     return AuthorOut(
         id=author.id,
         name=author.name,
+        written=author.written or author.name,
         papers=len(item_ids),
         orcid=author.orcid,
         openalex_id=author.openalex_id,

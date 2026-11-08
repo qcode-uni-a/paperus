@@ -388,6 +388,41 @@
         }
       }
     },
+    "/api/auth/name-format": {
+      "put": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Set Name Format",
+        "description": "How the website writes people's names for the person: \"Benito,\nM\u00f3nica\" (family-given) or \"M\u00f3nica Benito\" (given-family).",
+        "operationId": "set_name_format",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NameFormatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/avatar": {
       "put": {
         "tags": [
@@ -7551,6 +7586,10 @@
             "type": "string",
             "title": "Name"
           },
+          "written": {
+            "type": "string",
+            "title": "Written"
+          },
           "papers": {
             "type": "integer",
             "title": "Papers"
@@ -7621,6 +7660,7 @@
         "required": [
           "id",
           "name",
+          "written",
           "papers",
           "spellings",
           "coauthors",
@@ -7642,6 +7682,10 @@
             "type": "string",
             "title": "Name"
           },
+          "written": {
+            "type": "string",
+            "title": "Written"
+          },
           "papers": {
             "type": "integer",
             "title": "Papers"
@@ -7662,6 +7706,7 @@
         "required": [
           "id",
           "name",
+          "written",
           "papers"
         ],
         "title": "AuthorRow"
@@ -11422,6 +11467,23 @@
         "title": "NameChoice",
         "description": "What a tag or collection of the export becomes where one of the\nsame or a similar name exists here."
       },
+      "NameFormatIn": {
+        "properties": {
+          "name_format": {
+            "type": "string",
+            "enum": [
+              "family-given",
+              "given-family"
+            ],
+            "title": "Name Format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name_format"
+        ],
+        "title": "NameFormatIn"
+      },
       "NewItemUpload": {
         "properties": {
           "item_id": {
@@ -14396,6 +14458,15 @@
                 "type": "null"
               }
             ]
+          },
+          "name_format": {
+            "type": "string",
+            "enum": [
+              "family-given",
+              "given-family"
+            ],
+            "title": "Name Format",
+            "default": "family-given"
           }
         },
         "type": "object",

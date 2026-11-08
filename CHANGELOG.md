@@ -8,6 +8,10 @@
   OpenAlex is asked without a contact email too. Copies whose sites
   refuse the server (publishers often do) are handed to the browser
   extension from Manage → Missing, which fetches them first.
+- **Names written one way**: people's full names are written family name
+  first ("Benito, Mónica") everywhere on the website; Settings → Names
+  switches to given name first ("Mónica Benito"), for all one's devices.
+  Manage → Authors sorted by name follows the choice.
 - **Authors compared before merging**: "Probably the same" pairs (one by
   one, or each with "Compare…") and "The same person" on an author's page
   show both people side by side: their papers, where they were, their

@@ -4,13 +4,14 @@
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
 	import type { Item } from '#lib/api/client.ts';
-	import { fullName, shortAuthors, typeName } from '#lib/format.ts';
+	import { shortAuthors, typeName } from '#lib/format.ts';
 	import { isShared } from '#lib/organize.svelte.ts';
 	import FileIcon from '#lib/FileIcon.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
 	import StarButton from '#lib/StarButton.svelte';
 	import { none } from '#lib/transitions.ts';
 	import type { TransitionConfig } from 'svelte/transition';
+	import { writtenName } from '#lib/names.svelte.ts';
 
 	/** ``note``: a line above the title, e.g. why it is in a list;
 	 * ``leave``: how the row goes when it leaves its list; ``done``: shown
@@ -51,7 +52,7 @@
 								: ', '}<a
 							class="person"
 							href={authorHref(item, i)}
-							title="Papers by {fullName(author)}">{author.split(',')[0].trim()}</a
+							title="Papers by {writtenName(author)}">{author.split(',')[0].trim()}</a
 						>{/each}{#if item.authors.length > 3}{' '}et al.{/if}{/if}{#if item.year}{authors
 						? ' '
 						: ''}({item.year}){/if}{#if item.container_title}{authors || item.year ? '. ' : ''}<em

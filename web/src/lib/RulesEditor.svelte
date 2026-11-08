@@ -5,6 +5,7 @@
 	import DateInput from '#lib/DateInput.svelte';
 	import { TYPE_NAMES } from '#lib/format.ts';
 	import { libraryById, libraryName, organize } from '#lib/organize.svelte.ts';
+	import { personName } from '#lib/names.svelte.ts';
 
 	/** The rules of a smart collection owned by ``library``: papers that
 	 * match all rules given. */
@@ -80,7 +81,7 @@
 		return () => clearTimeout(timer);
 	});
 	function addAuthor(author: AuthorRow) {
-		rememberAuthor(author.id, author.name);
+		rememberAuthor(author.id, personName(author));
 		rules.authors = [...(rules.authors ?? []), author.id];
 		authorSearch = '';
 		authorsFound = [];
@@ -151,7 +152,7 @@
 			<div class="chips">
 				{#each authorsFound as author (author.id)}
 					<button type="button" class="pick" onclick={() => addAuthor(author)}
-						>{author.name} <span class="muted">{author.papers}</span></button
+						>{personName(author)} <span class="muted">{author.papers}</span></button
 					>
 				{/each}
 			</div>

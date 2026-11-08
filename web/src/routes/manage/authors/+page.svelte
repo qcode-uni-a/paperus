@@ -10,9 +10,9 @@
 	} from '#lib/api/client.ts';
 	import AuthorCompare from '#lib/AuthorCompare.svelte';
 	import type { AuthorRow, AuthorToCheck, LikelyOut } from '#lib/api/generated/types.gen.ts';
-	import { fullName } from '#lib/format.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import { personName, writtenName } from '#lib/names.svelte.ts';
 
 	/** The authors of one's papers, as people; and the authors to check: a
 	 * name several people share, with nothing on the paper to tell which. */
@@ -100,7 +100,7 @@
 			{#each toCheck as entry (`${entry.item.id}-${entry.position}`)}
 				<li>
 					<p>
-						<strong>{fullName(entry.written)}</strong> on
+						<strong>{writtenName(entry.written)}</strong> on
 						<a href={resolve('/items/[id]', { id: entry.item.id })}
 							>{plainTitle(entry.item.title)}</a
 						>
@@ -108,7 +108,7 @@
 					<div class="row">
 						{#each entry.candidates as person (person.id)}
 							<button onclick={() => decide(entry, person)}
-								>{person.name}: {person.papers}
+								>{personName(person)}: {person.papers}
 								{person.papers === 1 ? 'paper' : 'papers'}</button
 							>
 							<a class="small" href={resolve('/authors/[id]', { id: person.id })}>see</a>
@@ -134,9 +134,9 @@
 			{#each likely as pair (`${pair.one.id}-${pair.other.id}`)}
 				<li>
 					<p>
-						<a href={resolve('/authors/[id]', { id: pair.one.id })}>{pair.one.name}</a>
+						<a href={resolve('/authors/[id]', { id: pair.one.id })}>{personName(pair.one)}</a>
 						<span class="muted">({pair.one.papers})</span> and
-						<a href={resolve('/authors/[id]', { id: pair.other.id })}>{pair.other.name}</a>
+						<a href={resolve('/authors/[id]', { id: pair.other.id })}>{personName(pair.other)}</a>
 						<span class="muted">({pair.other.papers})</span>{#if pair.shared}<span class="muted"
 								>{' '}· {pair.shared}
 								{pair.shared === 1 ? 'co-author' : 'co-authors'} in common</span
@@ -191,7 +191,7 @@
 	<ul class="authors">
 		{#each rows as person (person.id)}
 			<li>
-				<a href={resolve('/authors/[id]', { id: person.id })}>{person.name}</a>
+				<a href={resolve('/authors/[id]', { id: person.id })}>{personName(person)}</a>
 				<span class="muted"
 					>{person.papers}
 					{person.papers === 1 ? 'paper' : 'papers'}{#if person.orcid}{' '}· ORCID{/if}</span

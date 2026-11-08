@@ -3,8 +3,10 @@
 		changePassword,
 		errorMessage,
 		loginMethods,
-		setDefaultLibrary
+		setDefaultLibrary,
+		setNameFormat
 	} from '#lib/api/client.ts';
+	import { NAME_FORMATS, nameFormat, type NameFormat } from '#lib/names.svelte.ts';
 	import {
 		defaultLibrary,
 		libraryName,
@@ -36,6 +38,13 @@
 	];
 
 	let ownerMessage = $state('');
+
+	let namesMessage = $state('');
+	async function chooseNameFormat(value: NameFormat) {
+		const { error } = await setNameFormat({ body: { name_format: value } });
+		if (!error && session.user) session.user.name_format = value;
+		namesMessage = error ? errorMessage(error) : 'Saved.';
+	}
 	async function chooseOwner(id: string) {
 		const { error } = await setDefaultLibrary({ body: { library_id: id } });
 		ownerMessage = error ? errorMessage(error) : 'Saved.';
@@ -129,6 +138,30 @@
 			</label>
 		{/each}
 	</fieldset>
+</section>
+
+<section>
+	<h2>Names</h2>
+	<p class="muted">How people’s names are written, on all your devices.</p>
+	<fieldset>
+		<legend class="visually-hidden">Names</legend>
+		{#each NAME_FORMATS as option (option.value)}
+			<label class="option">
+				<input
+					type="radio"
+					name="name-format"
+					value={option.value}
+					checked={nameFormat() === option.value}
+					onchange={() => chooseNameFormat(option.value)}
+				/>
+				<span>
+					<strong>{option.label}</strong>
+					<small>{option.example}</small>
+				</span>
+			</label>
+		{/each}
+	</fieldset>
+	{#if namesMessage}<p class="saved" aria-live="polite">{namesMessage}</p>{/if}
 </section>
 
 <section>

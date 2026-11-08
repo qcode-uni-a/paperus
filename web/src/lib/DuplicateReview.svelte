@@ -12,11 +12,12 @@
 		trashItem
 	} from '#lib/api/client.ts';
 	import type { DuplicateOut, ItemOut, MergeStep } from '#lib/api/generated/types.gen.ts';
-	import { fullName, typeName } from '#lib/format.ts';
+	import { typeName } from '#lib/format.ts';
 	import Icon from '#lib/Icon.svelte';
 	import { libraryName, loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import PdfThumb from '#lib/PdfThumb.svelte';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import { nameSeparator, writtenName } from '#lib/names.svelte.ts';
 
 	/** The likely duplicates one pair after another: both papers side by
 	 * side (first page and details), and what merging would do. */
@@ -276,7 +277,7 @@
 				name: organize.collections.find((c) => c.id === id)?.name ?? ''
 			}));
 		const shown = (item: ItemOut): Record<string, string[]> => ({
-			Authors: item.authors.length ? [item.authors.map(fullName).join(', ')] : [],
+			Authors: item.authors.length ? [item.authors.map(writtenName).join(nameSeparator())] : [],
 			Year: item.year ? [String(item.year)] : [],
 			'Published in': item.container_title ? [item.container_title] : [],
 			Type: [typeName(item.type)]

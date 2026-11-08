@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import (
@@ -19,11 +19,19 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    case,
     func,
+    select,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    column_property,
+    mapped_column,
+    relationship,
+)
 
 
 class Base(DeclarativeBase):
@@ -70,6 +78,11 @@ class User(Record, Base):
     handed_over: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """The last hand-over of their own library while they were deactivated
     (``at``, ``to``, ``by``, ``papers``), shown to them if they come back."""
+    name_format: Mapped[str] = mapped_column(
+        String(16), server_default=text("'family-given'")
+    )
+    """How the website writes people's names: "family-given" ("Benito,
+    Mónica") or "given-family" ("Mónica Benito")."""
 
 
 class Role(StrEnum):
@@ -465,6 +478,10 @@ class Author(Record, Base):
     """The name folded (``authors.fold``): what "the same full name" means."""
     orcid: Mapped[str | None] = mapped_column(String(19), unique=True)
     openalex_id: Mapped[str | None] = mapped_column(String(32), unique=True)
+    if TYPE_CHECKING:
+        written: str | None
+        """The name as on their papers, "Benito, Mónica" (the spelling
+        shown first); set below, after ``Authorship``."""
 
 
 class AuthorSource(StrEnum):
@@ -503,6 +520,26 @@ class Authorship(Base):
     orcid: Mapped[str | None] = mapped_column(String(19))
     openalex_id: Mapped[str | None] = mapped_column(String(32))
     """The ids this paper's details give for the author."""
+
+
+def _given_family(written: Any) -> Any:  # noqa: ANN401 (SQL expressions)
+    """ "Benito, Mónica" → "Mónica Benito" in SQL (``authors._shown``)."""
+    comma = func.strpos(written, ",")
+    given = func.nullif(func.btrim(func.substr(written, comma + 1)), "")
+    family = func.btrim(func.split_part(written, ",", 1))
+    return case((comma > 0, func.concat_ws(" ", given, family)), else_=written)
+
+
+Author.written = column_property(  # ty: ignore[invalid-assignment]
+    select(Authorship.written)
+    .where(Authorship.author_id == Author.id)
+    .order_by(
+        (_given_family(Authorship.written) == Author.name).desc(), Authorship.written
+    )
+    .limit(1)
+    .correlate_except(Authorship)
+    .scalar_subquery()
+)
 
 
 class AuthorsApart(Base):

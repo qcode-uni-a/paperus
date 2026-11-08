@@ -62,10 +62,10 @@ test('filter the library by tags and authors', async ({ page }) => {
 	// By an author's name (where authors lead until they are linked to
 	// people, see authors.spec.ts): the family name and the first letter.
 	await page.goto(`/?${new URLSearchParams({ author: `${family}, Mónica` })}`);
-	await expect(page.getByText(`Papers by Mónica ${family}.`)).toBeVisible();
+	await expect(page.getByText(`Papers by ${family}, Mónica.`)).toBeVisible();
 	await expect(rows).toHaveCount(2);
 	await page.goto(`/?${new URLSearchParams({ author: `${family}, M.` })}`);
-	await expect(page.getByText(`Papers by M. ${family}.`)).toBeVisible();
+	await expect(page.getByText(`Papers by ${family}, M.`)).toBeVisible();
 	await expect(rows).toHaveCount(2);
 });
 

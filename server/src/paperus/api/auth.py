@@ -3,7 +3,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Path, Request, Response
@@ -30,6 +30,9 @@ class LoginRequest(BaseModel):
     password: str
 
 
+NameFormat = Literal["family-given", "given-family"]
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     username: str
@@ -44,6 +47,8 @@ class UserOut(BaseModel):
     """How dates and times are shown (the installation's setting)."""
     handed_over: "HandedOver | None" = None
     """While the account was deactivated, its library went to someone else."""
+    name_format: NameFormat = "family-given"
+    """How the website writes people's names (the person's choice)."""
 
 
 class HandedOver(BaseModel):
@@ -75,6 +80,7 @@ def user_out(user: auth.User, date_format: DateFormat) -> UserOut:
         avatar_url=avatar_url(user.id, user.avatar_version),
         date_format=date_format,
         handed_over=HandedOver(**user.handed_over) if user.handed_over else None,
+        name_format=user.name_format,  # ty: ignore[invalid-argument-type]
     )
 
 
@@ -311,3 +317,15 @@ def mark_hint_seen(hint: Hint, db: DB, user: CurrentUser) -> None:
     if hint not in user.seen_hints:
         user.seen_hints = [*user.seen_hints, hint]
         db.commit()
+
+
+class NameFormatIn(BaseModel):
+    name_format: NameFormat
+
+
+@router.put("/name-format", status_code=204)
+def set_name_format(body: NameFormatIn, db: DB, user: CurrentUser) -> None:
+    """How the website writes people's names for the person: "Benito,
+    Mónica" (family-given) or "Mónica Benito" (given-family)."""
+    user.name_format = body.name_format
+    db.commit()

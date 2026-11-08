@@ -1,4 +1,5 @@
 import { getAuthor } from '#lib/api/client.ts';
+import { personName } from '#lib/names.svelte.ts';
 
 /** Authors' names by id, for rules that hold ids (smart collections, the
  * library's filter): asked for once, shown when they arrive. */
@@ -9,7 +10,7 @@ export function authorName(id: string): string {
 	if (!(id in names) && !asked.has(id)) {
 		asked.add(id);
 		getAuthor({ path: { author_id: id } }).then(({ data }) => {
-			names[id] = data?.name ?? 'someone not in your library';
+			names[id] = data ? personName(data) : 'someone not in your library';
 		});
 	}
 	return names[id] ?? '…';

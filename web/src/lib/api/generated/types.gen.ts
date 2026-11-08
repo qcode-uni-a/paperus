@@ -147,6 +147,10 @@ export type AuthorOut = {
      */
     name: string;
     /**
+     * Written
+     */
+    written: string;
+    /**
      * Papers
      */
     papers: number;
@@ -196,6 +200,10 @@ export type AuthorRow = {
      * Name
      */
     name: string;
+    /**
+     * Written
+     */
+    written: string;
     /**
      * Papers
      */
@@ -2338,6 +2346,16 @@ export type NameChoice = {
 };
 
 /**
+ * NameFormatIn
+ */
+export type NameFormatIn = {
+    /**
+     * Name Format
+     */
+    name_format: 'family-given' | 'given-family';
+};
+
+/**
  * NewItemUpload
  */
 export type NewItemUpload = {
@@ -3946,6 +3964,10 @@ export type UserOut = {
      */
     date_format?: 'browser' | 'europe' | 'uk' | 'iso' | 'us';
     handed_over?: HandedOver | null;
+    /**
+     * Name Format
+     */
+    name_format?: 'family-given' | 'given-family';
 };
 
 /**
@@ -4347,6 +4369,31 @@ export type MarkHintSeenResponses = {
 };
 
 export type MarkHintSeenResponse = MarkHintSeenResponses[keyof MarkHintSeenResponses];
+
+export type SetNameFormatData = {
+    body: NameFormatIn;
+    path?: never;
+    query?: never;
+    url: '/api/auth/name-format';
+};
+
+export type SetNameFormatErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetNameFormatError = SetNameFormatErrors[keyof SetNameFormatErrors];
+
+export type SetNameFormatResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetNameFormatResponse = SetNameFormatResponses[keyof SetNameFormatResponses];
 
 export type RemoveAvatarData = {
     body?: never;

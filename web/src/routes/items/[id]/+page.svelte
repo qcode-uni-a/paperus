@@ -42,10 +42,11 @@
 	import PdfViewer from '#lib/PdfViewer.svelte';
 	import TextViewer from '#lib/TextViewer.svelte';
 	import { isShared, libraryById } from '#lib/organize.svelte.ts';
-	import { ago, fullName, readingProblem } from '#lib/format.ts';
+	import { ago, readingProblem } from '#lib/format.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Avatar from '#lib/Avatar.svelte';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
+	import { nameSeparator, writtenName } from '#lib/names.svelte.ts';
 
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
@@ -313,10 +314,10 @@
 			{/if}
 		</div>
 		<p class="muted">
-			{#each item.authors as author, i (i)}{i ? ', ' : ''}<a
+			{#each item.authors as author, i (i)}{i ? nameSeparator() : ''}<a
 					class="person"
 					href={authorHref(item, i)}
-					title="Papers by {fullName(author)} in the library">{fullName(author)}</a
+					title="Papers by {writtenName(author)} in the library">{writtenName(author)}</a
 				>{/each}{#if item.year}{' '}({item.year}){/if}
 		</p>
 		{#if item.container_title}<p class="muted journal"><em>{item.container_title}</em></p>{/if}

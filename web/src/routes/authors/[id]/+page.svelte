@@ -15,6 +15,7 @@
 	import AuthorCompare from '#lib/AuthorCompare.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import { ago } from '#lib/format.ts';
+	import { personName } from '#lib/names.svelte.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { writableLibraries } from '#lib/organize.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
@@ -76,7 +77,7 @@
 		}
 		notify({
 			kind: 'success',
-			title: `${chosen.length} ${chosen.length === 1 ? 'paper' : 'papers'} moved to another ${data.name}`,
+			title: `${chosen.length} ${chosen.length === 1 ? 'paper' : 'papers'} moved to another ${personName(data)}`,
 			text: 'The two are kept apart from now on.',
 			link: { href: resolve('/authors/[id]', { id: data.id }), label: 'Open' }
 		});
@@ -133,7 +134,7 @@
 		!first ? '' : first === last ? String(first) : `${first}–${last}`;
 </script>
 
-<svelte:head><title>{author?.name ?? 'Author'} · paperus</title></svelte:head>
+<svelte:head><title>{author ? personName(author) : 'Author'} · paperus</title></svelte:head>
 
 {#if comparing && author}
 	<AuthorCompare
@@ -162,7 +163,7 @@
 {:else if author}
 	<header class="head">
 		<p class="kicker"><a href={resolve('/manage/authors')}>Authors</a></p>
-		<h1>{author.name}</h1>
+		<h1>{personName(author)}</h1>
 		<p class="meta">
 			{author.papers}
 			{author.papers === 1 ? 'paper' : 'papers'} in your library{#if author.orcid}
@@ -200,7 +201,7 @@
 			<p class="chips">
 				{#each author.coauthors as other (other.id)}
 					<a class="chip" href={resolve('/authors/[id]', { id: other.id })}
-						>{other.name} <span class="muted">{other.papers}</span></a
+						>{personName(other)} <span class="muted">{other.papers}</span></a
 					>
 				{/each}
 			</p>
@@ -209,11 +210,11 @@
 
 	{#if author.namesakes.length}
 		<section class="namesakes">
-			<h2>Others named {author.name}</h2>
+			<h2>Others named {personName(author)}</h2>
 			<ul>
 				{#each author.namesakes as other (other.id)}
 					<li>
-						<a href={resolve('/authors/[id]', { id: other.id })}>{other.name}</a>
+						<a href={resolve('/authors/[id]', { id: other.id })}>{personName(other)}</a>
 						<span class="muted">{other.papers} {other.papers === 1 ? 'paper' : 'papers'}</span>
 						{#if author.may_change}
 							<button class="link" onclick={() => merge(other)}>The same person</button>
@@ -238,7 +239,7 @@
 					title="A collection that always holds their papers, also those added later"
 					onclick={() =>
 						author &&
-						collectionDialog?.open(undefined, true, { authors: [author.id] }, author.name)}
+						collectionDialog?.open(undefined, true, { authors: [author.id] }, personName(author))}
 					>Smart collection</button
 				>
 			</div>
@@ -259,7 +260,7 @@
 						{#each found as other (other.id)}
 							<li>
 								<button class="link" onclick={() => merge(other)}
-									>{other.name}{#if other.orcid}{' '}(ORCID){/if}</button
+									>{personName(other)}{#if other.orcid}{' '}(ORCID){/if}</button
 								>
 								<span class="muted">{other.papers} {other.papers === 1 ? 'paper' : 'papers'}</span>
 							</li>
@@ -274,13 +275,13 @@
 		{#if splitting}
 			<div class="tool">
 				<p>
-					Choose the papers by another {author.name}; they go to a new person, and the two are kept
-					apart from then on.
+					Choose the papers by another {personName(author)}; they go to a new person, and the two
+					are kept apart from then on.
 				</p>
 				<div class="row">
 					<button class="primary" disabled={!chosen.length || working} onclick={split}
 						>Move {chosen.length}
-						{chosen.length === 1 ? 'paper' : 'papers'} to another {author.name}</button
+						{chosen.length === 1 ? 'paper' : 'papers'} to another {personName(author)}</button
 					>
 					<button class="quiet" onclick={() => ((splitting = false), (chosen = []))}>Cancel</button>
 				</div>

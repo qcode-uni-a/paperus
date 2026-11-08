@@ -155,6 +155,12 @@ def upgrade() -> None:
         sa.Column(
             "handed_over", postgresql.JSONB(astext_type=sa.Text()), nullable=True
         ),
+        sa.Column(
+            "name_format",
+            sa.String(length=16),
+            server_default=sa.text("'family-given'"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("oidc_subject"),
         sa.UniqueConstraint("username"),

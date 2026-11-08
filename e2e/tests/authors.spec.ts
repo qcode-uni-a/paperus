@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { unique } from './helpers.ts';
+import { LOGGED_OUT, unique } from './helpers.ts';
 
 type Name = { family: string; given: string };
 
@@ -35,11 +35,11 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 
 	// From a paper to its author's page.
 	await page.goto(`/items/${proteins}`);
-	await page.getByRole('link', { name: `Mónica ${family}` }).click();
-	await expect(page.getByRole('heading', { level: 1, name: `Mónica ${family}` })).toBeVisible();
+	await page.getByRole('link', { name: `${family}, Mónica` }).click();
+	await expect(page.getByRole('heading', { level: 1, name: `${family}, Mónica` })).toBeVisible();
 	await expect(page.getByText('3 papers in your library')).toBeVisible();
 	await expect(
-		page.getByRole('link', { name: new RegExp(`Gloria ${platero.family}`) })
+		page.getByRole('link', { name: new RegExp(`${platero.family}, Gloria`) })
 	).toBeVisible();
 	const physicist = page.url();
 
@@ -53,7 +53,7 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 	await page.getByRole('button', { name: /^Move 1 paper to another/ }).click();
 	await expect(page.getByText(/1 paper moved to another/)).toBeVisible();
 	await expect(page.getByText('2 papers in your library')).toBeVisible();
-	await expect(page.getByRole('heading', { name: `Others named Mónica ${family}` })).toBeVisible();
+	await expect(page.getByRole('heading', { name: `Others named ${family}, Mónica` })).toBeVisible();
 
 	// A new paper by that name alone: which one is it? To check.
 	const alone = await add(page, `${word} alone`, [benito]);
@@ -79,7 +79,7 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 
 	// Found under Manage → Authors; and merged again after all.
 	await page.getByRole('searchbox', { name: 'Find an author' }).fill(family);
-	await expect(page.getByRole('link', { name: `Mónica ${family}` })).toHaveCount(2);
+	await expect(page.getByRole('link', { name: `${family}, Mónica` })).toHaveCount(2);
 	await page.goto(physicist);
 	await page.getByRole('button', { name: 'The same person' }).click();
 	const compare = page.getByRole('dialog', { name: 'The same person?' });
@@ -122,16 +122,16 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	// Counted next to Manage → Authors in the menu.
 	await expect(page.getByTitle(/pairs? probably the same/)).toBeVisible();
 	const section = page.locator('section').filter({ hasText: 'Probably the same' });
-	const pair = section.getByRole('listitem').filter({ hasText: `Guido ${family}` });
+	const pair = section.getByRole('listitem').filter({ hasText: `${family}, Guido` });
 	await expect(pair).toContainText('1 co-author in common');
-	await expect(pair).toContainText(`G. ${family}`);
+	await expect(pair).toContainText(`${family}, G.`);
 	// Compared side by side, what both have marked.
 	await pair.getByRole('button', { name: 'Compare…' }).click();
 	const compare = page.getByRole('dialog', { name: 'The same person?' });
 	await expect(compare.getByTitle('Both have this')).toHaveCount(2);
 	await expect(compare.getByText('In common (green): 1 co-author.')).toBeVisible();
 	await compare.getByRole('button', { name: 'The same person' }).click();
-	await expect(page.getByText(`One person now: Guido ${family}`)).toBeVisible();
+	await expect(page.getByText(`One person now: ${family}, Guido`)).toBeVisible();
 	await expect(compare).toBeHidden();
 	await expect(pair).toBeHidden();
 	// "Gerda" never fits "Guido"; "G." did, but is merged now.
@@ -151,14 +151,39 @@ test('a smart collection of an author’s papers', async ({ page }) => {
 	await page.getByRole('button', { name: 'Smart collection' }).click();
 	const dialog = page.getByRole('dialog', { name: 'New collection' });
 	await expect(dialog.getByRole('radio', { name: /^Smart/ })).toBeChecked();
-	await expect(dialog.getByLabel('Name')).toHaveValue(`Gloria ${family}`);
-	await expect(dialog.getByRole('button', { name: `Remove Gloria ${family}` })).toBeVisible();
+	await expect(dialog.getByLabel('Name')).toHaveValue(`${family}, Gloria`);
+	await expect(dialog.getByRole('button', { name: `Remove ${family}, Gloria` })).toBeVisible();
 	await dialog.getByRole('button', { name: 'Create collection' }).click();
 	await page.goto('/collections');
 	await page
-		.getByRole('link', { name: `Gloria ${family}` })
+		.getByRole('link', { name: `${family}, Gloria` })
 		.first()
 		.click();
-	await expect(page.getByText(`Papers by Gloria ${family}.`)).toBeVisible();
+	await expect(page.getByText(`Papers by ${family}, Gloria.`)).toBeVisible();
 	await expect(page.getByRole('heading', { name: '2 items' })).toBeVisible();
+});
+
+test('names written family name first, or as one chooses', async ({ page, browser }) => {
+	// A person of their own: the choice is theirs, not the other tests'.
+	const eve = { username: unique('eve'), password: 'eve-password-e2e' };
+	expect((await page.request.post('/api/admin/users', { data: eve })).status()).toBe(201);
+	const context = await browser.newContext({ storageState: LOGGED_OUT });
+	const own = await context.newPage();
+	await own.goto('/login');
+	await own.getByLabel('Username').fill(eve.username);
+	await own.getByLabel('Password').fill(eve.password);
+	await own.getByRole('button', { name: 'Log in' }).click();
+	await expect(own).toHaveURL(/\/$/);
+
+	const family = unique('Loss');
+	const id = await add(own, unique('Named '), [{ family, given: 'Daniel' }]);
+	await own.goto(`/items/${id}`);
+	await expect(own.getByRole('link', { name: `${family}, Daniel` })).toBeVisible();
+
+	await own.goto('/settings');
+	await own.getByRole('radio', { name: /Given name first/ }).check();
+	await expect(own.getByText('Saved.')).toBeVisible();
+	await own.goto(`/items/${id}`);
+	await expect(own.getByRole('link', { name: `Daniel ${family}` })).toBeVisible();
+	await context.close();
 });

@@ -15,6 +15,12 @@ name; Manage → Authors lists them all.
   name as written on that paper, how the link was made (`orcid`,
   `openalex`, `name`, `hand`), and, per paper, the affiliation and the ids
   its details give. The paper's details (CSL-JSON) stay as they are.
+- **Names are written as each person chooses** (Settings → Names,
+  `users.name_format`): family name first, "Benito, Mónica" (the default),
+  or given name first, "Mónica Benito". A record keeps its name both ways:
+  `name` ("Mónica Benito") and `written`, the same as on its papers
+  ("Benito, Mónica"; read from them, not stored). Only how they are shown:
+  citations use each paper's own names.
 
 ## Who is who
 

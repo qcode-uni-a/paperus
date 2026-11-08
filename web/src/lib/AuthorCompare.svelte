@@ -14,6 +14,7 @@
 	import type { AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
 	import Icon from '#lib/Icon.svelte';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import { personName } from '#lib/names.svelte.ts';
 
 	/** Two author records side by side (their papers, co-authors, places),
 	 * one pair after another: the same person (shown under the name chosen)
@@ -174,7 +175,7 @@
 			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
 			return;
 		}
-		notify({ kind: 'success', title: `One person now: ${data.name}` });
+		notify({ kind: 'success', title: `One person now: ${personName(data)}` });
 		// The merged record is gone: later pairs with it name the kept one
 		// (and a pair of the two is settled).
 		const gone = merged.id;
@@ -240,7 +241,7 @@
 	<article class="person">
 		<h3>
 			<a href={resolve('/authors/[id]', { id: row.id })} target="_blank" rel="noopener"
-				>{row.name}</a
+				>{personName(row)}</a
 			>
 		</h3>
 		<p class="ids muted">
@@ -274,7 +275,7 @@
 				<p class="chips">
 					<span class="label">Wrote with</span>
 					{#each coauthors(author, other).slice(0, COAUTHORS) as { person, match } (person.id)}
-						{@render chip(person.name, match)}
+						{@render chip(personName(person), match)}
 					{/each}
 				</p>
 			{/if}

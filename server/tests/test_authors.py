@@ -230,6 +230,7 @@ def test_merge(client: TestClient, db: Session) -> None:
     assert response.json() == {
         "id": str(keep),
         "name": "Mónica Benito",
+        "written": "Benito, Mónica",
         "papers": 2,
         "orcid": "0000-0001-2345-6789",
     }
@@ -268,6 +269,31 @@ def test_undoing_a_merge_gives_the_old_name_back(
     db.expire_all()
     record = db.get(Author, keep)
     assert record is not None and record.name == "M. Benito"
+
+
+def test_names_written_as_the_person_chooses(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    paper(ada, "One", "Zeller, Anna", "Albers, Zoe", "Mitte")
+    authors.link_waiting(db)
+    assert ada.get("/api/auth/me").json()["name_format"] == "family-given"
+
+    def by_name() -> list[tuple[str, str]]:
+        found = ada.get("/api/authors", params={"sort": "name"}).json()
+        return [(a["name"], a["written"]) for a in found]
+
+    # Family names first: sorted by them.
+    assert by_name() == [
+        ("Zoe Albers", "Albers, Zoe"),
+        ("Mitte", "Mitte"),
+        ("Anna Zeller", "Zeller, Anna"),
+    ]
+    assert (
+        ada.put("/api/auth/name-format", {"name_format": "given-family"}).status_code
+        == 204
+    )
+    assert ada.get("/api/auth/me").json()["name_format"] == "given-family"
+    assert [name for name, _ in by_name()] == ["Anna Zeller", "Mitte", "Zoe Albers"]
+    assert ada.put("/api/auth/name-format", {"name_format": "x"}).status_code == 422
 
 
 def test_seen_only_through_ones_papers(client: TestClient, db: Session) -> None:
