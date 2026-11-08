@@ -71,12 +71,65 @@
 		Boolean(pair?.one.orcid && pair.other.orcid && pair.one.orcid !== pair.other.orcid)
 	);
 
-	/** Co-authors both have. */
-	const shared = $derived.by(() => {
-		if (!left || !right) return new Set<string>();
-		const theirs = new Set(right.author.coauthors.map((c) => c.id));
-		return new Set(left.author.coauthors.filter((c) => theirs.has(c.id)).map((c) => c.id));
+	/** What both have: the same (green), or probably the same written
+	 * differently (dashed). */
+	type Match = 'same' | 'similar' | null;
+	const fold = (text: string) =>
+		text
+			.normalize('NFD')
+			.replace(/\p{M}/gu, '')
+			.toLowerCase()
+			.replace(/[^\p{L}\p{N}]+/gu, ' ')
+			.trim();
+	/** "W. Huang" and "Wister Huang": the same family name and initial. */
+	function alike(a: string, b: string): boolean {
+		const [x, y] = [fold(a).split(' '), fold(b).split(' ')];
+		return x.length > 1 && y.length > 1 && x.at(-1) === y.at(-1) && x[0][0] === y[0][0];
+	}
+	function coauthor(person: AuthorRow, other: AuthorOut | undefined): Match {
+		if (!other) return null;
+		if (other.coauthors.some((c) => c.id === person.id)) return 'same';
+		return other.coauthors.some((c) => alike(c.name, person.name)) ? 'similar' : null;
+	}
+	/** "UNSW Sydney" in both; one place's name in the other's ("Delft
+	 * University of Technology" and "QuTech, Delft University of
+	 * Technology") is probably the same. */
+	/** A paper's affiliation may name several places: "UNSW Sydney;
+	 * Quantum Motion Technologies". */
+	const places = (author: AuthorOut) =>
+		author.affiliations.flatMap((a) => a.name.split(/\s*;\s*/).filter(Boolean));
+	function place(name: string, other: AuthorOut | undefined): Match {
+		if (!other) return null;
+		const mine = fold(name);
+		const theirs = places(other).map(fold);
+		if (theirs.includes(mine)) return 'same';
+		return theirs.some((t) => t.includes(mine) || mine.includes(t)) ? 'similar' : null;
+	}
+	const PLACES = 3;
+	const COAUTHORS = 8;
+	/** Co-authors, those in common first (the same, then probably). */
+	function coauthors(author: AuthorOut, other: AuthorOut | undefined) {
+		const rank = { same: 0, similar: 1 } as const;
+		return author.coauthors
+			.map((person) => ({ person, match: coauthor(person, other) }))
+			.sort((a, b) => (a.match ? rank[a.match] : 2) - (b.match ? rank[b.match] : 2));
+	}
+	/** In common, for the summary above both. */
+	const common = $derived.by(() => {
+		if (!left || !right) return null;
+		const where = [...new Set(places(left.author))].map((p) => place(p, right.author));
+		const people = left.author.coauthors.map((c) => coauthor(c, right.author));
+		const count = (found: Match[], match: Match) => found.filter((m) => m === match).length;
+		return {
+			places: count(where, 'same') + count(where, 'similar'),
+			same: count(people, 'same'),
+			similar: count(people, 'similar')
+		};
 	});
+	const MATCH: Record<string, string> = {
+		same: 'Both have this',
+		similar: 'Probably both: written differently'
+	};
 
 	/** The record that stays (its page, its ids): the one with an ORCID
 	 * iD, else an OpenAlex id, else more papers, else the one preferred. */
@@ -95,24 +148,6 @@
 	});
 	const merged = $derived(pair && kept ? (kept.id === pair.one.id ? pair.other : pair.one) : null);
 
-	/** The names to choose from: both, the fuller one first (more letters,
-	 * accents included), and one typed in. */
-	const names = $derived.by(() => {
-		if (!pair) return [];
-		const both = [pair.one.name, pair.other.name].filter((n, i, all) => all.indexOf(n) === i);
-		return both.sort((a, b) => b.normalize('NFD').length - a.normalize('NFD').length);
-	});
-	let name = $state('');
-	let typed = $state('');
-	$effect(() => {
-		void pair?.one.id;
-		void pair?.other.id;
-		name = untrack(() => names[0] ?? '');
-		typed = '';
-	});
-	const OTHER = '\u0000other';
-	const chosenName = $derived(name === OTHER ? typed.trim() : name);
-
 	function next() {
 		if (index < queue.length - 1) index += 1;
 		else dialog?.close();
@@ -128,11 +163,11 @@
 	}
 
 	async function same() {
-		if (!kept || !merged || busy || twoOrcids || !chosenName) return;
+		if (!kept || !merged || busy || twoOrcids) return;
 		busy = true;
 		const { data, error } = await mergeAuthors({
 			path: { author_id: kept.id },
-			body: { other_id: merged.id, name: chosenName }
+			body: { other_id: merged.id }
 		});
 		busy = false;
 		if (!data) {
@@ -173,7 +208,7 @@
 	}
 
 	function key(event: KeyboardEvent) {
-		if (busy || (event.target instanceof HTMLInputElement && event.target.type === 'text')) return;
+		if (busy) return;
 		const actions: Record<string, () => void> = {
 			s: () => same(),
 			d: () => different(),
@@ -191,7 +226,17 @@
 		!first ? '' : first === last ? String(first) : `${first}–${last}`;
 </script>
 
-{#snippet person(row: AuthorRow, found: { author: AuthorOut; papers: Item[] } | null)}
+{#snippet chip(text: string, match: Match)}
+	<span class="chip {match ?? ''}" title={match ? MATCH[match] : undefined}
+		>{text}{#if match}<span class="visually-hidden"> ({MATCH[match]})</span>{/if}</span
+	>
+{/snippet}
+
+{#snippet person(
+	row: AuthorRow,
+	found: { author: AuthorOut; papers: Item[] } | null,
+	other: AuthorOut | undefined
+)}
 	<article class="person">
 		<h3>
 			<a href={resolve('/authors/[id]', { id: row.id })} target="_blank" rel="noopener"
@@ -211,23 +256,25 @@
 				<p><span class="label">Written as</span> {author.spellings.join('; ')}</p>
 			{/if}
 			{#if author.affiliations.length}
-				<p>
+				<p class="chips">
 					<span class="label">Where</span>
-					{#each author.affiliations.slice(0, 2) as place, i (place.name)}{i
-							? '; '
-							: ''}{place.name}
-						<span class="muted">{years(place.first_year, place.last_year)}</span>{/each}
+					{#each author.affiliations.slice(0, PLACES) as where (where.name)}
+						<span class="place"
+							>{#each where.name.split(/\s*;\s*/).filter(Boolean) as part (part)}{@render chip(
+									part,
+									place(part, other)
+								)}{/each}{#if where.first_year}<span class="muted"
+									>{years(where.first_year, where.last_year)}</span
+								>{/if}</span
+						>
+					{/each}
 				</p>
 			{/if}
 			{#if author.coauthors.length}
 				<p class="chips">
 					<span class="label">Wrote with</span>
-					{#each author.coauthors.slice(0, 8) as other (other.id)}
-						<span
-							class="chip"
-							class:shared={shared.has(other.id)}
-							title={shared.has(other.id) ? 'Both wrote with them' : undefined}>{other.name}</span
-						>
+					{#each coauthors(author, other).slice(0, COAUTHORS) as { person, match } (person.id)}
+						{@render chip(person.name, match)}
 					{/each}
 				</p>
 			{/if}
@@ -261,11 +308,20 @@
 							{index + 1} of {queue.length}</span
 						>{/if}
 				</h2>
-				{#if shared.size}
+				{#if common && (common.places || common.same || common.similar)}
 					<p class="muted">
-						{shared.size}
-						{shared.size === 1 ? 'co-author' : 'co-authors'} in common (marked).
+						In common (green):
+						{[
+							common.places && `${common.places} ${common.places === 1 ? 'place' : 'places'}`,
+							common.same && `${common.same} ${common.same === 1 ? 'co-author' : 'co-authors'}`,
+							common.similar &&
+								`${common.similar} ${common.similar === 1 ? 'co-author' : 'co-authors'} written differently (dashed)`
+						]
+							.filter(Boolean)
+							.join(', ')}.
 					</p>
+				{:else if common}
+					<p class="muted">No co-authors or places in common.</p>
 				{/if}
 			</div>
 			<button class="icon" aria-label="Close" onclick={() => dialog?.close()}
@@ -274,30 +330,12 @@
 		</header>
 
 		<div class="sides">
-			{@render person(pair.one, left)}
-			{@render person(pair.other, right)}
+			{@render person(pair.one, left, right?.author)}
+			{@render person(pair.other, right, left?.author)}
 		</div>
 
 		{#if twoOrcids}
 			<p class="warn">They have different ORCID iDs, so they are two people.</p>
-		{:else}
-			<fieldset class="name">
-				<legend>If they are the same person, show them as</legend>
-				{#each names as option (option)}
-					<label><input type="radio" bind:group={name} value={option} /> {option}</label>
-				{/each}
-				<label class="typed">
-					<input type="radio" bind:group={name} value={OTHER} />
-					<input
-						type="text"
-						bind:value={typed}
-						placeholder="Another spelling"
-						aria-label="Another spelling"
-						maxlength="200"
-						onfocus={() => (name = OTHER)}
-					/>
-				</label>
-			</fieldset>
 		{/if}
 
 		<footer>
@@ -307,7 +345,7 @@
 			<div class="buttons">
 				<button onclick={different} disabled={busy}>Different people</button>
 				{#if queue.length > 1}<button onclick={next} disabled={busy}>Skip</button>{/if}
-				<button class="primary" onclick={same} disabled={busy || twoOrcids || !chosenName}>
+				<button class="primary" onclick={same} disabled={busy || twoOrcids}>
 					{busy ? 'Merging…' : 'The same person'}
 				</button>
 			</div>
@@ -400,13 +438,28 @@
 		margin: 0 2px;
 		padding: 0 8px;
 		border: 1.5px solid var(--rule);
-		border-radius: 999px;
+		border-radius: 12px;
 		line-height: 1.6;
 	}
-	.chip.shared {
-		border-color: var(--royal);
-		color: var(--royal);
-		font-weight: 600;
+	.place {
+		margin-right: 6px;
+	}
+	.chip.same,
+	.chip.similar {
+		border-color: var(--success);
+		background: color-mix(in srgb, var(--success) 12%, transparent);
+	}
+	.chip.similar {
+		border-style: dashed;
+		background: none;
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 	.papers {
 		display: grid;
@@ -420,32 +473,6 @@
 	.papers a {
 		font-family: var(--serif);
 		color: var(--ink);
-	}
-	.name {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px 18px;
-		margin: 16px 0 0;
-		padding: 0;
-		border: none;
-	}
-	.name legend {
-		margin-bottom: 6px;
-		padding: 0;
-		font-weight: 650;
-	}
-	.name label {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.name input[type='radio'] {
-		width: auto;
-		margin: 0;
-	}
-	.typed input[type='text'] {
-		width: 14rem;
 	}
 	.warn {
 		margin: 16px 0 0;

@@ -2142,10 +2142,6 @@ export type Merge = {
      * Other Id
      */
     other_id: string;
-    /**
-     * Name
-     */
-    name?: string | null;
 };
 
 /**

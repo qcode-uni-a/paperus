@@ -35,13 +35,14 @@ Fixes by hand, which later automatic passes keep:
   go to a new person of the same name; the two are remembered as different.
 - **Merge** ("Same person as…", "The same person" next to a namesake, or
   "Compare…" at a suggestion): both people side by side (their papers,
-  where they were, co-authors, those in common marked), then "The same
-  person" under the name chosen (either one's, or another spelling; the
-  fuller one at first) or "Different people". The other person's papers
-  come to the one that stays (an ORCID iD, else an OpenAlex id, else more
-  papers, else the one whose page it is); the name chosen is also what
-  they are found by. Refused for two different ORCID iDs (OpenAlex
-  sometimes has two profiles of one person: those may be merged).
+  where they were, co-authors), what both have in green (the same place
+  or co-author; dashed: probably the same, written differently, "W.
+  Huang" and "Wister Huang"), then "The same person" or "Different
+  people". The other person's papers come to the one that stays (an
+  ORCID iD, else an OpenAlex id, else more papers, else the one whose
+  page it is), shown under the fuller spelling. Refused for two
+  different ORCID iDs (OpenAlex sometimes has two profiles of one
+  person: those may be merged).
 - **Decide** a paper's author under "To check", or someone new.
 
 Author records are shared, so a fix changes them for everyone who has

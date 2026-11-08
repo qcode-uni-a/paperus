@@ -114,11 +114,6 @@ with `npm run dev -- --host 0.0.0.0`, then open `http://<this PC's IP>:5173`.
 `npm run build` writes the website to `web/build`, which `paperus serve`
 serves on its own port as well. Checks: `uv run pytest`, `uvx pre-commit run --all-files`.
 
-## Name
-
-paperus: "papers for us", and it sounds like *papyrus*. `paperus` is free on
-PyPI and npm (checked 2026-11-04).
-
 ## Licence
 
 Apache-2.0, see [LICENSE](LICENSE). Bundled fonts and libraries keep their

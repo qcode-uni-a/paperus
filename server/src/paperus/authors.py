@@ -112,12 +112,6 @@ def _accents(name: str) -> int:
     return sum(1 for c in name if ord(c) > 127)
 
 
-def _rename(author: Author, name: str) -> None:
-    """Shown as this name, and found by it (new papers with this spelling
-    come to them)."""
-    author.name, author.key = name, fold(name)
-
-
 def _better_name(author: Author, shown: str) -> None:
     """Keep the fuller spelling of the same name (with its accents)."""
     if _accents(shown) > _accents(author.name):
@@ -640,11 +634,9 @@ def merge(
     *,
     by: uuid.UUID | None = None,
     logged: bool = True,
-    name: str | None = None,
 ) -> None:
     """The same person: ``other``'s papers go to ``keep`` (logged as done
-    ``by`` someone), shown as ``name`` if given (else the fuller spelling).
-    Refused for two different ORCID iDs. Commits."""
+    ``by`` someone). Refused for two different ORCID iDs. Commits."""
     if keep.id == other.id:
         raise Refused("the same person already")
     # Two ORCID iDs are two people; OpenAlex has duplicate profiles, so
@@ -659,10 +651,7 @@ def merge(
             setattr(keep, column, value)
     moved = list(db.scalars(select(Authorship).where(Authorship.author_id == other.id)))
     before = keep.name
-    if name and name.strip():
-        _rename(keep, name.strip())
-    else:
-        _better_name(keep, other.name)
+    _better_name(keep, other.name)
     if logged:
         change = _log(db, AuthorChangeKind.MERGE, by, keep, other, moved)
         change.renamed_from = before if keep.name != before else None
@@ -720,7 +709,7 @@ def undo(db: Session, change: AuthorChange) -> None:
             authorship.author_id = other.id
         apart(db, author.id, other.id)
         if change.renamed_from:
-            _rename(author, change.renamed_from)
+            author.name = change.renamed_from
     else:
         other = db.get(Author, change.other_id)
         if other is None:

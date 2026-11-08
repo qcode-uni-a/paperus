@@ -125,14 +125,13 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	const pair = section.getByRole('listitem').filter({ hasText: `Guido ${family}` });
 	await expect(pair).toContainText('1 co-author in common');
 	await expect(pair).toContainText(`G. ${family}`);
-	// Compared side by side, shown under the name chosen.
+	// Compared side by side, what both have marked.
 	await pair.getByRole('button', { name: 'Compare…' }).click();
 	const compare = page.getByRole('dialog', { name: 'The same person?' });
-	await expect(compare.getByTitle('Both wrote with them')).toHaveCount(2);
-	await expect(compare.getByRole('radio', { name: `Guido ${family}` })).toBeChecked();
-	await compare.getByRole('radio', { name: `G. ${family}` }).check();
+	await expect(compare.getByTitle('Both have this')).toHaveCount(2);
+	await expect(compare.getByText('In common (green): 1 co-author.')).toBeVisible();
 	await compare.getByRole('button', { name: 'The same person' }).click();
-	await expect(page.getByText(`One person now: G. ${family}`)).toBeVisible();
+	await expect(page.getByText(`One person now: Guido ${family}`)).toBeVisible();
 	await expect(compare).toBeHidden();
 	await expect(pair).toBeHidden();
 	// "Gerda" never fits "Guido"; "G." did, but is merged now.

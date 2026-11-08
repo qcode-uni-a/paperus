@@ -11,9 +11,8 @@
 - **Authors compared before merging**: "Probably the same" pairs (one by
   one, or each with "Compare…") and "The same person" on an author's page
   show both people side by side: their papers, where they were, their
-  co-authors (those in common marked). Merging asks which name to show
-  (either one's, or another spelling); undoing a merge gives the old name
-  back.
+  co-authors, with what both have in green (dashed: probably the same,
+  written differently). Undoing a merge also gives the old name back.
 - **The trash says when it is emptied**: how many days things stay
   (Administration → Settings → Trash), and on each paper and note the day
   it is deleted for good; or that the trash stays until emptied by hand.

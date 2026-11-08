@@ -363,8 +363,6 @@ def split_author(
 class Merge(BaseModel):
     other_id: uuid.UUID
     """The same person: their papers come to this author."""
-    name: Annotated[str, Field(min_length=1, max_length=200)] | None = None
-    """Shown as this name from then on (default: the fuller spelling)."""
 
 
 @router.post("/api/authors/{author_id}/merge")
@@ -375,7 +373,7 @@ def merge_authors(
     other = visible_author(db, access, body.other_id)
     _changeable(db, access, keep, other)
     try:
-        authors.merge(db, keep, other, by=access.user.id, name=body.name)
+        authors.merge(db, keep, other, by=access.user.id)
     except authors.Refused as error:
         raise HTTPException(409, str(error)) from error
     return _row(keep, _counts(db, access, [keep.id]).get(keep.id, 0))
