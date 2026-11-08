@@ -56,6 +56,9 @@
   - the readable copy's preview shows the administrator's own papers;
   - "To check" offers only people one sees, and the change log on an
     author's page does not name people one does not see.
+- **Hand-over**: an administrator can no longer hand someone's library to
+  themselves; the person learns, when back, where their papers went and
+  who handed them over.
 - Manage → Authors shows in the menu how many authors there are to check
   and pairs that are probably one person.
 

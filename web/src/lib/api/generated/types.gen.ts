@@ -1288,6 +1288,28 @@ export type HandOver = {
 };
 
 /**
+ * HandedOver
+ */
+export type HandedOver = {
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * To
+     */
+    to: string;
+    /**
+     * By
+     */
+    by: string;
+    /**
+     * Papers
+     */
+    papers: number;
+};
+
+/**
  * IdentifierIn
  */
 export type IdentifierIn = {
@@ -3901,6 +3923,7 @@ export type UserOut = {
      * Date Format
      */
     date_format?: 'browser' | 'europe' | 'uk' | 'iso' | 'us';
+    handed_over?: HandedOver | null;
 };
 
 /**

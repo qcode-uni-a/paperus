@@ -152,6 +152,9 @@ def upgrade() -> None:
         sa.Column("avatar", sa.LargeBinary(), nullable=True),
         sa.Column("avatar_type", sa.String(length=32), nullable=True),
         sa.Column("avatar_version", sa.String(length=16), nullable=True),
+        sa.Column(
+            "handed_over", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("oidc_subject"),
         sa.UniqueConstraint("username"),

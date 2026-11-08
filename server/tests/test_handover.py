@@ -72,9 +72,21 @@ def test_hand_over_to_a_person(client: TestClient, db: Session) -> None:
         ).status_code
         == 422
     )
+    # Being an administrator reads no library: not to oneself.
+    refused = root.post(
+        f"/api/admin/users/{ada.id}/hand-over", json={"user_id": root.id}
+    )
+    assert refused.status_code == 422 and "yourself" in refused.text
     done = root.post(f"/api/admin/users/{ada.id}/hand-over", json={"user_id": ben.id})
     assert done.json()["items"] == 1
     assert ben.titles() == ["Ada's paper"]
+    # Back again, Ada learns what happened.
+    root.patch(f"/api/admin/users/{ada.id}", json={"active": True})
+    login = client.post(
+        "/api/auth/login", json={"username": "ada", "password": "secret"}
+    ).json()
+    told = login["user"]["handed_over"]
+    assert (told["to"], told["by"], told["papers"]) == ("ben", "root", 1)
 
 
 def test_new_accounts_join_groups(client: TestClient, db: Session) -> None:

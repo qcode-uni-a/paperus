@@ -7,6 +7,7 @@
 	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import { organize } from '#lib/organize.svelte.ts';
 	import GettingStarted from '#lib/GettingStarted.svelte';
+	import HandedOver from '#lib/HandedOver.svelte';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { shortAuthors } from '#lib/format.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -208,6 +209,7 @@
 </script>
 
 <div class="library">
+	<HandedOver />
 	{#if !searched && !filtered}<GettingStarted bind:shown={starting} />{/if}
 	{#if searched}
 		<div class="results-head row">

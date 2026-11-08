@@ -5,6 +5,7 @@
 	import { saveConfig } from '#lib/admin/config.svelte.ts';
 	import SectionButtons from '#lib/admin/SectionButtons.svelte';
 	import { errorMessage, handOver, listGroups, listUsers, privateThings } from '#lib/api/client.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import type { GroupOut, Joining, Private, UserRow } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
 	import Icon from '#lib/Icon.svelte';
@@ -61,6 +62,8 @@
 	// Handing over a departed person's things.
 	const departed = $derived(users.filter((u) => u.deactivated_at));
 	const active = $derived(users.filter((u) => !u.deactivated_at));
+	// Being an administrator reads no library: never handed to oneself.
+	const receivers = $derived(active.filter((u) => u.id !== session.user?.id));
 	let open = $state<string | null>(null);
 	let holds = $state<Private | null>(null);
 	let target = $state('');
@@ -188,7 +191,7 @@
 									>{/each}
 							</optgroup>
 							<optgroup label="A person">
-								{#each active as person (person.id)}<option value="user:{person.id}"
+								{#each receivers as person (person.id)}<option value="user:{person.id}"
 										>{person.username}</option
 									>{/each}
 							</optgroup>

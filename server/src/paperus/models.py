@@ -67,6 +67,9 @@ class User(Record, Base):
     avatar_type: Mapped[str | None] = mapped_column(String(32))
     avatar_version: Mapped[str | None] = mapped_column(String(16))
     """Changes with the picture, so its address can be cached for good."""
+    handed_over: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """The last hand-over of their own library while they were deactivated
+    (``at``, ``to``, ``by``, ``papers``), shown to them if they come back."""
 
 
 class Role(StrEnum):

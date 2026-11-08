@@ -48,6 +48,9 @@ because of it; they need a membership like everyone else.
   paper instead of adding it again. Papers in other people's private space
   stay invisible, so two people adding the same paper independently get
   two items.
+- An uploaded PDF whose identifier matches a group's paper I may change
+  joins that paper (a paper exists once): its file is then the group's,
+  and every member can open it. As a reader, my upload stays mine.
 - When a paper changes owner, the collections of a group that no longer
   owns it let it go. Tags stay.
 - **Merging** two papers that are the same: the one merged away goes to the
@@ -128,6 +131,7 @@ because of it; they need a membership like everyone else.
 | Reset a password (logs the person out everywhere) | no (own password: Settings) | yes |
 | Grant or take administrator rights | no | yes, but one active administrator always stays |
 | Deactivate (no login; papers and groups stay), reactivate | no | yes, not oneself |
+| Hand over a deactivated person's papers, notes, tags and collections | no | yes, to a group or another person, never to oneself; the person is told if they come back |
 
 ## Access tokens
 

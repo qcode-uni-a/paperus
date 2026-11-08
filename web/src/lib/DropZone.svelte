@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { organize } from '#lib/organize.svelte.ts';
+	import { organize, writableLibraries } from '#lib/organize.svelte.ts';
 	import { addFiles } from '#lib/uploads.svelte.ts';
 
 	// On a collection's page, dropped files go into that collection too
@@ -42,7 +42,13 @@
 
 {#if depth > 0}
 	<div class="overlay" aria-hidden="true">
-		<div>Drop files to add them{collection ? ` to ${collection.name}` : ''}</div>
+		<div>
+			Drop files to add them{collection ? ` to ${collection.name}` : ''}
+			{#if writableLibraries().length > 1}
+				<!-- A paper exists once: see docs/permissions.md. -->
+				<small>A paper one of your groups has already gets the file there, for the group.</small>
+			{/if}
+		</div>
 	</div>
 {/if}
 
@@ -59,7 +65,14 @@
 		font-size: 1.4em;
 		color: var(--accent);
 	}
+	.overlay small {
+		display: block;
+		margin-top: 6px;
+		font-size: var(--step--1);
+		color: var(--muted);
+	}
 	.overlay div {
+		max-width: min(32rem, calc(100vw - 32px));
 		background: var(--surface);
 		padding: 16px 24px;
 		border-radius: var(--radius);

@@ -14,7 +14,7 @@ from paperus.api.admin import Admin
 from paperus.api.auth import check_password_length
 from paperus.api.deps import DB
 from paperus.avatars import avatar_url
-from paperus.models import Item, Library, Membership, User
+from paperus.models import Group, Item, Library, Membership, User
 from paperus.system import load_config
 
 router = APIRouter(prefix="/api/admin/users", tags=["users"])
@@ -184,6 +184,10 @@ def _own_library(db: DB, user: User) -> uuid.UUID:
     return db.scalars(select(Library.id).where(Library.user_id == user.id)).one()
 
 
+HANDED_OVER = "handed-over"
+"""The hint that shows a person what was handed over (see ``hand_over``)."""
+
+
 @router.post("/{user_id}/hand-over")
 def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Private:
     """Give a deactivated person's papers, notes, tags and collections to a
@@ -196,10 +200,14 @@ def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Priva
     if (body.group_id is None) == (body.user_id is None):
         raise HTTPException(422, "name a group or a person")
     if body.group_id is not None:
-        # Every group has a library.
-        target = db.scalar(select(Library.id).where(Library.group_id == body.group_id))
-        if target is None:
+        group = db.get(Group, body.group_id)
+        if group is None:
             raise HTTPException(404, "group not found")
+        # Every group has a library.
+        target = db.scalars(
+            select(Library.id).where(Library.group_id == group.id)
+        ).one()
+        to = f"the group {group.name}"
     else:
         receiver = db.get(User, body.user_id)
         if (
@@ -208,7 +216,19 @@ def hand_over(user_id: uuid.UUID, body: HandOver, db: DB, admin: Admin) -> Priva
             or receiver.id == user.id
         ):
             raise HTTPException(422, "hand over to another active person")
+        if receiver.id == admin.id:
+            # Being an administrator reads no library: not this way either.
+            raise HTTPException(422, "not to yourself: hand over to someone else")
         target = _own_library(db, receiver)
+        to = receiver.username
     moved = handover.hand_over(db, _own_library(db, user), target)
+    # Kept, and shown to them should they come back.
+    user.handed_over = {
+        "at": datetime.now(UTC).isoformat(),
+        "to": to,
+        "by": admin.username,
+        "papers": moved.items,
+    }
+    user.seen_hints = [h for h in user.seen_hints if h != HANDED_OVER]
     db.commit()
     return Private(**moved.__dict__)

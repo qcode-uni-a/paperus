@@ -9511,6 +9511,35 @@
         "title": "HandOver",
         "description": "To a group or to another person (one of the two)."
       },
+      "HandedOver": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "to": {
+            "type": "string",
+            "title": "To"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "papers": {
+            "type": "integer",
+            "title": "Papers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "to",
+          "by",
+          "papers"
+        ],
+        "title": "HandedOver"
+      },
       "IdentifierIn": {
         "properties": {
           "scheme": {
@@ -14293,6 +14322,16 @@
             ],
             "title": "Date Format",
             "default": "browser"
+          },
+          "handed_over": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandedOver"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

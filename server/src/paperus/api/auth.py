@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Annotated
 from urllib.parse import quote
 
@@ -42,6 +42,17 @@ class UserOut(BaseModel):
     """The profile picture, if one is set."""
     date_format: DateFormat = "browser"
     """How dates and times are shown (the installation's setting)."""
+    handed_over: "HandedOver | None" = None
+    """While the account was deactivated, its library went to someone else."""
+
+
+class HandedOver(BaseModel):
+    at: datetime
+    to: str
+    """A person's username, or "the group …"."""
+    by: str
+    """The administrator."""
+    papers: int
 
 
 class PasswordChange(BaseModel):
@@ -63,6 +74,7 @@ def user_out(user: auth.User, date_format: DateFormat) -> UserOut:
         oidc_linked=user.oidc_subject is not None,
         avatar_url=avatar_url(user.id, user.avatar_version),
         date_format=date_format,
+        handed_over=HandedOver(**user.handed_over) if user.handed_over else None,
     )
 
 
