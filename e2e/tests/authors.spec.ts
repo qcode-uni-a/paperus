@@ -58,9 +58,19 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 	// A new paper by that name alone: which one is it? To check.
 	const alone = await add(page, `${word} alone`, [benito]);
 	expect((await page.request.post('/api/admin/jobs/authors')).status()).toBe(202);
+	// Linked in the background: listed once that has run.
+	await expect
+		.poll(
+			async () =>
+				(await (await page.request.get('/api/authors-to-check')).json()).some(
+					(e: { item: { id: string } }) => e.item.id === alone
+				),
+			{ timeout: 20_000 }
+		)
+		.toBe(true);
 	await page.goto('/manage/authors');
 	const entry = page.getByRole('listitem').filter({ hasText: `${word} alone` });
-	await expect(entry).toBeVisible({ timeout: 20_000 });
+	await expect(entry).toBeVisible();
 	await entry.getByRole('button', { name: /: 2 papers$/ }).click();
 	await expect(entry).toBeHidden();
 	expect((await (await page.request.get(`/api/items/${alone}`)).json()).author_ids[0]).toBe(
