@@ -128,13 +128,11 @@ jobs:
         with:
           node-version: 26
           registry-url: https://registry.npmjs.org
-      # Trusted publishing (no token), staged: the version goes live once a
-      # maintainer approves it on npmjs.com (Staged Packages) or with
-      # `npm stage approve <id>`. Needs npm 11.15 or newer.
+      # Trusted publishing (no token) needs npm 11.5.1 or newer.
       - run: npm install -g npm@11
       - run: npm ci
       - run: npm run build
-      - run: npm stage publish --provenance --access public
+      - run: npm publish --provenance --access public
 
   # The stores only get a new version when the extension changed since the
   # previous release (each one goes through review).
