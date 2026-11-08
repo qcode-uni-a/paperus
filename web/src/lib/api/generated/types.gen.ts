@@ -3794,6 +3794,20 @@ export type TokenOut = {
 };
 
 /**
+ * TrashRules
+ */
+export type TrashRules = {
+    /**
+     * Days
+     */
+    days: number | null;
+    /**
+     * Night Hour
+     */
+    night_hour: number;
+};
+
+/**
  * Trashed
  */
 export type Trashed = {
@@ -7014,6 +7028,22 @@ export type EmptyTrashResponses = {
 };
 
 export type EmptyTrashResponse = EmptyTrashResponses[keyof EmptyTrashResponses];
+
+export type TrashRulesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/trash';
+};
+
+export type TrashRulesResponses = {
+    /**
+     * Successful Response
+     */
+    200: TrashRules;
+};
+
+export type TrashRulesResponse = TrashRulesResponses[keyof TrashRulesResponses];
 
 export type StorageData = {
     body?: never;

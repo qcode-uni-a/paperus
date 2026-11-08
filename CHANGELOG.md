@@ -8,6 +8,9 @@
   OpenAlex is asked without a contact email too. Copies whose sites
   refuse the server (publishers often do) are handed to the browser
   extension from Manage → Missing, which fetches them first.
+- **The trash says when it is emptied**: how many days things stay
+  (Administration → Settings → Trash), and on each paper and note the day
+  it is deleted for good; or that the trash stays until emptied by hand.
 
 ## 0.0.15 (2026-11-08)
 

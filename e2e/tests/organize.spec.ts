@@ -62,6 +62,7 @@ test('trash and restore', async ({ page }) => {
 	await expect(page.getByText(`Nothing found for “${paper.word}”.`)).toBeVisible();
 
 	await page.goto('/trash');
+	await expect(page.getByText('stay in the trash until someone empties it')).toBeVisible();
 	const row = page.getByRole('listitem').filter({ hasText: paper.title });
 	await row.getByRole('button', { name: 'Restore' }).click();
 	await expect(row).toBeHidden();

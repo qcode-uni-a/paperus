@@ -4894,6 +4894,26 @@
       }
     },
     "/api/trash": {
+      "get": {
+        "tags": [
+          "trash"
+        ],
+        "summary": "Trash Rules",
+        "description": "When the trash is emptied by itself (Administration \u2192 Settings).",
+        "operationId": "trash_rules",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashRules"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "trash"
@@ -14096,6 +14116,31 @@
           "last_used_at"
         ],
         "title": "TokenOut"
+      },
+      "TrashRules": {
+        "properties": {
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "night_hour": {
+            "type": "integer",
+            "title": "Night Hour"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "night_hour"
+        ],
+        "title": "TrashRules"
       },
       "Trashed": {
         "properties": {

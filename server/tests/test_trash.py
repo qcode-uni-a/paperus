@@ -69,6 +69,17 @@ def test_empty_by_hand_only_what_one_may_change(
     assert ada.delete("/api/trash").json()["items"] == 1
 
 
+def test_everyone_learns_when_the_trash_is_emptied(
+    client: TestClient, db: Session
+) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    assert ada.get("/api/trash").json() == {"days": None, "night_hour": 2}
+    config = root.get("/api/admin/config").json()
+    root.put("/api/admin/config", json={**config, "trash_days": 30, "night_hour": 4})
+    assert ada.get("/api/trash").json() == {"days": 30, "night_hour": 4}
+
+
 def test_installation_settings(client: TestClient, db: Session) -> None:
     root = Person(client, db, "root", admin=True)
     config = root.get("/api/admin/config").json()

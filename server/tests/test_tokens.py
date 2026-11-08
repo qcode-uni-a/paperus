@@ -357,6 +357,7 @@ ROUTES = {
     ("POST", "/api/tags/remove-keywords"): "tags.write",
     ("GET", "/api/storage"): None,
     ("DELETE", "/api/trash"): None,
+    ("GET", "/api/trash"): None,
     ("POST", "/api/uploads"): "papers.write",
     ("GET", "/api/uploads/{sha256}"): "papers.read",
     ("GET", "/api/users"): None,
