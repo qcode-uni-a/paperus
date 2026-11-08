@@ -33,6 +33,10 @@
   (`journals.aps.org/prb/pdf/10.1103/…`) and looks up the paper's
   details, so the page comes in as the paper (or joins the one already
   in the library), and its open-access copy is looked for.
+- **The database migrations are one again** (`0001`), the same schema as
+  the thirty before it. An installation of 0.0.14 (with the authors
+  migrations of main, `0030`) is marked as up to date by hand, once:
+  `UPDATE alembic_version SET version_num = '0001';`
 - Manage → Authors shows in the menu how many authors there are to check
   and pairs that are probably one person.
 

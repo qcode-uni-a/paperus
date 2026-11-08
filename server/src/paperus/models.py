@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     func,
     text,
 )
@@ -124,7 +125,9 @@ class Library(Record, Base):
 
     __tablename__ = "libraries"
     __table_args__ = (
-        CheckConstraint("(user_id IS NULL) <> (group_id IS NULL)", name="one_owner"),
+        CheckConstraint(
+            "(user_id IS NULL) <> (group_id IS NULL)", name="ck_libraries_one_owner"
+        ),
     )
 
     user_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -363,7 +366,7 @@ class Item(Record, Trashable, Base):
     open_access_tried_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
-    open_access_error: Mapped[str | None]
+    open_access_error: Mapped[str | None] = mapped_column(Text)
     """Why the last try found no open-access copy."""
     published_checked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
@@ -633,10 +636,9 @@ class OcrPage(Base):
     )
     page: Mapped[int] = mapped_column(primary_key=True)
     """From 0."""
-    text: Mapped[str]
-    lines: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, server_default=text("'[]'::jsonb")
-    )
+    text: Mapped[str] = mapped_column(Text)
+    # A plain default: ``text()`` is hidden by the column above.
+    lines: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")
     """Each line's text, confidence and box (left, top, right, bottom, in
     pixels of the image that was read)."""
     width: Mapped[int]
