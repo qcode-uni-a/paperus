@@ -23,6 +23,9 @@
 	 * side (first page and details), and what merging would do. */
 	let { pairs, onclose }: { pairs: DuplicateOut[]; onclose: (changed: boolean) => void } = $props();
 
+	/** Saved web pages (Zotero's snapshots), previewed small. */
+	const WEB_PAGES = ['text/html', 'application/xhtml+xml'];
+
 	const REASONS: Record<string, string> = {
 		identifier: 'Same DOI or arXiv ID',
 		file: 'Same file',
@@ -360,11 +363,28 @@
 
 {#snippet paper(item: ItemOut, role: string, kept: boolean)}
 	{@const pdf = (item.files ?? []).find((f) => f.media_type === 'application/pdf')}
+	{@const page = (item.files ?? []).find((f) => WEB_PAGES.includes(f.media_type))}
+	{@const image = (item.files ?? []).find((f) => f.media_type.startsWith('image/'))}
 	<article class="paper" class:kept>
 		<span class="role">{role}</span>
 		<div class="preview">
 			{#if pdf}
 				{#key pdf.id}<PdfThumb url="/api/files/{pdf.id}/content" width={220} />{/key}
+			{:else if page}
+				<!-- A saved web page, small: without its scripts, loading nothing
+				     from the web (as on the paper's page). -->
+				<div class="web-thumb">
+					<iframe
+						title="Saved web page: {page.filename}"
+						src="/api/files/{page.id}/content"
+						sandbox=""
+						referrerpolicy="no-referrer"
+						loading="lazy"
+						tabindex="-1"
+					></iframe>
+				</div>
+			{:else if image}
+				<img class="image-thumb" src="/api/files/{image.id}/content" alt="" />
 			{:else}
 				<div class="no-file">{(item.files ?? []).length ? 'No PDF' : 'No file'}</div>
 			{/if}
@@ -535,6 +555,29 @@
 	}
 	.kept .role {
 		color: var(--royal);
+	}
+	.web-thumb {
+		width: 220px;
+		height: 286px;
+		overflow: hidden;
+		border: 1px solid var(--rule);
+		border-radius: 4px;
+		background: white;
+	}
+	/* The page laid out at four times the size, shown at a quarter. */
+	.web-thumb iframe {
+		width: 880px;
+		height: 1144px;
+		border: 0;
+		transform: scale(0.25);
+		transform-origin: 0 0;
+		pointer-events: none;
+	}
+	.image-thumb {
+		max-width: 220px;
+		max-height: 286px;
+		border: 1px solid var(--rule);
+		border-radius: 4px;
 	}
 	.no-file {
 		display: grid;

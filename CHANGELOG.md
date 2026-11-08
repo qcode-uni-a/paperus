@@ -12,7 +12,10 @@
   name others see instead of the username, the profile picture, one's
   ORCID iD), Login, New papers, Appearance (theme and names), Access
   tokens and apps, Export; the open ones are in the address. With an
-  ORCID iD, one's own author page says "This is you".
+  ORCID iD, one's own author page says "This is you", and Manage → Authors
+  lists oneself first.
+- **Duplicate review previews saved web pages** (and images), not only
+  PDFs: a paper whose only file is a snapshot no longer shows "No PDF".
 - **Names written one way**: people's full names are written family name
   first ("Benito, Mónica") everywhere on the website; Settings → Names
   switches to given name first ("Mónica Benito"), for all one's devices.

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { LOGGED_OUT, unique } from './helpers.ts';
 
-type Name = { family: string; given: string };
+type Name = { family: string; given: string; ORCID?: string };
 
 async function add(page: Page, title: string, authors: Name[]): Promise<string> {
 	const added = await page.request.post('/api/items', {
@@ -185,5 +185,45 @@ test('names written family name first, or as one chooses', async ({ page, browse
 	await expect(own.getByText('Saved.')).toBeVisible();
 	await own.goto(`/items/${id}`);
 	await expect(own.getByRole('link', { name: `Daniel ${family}` })).toBeVisible();
+	await context.close();
+});
+
+test('you, found by your ORCID iD, first among the authors', async ({ page, browser }) => {
+	const fay = { username: unique('fay'), password: 'fay-password-e2e' };
+	expect((await page.request.post('/api/admin/users', { data: fay })).status()).toBe(201);
+	const context = await browser.newContext({ storageState: LOGGED_OUT });
+	const own = await context.newPage();
+	await own.goto('/login');
+	await own.getByLabel('Username').fill(fay.username);
+	await own.getByLabel('Password').fill(fay.password);
+	await own.getByRole('button', { name: 'Log in' }).click();
+	await expect(own).toHaveURL(/\/$/);
+
+	const family = unique('Hudson');
+	const orcid = '0000-0002-1825-0097';
+	const id = await add(own, unique('Mine '), [{ family, given: 'Fay', ORCID: orcid }]);
+	// Linked by the administrator's "Link authors now".
+	expect((await page.request.post('/api/admin/jobs/authors')).status()).toBe(202);
+	await expect
+		.poll(async () => (await (await own.request.get(`/api/items/${id}`)).json()).author_ids, {
+			timeout: 20_000
+		})
+		.not.toBeNull();
+	await own.goto('/manage/authors');
+	await expect(own.getByText('add your ORCID iD in')).toBeVisible();
+
+	await own.goto('/settings?open=account');
+	await own.getByLabel('Display name').fill('Fay H.');
+	await own.getByLabel('ORCID iD').fill(`https://orcid.org/${orcid}`);
+	await own.getByRole('button', { name: 'Save' }).click();
+	await expect(own.getByText('Saved.')).toBeVisible();
+	await expect(own.getByRole('link', { name: 'Your author page' })).toBeVisible();
+	await expect(own.getByRole('button', { name: /Fay H\./ })).toBeVisible();
+
+	await own.goto('/manage/authors');
+	const me = own.getByRole('link', { name: /^You/ });
+	await expect(me).toContainText(`${family}, Fay`);
+	await me.click();
+	await expect(own.getByText('This is you')).toBeVisible();
 	await context.close();
 });

@@ -6,8 +6,11 @@
 		authorsToCheck,
 		errorMessage,
 		keepApart,
+		getAuthor,
 		listAuthors
 	} from '#lib/api/client.ts';
+	import type { AuthorOut } from '#lib/api/generated/types.gen.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import AuthorCompare from '#lib/AuthorCompare.svelte';
 	import type { AuthorRow, AuthorToCheck, LikelyOut } from '#lib/api/generated/types.gen.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
@@ -18,6 +21,17 @@
 	 * name several people share, with nothing on the paper to tell which. */
 
 	const PAGE = 100;
+
+	/** Oneself, found by one's ORCID iD (Settings → Account), first. */
+	let me = $state<AuthorOut | null>(null);
+	$effect(() => {
+		const id = session.user?.author_id;
+		if (!id) {
+			me = null;
+			return;
+		}
+		getAuthor({ path: { author_id: id } }).then(({ data }) => (me = data ?? null));
+	});
 	let search = $state('');
 	let sort = $state<'papers' | 'name'>('papers');
 	let rows = $state<AuthorRow[] | null>(null);
@@ -165,6 +179,25 @@
 	/>
 {/if}
 
+{#if me}
+	<a class="me" href={resolve('/authors/[id]', { id: me.id })}>
+		<span class="you">You</span>
+		<strong>{personName(me)}</strong>
+		<span class="muted"
+			>{me.papers}
+			{me.papers === 1 ? 'paper' : 'papers'} in your library{#if me.coauthors.length}, with {me
+					.coauthors.length}
+				{me.coauthors.length === 1 ? 'co-author' : 'co-authors'}{/if}</span
+		>
+	</a>
+{:else if session.user && !session.user.orcid}
+	<p class="muted find-me">
+		Your own papers: add your ORCID iD in <a href="{resolve('/settings')}?open=account"
+			>Settings → Account</a
+		>, and you are listed first.
+	</p>
+{/if}
+
 <div class="tools">
 	<input
 		type="search"
@@ -261,6 +294,31 @@
 		border-color: transparent;
 		background: none;
 		color: var(--muted);
+	}
+	.me {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 12px;
+		margin: 0 0 16px;
+		padding: 12px 16px;
+		border: 1px solid var(--success);
+		border-radius: 10px;
+		background: color-mix(in srgb, var(--success) 8%, transparent);
+		color: var(--ink);
+		text-decoration: none;
+	}
+	.me:hover strong {
+		color: var(--royal);
+		text-decoration: underline;
+	}
+	.you {
+		font-size: var(--step--1);
+		font-weight: 650;
+		color: var(--success);
+	}
+	.find-me {
+		margin: 0 0 16px;
 	}
 	.tools {
 		display: flex;
