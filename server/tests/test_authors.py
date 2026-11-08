@@ -184,6 +184,8 @@ def test_two_people_of_one_name_stay_apart(client: TestClient, db: Session) -> N
     assert people(db, unclear) == [None]
 
     [check] = ada.get("/api/authors-to-check").json()
+    # The number next to Manage → Authors in the menu.
+    assert ada.get("/api/manage/counts").json()["authors_to_check"] == 1
     assert check["item"]["id"] == unclear and check["written"] == "Benito, Mónica"
     assert {c["id"] for c in check["candidates"]} == {str(benito), str(biologist)}
     # Decided by hand, kept by later passes.
@@ -495,6 +497,8 @@ def test_probably_the_same(client: TestClient, db: Session) -> None:
         ]
 
     found = pairs()
+    counts = ada.get("/api/manage/counts").json()
+    assert counts["authors_likely"] == len(found)
     # Co-authors in common first; "Mónica" and "María" never.
     assert found[0] == ({"Mónica Benito", "M. Benito"}, 1)
     assert {"Mónica Benito", "María Benito"} not in [names for names, _ in found]

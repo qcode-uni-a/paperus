@@ -153,6 +153,8 @@ def test_unsorted(client: TestClient, db: Session) -> None:
         "missing": 0,
         "missing_journal": 0,
         "snapshots": 0,
+        "authors_to_check": 0,
+        "authors_likely": 0,
     }
     bob = Person(client, db, "bob")
     assert bob.get("/api/manage/counts").json() == {
@@ -162,6 +164,8 @@ def test_unsorted(client: TestClient, db: Session) -> None:
         "missing": 0,
         "missing_journal": 0,
         "snapshots": 0,
+        "authors_to_check": 0,
+        "authors_likely": 0,
     }
 
 

@@ -52,7 +52,9 @@ class AuthorOut(AuthorRow):
     """Other people of the same name."""
 
 
-def _visible(access: Access) -> list[ColumnElement[bool]]:
+def visible_papers(access: Access) -> list[ColumnElement[bool]]:
+    """Papers whose authors the person sees: readable, not in the trash or
+    the archive."""
     return [
         Item.deleted_at.is_(None),
         Item.archived_at.is_(None),
@@ -66,7 +68,7 @@ def _counts(
     rows = db.execute(
         select(Authorship.author_id, func.count(func.distinct(Authorship.item_id)))
         .join(Item, Item.id == Authorship.item_id)
-        .where(Authorship.author_id.in_(author_ids), *_visible(access))
+        .where(Authorship.author_id.in_(author_ids), *visible_papers(access))
         .group_by(Authorship.author_id)
     )
     return {author_id: count for author_id, count in rows if author_id is not None}
@@ -102,7 +104,7 @@ def list_authors(
         select(Author, papers)
         .join(Authorship, Authorship.author_id == Author.id)
         .join(Item, Item.id == Authorship.item_id)
-        .where(*_visible(access))
+        .where(*visible_papers(access))
         .group_by(Author.id)
     )
     for word in authors.fold(q or "").split():
@@ -125,7 +127,7 @@ def get_author(author_id: uuid.UUID, db: DB, access: CurrentAccess) -> AuthorOut
         db.execute(
             select(Authorship, Item.year)
             .join(Item, Item.id == Authorship.item_id)
-            .where(Authorship.author_id == author.id, *_visible(access))
+            .where(Authorship.author_id == author.id, *visible_papers(access))
         )
     )
     item_ids = {a.item_id for a, _ in mine}
@@ -139,7 +141,7 @@ def get_author(author_id: uuid.UUID, db: DB, access: CurrentAccess) -> AuthorOut
                 other.item_id.in_(item_ids),
                 other.author_id.is_not(None),
                 other.author_id != author.id,
-                *_visible(access),
+                *visible_papers(access),
             )
         )
     )
@@ -201,7 +203,7 @@ def authors_to_check(
         db.execute(
             select(Authorship, Item)
             .join(Item, Item.id == Authorship.item_id)
-            .where(Authorship.author_id.is_(None), *_visible(access))
+            .where(Authorship.author_id.is_(None), *visible_papers(access))
             .order_by(Item.id.desc(), Authorship.position)
             .limit(limit)
         )
@@ -303,7 +305,7 @@ def author_suggestions(
     """People among the authors of one's papers who are probably one: the
     same family name, given names that fit ("M." and "Mónica"), not said to
     be different; most co-authors in common first."""
-    pairs = authors.likely_the_same(db, _visible(access), limit=limit)
+    pairs = authors.likely_the_same(db, visible_papers(access), limit=limit)
     ids = {p.one for p in pairs} | {p.other for p in pairs}
     people = {a.id: a for a in db.scalars(select(Author).where(Author.id.in_(ids)))}
     counts = _counts(db, access, list(ids))

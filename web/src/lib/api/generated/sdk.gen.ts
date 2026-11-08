@@ -906,8 +906,8 @@ export const markDifferent = <ThrowOnError extends boolean = false>(options: Opt
 /**
  * Manage Counts
  *
- * How many duplicates, unsorted papers, unreadable files and papers
- * missing a file the person can see.
+ * How many duplicates, unsorted papers, unreadable files, papers
+ * missing a file and authors to look at the person can see.
  */
 export const manageCounts = <ThrowOnError extends boolean = false>(options?: Options<ManageCountsData, ThrowOnError>): RequestResult<ManageCountsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ManageCountsResponses, unknown, ThrowOnError>({ url: '/api/manage/counts', ...options });
 

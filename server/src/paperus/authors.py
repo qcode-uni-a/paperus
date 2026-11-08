@@ -474,7 +474,7 @@ def _full_given(given: str) -> bool:
 
 
 def likely_the_same(
-    db: Session, visible: list[Any], *, limit: int = 50
+    db: Session, visible: list[Any], *, limit: int | None = 50
 ) -> list[Likely]:
     """Pairs of people, among the authors of the papers ``visible`` finds,
     with the same family name and given names that fit, not said to be

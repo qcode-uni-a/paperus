@@ -2015,6 +2015,14 @@ export type ManageCounts = {
      * Snapshots
      */
     snapshots?: number;
+    /**
+     * Authors To Check
+     */
+    authors_to_check?: number;
+    /**
+     * Authors Likely
+     */
+    authors_likely?: number;
 };
 
 /**

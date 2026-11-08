@@ -1,5 +1,5 @@
 """What needs looking at: the numbers next to Manage → Duplicates,
-Unsorted and Missing in the menu, and Manage → Missing (papers without a
+Unsorted, Missing and Authors in the menu, and Manage → Missing (papers without a
 file, or with only their preprint's)."""
 
 import uuid
@@ -11,13 +11,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
-from paperus import duplicates, library, missing, system
+from paperus import authors, duplicates, library, missing, system
 from paperus.access import Access
+from paperus.api.authors import visible_papers
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import PDF, FileOut, file_out, unreadable
 from paperus.api.items import ItemOut, get_readable_item, item_out, unsorted_conditions
 from paperus.jobs import queue_open_access, queue_text_extraction
-from paperus.models import File, Item, Version
+from paperus.models import Authorship, File, Item, Version
 
 router = APIRouter(tags=["manage"])
 
@@ -39,6 +40,10 @@ class ManageCounts(BaseModel):
     snapshots: int = 0
     """Saved web pages next to a PDF of the same version, which the person
     may remove (see ``POST /api/manage/snapshots/trash``)."""
+    authors_to_check: int = 0
+    """Authors on one's papers that several people's names fit, undecided."""
+    authors_likely: int = 0
+    """Pairs of people who are probably one, not decided yet."""
 
 
 def _count(db: DB, access: CurrentAccess, *conditions: ColumnElement[bool]) -> int:
@@ -54,8 +59,8 @@ def _count(db: DB, access: CurrentAccess, *conditions: ColumnElement[bool]) -> i
 
 @router.get("/api/manage/counts")
 def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
-    """How many duplicates, unsorted papers, unreadable files and papers
-    missing a file the person can see."""
+    """How many duplicates, unsorted papers, unreadable files, papers
+    missing a file and authors to look at the person can see."""
     return ManageCounts(
         duplicates=len(duplicates.find(db, access)),
         unsorted=_count(
@@ -69,6 +74,16 @@ def manage_counts(db: DB, access: CurrentAccess) -> ManageCounts:
         missing=_count(db, access, *missing.conditions("file")),
         missing_journal=_count(db, access, *missing.conditions("journal")),
         snapshots=len(web_page_copies(db, access)),
+        authors_to_check=db.scalar(
+            select(func.count())
+            .select_from(Authorship)
+            .join(Item, Item.id == Authorship.item_id)
+            .where(Authorship.author_id.is_(None), *visible_papers(access))
+        )
+        or 0,
+        authors_likely=len(
+            authors.likely_the_same(db, visible_papers(access), limit=None)
+        ),
     )
 
 

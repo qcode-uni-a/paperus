@@ -75,8 +75,8 @@
 		[resolve('/trash'), 'Trash', mdiTrashCanOutline]
 	] as const;
 
-	// How many duplicates, unsorted papers (or unreadable files) and papers
-	// without a file wait:
+	// How many duplicates, unsorted papers (or unreadable files), papers
+	// without a file and authors to look at wait:
 	// after each change of page (one may just have resolved some) and every
 	// minute.
 	let counts = $state<ManageCounts | null>(null);
@@ -119,6 +119,19 @@
 							'paper with only its preprint',
 							'papers with only their preprint'
 						)
+					: ''
+			]
+				.filter(Boolean)
+				.join(', ')
+		},
+		[resolve('/manage/authors')]: {
+			count: (counts?.authors_to_check ?? 0) + (counts?.authors_likely ?? 0),
+			title: [
+				counts?.authors_to_check
+					? count(counts.authors_to_check, 'author to check', 'authors to check')
+					: '',
+				counts?.authors_likely
+					? count(counts.authors_likely, 'pair probably the same', 'pairs probably the same')
 					: ''
 			]
 				.filter(Boolean)

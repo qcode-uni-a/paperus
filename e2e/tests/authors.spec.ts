@@ -95,6 +95,8 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	await linked(page, last);
 
 	await page.goto('/manage/authors');
+	// Counted next to Manage → Authors in the menu.
+	await expect(page.getByTitle(/pairs? probably the same/)).toBeVisible();
 	const section = page.locator('section').filter({ hasText: 'Probably the same' });
 	const pair = section.getByRole('listitem').filter({ hasText: `Guido ${family}` });
 	await expect(pair).toContainText('1 co-author in common');

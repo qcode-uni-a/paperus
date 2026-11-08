@@ -4535,7 +4535,7 @@
           "manage"
         ],
         "summary": "Manage Counts",
-        "description": "How many duplicates, unsorted papers, unreadable files and papers\nmissing a file the person can see.",
+        "description": "How many duplicates, unsorted papers, unreadable files, papers\nmissing a file and authors to look at the person can see.",
         "operationId": "manage_counts",
         "responses": {
           "200": {
@@ -10765,6 +10765,16 @@
           "snapshots": {
             "type": "integer",
             "title": "Snapshots",
+            "default": 0
+          },
+          "authors_to_check": {
+            "type": "integer",
+            "title": "Authors To Check",
+            "default": 0
+          },
+          "authors_likely": {
+            "type": "integer",
+            "title": "Authors Likely",
             "default": 0
           }
         },
