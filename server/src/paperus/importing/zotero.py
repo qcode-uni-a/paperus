@@ -22,6 +22,7 @@ from rdflib.term import Node
 
 from paperus.importing import Export, ExportedFile, ExportedNote, ExportedPaper
 from paperus.importing.common import date_parts, identifiers_of
+from paperus.importing.web_pages import doi_in_address
 
 Z = Namespace("http://www.zotero.org/namespaces/export#")
 DC = Namespace("http://purl.org/dc/elements/1.1/")
@@ -278,7 +279,10 @@ class _Reader:
             if field in identifiers:
                 csl[field] = identifiers[field]
         found = identifiers_of(
-            doi=identifiers.get("DOI") or _extra_field(extra, "DOI"),
+            # A web page Zotero kept for a paper: the DOI in its address.
+            doi=identifiers.get("DOI")
+            or _extra_field(extra, "DOI")
+            or (doi_in_address(url) if csl["type"] == "webpage" else None),
             arxiv=arxiv,
             isbn=identifiers.get("ISBN"),
             pmid=_extra_field(extra, "PMID"),

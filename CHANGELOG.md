@@ -27,6 +27,14 @@
 - **AI assistants and authors**: `find_authors`, `get_author`, papers by
   an author with `list_documents(author_id=…)`, and each author's person
   in `get_document`.
+- **Papers Zotero kept as web pages**: when Zotero could not get a
+  paper's PDF it saved the journal's page instead, titled like the page
+  or by its address. A Zotero import now reads the DOI in such an address
+  (`journals.aps.org/prb/pdf/10.1103/…`) and looks up the paper's
+  details, so the page comes in as the paper (or joins the one already
+  in the library), and its open-access copy is looked for.
+- Manage → Authors shows in the menu how many authors there are to check
+  and pairs that are probably one person.
 
 ## 0.0.14 (2026-11-07)
 

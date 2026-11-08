@@ -39,6 +39,7 @@ from paperus.importing import (
     paperus_export,
     references,
     ris,
+    web_pages,
     zotero,
 )
 from paperus.importing.apply import Files as FileSource
@@ -415,6 +416,7 @@ def run_import(
             export = read_opened(opened)
             if opened.format == "bbl":
                 references.complete(export, http)
+            web_pages.complete(export, http)
             if opened.latex and export.papers:
                 into_collection(export, _collection_name(opened, record.filename, http))
             yield export, opened.files
