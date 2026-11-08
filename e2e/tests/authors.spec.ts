@@ -81,8 +81,10 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 	await page.getByRole('searchbox', { name: 'Find an author' }).fill(family);
 	await expect(page.getByRole('link', { name: `Mónica ${family}` })).toHaveCount(2);
 	await page.goto(physicist);
-	page.once('dialog', (dialog) => dialog.accept());
 	await page.getByRole('button', { name: 'The same person' }).click();
+	const compare = page.getByRole('dialog', { name: 'The same person?' });
+	await compare.getByRole('button', { name: 'The same person' }).click();
+	await expect(compare).toBeHidden();
 	await expect(page.getByText('4 papers in your library')).toBeVisible();
 
 	// On a phone: nothing wider than the screen.
@@ -123,8 +125,15 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	const pair = section.getByRole('listitem').filter({ hasText: `Guido ${family}` });
 	await expect(pair).toContainText('1 co-author in common');
 	await expect(pair).toContainText(`G. ${family}`);
-	await pair.getByRole('button', { name: 'The same person' }).click();
-	await expect(page.getByText(new RegExp(`is now one with Guido ${family}`))).toBeVisible();
+	// Compared side by side, shown under the name chosen.
+	await pair.getByRole('button', { name: 'Compare…' }).click();
+	const compare = page.getByRole('dialog', { name: 'The same person?' });
+	await expect(compare.getByTitle('Both wrote with them')).toHaveCount(2);
+	await expect(compare.getByRole('radio', { name: `Guido ${family}` })).toBeChecked();
+	await compare.getByRole('radio', { name: `G. ${family}` }).check();
+	await compare.getByRole('button', { name: 'The same person' }).click();
+	await expect(page.getByText(`One person now: G. ${family}`)).toBeVisible();
+	await expect(compare).toBeHidden();
 	await expect(pair).toBeHidden();
 	// "Gerda" never fits "Guido"; "G." did, but is merged now.
 	await expect(section.getByRole('listitem').filter({ hasText: family })).toHaveCount(0);

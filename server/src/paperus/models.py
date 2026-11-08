@@ -548,6 +548,8 @@ class AuthorChange(Record, Base):
         JSONB, server_default=text("'[]'::jsonb")
     )
     """The papers' authors that changed person: [item id, position]."""
+    renamed_from: Mapped[str | None]
+    """A merge: the kept person's name before, if the merge changed it."""
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

@@ -251,6 +251,30 @@ def test_merge(client: TestClient, db: Session) -> None:
     assert refused.status_code == 409 and "ORCID" in refused.text
 
 
+def test_merge_with_a_name_chosen(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    full = paper(ada, "Full", "Benito, Mónica")
+    short = paper(ada, "Short", "Benito, M.")
+    authors.link_waiting(db)
+    [keep] = people(db, full)
+    [other] = people(db, short)
+    response = ada.post(
+        f"/api/authors/{keep}/merge", {"other_id": str(other), "name": " M. Benito "}
+    )
+    assert response.json()["name"] == "M. Benito"
+    # Found by that name now.
+    found = ada.get("/api/authors", params={"q": "m benito"}).json()
+    assert [a["id"] for a in found] == [str(keep)]
+    [change] = ada.get(f"/api/authors/{keep}").json()["changes"]
+    assert change["renamed_from"] == "Mónica Benito"
+    # Undone: the old name again.
+    assert ada.post(f"/api/author-changes/{change['id']}/undo").status_code == 200
+    db.expire_all()
+    record = db.get(Author, keep)
+    assert record is not None
+    assert (record.name, record.key) == ("Mónica Benito", "monica benito")
+
+
 def test_seen_only_through_ones_papers(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     bob = Person(client, db, "bob")
@@ -661,6 +685,9 @@ def test_fixes_are_logged_and_undone(client: TestClient, db: Session) -> None:
         "undone": False,
         "may_undo": True,
     }
+    assert (
+        ada.get(f"/api/authors/{monica}").json()["changes"][0]["renamed_from"] is None
+    )
     assert undo(merged) == 200
     [back] = people(db, short)
     assert back is not None and back != monica

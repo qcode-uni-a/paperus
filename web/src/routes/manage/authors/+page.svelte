@@ -6,9 +6,9 @@
 		authorsToCheck,
 		errorMessage,
 		keepApart,
-		listAuthors,
-		mergeAuthors
+		listAuthors
 	} from '#lib/api/client.ts';
+	import AuthorCompare from '#lib/AuthorCompare.svelte';
 	import type { AuthorRow, AuthorToCheck, LikelyOut } from '#lib/api/generated/types.gen.ts';
 	import { fullName } from '#lib/format.ts';
 	import { plainTitle } from '#lib/title.svelte.ts';
@@ -57,25 +57,8 @@
 		loadLikely();
 	});
 
-	async function same(pair: LikelyOut) {
-		// The one with more papers (else the longer name) stays.
-		const [keep, other] =
-			pair.other.papers > pair.one.papers ||
-			(pair.other.papers === pair.one.papers && pair.other.name.length > pair.one.name.length)
-				? [pair.other, pair.one]
-				: [pair.one, pair.other];
-		const { error } = await mergeAuthors({
-			path: { author_id: keep.id },
-			body: { other_id: other.id }
-		});
-		if (error) {
-			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
-			return;
-		}
-		notify({ kind: 'success', title: `${other.name} is now one with ${keep.name}` });
-		loadLikely();
-		load();
-	}
+	/** Compared side by side: these pairs, one after another. */
+	let comparing = $state<LikelyOut[] | null>(null);
 
 	async function different(pair: LikelyOut) {
 		await keepApart({ path: { author_id: pair.one.id }, body: { other_id: pair.other.id } });
@@ -140,7 +123,10 @@
 
 {#if likely.length}
 	<section class="check likely">
-		<h2>Probably the same <span class="count">{likely.length}</span></h2>
+		<div class="likely-head">
+			<h2>Probably the same <span class="count">{likely.length}</span></h2>
+			<button class="primary" onclick={() => (comparing = likely)}>Review one by one</button>
+		</div>
 		<p class="muted">
 			The same family name, given names that fit; with co-authors in common first.
 		</p>
@@ -157,13 +143,26 @@
 							>{/if}
 					</p>
 					<div class="row">
-						<button onclick={() => same(pair)}>The same person</button>
+						<button onclick={() => (comparing = [pair])}>Compare…</button>
 						<button class="quiet" onclick={() => different(pair)}>Different people</button>
 					</div>
 				</li>
 			{/each}
 		</ul>
 	</section>
+{/if}
+
+{#if comparing}
+	<AuthorCompare
+		pairs={comparing}
+		onclose={(changed) => {
+			comparing = null;
+			if (changed) {
+				loadLikely();
+				load();
+			}
+		}}
+	/>
 {/if}
 
 <div class="tools">
@@ -225,6 +224,13 @@
 	}
 	.likely {
 		border-left-color: var(--royal);
+	}
+	.likely-head {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		align-items: center;
+		gap: 8px;
 	}
 	.check h2 {
 		margin: 0 0 4px;

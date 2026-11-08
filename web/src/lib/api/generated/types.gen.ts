@@ -121,6 +121,10 @@ export type AuthorChangeOut = {
      */
     papers: number;
     /**
+     * Renamed From
+     */
+    renamed_from?: string | null;
+    /**
      * Undone
      */
     undone: boolean;
@@ -2138,6 +2142,10 @@ export type Merge = {
      * Other Id
      */
     other_id: string;
+    /**
+     * Name
+     */
+    name?: string | null;
 };
 
 /**

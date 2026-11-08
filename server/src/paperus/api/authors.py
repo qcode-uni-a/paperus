@@ -76,6 +76,8 @@ class AuthorChangeOut(BaseModel):
     """The other person, if they are still there and seen."""
     papers: int
     """Of the papers whose author changed person, those one may see."""
+    renamed_from: str | None = None
+    """A merge that changed this person's name: the name before."""
     undone: bool
     may_undo: bool
 
@@ -176,6 +178,7 @@ def _changes(db: Session, access: Access, author: Author) -> list[AuthorChangeOu
                 at=c.created_at,
                 by_you=c.user_id == access.user.id,
                 other_name=c.other_name if other or papers else None,
+                renamed_from=c.renamed_from,
                 other_id=other,
                 papers=papers,
                 undone=c.undone_at is not None,
@@ -360,6 +363,8 @@ def split_author(
 class Merge(BaseModel):
     other_id: uuid.UUID
     """The same person: their papers come to this author."""
+    name: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+    """Shown as this name from then on (default: the fuller spelling)."""
 
 
 @router.post("/api/authors/{author_id}/merge")
@@ -370,7 +375,7 @@ def merge_authors(
     other = visible_author(db, access, body.other_id)
     _changeable(db, access, keep, other)
     try:
-        authors.merge(db, keep, other, by=access.user.id)
+        authors.merge(db, keep, other, by=access.user.id, name=body.name)
     except authors.Refused as error:
         raise HTTPException(409, str(error)) from error
     return _row(keep, _counts(db, access, [keep.id]).get(keep.id, 0))

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import {
@@ -6,12 +7,12 @@
 		getAuthor,
 		listAuthors,
 		listItems,
-		mergeAuthors,
 		splitAuthor,
 		undoAuthorChange,
 		type Item
 	} from '#lib/api/client.ts';
 	import type { AuthorChangeOut, AuthorOut, AuthorRow } from '#lib/api/generated/types.gen.ts';
+	import AuthorCompare from '#lib/AuthorCompare.svelte';
 	import CollectionDialog from '#lib/CollectionDialog.svelte';
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
@@ -101,25 +102,12 @@
 		return () => clearTimeout(timer);
 	});
 
-	async function merge(other: AuthorRow) {
-		if (!author) return;
-		const ok = confirm(
-			`${other.name} (${other.papers} ${other.papers === 1 ? 'paper' : 'papers'}) and ${author.name} are the same person? Their papers come together here.`
-		);
-		if (!ok) return;
-		const { data, error } = await mergeAuthors({
-			path: { author_id: id },
-			body: { other_id: other.id }
-		});
-		if (!data) {
-			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
-			return;
-		}
-		notify({ kind: 'success', title: `${other.name} is now one with ${data.name}` });
-		merging = false;
-		search = '';
-		load(id);
+	/** Compared side by side with another record, to merge or keep apart. */
+	let comparing = $state<AuthorRow | null>(null);
+	function merge(other: AuthorRow) {
+		comparing = other;
 	}
+	let keptAs = $state<string | null>(null);
 
 	// Fixes by hand: who is who is shared by everyone, so each is kept and
 	// can be taken back.
@@ -146,6 +134,23 @@
 </script>
 
 <svelte:head><title>{author?.name ?? 'Author'} · paperus</title></svelte:head>
+
+{#if comparing && author}
+	<AuthorCompare
+		pairs={[{ one: author, other: comparing }]}
+		prefer={id}
+		onmerged={(kept) => (keptAs = kept.id)}
+		onclose={async (changed) => {
+			comparing = null;
+			if (!changed) return;
+			merging = false;
+			search = '';
+			if (keptAs && keptAs !== id) await goto(resolve('/authors/[id]', { id: keptAs }));
+			else load(id);
+			keptAs = null;
+		}}
+	/>
+{/if}
 
 {#if missing}
 	<h1>Author not found</h1>
@@ -311,7 +316,8 @@
 									>{change.other_name}</a
 								>{:else}{change.other_name ??
 									'another person'}{/if}{#if change.papers}{' '}({change.papers}
-								{change.papers === 1 ? 'paper' : 'papers'}){/if}</span
+								{change.papers === 1 ? 'paper' : 'papers'}){/if}{#if change.renamed_from}, before
+								named {change.renamed_from}{/if}</span
 						>
 						<span class="muted"
 							>{change.by_you ? 'by you' : 'by someone else'}, {ago(

@@ -33,10 +33,15 @@ Fixes by hand, which later automatic passes keep:
 
 - **Split** (author page → "Some are by someone else"): the chosen papers
   go to a new person of the same name; the two are remembered as different.
-- **Merge** ("Same person as…", or "The same person" next to a namesake
-  or a suggestion): the other person's papers come here. Refused for two
-  different ORCID iDs (OpenAlex sometimes has two profiles of one person:
-  those may be merged).
+- **Merge** ("Same person as…", "The same person" next to a namesake, or
+  "Compare…" at a suggestion): both people side by side (their papers,
+  where they were, co-authors, those in common marked), then "The same
+  person" under the name chosen (either one's, or another spelling; the
+  fuller one at first) or "Different people". The other person's papers
+  come to the one that stays (an ORCID iD, else an OpenAlex id, else more
+  papers, else the one whose page it is); the name chosen is also what
+  they are found by. Refused for two different ORCID iDs (OpenAlex
+  sometimes has two profiles of one person: those may be merged).
 - **Decide** a paper's author under "To check", or someone new.
 
 Author records are shared, so a fix changes them for everyone who has
@@ -52,7 +57,8 @@ papers by that author. Hence:
   hand" ("by you", or "by someone else": who it was would tell what
   papers they have), and anyone who may fix that author can undo one: a
   merge gives the other person's papers back to a new person of that
-  name (kept apart), a split joins the two again, "different people" may
+  name (kept apart) and the one kept their name before, a split joins
+  the two again, "different people" may
   be suggested again.
 
 ## Ids and affiliations from OpenAlex
@@ -78,8 +84,8 @@ Manage → Authors suggests pairs of people who are probably one
 "Mónica", "M. F." and "Mario Fernando"; not "Mónica" and "María"; a person
 known by a written-out given name is compared by that, not by initials
 also seen), not said to be different, not two different ORCID iDs; those
-with co-authors in common first. "The same person" merges them (the one
-with more papers stays), "Different people" remembers them as two.
+with co-authors in common first. "Compare…" (or "Review one by one" for
+all) shows each pair side by side to merge, as above, or keep apart.
 
 ## When it happens
 

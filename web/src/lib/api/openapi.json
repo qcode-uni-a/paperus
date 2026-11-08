@@ -7506,6 +7506,17 @@
             "type": "integer",
             "title": "Papers"
           },
+          "renamed_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renamed From"
+          },
           "undone": {
             "type": "boolean",
             "title": "Undone"
@@ -11045,6 +11056,19 @@
             "type": "string",
             "format": "uuid",
             "title": "Other Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
           }
         },
         "type": "object",
