@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from paperus import auth, integrity, metrics, ocr, oidc, readable, system, usage
+from paperus.access import Access
 from paperus.api.auth import OIDC_CALLBACK, public_base
 from paperus.api.deps import DB, CurrentUser, request_token
 from paperus.jobs import (
@@ -419,5 +420,8 @@ def preview_template(body: TemplateIn, db: DB, admin: Admin) -> TemplatePreview:
         template = readable.check_template(body.template)
     except readable.TemplateError as error:
         return TemplatePreview(paths=[], error=str(error))
-    found = readable.wanted(db, template, limit=40)
+    # From the administrator's own papers: being one reads no library.
+    found = readable.wanted(
+        db, template, limit=40, libraries=Access.of(db, admin).readable
+    )
     return TemplatePreview(paths=[w.path for w in found[:8]])

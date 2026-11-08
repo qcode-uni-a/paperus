@@ -181,12 +181,13 @@ def identify(
 
 
 def _known_to_uploader(db: Session, file: File) -> list[uuid.UUID]:
-    """Where to look for the paper: every library the uploader can read (a
-    paper exists once), else just the upload's own."""
+    """Where to look for the paper: every library the uploader may change (a
+    paper exists once; a reader's private copy of a group paper stays
+    private), else just the upload's own."""
     uploader = db.get(User, file.uploaded_by) if file.uploaded_by else None
     if uploader is None:
         return [file.version.item.library_id]
-    return [*Access.of(db, uploader).readable, file.version.item.library_id]
+    return [*Access.of(db, uploader).writable, file.version.item.library_id]
 
 
 def join_known_item(db: Session, upload: Version, known_id: uuid.UUID) -> None:

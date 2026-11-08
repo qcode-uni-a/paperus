@@ -16,7 +16,7 @@ from paperus.models import File
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
-from tests.people import Person
+from tests.people import Person, group
 from tests.test_mcp import ALL, Assistant, token
 
 SECRET = "zebracorn"
@@ -204,3 +204,34 @@ def test_assistants_see_nothing_private(
         assert not leaked(json.dumps(result)), tool["name"]
     item = ada.get(f"/api/items/{ids['item_id']}").json()
     assert item["title"] == f"The {SECRET} paper" and item["tags"]
+
+
+def test_others_private_tags_and_collections(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    """Filtering by another person's tag or collection is refused, and
+    tagging or filing a group paper privately does not move it up in the
+    others' recent papers."""
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    ids = private_library(db, blobs, ada)
+    for url in (
+        f"/api/items?tag={ids['tag_id']}",
+        f"/api/items?tag_none={ids['tag_id']}",
+        f"/api/items?collection={ids['collection_id']}",
+        f"/api/notes?collection={ids['collection_id']}",
+    ):
+        assert bob.get(url).status_code == 404, url
+        assert ada.get(url).status_code == 200, url
+
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    library = ada.libraries()["Chair"]["id"]
+    first = ada.add("First", library)["id"]
+    ada.add("Second", library)
+    before = [i["id"] for i in ada.get("/api/items", {"sort": "recent"}).json()]
+    bob.post(f"/api/items/{first}/tags", {"name": "reading"})
+    shelf = bob.post("/api/collections", {"name": "Mine"}).json()["id"]
+    bob.post(f"/api/collections/{shelf}/items", {"item_ids": [first]})
+    after = [i["id"] for i in ada.get("/api/items", {"sort": "recent"}).json()]
+    assert after == before

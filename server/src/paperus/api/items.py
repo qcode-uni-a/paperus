@@ -20,12 +20,14 @@ from paperus.api.organize import ItemTagOut, item_tags
 from paperus.avatars import avatar_url
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.models import (
+    Collection,
     Favourite,
     File,
     FileRole,
     Item,
     ItemView,
     MetadataSource,
+    Tag,
     TextStatus,
     User,
     Version,
@@ -561,6 +563,25 @@ def by_author(name: str) -> ColumnElement[bool]:
     return Item.id.in_(in_versions) | Item.id.in_(edited)
 
 
+def require_readable(
+    db: Session,
+    access: Access,
+    model: type[Tag] | type[Collection],
+    ids: list[uuid.UUID],
+) -> None:
+    """Filtering by someone else's private tag or collection would tell what
+    they tagged or filed: answered as if it did not exist."""
+    if not ids:
+        return
+    readable = db.scalar(
+        select(func.count())
+        .select_from(model)
+        .where(model.id.in_(ids), model.library_id.in_(access.readable))
+    )
+    if readable != len(set(ids)):
+        raise HTTPException(404, f"no such {model.__name__.lower()}")
+
+
 @router.get("/api/items")
 def list_items(
     response: Response,
@@ -619,6 +640,9 @@ def list_items(
     is the number to pass as ``since`` next time.
     """
     response.headers["Last-Change"] = str(changes.current_change(db))
+    tags = [*(tag or []), *(tag_any or []), *(tag_none or [])]
+    require_readable(db, access, Tag, tags)
+    require_readable(db, access, Collection, [collection] if collection else [])
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []

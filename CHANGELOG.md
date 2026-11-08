@@ -43,6 +43,19 @@
   in a group can no longer change who is who for the whole group). Every
   fix is kept, listed on the author's page ("Changed by hand"), and can
   be undone.
+- **Privacy fixes** (a review of every route and assistant tool, now also
+  a test that tries them all as someone else):
+  - an access token needs "read files" for a file's passages, not only
+    "read papers";
+  - filtering papers or notes by someone else's tag or collection is
+    refused (it would show what they tagged or filed);
+  - tagging or filing a group's paper (privately) no longer moves it up
+    in the others' recent papers;
+  - a reader's private upload of a group's paper stays private (it joined
+    the group's paper before);
+  - the readable copy's preview shows the administrator's own papers;
+  - "To check" offers only people one sees, and the change log on an
+    author's page does not name people one does not see.
 - Manage → Authors shows in the menu how many authors there are to check
   and pairs that are probably one person.
 

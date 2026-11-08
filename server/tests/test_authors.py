@@ -725,3 +725,39 @@ def test_what_cannot_be_undone(client: TestClient, db: Session) -> None:
     db.commit()
     with pytest.raises(authors.Refused, match="no longer there"):
         authors.undo(db, split)
+
+
+def test_others_namesakes_stay_theirs(client: TestClient, db: Session) -> None:
+    """A namesake known only from someone else's papers is no candidate, and
+    a fix by them names no one one cannot see."""
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    physics = paper(ada, "Physics", "Benito, Mónica")
+    biology = paper(ada, "Biology", "Benito, Mónica")
+    short = paper(ada, "Short", "Benito, M. R.")
+    authors.link_waiting(db)
+    [monica] = people(db, physics)
+    [m] = people(db, short)
+    assert monica is not None and m is not None
+    ada.post(f"/api/authors/{monica}/split", {"item_ids": [biology]})
+    alone = paper(bob, "Bob's", "Benito, Mónica")
+    authors.link_waiting(db)
+    assert people(db, alone) == [None]
+    [check] = bob.get("/api/authors-to-check").json()
+    assert check["candidates"] == []  # both Mónicas are Ada's alone
+    # Jane Smith is on papers of both; "J. K. Smith" on Ada's alone.
+    paper(ada, "Ada's", "Smith, Jane")
+    paper(ada, "Initials", "Smith, J. K.")
+    bobs = paper(bob, "Bob's too", "Smith, Jane")
+    authors.link_waiting(db)
+    [jane] = people(db, bobs)
+    jk = db.scalar(select(Author.id).where(Author.name == "J. K. Smith"))
+    ada.post(f"/api/authors/{jane}/merge", {"other_id": str(jk)})
+    [merged] = bob.get(f"/api/authors/{jane}").json()["changes"]
+    assert (merged["other_name"], merged["papers"], merged["by_you"]) == (
+        None,
+        0,
+        False,
+    )
+    assert ada.get(f"/api/authors/{jane}").json()["changes"][0]["other_name"] == (
+        "J. K. Smith"
+    )

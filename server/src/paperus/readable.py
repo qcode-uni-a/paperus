@@ -11,6 +11,7 @@ import re
 import shutil
 import string
 import unicodedata
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -175,13 +176,22 @@ def _owners(db: Session) -> dict[Any, str]:
     return owners
 
 
-def wanted(db: Session, template: str, *, limit: int | None = None) -> list[Wanted]:
+def wanted(
+    db: Session,
+    template: str,
+    *,
+    limit: int | None = None,
+    libraries: list[uuid.UUID] | None = None,
+) -> list[Wanted]:
     """Every file of every paper (not in the trash; the preferred
-    version's files) and where it goes in the copy."""
+    version's files), or of those in ``libraries``, and where it goes in
+    the copy."""
     owners = _owners(db)
     taken: set[str] = set()
     found: list[Wanted] = []
     query = select(Item).where(Item.deleted_at.is_(None)).order_by(Item.id)
+    if libraries is not None:
+        query = query.where(Item.library_id.in_(libraries))
     if limit is not None:
         query = query.limit(limit)
     for item in db.scalars(query):

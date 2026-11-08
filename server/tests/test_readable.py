@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from paperus import readable
 from paperus.storage import BlobStore, FilesystemStore
+from tests.pdfs import make_pdf
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 3000 + b"\n%%EOF\n"
@@ -133,6 +134,9 @@ def test_hard_links(
 
 def test_settings_and_preview(client: TestClient, db: Session) -> None:
     root = Person(client, db, "root", admin=True)
+    # Being an administrator reads no library: not in the preview.
+    ada = Person(client, db, "ada")
+    upload(ada, add(ada, {"title": "Ada's own"}), make_pdf([["Private"]]))
     paper = add(root, {"title": "Shown", "issued": {"date-parts": [[2020]]}})
     upload(root, paper, PDF)
     preview = root.post(

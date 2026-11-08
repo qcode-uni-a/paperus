@@ -309,7 +309,8 @@
 							>{DONE[change.kind]}
 							{#if change.other_id}<a href={resolve('/authors/[id]', { id: change.other_id })}
 									>{change.other_name}</a
-								>{:else}{change.other_name}{/if}{#if change.papers}{' '}({change.papers}
+								>{:else}{change.other_name ??
+									'another person'}{/if}{#if change.papers}{' '}({change.papers}
 								{change.papers === 1 ? 'paper' : 'papers'}){/if}</span
 						>
 						<span class="muted"

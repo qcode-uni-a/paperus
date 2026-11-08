@@ -20,6 +20,7 @@ from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
 from tests.pdfs import make_pdf
+from tests.people import Person, group
 
 DOI = "10.1234/drought.2024.5"
 CSL = {
@@ -192,6 +193,31 @@ def test_known_paper_joins_the_existing_item(
     db.expire_all()
     files = get_item(logged_in, existing["id"])["versions"][0]["files"]
     assert [f["role"] for f in files] == ["main", "other"]
+
+
+def test_a_readers_copy_of_a_group_paper_stays_private(
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    chair = group(root, "Chair", ada)
+    ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "reader"})
+    doi_registry.records[DOI] = CSL
+    shared = ada.post(
+        "/api/items", json={"doi": DOI, "library_id": ada.libraries()["Chair"]["id"]}
+    ).json()
+    pdf = make_pdf([FIRST_PAGE, ["Bob's notes in the margin"]])
+    uploaded = bob.post("/api/uploads", files={"upload": ("mine.pdf", pdf, "x")})
+    assert uploaded.status_code == 201, uploaded.text
+    mine = uploaded.json()
+    run_job(db, blobs, doi_registry, mine["file"]["id"])
+    db.expire_all()
+    # Not moved into the group's paper: Bob only reads that one.
+    assert ada.get(f"/api/items/{shared['id']}").json()["versions"][0]["files"] == []
+    assert bob.get(f"/api/items/{mine['item_id']}").json()["title"] == CSL["title"]
 
 
 def test_same_file_again_makes_no_new_item(logged_in: TestClient) -> None:

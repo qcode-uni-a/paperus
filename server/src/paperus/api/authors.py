@@ -70,7 +70,8 @@ class AuthorChangeOut(BaseModel):
     at: datetime
     by_you: bool
     """Who else made it is not said (it would tell what papers they have)."""
-    other_name: str
+    other_name: str | None
+    """None: someone one sees no paper of."""
     other_id: uuid.UUID | None
     """The other person, if they are still there and seen."""
     papers: int
@@ -161,27 +162,27 @@ def _changes(db: Session, access: Access, author: Author) -> list[AuthorChangeOu
     others = {c.other_id for c in changes} | {c.author_id for c in changes}
     counts = _counts(db, access, list(others))
     mine = may_change(db, access, author.id)
-    return [
-        AuthorChangeOut(
-            id=c.id,
-            kind=AuthorChangeKind(c.kind),
-            at=c.created_at,
-            by_you=c.user_id == access.user.id,
-            other_name=c.other_name,
-            other_id=next(
-                (
-                    i
-                    for i in (c.other_id, c.author_id)
-                    if i != author.id and i in counts
-                ),
-                None,
-            ),
-            papers=sum(uuid.UUID(i) in seen for i, _ in c.moved),
-            undone=c.undone_at is not None,
-            may_undo=c.undone_at is None and c.author_id == author.id and mine,
+    result = []
+    for c in changes:
+        other = next(
+            (i for i in (c.other_id, c.author_id) if i != author.id and i in counts),
+            None,
         )
-        for c in changes
-    ]
+        papers = sum(uuid.UUID(i) in seen for i, _ in c.moved)
+        result.append(
+            AuthorChangeOut(
+                id=c.id,
+                kind=AuthorChangeKind(c.kind),
+                at=c.created_at,
+                by_you=c.user_id == access.user.id,
+                other_name=c.other_name if other or papers else None,
+                other_id=other,
+                papers=papers,
+                undone=c.undone_at is not None,
+                may_undo=c.undone_at is None and c.author_id == author.id and mine,
+            )
+        )
+    return result
 
 
 def visible_author(db: Session, access: Access, author_id: uuid.UUID) -> Author:
@@ -324,8 +325,11 @@ def authors_to_check(
             item=item_out(item, access),
             position=authorship.position,
             written=authorship.written,
+            # Only those one sees (others' namesakes stay theirs).
             candidates=[
-                _row(p, counts.get(p.id, 0)) for p in people if p.key == authorship.key
+                _row(p, counts[p.id])
+                for p in people
+                if p.key == authorship.key and counts.get(p.id)
             ],
         )
         for authorship, item in rows

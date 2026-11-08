@@ -69,12 +69,16 @@ def _stamped(obj: object) -> Item | Tag | Collection | Note | None:
 
 @event.listens_for(Session, "before_flush")
 def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> None:
-    changed = chain(
-        db.new,
-        (obj for obj in db.dirty if db.is_modified(obj, include_collections=True)),
-        db.deleted,
+    changed_objects = list(
+        chain(
+            db.new,
+            (obj for obj in db.dirty if db.is_modified(obj, include_collections=True)),
+            db.deleted,
+        )
     )
-    stamped = {target for obj in changed if (target := _stamped(obj)) is not None}
+    stamped = {
+        target for obj in changed_objects if (target := _stamped(obj)) is not None
+    }
     if not stamped:
         return
     # A note filed in a collection or linked to a paper is not "changed" for
@@ -86,15 +90,21 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
         for target in stamped
         if target in db.new or db.is_modified(target, include_collections=False)
     }
+    # Likewise a paper tagged or filed (perhaps privately, by a reader of a
+    # group paper): its versions, files and identifiers are the paper's own.
+    content = {
+        id(target)
+        for obj in changed_objects
+        if isinstance(obj, Version | Identifier | File)
+        and (target := _stamped(obj)) is not None
+    }
     with db.no_autoflush:
         if _INFO_KEY not in db.info:
             db.info[_INFO_KEY] = _next_change(db)
         now = datetime.now(UTC)
         for target in stamped:
             target.change = db.info[_INFO_KEY]
-            if isinstance(target, Item) or (
-                isinstance(target, Note) and id(target) in own_change
-            ):
+            if isinstance(target, Item | Note) and id(target) in own_change | content:
                 target.changed_at = now
 
 

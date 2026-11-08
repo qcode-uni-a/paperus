@@ -261,13 +261,20 @@ def test_recent_activity(logged_in: TestClient) -> None:
         return [i["title"] for i in response.json()]
 
     assert recent() == ["New", "Middle", "Old"]
-    # Opening an item brings it up, and so does changing one.
+    # Opening an item brings it up, and so does changing one (not tagging
+    # or filing it: done privately to a group's paper, that would show).
     assert logged_in.post(f"/api/items/{old}/viewed").status_code == 204
     assert recent() == ["Old", "New", "Middle"]
     listed = logged_in.get("/api/items", params={"sort": "recent", "limit": 1}).json()
     assert listed[0]["viewed_at"] is not None
     logged_in.post(f"/api/items/{middle}/tags", json={"name": "fresh"})
-    assert recent() == ["Middle", "Old", "New"]
+    assert recent() == ["Old", "New", "Middle"]
+    logged_in.put(
+        f"/api/items/{middle}/overrides",
+        json={"title": "Middle, renamed"},
+        headers={"If-Match": logged_in.get(f"/api/items/{middle}").headers["ETag"]},
+    )
+    assert recent() == ["Middle, renamed", "Old", "New"]
     page = logged_in.get("/api/items", params={"sort": "recent", "offset": 2}).json()
     assert [i["title"] for i in page] == ["New"]
     opened = logged_in.get("/api/items", params={"sort": "opened"})

@@ -111,7 +111,7 @@ export type AuthorChangeOut = {
     /**
      * Other Name
      */
-    other_name: string;
+    other_name: string | null;
     /**
      * Other Id
      */

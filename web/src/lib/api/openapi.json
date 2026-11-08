@@ -7460,7 +7460,14 @@
             "title": "By You"
           },
           "other_name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Other Name"
           },
           "other_id": {

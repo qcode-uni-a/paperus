@@ -13,10 +13,11 @@ from sqlalchemy import func, select
 from paperus import library, notes, organize
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
-from paperus.api.items import Owner
+from paperus.api.items import Owner, require_readable
 from paperus.api.organize import _collection
 from paperus.jobs import queue_note_embedding
 from paperus.models import (
+    Collection,
     CollectionNote,
     Item,
     Note,
@@ -173,6 +174,7 @@ def list_notes(
     about a paper (``item``) or in a collection (with its subcollections
     unless ``nested=false``); ``trashed=true`` lists the trash instead.
     ``X-Total-Count`` is the number of matching notes."""
+    require_readable(db, access, Collection, [collection] if collection else [])
     conditions = [
         Note.library_id.in_(access.readable),
         Note.deleted_at.is_not(None) if trashed else Note.deleted_at.is_(None),

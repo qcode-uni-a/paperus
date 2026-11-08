@@ -267,7 +267,7 @@ ROUTES = {
     ("POST", "/api/manage/missing/open-access/progress"): None,
     ("POST", "/api/manage/snapshots/trash"): None,
     ("DELETE", "/api/files/{file_id}"): "papers.write",
-    ("GET", "/api/files/{file_id}/passages/{position}"): "papers.read",
+    ("GET", "/api/files/{file_id}/passages/{position}"): "files.read",
     ("GET", "/api/files/unreadable"): None,
     ("POST", "/api/files/{file_id}/read-again"): "papers.write",
     ("POST", "/api/files/{file_id}/download-again"): "papers.write",
