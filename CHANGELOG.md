@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Reading goes on where you stopped**: a paper's PDF opens where you
+  last were in it, on any device, in either view (normal or fluent: the
+  place is kept as a page and a height on it, with the column where
+  known); "Where you left off" says so, with a link to the start. A new
+  migration (`0005`) adds it to `item_views`.
+- **Contents links land on their chapter**: the panel kept its current
+  entry in view by scrolling, which moved the page too, off the chapter
+  just gone to (in both views). In fluent mode a jump follows its place
+  while the pages around it are laid out; headings are found by their
+  words also where the bookmark names the page's left edge.
 - **Fluent mode** leaves out a page number centred under the text also
   where LaTeX preprints set it, well above the page's bottom edge (11-16%
   up), and where IEEE's sits close under the columns. Three new layout

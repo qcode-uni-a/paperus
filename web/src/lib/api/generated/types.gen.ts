@@ -3380,6 +3380,32 @@ export type ReadableCopy = {
 };
 
 /**
+ * Reading
+ *
+ * Where a person stopped reading a paper: on a page of one of its
+ * files, at ``top`` (PDF points from the page's top); ``left`` says which
+ * column, where known (fluent mode).
+ */
+export type Reading = {
+    /**
+     * File Id
+     */
+    file_id: string;
+    /**
+     * Page
+     */
+    page: number;
+    /**
+     * Top
+     */
+    top: number;
+    /**
+     * Left
+     */
+    left?: number | null;
+};
+
+/**
  * Redirect
  */
 export type Redirect = {
@@ -5579,6 +5605,68 @@ export type MarkViewedResponses = {
 };
 
 export type MarkViewedResponse = MarkViewedResponses[keyof MarkViewedResponses];
+
+export type GetReadingData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/reading';
+};
+
+export type GetReadingErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetReadingError = GetReadingErrors[keyof GetReadingErrors];
+
+export type GetReadingResponses = {
+    /**
+     * Response Get Reading
+     *
+     * Successful Response
+     */
+    200: Reading | null;
+};
+
+export type GetReadingResponse = GetReadingResponses[keyof GetReadingResponses];
+
+export type SetReadingData = {
+    body: Reading;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/reading';
+};
+
+export type SetReadingErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetReadingError = SetReadingErrors[keyof SetReadingErrors];
+
+export type SetReadingResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetReadingResponse = SetReadingResponses[keyof SetReadingResponses];
 
 export type LookupItemsData = {
     body?: never;

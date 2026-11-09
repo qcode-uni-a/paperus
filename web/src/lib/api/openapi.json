@@ -1551,6 +1551,103 @@
         }
       }
     },
+    "/api/items/{item_id}/reading": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Get Reading",
+        "description": "Where the person stopped reading the paper, if anywhere.",
+        "operationId": "get_reading",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Reading"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Reading"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Set Reading",
+        "description": "Remember where the person is reading the paper (the viewer sends it\nas they scroll), to go on from there next time, on any device.",
+        "operationId": "set_reading",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reading"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/lookup": {
       "get": {
         "tags": [
@@ -13948,6 +14045,48 @@
           "links_possible"
         ],
         "title": "ReadableCopy"
+      },
+      "Reading": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "page": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "top": {
+            "type": "number",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Top"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "page",
+          "top"
+        ],
+        "title": "Reading",
+        "description": "Where a person stopped reading a paper: on a page of one of its\nfiles, at ``top`` (PDF points from the page's top); ``left`` says which\ncolumn, where known (fluent mode)."
       },
       "Redirect": {
         "properties": {

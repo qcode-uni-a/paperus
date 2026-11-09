@@ -12,6 +12,7 @@
 		etagOf,
 		FILE_ROLES,
 		getItem,
+		getReading,
 		markViewed,
 		downloadAgain,
 		passageText,
@@ -20,6 +21,7 @@
 		restoreFile,
 		restoreItem,
 		setOverrides,
+		setReading,
 		trashFile,
 		trashItem,
 		unarchiveItem,
@@ -29,6 +31,8 @@
 		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
+	import type { Reading } from '#lib/api/generated/types.gen.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 	import MenuButton from '#lib/MenuButton.svelte';
 	import StarButton from '#lib/StarButton.svelte';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
@@ -163,6 +167,54 @@
 	$effect(() => {
 		if (id) markViewed({ path: { item_id: id } });
 	});
+
+	// Where the person stopped reading (in either view, on any device): the
+	// PDF opens there, unless a link names a page.
+	let reading = $state<Reading | null | undefined>(undefined);
+	$effect(() => {
+		const item_id = id;
+		reading = undefined;
+		if (item_id)
+			getReading({ path: { item_id } }).then(({ data }) => {
+				if (item_id === id) reading = data ?? null;
+			});
+	});
+	const resume = $derived(
+		!page.url.searchParams.has('page') && reading && pdfFile && reading.file_id === pdfFile.id
+			? reading
+			: null
+	);
+	// Said once, with the way back to the start.
+	let told = '';
+	$effect(() => {
+		if (!resume || told === id || (resume.page === 1 && resume.top < 200)) return;
+		told = id;
+		notify({
+			kind: 'info',
+			title: 'Where you left off',
+			text: `Page ${resume.page}.`,
+			link: { href: `${resolve('/items/[id]', { id })}?page=1`, label: 'From the start' }
+		});
+	});
+
+	function saveReading(
+		place: { page: number; top: number; left: number | null },
+		leaving: boolean
+	) {
+		const file = pdfFile;
+		if (!file || !id) return;
+		const body = { file_id: file.id, ...place };
+		if (leaving)
+			// Also while the page goes away.
+			fetch(`/api/items/${id}/reading`, {
+				method: 'PUT',
+				keepalive: true,
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(body)
+			}).catch(() => {});
+		else setReading({ path: { item_id: id }, body });
+	}
 
 	// Refresh while the server reads the files (text, title from the file).
 	$effect(() => {
@@ -491,14 +543,22 @@
 	{/if}
 
 	{#if pdfFile}
-		<PdfViewer
-			url="/api/files/{pdfFile.id}/content"
-			fileId={pdfFile.id}
-			itemId={item.id}
-			title={plainTitle(item.title)}
-			{startPage}
-			highlight={highlight && page.url.searchParams.get('file') === pdfFile.id ? highlight : null}
-		/>
+		<!-- A link to a page of it ("From the start") opens it there anew. -->
+		{#if reading !== undefined}{#key page.url.searchParams.get('page')}
+				<PdfViewer
+					url="/api/files/{pdfFile.id}/content"
+					fileId={pdfFile.id}
+					itemId={item.id}
+					title={plainTitle(item.title)}
+					startPage={resume?.page ?? startPage}
+					startTop={resume?.top ?? null}
+					startLeft={resume?.left ?? null}
+					onplace={saveReading}
+					highlight={highlight && page.url.searchParams.get('file') === pdfFile.id
+						? highlight
+						: null}
+				/>
+			{/key}{/if}
 	{:else if textFile}
 		<TextViewer
 			url="/api/files/{textFile.id}/content"

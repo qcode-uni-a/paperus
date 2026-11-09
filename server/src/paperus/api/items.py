@@ -801,6 +801,54 @@ def mark_viewed(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
     return Response(status_code=204)
 
 
+class Reading(BaseModel):
+    """Where a person stopped reading a paper: on a page of one of its
+    files, at ``top`` (PDF points from the page's top); ``left`` says which
+    column, where known (fluent mode)."""
+
+    file_id: uuid.UUID
+    page: int = Field(ge=1, le=100_000)
+    top: float = Field(ge=0, le=100_000)
+    left: float | None = Field(None, ge=0, le=100_000)
+
+
+@router.get("/api/items/{item_id}/reading")
+def get_reading(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Reading | None:
+    """Where the person stopped reading the paper, if anywhere."""
+    get_readable_item(db, access, item_id)
+    view = db.get(ItemView, (access.user.id, item_id))
+    if view is None or view.reading is None:
+        return None
+    return Reading.model_validate(view.reading)
+
+
+@router.put("/api/items/{item_id}/reading", status_code=204)
+def set_reading(
+    item_id: uuid.UUID, body: Reading, db: DB, access: CurrentAccess
+) -> Response:
+    """Remember where the person is reading the paper (the viewer sends it
+    as they scroll), to go on from there next time, on any device."""
+    item = get_readable_item(db, access, item_id)
+    if not any(f.id == body.file_id for v in item.versions for f in v.files):
+        raise HTTPException(404, "no such file of this item")
+    reading = body.model_dump(mode="json")
+    db.execute(
+        insert(ItemView)
+        .values(
+            user_id=access.user.id,
+            item_id=item_id,
+            viewed_at=func.now(),
+            reading=reading,
+        )
+        .on_conflict_do_update(
+            index_elements=[ItemView.user_id, ItemView.item_id],
+            set_={"reading": reading},
+        )
+    )
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.get("/api/items/lookup")
 def lookup_items(
     db: DB,

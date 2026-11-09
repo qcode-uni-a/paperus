@@ -154,7 +154,7 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
 # their own tools): not for assistants and scripts, even where a rule above
 # matches.
 _CLOSED = re.compile(
-    r"/api/(items/[^/]+/(favourite|viewed|references/import)"
+    r"/api/(items/[^/]+/(favourite|viewed|reading|references/import)"
     r"|items/bulk|collections/[^/]+/pin)"
 )
 

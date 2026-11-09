@@ -599,7 +599,8 @@ class AuthorChange(Record, Base):
 
 
 class ItemView(Base):
-    """When a person last opened an item, for their recent papers."""
+    """When a person last opened an item (for their recent papers), and
+    where they stopped reading it."""
 
     __tablename__ = "item_views"
 
@@ -610,6 +611,9 @@ class ItemView(Base):
         ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     viewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reading: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """Where they stopped (``api.items.Reading``: the file, its page, the
+    place on it), to go on from there in either view."""
 
 
 class Version(Record, Base):

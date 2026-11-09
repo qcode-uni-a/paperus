@@ -69,9 +69,15 @@
 		// The chapter being read unfolded and in view when the panel opens.
 		const opened = ancestors(current).filter((at) => folded.has(at));
 		if (opened.length) folded = new Set([...folded].filter((at) => !opened.includes(at)));
-		requestAnimationFrame(() =>
-			panel?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'center' })
-		);
+		// Within the panel only: scrollIntoView would move the page too,
+		// away from the chapter just gone to.
+		requestAnimationFrame(() => {
+			const entry = panel?.querySelector<HTMLElement>('[aria-current="true"]');
+			if (!panel || !entry) return;
+			const box = panel.getBoundingClientRect();
+			const at = entry.getBoundingClientRect();
+			panel.scrollTop += at.top - box.top - (box.height - at.height) / 2;
+		});
 		const away = (event: PointerEvent) => {
 			const target = event.target as Node;
 			if (!panel?.contains(target) && !toggle?.contains(target)) open = false;

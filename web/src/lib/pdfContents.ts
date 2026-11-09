@@ -47,16 +47,22 @@ async function headingOf(
 		);
 	const items = await texts.get(number)!;
 	const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-	const wanted = plain(title);
+	// With its number and without ("I. INTRODUCTION": the PDF may hold the
+	// "I." apart).
+	const wanted = [plain(title), plain(title.replace(/^\s*[\p{L}\d]{1,5}[.)]\s+/u, ''))].filter(
+		(words) => words.length >= 3
+	);
+	const matches = (words: string) => wanted.some((w) => w.startsWith(words) || words.startsWith(w));
 	const upper = page.view[3];
 	let best: { top: number; left: number; distance: number } | null = null;
 	for (const item of items) {
 		const words = plain(item.str);
-		if (words.length < 3 || !(wanted.startsWith(words) || words.startsWith(wanted))) continue;
+		if (words.length < 3 || !matches(words)) continue;
 		const size = Math.hypot(item.transform[2], item.transform[3]);
 		const at = Math.max(0, upper - item.transform[5] - size);
 		const distance = top === null ? at : Math.abs(at - top);
-		if (distance < 250 && (!best || distance < best.distance))
+		// Near the height the bookmark gives; the first on the page if none.
+		if ((top === null || distance < 250) && (!best || distance < best.distance))
 			best = { top: at, left: item.transform[4] - page.view[0], distance };
 	}
 	return best && { top: best.top, left: best.left };
@@ -72,7 +78,10 @@ async function outline(pdf: PDFDocumentProxy): Promise<Section[]> {
 			if (found.length >= MAX_SECTIONS) return;
 			const place = await destination(pdf, entry.dest).catch(() => null);
 			const title = tidy(entry.title);
-			if (place && title && place.left === null) {
+			// The heading's own place, where its words are near: bookmarks
+			// often give the page's left edge (hyperref's) or a height
+			// above it, which in fluent mode would be the wrong column.
+			if (place && title) {
 				const heading = await headingOf(pdf, texts, place.page, title, place.top).catch(() => null);
 				if (heading) Object.assign(place, heading);
 			}

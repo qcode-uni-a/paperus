@@ -29,6 +29,9 @@
 		mark,
 		highlight,
 		startPage,
+		startTop = null,
+		startLeft = null,
+		readingLine = () => 0,
 		viewports,
 		current = $bindable(1)
 	}: {
@@ -44,6 +47,12 @@
 		mark: (layer: HTMLElement, passage: string) => void;
 		highlight: { page: number; text: string } | null;
 		startPage: number;
+		/** Where on the start page to begin (PDF points from its top; and
+		 * its left: which column): where one stopped reading. */
+		startTop?: number | null;
+		startLeft?: number | null;
+		/** Where on the screen one reads (below the toolbar). */
+		readingLine?: () => number;
 		/** Each piece's viewport by its key, for marking a selection. */
 		viewports: Map<string, Viewport>;
 		current?: number;
@@ -227,7 +236,7 @@
 		for (const draw of draws.values()) draw.update();
 	});
 
-	let scrolledToStart = untrack(() => startPage) <= 1;
+	let scrolledToStart = untrack(() => startPage) <= 1 && untrack(() => startTop) === null;
 
 	/** Watches a piece: near the screen it is drawn, far away let go. */
 	function piece(number: number, index: number, found: Piece, k: number) {
@@ -264,7 +273,14 @@
 			viewports.set(`${number}-${index}`, view.clone({ scale: k }));
 			if (!scrolledToStart && number === untrack(() => startPage) && index === 0) {
 				scrolledToStart = true;
-				window_.scrollIntoView();
+				const top = untrack(() => startTop);
+				if (top === null) window_.scrollIntoView();
+				else
+					follow(
+						number,
+						top,
+						untrack(() => startLeft)
+					);
 			}
 			return () => {
 				for (const watcher of watchers) watcher.disconnect();
@@ -340,6 +356,46 @@
 		if (!node) return null;
 		const within = Math.max(0, y - p.y) * scaleOf(p);
 		return node.getBoundingClientRect().top + window.scrollY + within;
+	}
+
+	/** The place being read: in the piece at ``line`` (on the screen), its
+	 * page and the place on it (PDF points), its left saying which column;
+	 * null between pieces. */
+	export function placeAt(line: number): { page: number; top: number; left: number } | null {
+		for (const node of document.querySelectorAll<HTMLElement>('.fluent .piece')) {
+			const box = node.getBoundingClientRect();
+			if (line < box.top || line >= box.bottom) continue;
+			const [page, index] = (node.querySelector<HTMLElement>('[data-piece]')?.dataset.piece ?? '')
+				.split('-')
+				.map(Number);
+			const p = layouts.pages[page - 1]?.layout.pieces[index];
+			if (!p) return null;
+			return { page, top: p.y + (line - box.top) / scaleOf(p), left: p.x };
+		}
+		return null;
+	}
+
+	/** Go to a place (as ``offsetOf``) and keep it at the reading line for
+	 * a moment: pages are laid out as they come near, and growing or
+	 * shrinking they move it. Stops when the reader scrolls. */
+	export function follow(page: number, top: number | null, left: number | null = null) {
+		let stop = false;
+		const halt = () => (stop = true);
+		const inputs = ['wheel', 'touchstart', 'keydown', 'mousedown'] as const;
+		for (const input of inputs) window.addEventListener(input, halt, { once: true, passive: true });
+		let tries = 0;
+		const place = () => {
+			if (stop) return;
+			const at = offsetOf(page, top, left);
+			if (at !== null) {
+				const target = Math.max(0, at - readingLine());
+				if (Math.abs(window.scrollY - target) > 2) window.scrollTo({ top: target });
+			}
+			if (tries++ < 20) setTimeout(place, 100);
+			else for (const input of inputs) window.removeEventListener(input, halt);
+		};
+		layouts.near(page);
+		requestAnimationFrame(place);
 	}
 
 	/** Scroll to a page's first piece. */

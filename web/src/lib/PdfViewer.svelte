@@ -28,6 +28,9 @@
 	let {
 		url,
 		startPage = 1,
+		startTop = null,
+		startLeft = null,
+		onplace,
 		highlight = null,
 		fileId = null,
 		itemId = null,
@@ -35,6 +38,13 @@
 	}: {
 		url: string;
 		startPage?: number;
+		/** Where on the start page to begin: PDF points from its top (and
+		 * its left: which column, in fluent mode), where one stopped. */
+		startTop?: number | null;
+		startLeft?: number | null;
+		/** Where one is reading, as one scrolls (and once more, ``leaving``,
+		 * when the page is hidden or left): to go on from there. */
+		onplace?: (place: Place, leaving: boolean) => void;
 		/** A passage to mark on its page (e.g. from a search result). */
 		highlight?: { page: number; text: string } | null;
 		/** With these, the file's annotations are shown and made. */
@@ -43,6 +53,8 @@
 		/** The paper's (for a note gathered from the annotations). */
 		title?: string;
 	} = $props();
+
+	type Place = { page: number; top: number; left: number | null };
 
 	const MAX_WIDTH = 1000;
 	// Horizontal padding of the desk around the pages (see .pages).
@@ -80,6 +92,52 @@
 		if (chosen) return chosen === 'on';
 		return window.matchMedia('(max-width: 720px)').matches;
 	}
+
+	/** The place at the reading line: in fluent mode its piece's, else
+	 * the page's there (no column known). */
+	function placeNow(): Place | null {
+		const line = readingLine();
+		if (fluent) return columnView?.placeAt(line) ?? null;
+		for (const node of document.querySelectorAll<HTMLElement>('.pages > .page')) {
+			const box = node.getBoundingClientRect();
+			if (line < box.top || line >= box.bottom || !scale) continue;
+			return { page: Number(node.dataset.page), top: (line - box.top) / scale, left: null };
+		}
+		return null;
+	}
+
+	// The place, a moment after scrolling stops, and when leaving.
+	$effect(() => {
+		if (!onplace || !pdf) return;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let last = '';
+		const send = (leaving: boolean) => {
+			const place = placeNow();
+			if (!place) return;
+			const key = `${place.page}:${Math.round(place.top / 8)}:${place.left}`;
+			if (key === last && !leaving) return;
+			last = key;
+			onplace(place, leaving);
+		};
+		const scrolled = () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => send(false), 1500);
+		};
+		const hidden = () => {
+			if (document.visibilityState === 'hidden') send(true);
+		};
+		const leaving = () => send(true);
+		window.addEventListener('scroll', scrolled, { passive: true });
+		document.addEventListener('visibilitychange', hidden);
+		window.addEventListener('pagehide', leaving);
+		return () => {
+			clearTimeout(timer);
+			send(true);
+			window.removeEventListener('scroll', scrolled);
+			document.removeEventListener('visibilitychange', hidden);
+			window.removeEventListener('pagehide', leaving);
+		};
+	});
 
 	/** Fluent mode on or off, staying on the page being read. */
 	async function toggleFluent() {
@@ -226,6 +284,12 @@
 	}
 
 	function go(section: Section) {
+		// Fluent mode: a jump, then the place followed while pages are laid
+		// out around it (scrolling through them would move it on the way).
+		if (fluent && columnView) {
+			columnView.follow(section.page, section.top, section.left);
+			return;
+		}
 		const offset = offsetOf(section);
 		if (offset === null) return;
 		const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -469,7 +533,11 @@
 			visible.observe(sheet);
 			seen.observe(sheet);
 			sharpen.set(number, check);
-			if (number === startPage && number > 1) sheet.scrollIntoView();
+			if (number === startPage && startTop !== null) {
+				// Where one stopped: that place at the reading line.
+				const at = sheet.getBoundingClientRect().top + window.scrollY + startTop * pageScale;
+				window.scrollTo({ top: Math.max(0, at - readingLine()) });
+			} else if (number === startPage && number > 1) sheet.scrollIntoView();
 
 			return () => {
 				sharpen.delete(number);
@@ -552,6 +620,9 @@
 					{mark}
 					{highlight}
 					{startPage}
+					{startTop}
+					{startLeft}
+					{readingLine}
 					viewports={pieceViewports}
 				/>
 			</div>
