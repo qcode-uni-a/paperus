@@ -13,6 +13,7 @@ import { analysePage } from '../src/lib/pageAnalysis.ts';
 import { check, type Spec } from './twins/check.ts';
 
 const HERE = import.meta.dirname;
+const FONTS = join(HERE, '..', 'node_modules', 'pdfjs-dist', 'standard_fonts') + '/';
 const specs = readdirSync(join(HERE, 'twins', 'pages'))
 	.filter((file) => file.endsWith('.json'))
 	.sort()
@@ -29,7 +30,9 @@ for (const spec of specs) {
 	test(`${spec.name}: ${spec.source}`, { todo: spec.todo }, async () => {
 		const task = getDocument({
 			data: new Uint8Array(readFileSync(join(out, `${spec.name}.pdf`))),
-			verbosity: 0
+			verbosity: 0,
+			// The same fonts on every machine (not the system's Helvetica).
+			standardFontDataUrl: FONTS
 		});
 		try {
 			const page = await (await task.promise).getPage(1);

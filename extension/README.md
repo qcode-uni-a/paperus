@@ -10,6 +10,11 @@ does the same; a full one with a check means you have it already.
   website for that.
 - **Another owner** (a group): right-click the button, "Save to …". A plain
   click saves to the owner chosen in the settings.
+- **The settings** (address, owner): right-click the button, "paperus
+  settings".
+- **When saving fails**, the page says why; where it cannot (a browser's own
+  PDF viewer), a small window does, with "Allow and save" if the extension
+  first needs access to the PDF's site.
 - **Many PDFs at once**: paperus' Manage → Missing page asks the extension
   to get the PDFs of papers it lacks: each opened at its publisher in a
   background tab, its PDF saved into the paper. The first time, a small
@@ -27,16 +32,14 @@ does the same; a full one with a check means you have it already.
   token with `papers.read`, `papers.write` and `groups.read` (for choosing
   the owner). End it in paperus under Settings → Access tokens.
 
-## Install (until it is in the stores)
+## Install
 
-Download `paperus-chrome-….zip` or `paperus-firefox-….zip` from the GitHub
-release, or build it (below).
-
-- **Chrome, Edge, Brave**: unzip; open `chrome://extensions`, switch on
-  Developer mode, "Load unpacked", choose the folder.
-- **Firefox** (140 or later; on Android 142): open `about:debugging#/runtime/this-firefox`,
-  "Load Temporary Add-on…", choose the zip (until Firefox restarts; a signed
-  version comes with the store).
+- **Firefox** (140 or later; on Android 142): from
+  [addons.mozilla.org](https://addons.mozilla.org/firefox/addon/paperus/).
+- **Chrome, Edge, Brave** (until it is in the Chrome Web Store): download
+  `paperus-chrome-….zip` from the GitHub release (or build it, below),
+  unzip; open `chrome://extensions`, switch on Developer mode, "Load
+  unpacked", choose the folder.
 
 Then open the extension's settings (it opens by itself on the first click),
 enter your paperus address and click Connect; confirm in the paperus tab.

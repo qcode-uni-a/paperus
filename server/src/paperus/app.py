@@ -9,6 +9,7 @@ from typing import Any
 import httpx2
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
@@ -97,6 +98,16 @@ def create_app(
         # Operation IDs are the route functions' names, e.g. "get_item", so
         # generated clients get readable names.
         generate_unique_id_function=lambda route: route.name,
+    )
+    # The browser extension calls the API from its own pages with an access
+    # token; browsers ask first (a preflight). Extensions only, and never
+    # with cookies, so no website borrows a login.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^(moz|chrome|safari-web)-extension://[^/]+$",
+        allow_methods=["*"],
+        allow_headers=["Authorization", "Content-Type"],
+        allow_credentials=False,
     )
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)

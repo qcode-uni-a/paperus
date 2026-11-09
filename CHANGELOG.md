@@ -8,6 +8,13 @@
   in that migration.
 - **Firefox add-on**: public on addons.mozilla.org; each release hands its
   version in from now on.
+- **Browser extension**: connects in Firefox also to a paperus at an
+  address with a port (paperus answers the browser's preflight from
+  extensions; the extension asks for the host, any port); where a page
+  cannot show why saving failed (Firefox's PDF viewer), a small window
+  does, with "Allow and save" when access to the PDF's site is missing;
+  "paperus settings" in the button's right-click menu; on arXiv's lists
+  the button stands after "[pdf, html, other]", so its label moves nothing.
 
 - **Annotations in the PDF viewer** (see [annotations](docs/annotations.md)):
   highlights, underlines and strike-throughs (select text, then a colour),

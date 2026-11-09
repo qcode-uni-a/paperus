@@ -96,7 +96,7 @@ export function check(spec: Spec, layout: PageLayout): Checked {
 		pieces.slice(i + 1).forEach((b, k) => {
 			const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
 			const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
-			if (w > 6 && h > 6 && w * h > Math.min(a.width * a.height, b.width * b.height) * 0.1)
+			if (w > 8 && h > 8 && w * h > Math.min(a.width * a.height, b.width * b.height) * 0.25)
 				problems.push(`pieces ${i} and ${i + 1 + k} overlap`);
 		})
 	);

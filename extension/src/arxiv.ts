@@ -9,7 +9,11 @@ const ID = /(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d+)?/;
 
 interface Spot {
 	id: string;
-	after: Element;
+	/** The button goes right after this (the abstract page's title), or at
+	 * the end of the line ``in`` (listings: after "[pdf, html, other]", so
+	 * that its label, shown on hover, moves nothing). */
+	after?: Element;
+	in?: Element;
 }
 
 /** Where the papers are on this page, and their IDs. */
@@ -27,7 +31,8 @@ function spots(): Spot[] {
 		'dt a[href*="/abs/"], p.list-title a[href*="/abs/"]'
 	)) {
 		const id = link.href.split('/abs/')[1]?.match(ID)?.[1];
-		if (id && !found.some((s) => s.id === id)) found.push({ id, after: link });
+		const line = link.closest('dt, p.list-title');
+		if (id && line && !found.some((s) => s.id === id)) found.push({ id, in: line });
 	}
 	return found;
 }
@@ -95,7 +100,11 @@ async function start(): Promise<void> {
 	const found = spots();
 	if (found.length === 0) return;
 	const buttons = new Map(found.map((s) => [s.id, button(s.id)]));
-	for (const spot of found) spot.after.after(buttons.get(spot.id)!.host);
+	for (const spot of found) {
+		const { host } = buttons.get(spot.id)!;
+		if (spot.in) spot.in.append(host);
+		else spot.after?.after(host);
+	}
 	const known: Record<string, string | null> =
 		(await chrome.runtime.sendMessage({ type: 'lookup', ids: found.map((s) => s.id) })) ?? {};
 	const server = (await settings())?.server;

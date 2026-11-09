@@ -47,6 +47,10 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const id = String(info.menuItemId);
+  if (id === "settings") {
+    await chrome.runtime.openOptionsPage();
+    return;
+  }
   if (!tab || !id.startsWith("owner:")) return;
   const asking = askAccess(tab);
   await asking;
@@ -88,6 +92,12 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
         void getPdfs(message.papers, sender.tab.id);
       }
       return { ok: true };
+    },
+    // The message window, once access to the PDF's site is allowed.
+    saveAgain: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("note.html")))
+        return { ok: false };
+      return saveTab(await chrome.tabs.get(message.tabId));
     },
     getPdfsAllowed: async () => {
       const { getPdfs: waiting } = (await chrome.storage.session.get(
@@ -184,7 +194,8 @@ async function saveTab(
 }
 
 /** In the page's corner; where no extension may go (a PDF viewer), as the
- * button's tooltip. */
+ * button's tooltip, and why it went wrong in a small window (with a button
+ * that allows access to the PDF's site, if that is missing). */
 async function tell(
   tabId: number,
   text: string,
@@ -195,6 +206,18 @@ async function tell(
     await inPage(tabId, showNote, text, link, ok);
   } catch {
     await chrome.action.setTitle({ tabId, title: text });
+    if (ok) return;
+    const query = new URLSearchParams({ text, tab: String(tabId) });
+    if (tabId === pdfWithoutAccess) {
+      const url = (await chrome.tabs.get(tabId).catch(() => null))?.url;
+      if (url) query.set("site", site(url));
+    }
+    await chrome.windows.create({
+      url: chrome.runtime.getURL(`note.html?${query}`),
+      type: "popup",
+      width: 460,
+      height: 280,
+    });
   }
 }
 
@@ -242,7 +265,7 @@ async function saveClosedTab(
   if (!(await chrome.permissions.contains({ origins: [site(url)] }))) {
     pdfWithoutAccess = tab.id;
     throw new PaperusError(
-      `To save this PDF, paperus needs to fetch it from ${new URL(url).host}: click the paperus button again and allow it.`,
+      `To save this PDF, paperus needs to fetch it from ${new URL(url).host}, and the browser asks you first.`,
     );
   }
   const pdf = await fetchPdf(url, MAX_BYTES);
@@ -450,35 +473,42 @@ function refreshMenu(): void {
 
 async function updateMenu(): Promise<void> {
   await chrome.contextMenus.removeAll();
-  if (!(await settings())) return;
-  const { data } = await call<Api.ListLibrariesData, Api.ListLibrariesResponse>(
-    "/api/libraries",
-  );
-  const owners: Owner[] = (data ?? [])
-    .filter((library) => library.writable)
-    .map((library) => ({
-      id: library.id,
-      name:
-        library.kind === "personal"
-          ? "my library"
-          : [...library.path, library.name].join(" › "),
-    }));
-  await chrome.storage.local.set({ owners });
-  if (owners.length < 2) return;
-  const nested =
-    owners.length > chrome.contextMenus.ACTION_MENU_TOP_LEVEL_LIMIT;
   const create = (properties: chrome.contextMenus.CreateProperties) =>
     chrome.contextMenus.create(
       { contexts: ["action"], ...properties },
       () => void chrome.runtime.lastError,
     );
-  if (nested) create({ id: "owners", title: "Save to" });
-  for (const owner of owners) {
-    create({
-      id: `owner:${owner.id}`,
-      title: nested ? owner.name : `Save to ${owner.name}`,
-      ...(nested ? { parentId: "owners" } : {}),
-    });
+  try {
+    if (!(await settings())) return;
+    const { data } = await call<
+      Api.ListLibrariesData,
+      Api.ListLibrariesResponse
+    >("/api/libraries");
+    const owners: Owner[] = (data ?? [])
+      .filter((library) => library.writable)
+      .map((library) => ({
+        id: library.id,
+        name:
+          library.kind === "personal"
+            ? "my library"
+            : [...library.path, library.name].join(" › "),
+      }));
+    await chrome.storage.local.set({ owners });
+    if (owners.length < 2) return;
+    // One place at the top level stays for the settings.
+    const nested =
+      owners.length > chrome.contextMenus.ACTION_MENU_TOP_LEVEL_LIMIT - 1;
+    if (nested) create({ id: "owners", title: "Save to" });
+    for (const owner of owners) {
+      create({
+        id: `owner:${owner.id}`,
+        title: nested ? owner.name : `Save to ${owner.name}`,
+        ...(nested ? { parentId: "owners" } : {}),
+      });
+    }
+  } finally {
+    // The extension's settings, also when paperus cannot be reached.
+    create({ id: "settings", title: "paperus settings" });
   }
 }
 

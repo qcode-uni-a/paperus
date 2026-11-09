@@ -16,6 +16,7 @@ import { analysePage } from '../../src/lib/pageAnalysis.ts';
 import { check, middle, type Spec } from './check.ts';
 
 const HERE = import.meta.dirname;
+const FONTS = join(HERE, '..', '..', 'node_modules', 'pdfjs-dist', 'standard_fonts') + '/';
 const SCALE = 1.4;
 
 const args = process.argv.slice(2);
@@ -31,7 +32,9 @@ for (const file of readdirSync(join(HERE, 'pages')).sort()) {
 	if (wanted.length && !wanted.includes(spec.name)) continue;
 	const task = getDocument({
 		data: new Uint8Array(readFileSync(join(out, `${spec.name}.pdf`))),
-		verbosity: 0
+		verbosity: 0,
+		// The same fonts on every machine (not the system's Helvetica).
+		standardFontDataUrl: FONTS
 	});
 	const doc = await task.promise;
 	const page = await doc.getPage(1);

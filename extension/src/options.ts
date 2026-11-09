@@ -32,10 +32,12 @@ $('connect').addEventListener('click', async () => {
 		message('Enter the address you open paperus at, e.g. https://papers.example.org.');
 		return;
 	}
-	// Asked now, while the click counts as the person's: paperus itself, and
-	// arXiv for the buttons there.
+	// Asked now, while the click counts as the person's: paperus itself (its
+	// host, any port: Firefox's patterns have none), and arXiv for the
+	// buttons there.
+	const { protocol, hostname } = new URL(origin);
 	const granted = await chrome.permissions.request({
-		origins: [`${origin}/*`, 'https://arxiv.org/*']
+		origins: [`${protocol}//${hostname}/*`, 'https://arxiv.org/*']
 	});
 	if (!granted) {
 		message('The extension needs to reach your paperus to save papers there.');
