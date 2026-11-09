@@ -7,7 +7,7 @@ async function expectNoHorizontalScroll(page: Page): Promise<void> {
 		scroll: document.documentElement.scrollWidth,
 		client: document.documentElement.clientWidth
 	}));
-	expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+	expect(widths.scroll, page.url()).toBeLessThanOrEqual(widths.client);
 }
 
 /** Pages with a heading, wide tables or long forms. */
