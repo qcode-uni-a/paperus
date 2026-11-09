@@ -329,17 +329,22 @@ export function layOut(
 		if (!within(y) || near >= BLOCK_SPLIT) return null;
 		let last = y;
 		let far = 0;
+		// Rows without a line of text in them (an equation's limits and
+		// brackets) go with it over less space.
+		let text = false;
+		const apart = () => far >= (text ? BLOCK_SPLIT : 3);
 		for (; within(y); y += step) {
 			if (inRow[y]) {
-				if (far >= BLOCK_SPLIT) break;
+				if (apart()) break;
 				// The rows themselves a few lines at most (the space after
 				// them may be wide).
 				if (Math.abs(y - start) > MIN_COLUMNS) return null;
+				if (dense(y)) text = true;
 				last = y;
 				far = 0;
 			} else far++;
 		}
-		return far >= BLOCK_SPLIT && far > near ? last : null;
+		return apart() && far > near ? last : null;
 	};
 
 	/** Lines (of text, or a figure) filling most of ``x0``–``x1``: a few at
@@ -371,6 +376,15 @@ export function layOut(
 		return false;
 	};
 
+	/** A row of a line of text (much ink across the body), not of an
+	 * equation's limits or brackets. */
+	const inkAcross = Array.from({ length: height }, (_, y) => {
+		let count = 0;
+		for (let x = left; x <= right; x++) if (at(x, y)) count++;
+		return count;
+	});
+	const dense = (y: number) => inkAcross[y] > bodyWidth * 0.2;
+
 	/** Rows ``y0``–``y1`` cut at the gap ``gutter`` into stretches across
 	 * it (wide) and stretches in two columns. */
 	const bandsOf = (y0: number, y1: number, [gutterLeft, gutterRight]: [number, number]) => {
@@ -388,10 +402,10 @@ export function layOut(
 		});
 		for (const [a, b] of runs(crosses))
 			if (b - a + 1 < 4) for (let i = a; i <= b; i++) crosses[i] = false;
+		const lastRow = crosses.length - 1;
 		for (const [a, b] of runs(crosses)) {
 			for (let i = a - 1; i >= Math.max(0, a - LINE_REACH) && inRow[y0 + i]; i--) crosses[i] = true;
-			const last = crosses.length - 1;
-			for (let i = b + 1; i <= Math.min(last, b + LINE_REACH) && inRow[y0 + i]; i++)
+			for (let i = b + 1; i <= Math.min(lastRow, b + LINE_REACH) && inRow[y0 + i]; i++)
 				crosses[i] = true;
 		}
 		type Band = { y0: number; y1: number; wide: boolean };
