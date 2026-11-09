@@ -284,9 +284,13 @@
 			display: none;
 		}
 		.fab-area {
+			/* Placed from the top by the height seen: Firefox on Android, its
+			   address bar at the top, puts what is anchored to the bottom too
+			   high by the bar's height. */
 			position: fixed;
 			right: 16px;
-			bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+			top: calc(100dvh - 16px - env(safe-area-inset-bottom, 0px));
+			transform: translateY(-100%);
 			z-index: 20;
 			display: grid;
 			justify-items: end;
