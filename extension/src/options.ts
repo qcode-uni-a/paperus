@@ -3,8 +3,22 @@ import { type Api, call, saveSettings, settings } from './paperus';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const message = (text: string) => ($('message').textContent = text);
 
+/** Plain HTTP to another machine: the token and papers unencrypted. */
+function insecure(address: string): boolean {
+	try {
+		const { protocol, hostname } = new URL(address);
+		const local = /^(localhost|127(\.\d+){3}|\[::1\])$|\.localhost$/.test(hostname);
+		return protocol === 'http:' && !local;
+	} catch {
+		return false;
+	}
+}
+
+const warn = (address: string) => ($('insecure').hidden = !insecure(address));
+
 async function show(): Promise<void> {
 	const config = await settings();
+	warn(config ? config.server : $<HTMLInputElement>('server').value.trim());
 	$('disconnected').hidden = !!config;
 	$('connected').hidden = !config;
 	if (!config) return;
@@ -22,6 +36,8 @@ async function show(): Promise<void> {
 		message(String((error as Error).message));
 	}
 }
+
+$('server').addEventListener('input', (event) => warn((event.target as HTMLInputElement).value.trim()));
 
 $('connect').addEventListener('click', async () => {
 	const input = $<HTMLInputElement>('server');

@@ -5,6 +5,8 @@
 	--royal: #2338a8;
 	--rule: #d9dcea;
 	--paper: #fbfbfd;
+	--danger: #b3261e;
+	--danger-wash: #fdecea;
 }
 @media (prefers-color-scheme: dark) {
 	:root {
@@ -13,6 +15,8 @@
 		--royal: #9aacff;
 		--rule: #2c3354;
 		--paper: #121731;
+		--danger: #ff8a80;
+		--danger-wash: #3a1517;
 	}
 }
 body {
@@ -78,5 +82,23 @@ a {
 	color: var(--royal);
 }
 #message:empty {
+	display: none;
+}
+.warning {
+	margin: 20px 0 0;
+	padding: 14px 16px;
+	border: 2px solid var(--danger);
+	border-radius: 10px;
+	background: var(--danger-wash);
+}
+.warning strong {
+	display: block;
+	color: var(--danger);
+	font-size: 17px;
+}
+.warning p {
+	margin: 6px 0 0;
+}
+.warning[hidden] {
 	display: none;
 }

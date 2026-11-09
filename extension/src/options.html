@@ -15,6 +15,16 @@
 				arXiv, a small button next to each paper does the same.
 			</p>
 
+			<div id="insecure" class="warning" role="alert" hidden>
+				<strong>Not encrypted</strong>
+				<p>
+					This paperus address starts with <code>http://</code>: the extension's access token and the
+					papers you save cross the network unencrypted, readable by others on it. Fine for a first
+					try on a network you trust; before real use, ask for HTTPS (a certificate for the server)
+					and connect to its <code>https://</code> address.
+				</p>
+			</div>
+
 			<section id="disconnected">
 				<h2>Connect</h2>
 				<label

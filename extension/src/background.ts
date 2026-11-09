@@ -566,7 +566,7 @@ async function connect(server: string): Promise<{ ok: boolean; text: string }> {
       });
       return {
         ok: true,
-        text: `Connected. ${writable.length} owners to choose from.`,
+        text: `Connected. ${writable.length} ${writable.length === 1 ? "owner" : "owners"} to choose from.`,
       };
     }
   }

@@ -11,7 +11,9 @@
 - **Firefox add-on**: connects to a paperus over plain HTTP at an address
   other than `localhost`, e.g. a test server on the local network (Firefox
   turned its requests into HTTPS ones, which failed with "paperus does not
-  answer").
+  answer"). Its settings warn in red when an address is plain HTTP to
+  another machine (the access token and papers then cross the network
+  unencrypted).
 - **Browser extension**: its icon outlined and filling its square, easier to
   see on light and dark toolbars.
 
