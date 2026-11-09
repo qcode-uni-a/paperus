@@ -4,9 +4,12 @@
 
 - **Search finds papers by their title and abstract**, with or without a
   file; a match of the searched words in a title or abstract ranks higher
-  than one in some text (`item_chunks`, added to the one migration). On
-  the evaluation questions: the right paper first 68% of the time (was
-  66%), among the first five 93% (was 89%).
+  than one in some text. A new migration (`0002`) adds the table
+  `item_chunks` and fills it for the papers already there; their vectors
+  for search by meaning follow in the background. From now on each change
+  of the database comes as a migration of its own. On the evaluation
+  questions: the right paper first 68% of the time (was 66%), among the
+  first five 93% (was 89%).
 - **Administrator setup**: a last step to create a group (or skip it).
 - **Firefox add-on**: connects to a paperus over plain HTTP at an address
   other than `localhost`, e.g. a test server on the local network (Firefox

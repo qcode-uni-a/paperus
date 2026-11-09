@@ -786,23 +786,6 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_table(
-        "item_chunks",
-        sa.Column("item_id", sa.Uuid(), nullable=False),
-        sa.Column("chunk_sha256", sa.LargeBinary(length=32), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["chunk_sha256"],
-            ["chunks.sha256"],
-        ),
-        sa.ForeignKeyConstraint(["item_id"], ["items.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("item_id"),
-    )
-    op.create_index(
-        op.f("ix_item_chunks_chunk_sha256"),
-        "item_chunks",
-        ["chunk_sha256"],
-        unique=False,
-    )
-    op.create_table(
         "note_items",
         sa.Column("note_id", sa.Uuid(), nullable=False),
         sa.Column("item_id", sa.Uuid(), nullable=False),
@@ -1108,8 +1091,6 @@ def downgrade() -> None:
     op.drop_table("note_revisions")
     op.drop_index(op.f("ix_note_items_item_id"), table_name="note_items")
     op.drop_table("note_items")
-    op.drop_index(op.f("ix_item_chunks_chunk_sha256"), table_name="item_chunks")
-    op.drop_table("item_chunks")
     op.drop_index(op.f("ix_note_chunks_chunk_sha256"), table_name="note_chunks")
     op.drop_table("note_chunks")
     op.drop_index(op.f("ix_not_duplicates_item_b"), table_name="not_duplicates")
