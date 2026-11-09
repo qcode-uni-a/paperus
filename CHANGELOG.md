@@ -17,6 +17,9 @@
 - **Fluent mode** reads a page's text before its references where a short
   rule over the columns' gap sets them apart (Physical Review): the text
   in its two columns first, then the references in theirs.
+- **Fluent mode** splits two columns where one is mostly an equation
+  (under a figure's caption on Physical Review Applied's pages); they were
+  read as one piece across the page, as if part of the figure.
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.

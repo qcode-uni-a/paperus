@@ -585,14 +585,49 @@ export function layOut(
 		// or of lines short of the column (a title's words in large type,
 		// equations and their numbers), are not columns either: across the
 		// page.
-		for (const band of bands)
-			if (
-				!band.wide &&
-				(drawn(x0, x1, band.y0, band.y1) ||
-					!filled(x0, gutterLeft - 1, band.y0, band.y1) ||
-					!filled(gutterRight + 1, x1, band.y0, band.y1))
-			)
+		// Lines down at least half of a side's rows (an equation's too).
+		const lined = (a: number, b: number, band: { y0: number; y1: number }) => {
+			let count = 0;
+			for (let y = band.y0; y <= band.y1; y++)
+				for (let x = a; x <= b; x++)
+					if (at(x, y)) {
+						count++;
+						break;
+					}
+			return count >= (band.y1 - band.y0 + 1) * 0.5;
+		};
+		// Nothing at all in the gap (not even a rule's or an equation's few
+		// rows).
+		const clear = (band: { y0: number; y1: number }) => {
+			for (let y = band.y0; y <= band.y1; y++)
+				for (let x = gutterLeft + inset; x <= gutterRight - inset; x++) if (at(x, y)) return false;
+			return true;
+		};
+		for (const band of bands) {
+			if (band.wide) continue;
+			if (drawn(x0, x1, band.y0, band.y1)) {
 				band.wide = true;
+				continue;
+			}
+			const one = filled(x0, gutterLeft - 1, band.y0, band.y1);
+			const two = filled(gutterRight + 1, x1, band.y0, band.y1);
+			if (one && two) continue;
+			// One column of lines beside one mostly an equation, a clear gap
+			// between them, more than a few lines down: columns still.
+			const tall = band.y1 - band.y0 + 1 >= MIN_COLUMNS * 2;
+			// (Not a figure beside the text: the other side is text too.)
+			const other: [number, number] = one ? [gutterRight + 1, x1] : [x0, gutterLeft - 1];
+			if (
+				(one || two) &&
+				tall &&
+				clear(band) &&
+				lined(x0, gutterLeft - 1, band) &&
+				lined(gutterRight + 1, x1, band) &&
+				!drawn(other[0], other[1], band.y0, band.y1)
+			)
+				continue;
+			band.wide = true;
+		}
 		const merged = bands.reduce<Band[]>((out, band) => {
 			const last = out.at(-1);
 			if (last && last.wide === band.wide) last.y1 = band.y1;
