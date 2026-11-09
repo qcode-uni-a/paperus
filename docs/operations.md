@@ -21,9 +21,12 @@ the group at the university, reachable only through the university VPN.
   Cursor, local models) through the stdio bridge/CLI with a personal API
   token. Hosted connectors (Claude.ai, ChatGPT) cannot reach a VPN-only
   server; they come with the next stage.
-- HTTPS is still needed (browser extension, service worker): a certificate
-  for the machine's university hostname, e.g. via the university's ACME
-  service.
+- HTTPS is still needed: for the service worker (offline reading), and to
+  keep passwords, access tokens and papers off the wire inside the campus
+  network. A certificate for the machine's university hostname, e.g. via
+  the university's ACME service. For a first try without one,
+  `COOKIE_SECURE=false`: the website and the browser extension work over
+  plain HTTP too.
 - Backups and a tested restore from the start: testers' notes are real data.
 - Testers know it is a test server; data moves to the pilot server.
 

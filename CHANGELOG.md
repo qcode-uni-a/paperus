@@ -8,6 +8,10 @@
   the evaluation questions: the right paper first 68% of the time (was
   66%), among the first five 93% (was 89%).
 - **Administrator setup**: a last step to create a group (or skip it).
+- **Firefox add-on**: connects to a paperus over plain HTTP at an address
+  other than `localhost`, e.g. a test server on the local network (Firefox
+  turned its requests into HTTPS ones, which failed with "paperus does not
+  answer").
 - **Browser extension**: its icon outlined and filling its square, easier to
   see on light and dark toolbars.
 

@@ -36,7 +36,12 @@ const base = {
 		}
 	],
 	web_accessible_resources: [{ resources: ['icons/icon-32.png'], matches: ['https://arxiv.org/*'] }],
-	options_ui: { page: 'options.html', open_in_tab: true }
+	options_ui: { page: 'options.html', open_in_tab: true },
+	// Firefox's default for extension pages adds "upgrade-insecure-requests",
+	// which turns requests to a paperus over plain HTTP (other than on
+	// localhost, e.g. a test server on the local network) into HTTPS ones
+	// that fail.
+	content_security_policy: { extension_pages: "script-src 'self'" }
 };
 
 // Only for automated tests: a paperus address allowed up front, as a robot
