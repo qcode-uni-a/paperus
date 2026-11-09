@@ -92,7 +92,8 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	cpSync('src/allow.html', `${out}/allow.html`);
 	cpSync('src/note.html', `${out}/note.html`);
 	cpSync('src/options.css', `${out}/options.css`);
-	cpSync('icons', `${out}/icons`, { recursive: true });
+	// The PNGs only; their sources (icon.svg, icon-16.svg) stay out.
+	cpSync('icons', `${out}/icons`, { recursive: true, filter: (path) => !path.endsWith('.svg') });
 	writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, '\t') + '\n');
 	// With Python's zipfile, which is there wherever paperus is developed.
 	const zip = `import os, sys, zipfile
