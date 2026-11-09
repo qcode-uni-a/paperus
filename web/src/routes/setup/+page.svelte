@@ -19,6 +19,7 @@
 	} from '#lib/api/client.ts';
 	import type {
 		GpuStep,
+		MlModel,
 		MlStatus,
 		ProviderFound,
 		RestoreCheckOut,
@@ -80,9 +81,16 @@
 	let config = $state<SystemConfig | null>(null);
 	let embeddingModel = $state('');
 	let rerank = $state<'auto' | 'on' | 'off'>('auto');
+	let rerankModel = $state('');
 	let ocr = $state(true);
+	let ocrModel = $state('');
 	const answers = $derived(ml?.services.some((s) => s.ok) ?? false);
 	const embedders = $derived(ml?.models.filter((m) => m.task === 'embedding') ?? []);
+	const rerankers = $derived(ml?.models.filter((m) => m.task === 'rerank') ?? []);
+	const readers = $derived(ml?.models.filter((m) => m.task === 'ocr') ?? []);
+	/** A model's name with its download size, for the lists. */
+	const sized = (model: MlModel) =>
+		`${model.name}${model.download_mb ? ` (${model.download_mb} MB)` : ''}`;
 	const advice = $derived(gpu ? gpuAdvice(gpu) : null);
 
 	async function checkMl() {
@@ -98,7 +106,9 @@
 			if (data) {
 				embeddingModel = data.embedding_model;
 				rerank = data.rerank ?? 'auto';
+				rerankModel = data.rerank_model ?? '';
 				ocr = data.ocr ?? true;
+				ocrModel = data.ocr_model ?? '';
 			}
 		});
 		void checkMl();
@@ -115,7 +125,14 @@
 		error = '';
 		busy = true;
 		const { error: failure } = await setConfig({
-			body: { ...config, embedding_model: embeddingModel, rerank, ocr }
+			body: {
+				...config,
+				embedding_model: embeddingModel,
+				rerank,
+				rerank_model: rerankModel,
+				ocr,
+				ocr_model: ocrModel
+			}
 		});
 		busy = false;
 		if (failure) error = errorMessage(failure);
@@ -339,9 +356,7 @@
 						>Model for search by meaning
 						<select bind:value={embeddingModel}>
 							{#each embedders as model (model.name)}
-								<option value={model.name}
-									>{model.name}{model.download_mb ? ` (${model.download_mb} MB)` : ''}</option
-								>
+								<option value={model.name}>{sized(model)}</option>
 							{/each}
 						</select>
 					</label>
@@ -358,9 +373,35 @@
 							<option value="off">Off</option>
 						</select>
 					</label>
+					{#if rerank !== 'off' && rerankers.length}
+						<label
+							>Reranker
+							<select bind:value={rerankModel}>
+								{#each rerankers as model (model.name)}
+									<option value={model.name}>{sized(model)}</option>
+								{/each}
+							</select>
+						</label>
+						<p class="muted small">
+							{rerankers.find((m) => m.name === rerankModel)?.description ?? ''}
+						</p>
+					{/if}
 					<label class="inline"
 						><input type="checkbox" bind:checked={ocr} /> Read scanned pages (OCR)</label
 					>
+					{#if ocr && readers.length}
+						<label
+							>OCR model
+							<select bind:value={ocrModel}>
+								{#each readers as model (model.name)}
+									<option value={model.name}>{sized(model)}</option>
+								{/each}
+							</select>
+						</label>
+						<p class="muted small">
+							{readers.find((m) => m.name === ocrModel)?.description ?? ''}
+						</p>
+					{/if}
 				{/if}
 			{/if}
 			{#if error}<p class="error">{error}</p>{/if}
