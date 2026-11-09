@@ -459,3 +459,22 @@ mark,
 	--tag-bg: var(--tag-violet-bg);
 	--tag-ink: var(--tag-violet-ink);
 }
+
+/* The paper's own links over its pages (lib/pdfLinks.ts): a faint box on
+   hover, as the PDF draws none (or its own coloured one). */
+.linkLayer {
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	pointer-events: none;
+}
+.linkLayer a {
+	position: absolute;
+	pointer-events: auto;
+	border-radius: 2px;
+}
+.linkLayer a:hover,
+.linkLayer a:focus-visible {
+	background: color-mix(in srgb, var(--royal) 14%, transparent);
+	outline: 1px solid color-mix(in srgb, var(--royal) 45%, transparent);
+}

@@ -93,7 +93,7 @@ async function outline(pdf: PDFDocumentProxy): Promise<Section[]> {
 	return found;
 }
 
-async function destination(
+export async function destination(
 	pdf: PDFDocumentProxy,
 	dest: unknown
 ): Promise<{ page: number; top: number | null; left: number | null } | null> {

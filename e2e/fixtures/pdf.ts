@@ -19,23 +19,34 @@ export function makePdf(pages: string[][], title?: string): Buffer {
 	);
 }
 
-/** A PDF of one page per content stream, in Helvetica (``/F1``). */
-function makePdfFrom(streams: string[], title?: string): Buffer {
+/** A PDF of one page per content stream, in Helvetica (``/F1``);
+ * ``annotations``: per page, annotation dictionaries (``{page N}`` in
+ * them names page N's object). */
+function makePdfFrom(streams: string[], title?: string, annotations: string[][] = []): Buffer {
 	const objects: string[] = [];
 	const kids = streams.map((_, i) => `${4 + 2 * i} 0 R`).join(' ');
+	// Annotations come after the pages, numbered in order.
+	let next = 4 + 2 * streams.length;
+	const annotationIds = streams.map((_, i) => (annotations[i] ?? []).map(() => next++));
 	objects.push('<< /Type /Catalog /Pages 2 0 R >>');
 	objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${streams.length} >>`);
 	objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
 	streams.forEach((stream, i) => {
 		const content = 4 + 2 * i + 1;
+		const annots = annotationIds[i].length
+			? ` /Annots [${annotationIds[i].map((id) => `${id} 0 R`).join(' ')}]`
+			: '';
 		objects.push(
 			'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]' +
-				` /Resources << /Font << /F1 3 0 R >> >> /Contents ${content} 0 R >>`
+				` /Resources << /Font << /F1 3 0 R >> >> /Contents ${content} 0 R${annots} >>`
 		);
 		objects.push(
 			`<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`
 		);
 	});
+	for (const page of annotations)
+		for (const body of page)
+			objects.push(body.replace(/\{page (\d+)\}/g, (_, n) => `${4 + 2 * (Number(n) - 1)} 0 R`));
 	let info = '';
 	if (title !== undefined) {
 		objects.push(`<< /Title (${escape(title)}) >>`);
@@ -76,5 +87,38 @@ export function makeLayoutPdf(
 			return `0.6 w ${drawn}${text}`;
 		}),
 		title
+	);
+}
+
+/** Two pages, the first with links: to the second page (a place in the
+ * paper), to a web page, and one with a script for an address (never a
+ * link). */
+export function makeLinkedPdf(title: string, word: string): Buffer {
+	const text = (lines: [number, string][]) =>
+		lines.map(([y, line]) => `BT /F1 11 Tf 72 ${y} Td (${escape(line)}) Tj ET `).join('');
+	const link = (y: number, action: string) =>
+		`<< /Type /Annot /Subtype /Link /Rect [70 ${y - 3} 300 ${y + 11}] /Border [0 0 0] ${action} >>`;
+	return makePdfFrom(
+		[
+			text([
+				[720, title],
+				[690, `Abstract. We study the ${word} effect in libraries.`],
+				[660, 'See the results on page 2'],
+				[640, 'The paper online'],
+				[620, 'Not a link']
+			]),
+			text([
+				[700, 'Results'],
+				[680, `The ${word} effect is real and measurable.`]
+			])
+		],
+		title,
+		[
+			[
+				link(660, '/Dest [{page 2} /XYZ 72 712 null]'),
+				link(640, '/A << /S /URI /URI (https://example.org/paper) >>'),
+				link(620, '/A << /S /URI /URI (javascript:alert\\(1\\)) >>')
+			]
+		]
 	);
 }

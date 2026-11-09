@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiOpenInNew, mdiTextLong } from '@mdi/js';
+	import { mdiArrowLeft, mdiOpenInNew, mdiTextLong } from '@mdi/js';
 	import { tick } from 'svelte';
 	import ColumnView from '#lib/ColumnView.svelte';
 	import { PageLayouts } from '#lib/pageLayouts.svelte.ts';
@@ -16,6 +16,7 @@
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import PdfContents from '#lib/PdfContents.svelte';
 	import { contents, type Section } from '#lib/pdfContents.ts';
+	import { addLinks, type Place as LinkPlace } from '#lib/pdfLinks.ts';
 	import AnnotationLayer from '#lib/annotations/AnnotationLayer.svelte';
 	import AnnotationsPanel from '#lib/annotations/AnnotationsPanel.svelte';
 	import AnnotationTools from '#lib/annotations/AnnotationTools.svelte';
@@ -267,7 +268,7 @@
 	}
 
 	/** Where a chapter starts on the page, from the document's top. */
-	function offsetOf(section: Section): number | null {
+	function offsetOf(section: LinkPlace): number | null {
 		if (fluent) return columnView?.offsetOf(section.page, section.top, section.left) ?? null;
 		const node = document.getElementById(`page-${section.page}`);
 		if (!node) return null;
@@ -283,7 +284,23 @@
 		return top + toolbar.offsetHeight + 12;
 	}
 
-	function go(section: Section) {
+	/** Where the paper's own link was followed from, to go back to. */
+	let back = $state<Place | null>(null);
+
+	/** A link within the paper: there, with the way back. */
+	function follow(place: LinkPlace) {
+		// (Above the first page, or between pieces: the page's top.)
+		back = placeNow() ?? { page: current, top: 0, left: null };
+		go(place);
+	}
+
+	function goBack() {
+		const place = back;
+		back = null;
+		if (place) go(place);
+	}
+
+	function go(section: LinkPlace) {
 		// Fluent mode: a jump, then the place followed while pages are laid
 		// out around it (scrolling through them would move it on the way).
 		if (fluent && columnView) {
@@ -513,6 +530,7 @@
 						viewport
 					});
 					await text.render().catch(() => {});
+					void addLinks(node, doc, pdfPage, viewport, follow);
 					if (highlight && highlight.page === number) mark(layer, highlight.text);
 					check();
 				},
@@ -563,6 +581,11 @@
 			<div class="row where">
 				{#if sections.length}<PdfContents {sections} current={reading} {go} />{/if}
 				<span class="muted">{current} / {pdf.numPages}</span>
+				{#if back}
+					<button class="back" onclick={goBack} title="Back to where you followed the link from"
+						><Icon path={mdiArrowLeft} size={16} />Back</button
+					>
+				{/if}
 			</div>
 			<div class="row">
 				{#if store}
@@ -623,6 +646,7 @@
 					{startTop}
 					{startLeft}
 					{readingLine}
+					onlink={follow}
 					viewports={pieceViewports}
 				/>
 			</div>
@@ -669,6 +693,13 @@
 <style>
 	.viewer {
 		width: 100%;
+	}
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 10px 2px 6px;
+		flex: none;
 	}
 	.toolbar {
 		position: sticky;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { addLinks, type Place } from '#lib/pdfLinks.ts';
 	import {
 		AnnotationMode,
 		TextLayer,
@@ -32,6 +33,7 @@
 		startTop = null,
 		startLeft = null,
 		readingLine = () => 0,
+		onlink,
 		viewports,
 		current = $bindable(1)
 	}: {
@@ -53,6 +55,8 @@
 		startLeft?: number | null;
 		/** Where on the screen one reads (below the toolbar). */
 		readingLine?: () => number;
+		/** A link within the paper followed (``pdfLinks``). */
+		onlink?: (place: Place) => void;
 		/** Each piece's viewport by its key, for marking a selection. */
 		viewports: Map<string, Viewport>;
 		current?: number;
@@ -96,6 +100,9 @@
 		task: RenderTask | undefined;
 		drawing = false;
 		texts = false;
+		/** The next page after the one being read: drawn already, before
+		 * it comes near. */
+		ahead = false;
 		readonly number: number;
 		constructor(number: number) {
 			this.number = number;
@@ -110,7 +117,7 @@
 				this.unload();
 				return;
 			}
-			if (!this.near.size || this.drawing) return;
+			if ((!this.near.size && !this.ahead) || this.drawing) return;
 			const ratio = this.wanted();
 			if (!this.ratio || ratio > this.ratio + 0.01) void this.draw(ratio);
 		}
@@ -124,6 +131,7 @@
 			}
 			this.ratio = 0;
 			this.texts = false;
+			this.ahead = false;
 		}
 
 		async draw(ratio: number) {
@@ -195,6 +203,7 @@
 			const content = await page.getTextContent();
 			for (const shown of this.shown.values()) {
 				const { node, piece, k } = shown;
+				if (onlink) void addLinks(node, doc, page, page.getViewport({ scale: k }), onlink);
 				const layer = document.createElement('div');
 				layer.className = 'textLayer';
 				node.append(layer);
@@ -254,8 +263,10 @@
 					{ rootMargin: margin }
 				);
 			const watchers = [
-				watch(draw.near, '1200px 0px'),
-				watch(draw.kept, '4000px 0px'),
+				// Drawn well before they show (a column in fluent mode is drawn
+				// large: one piece may be taller than the screen), kept a while.
+				watch(draw.near, '2500px 0px'),
+				watch(draw.kept, '5000px 0px'),
 				watch(draw.seen, '0px')
 			];
 			const reading = new IntersectionObserver(
@@ -263,6 +274,12 @@
 					if (entry.isIntersecting) {
 						current = number;
 						layouts.near(number);
+						// The next page drawn now, so it is there when reached.
+						const next = draws.get(number + 1);
+						if (next && !next.ahead) {
+							next.ahead = true;
+							next.update();
+						}
 					}
 				},
 				{ rootMargin: '-40% 0px -59% 0px' }

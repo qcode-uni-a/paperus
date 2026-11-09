@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Links in a paper work**, in both views: to a reference, a chapter, a
+  figure or an equation it goes there, and Back returns; web links (only
+  http, https and mailto) open in a tab of their own.
+- **Fluent mode draws ahead**: the next page as soon as one starts
+  reading a page, and pieces from further away, so reading on does not
+  wait for them.
 - **Reading goes on where you stopped**: a paper's PDF opens where you
   last were in it, on any device, in either view (normal or fluent: the
   place is kept as a page and a height on it, with the column where
