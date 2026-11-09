@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { asset, resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import {
 		authentication,
 		checkProvider,
 		checkRestore,
 		createFirstAdmin,
+		createGroup,
 		errorMessage,
 		getConfig,
 		restoreOnFirstStart,
@@ -19,14 +21,18 @@
 
 	/** First start: a new administrator, or a backup restored. */
 	let setup = $state<SetupState | null>(null);
-	let choice = $state<'new' | 'restore' | 'oidc' | null>(null);
+	// Back from linking the OIDC login: on to the group.
+	let choice = $state<'new' | 'restore' | 'oidc' | 'group' | null>(
+		page.url.searchParams.get('step') === 'group' ? 'group' : null
+	);
 	let error = $state('');
+	const linkError = page.url.searchParams.get('link_error');
 
 	$effect(() => {
 		setupState().then(({ data }) => {
 			setup = data ?? null;
 			// Set up already (e.g. someone else was faster): to the login.
-			if (data && !data.needed && choice !== 'oidc') goto(resolve('/login'));
+			if (data && !data.needed && choice !== 'oidc' && choice !== 'group') goto(resolve('/login'));
 		});
 	});
 
@@ -96,9 +102,31 @@
 			error = errorMessage(saved.error);
 			return;
 		}
-		// One login there links it to this account; back to its settings.
-		const next = '/admin/settings?open=authentication';
+		// One login there links it to this account; then the group.
+		const next = '/setup?step=group';
 		window.location.href = `/api/auth/oidc/start?link=true&next=${encodeURIComponent(next)}`;
+	}
+
+	// A first group (optional), its admin the new administrator.
+	let groupName = $state('');
+	let groupDescription = $state('');
+
+	async function addGroup(event: SubmitEvent) {
+		event.preventDefault();
+		error = '';
+		busy = true;
+		const { data, error: failure } = await createGroup({
+			body: {
+				name: groupName.trim(),
+				description: groupDescription.trim() || null
+			}
+		});
+		busy = false;
+		if (!data) {
+			error = errorMessage(failure);
+			return;
+		}
+		await goto(`${resolve('/manage/groups')}?group=${data.id}`);
 	}
 
 	// Restore.
@@ -219,8 +247,31 @@
 			<label>Button text <input bind:value={buttonText} maxlength="60" /></label>
 			{#if error}<p class="error">{error}</p>{/if}
 			<div class="buttons">
-				<button type="button" onclick={() => goto(resolve('/'))}>Skip</button>
+				<button type="button" onclick={() => ((choice = 'group'), (error = ''))}>Skip</button>
 				<button class="primary" disabled={busy}>Save and link my account</button>
+			</div>
+		</form>
+	{:else if choice === 'group'}
+		<form onsubmit={addGroup}>
+			<h2>A first group</h2>
+			{#if linkError}
+				<p class="check warn">
+					{linkError} Your account is not linked yet; try again under Administration → Settings → Authentication.
+				</p>
+			{/if}
+			<p class="muted">
+				Optional: papers are shared in groups, e.g. a research group or a course. You are its admin;
+				add people afterwards. Also later, under Manage → Groups.
+			</p>
+			<label>Name <input bind:value={groupName} required maxlength="200" /></label>
+			<label>
+				<span>Description <span class="optional">(optional)</span></span>
+				<textarea bind:value={groupDescription} rows="2"></textarea>
+			</label>
+			{#if error}<p class="error">{error}</p>{/if}
+			<div class="buttons">
+				<button type="button" onclick={() => goto(resolve('/'))}>Skip</button>
+				<button class="primary" disabled={busy}>Create group</button>
 			</div>
 		</form>
 	{:else}
@@ -375,7 +426,12 @@
 		gap: 6px;
 		font-weight: 600;
 	}
-	label input {
+	label input,
+	label textarea {
+		font-weight: 400;
+	}
+	.optional {
+		color: var(--muted);
 		font-weight: 400;
 	}
 	ul {

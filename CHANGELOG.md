@@ -7,6 +7,7 @@
   than one in some text (`item_chunks`, added to the one migration). On
   the evaluation questions: the right paper first 68% of the time (was
   66%), among the first five 93% (was 89%).
+- **Administrator setup**: a last step to create a group (or skip it).
 
 ## 0.0.17 (2026-11-09)
 

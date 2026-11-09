@@ -14,6 +14,10 @@ setup('first run: create the administrator', async ({ page }) => {
 	// Then the optional OIDC login, skipped.
 	await expect(page.getByRole('heading', { name: 'OIDC login' })).toBeVisible();
 	await page.getByRole('button', { name: 'Skip' }).click();
+
+	// And a first group, skipped too (the other tests start without one).
+	await expect(page.getByRole('heading', { name: 'A first group' })).toBeVisible();
+	await page.getByRole('button', { name: 'Skip' }).click();
 	await expect(page.getByRole('heading', { name: 'Nothing in the library yet' })).toBeVisible();
 
 	// Setting up again is refused.
