@@ -176,7 +176,7 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 			const text = tidy(line.text);
 			if (text.length < 3 || text.length > 90 || found.length >= MAX_SECTIONS) continue;
 			const larger = line.size >= body * 1.12;
-			const stands = larger || line.bold || text === text.toUpperCase();
+			const stands = larger || line.bold || capitals(text);
 			const numbered = NUMBERED.exec(text);
 			const named = NAMED.test(text.replace(/^\d+(\.\d+)*\.?\s+/, ''));
 			if (!stands || !(numbered || named)) continue;
@@ -196,6 +196,14 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 	return found.length >= 2 ? found : [];
 }
 
+/** Set in capitals, but for a few (an abbreviation like "BdG" in
+ * "II. FULL BdG MODEL"). */
+function capitals(text: string): boolean {
+	const letters = text.replace(/[^\p{L}]/gu, '');
+	const upper = letters.replace(/[^\p{Lu}]/gu, '').length;
+	return letters.length > 0 && upper >= letters.length * 0.8;
+}
+
 /** Words after a heading's number, not an equation's numbers or a sentence
  * of a numbered list: starting with a letter, mostly letters, two letters
  * in a row at least, no full stop at the end. */
@@ -203,7 +211,7 @@ function wordy(rest: string): boolean {
 	const letters = (rest.match(/\p{L}/gu) ?? []).length;
 	return (
 		/^\p{L}/u.test(rest) &&
-		/\p{L}{2}/u.test(rest) &&
+		/\p{L}{3}/u.test(rest) &&
 		letters >= rest.replace(/\s/g, '').length * 0.7 &&
 		!/[.;,:]$/.test(rest)
 	);
