@@ -7,6 +7,10 @@
   up), and where IEEE's sits close under the columns. Three new layout
   twins test it (a thesis's contents, lecture notes, an IEEE conference
   page).
+- **Fluent mode reads three columns** (Science, IEEE magazines) as three:
+  the first gap found left two of them as one piece, too small to read on
+  a phone. A title and abstract over two of the columns stay whole above
+  them.
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.

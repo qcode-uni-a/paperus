@@ -41,6 +41,9 @@ const LINE_REACH = 5;
 const BLOCK_SPLIT = 9;
 /** A figure's panels are at most this far apart. */
 const FIGURE_GAP = 30;
+/** One side of a page's columns holding two of three: wider than this
+ * share of the body (two columns' sides are each about half). */
+const THIRD_COLUMN_SIDE = 0.55;
 /** A stretch of two columns is at least this tall (a few lines). */
 const MIN_COLUMNS = 36;
 /** A running header or footer: a block of a line or two (with a rule, a
@@ -326,23 +329,44 @@ export function layOut(
 		return maxX < 0 ? null : { x0: minX, x1: maxX, y0: minY, y1: maxY };
 	};
 
+	/** Which rows have ink between ``x0`` and ``x1`` (the body's: inRow);
+	 * for the side of a three-column page, whose third column has ink on
+	 * rows that are blank on this side. */
+	const sideRows = new Map<string, boolean[]>();
+	const rowsIn = (x0: number, x1: number): boolean[] => {
+		if (x0 === left && x1 === right) return inRow;
+		const key = `${x0}-${x1}`;
+		let rows = sideRows.get(key);
+		if (!rows) {
+			rows = Array.from({ length: height }, (_, y) => {
+				for (let x = x0; x <= x1; x++) if (at(x, y)) return true;
+				return false;
+			});
+			sideRows.set(key, rows);
+		}
+		return rows;
+	};
+
 	/** The gap between two columns in rows ``y0``–``y1``: a strip near
 	 * the body's middle that long stretches of rows (a few lines at least)
 	 * do not cross, holding the most ink between them. One column of text
 	 * crosses any strip a few points wide on nearly every line (word spaces
 	 * are narrower); a figure across the page breaks the stretches, not
 	 * the columns beside it, and its own gaps do not count. Null if there
-	 * is none. */
-	const gutterOf = (y0: number, y1: number): [number, number] | null => {
-		const from = Math.round(left + bodyWidth * 0.3);
-		const to = Math.round(left + bodyWidth * 0.7);
+	 * is none. Within ``x0``–``x1`` if given (the two columns on one side
+	 * of a three-column page's first gap). */
+	const gutterOf = (y0: number, y1: number, x0 = left, x1 = right): [number, number] | null => {
+		const across = x1 - x0 + 1;
+		const rows = rowsIn(x0, x1);
+		const from = Math.round(x0 + across * 0.3);
+		const to = Math.round(x0 + across * 0.7);
 		const starts = to - from + 1 - GUTTER;
 		if (starts <= 0) return null;
 		// A figure's own gaps (between its panels) are not columns.
 		const figures = new Map<string, boolean>();
 		const figure = (a: number, b: number) => {
 			const key = `${a}-${b}`;
-			if (!figures.has(key)) figures.set(key, drawn(left, right, a, b));
+			if (!figures.has(key)) figures.set(key, drawn(x0, x1, a, b));
 			return figures.get(key)!;
 		};
 		/** Per strip: ink rows in long uncrossed stretches; the current one. */
@@ -352,7 +376,7 @@ export function layOut(
 		let inkRows = 0;
 		for (let y = y0; y <= y1 + 1; y++) {
 			const end = y > y1;
-			const ink = !end && inRow[y];
+			const ink = !end && rows[y];
 			if (ink) inkRows++;
 			let count = 0;
 			if (ink) for (let x = from; x < from + GUTTER; x++) if (at(x, y)) count++;
@@ -377,8 +401,8 @@ export function layOut(
 		if (text) {
 			textRows = 0;
 			for (let y = y0; y <= y1; y++) {
-				if (!inRow[y]) continue;
-				for (let x = left; x <= right; x++)
+				if (!rows[y]) continue;
+				for (let x = x0; x <= x1; x++)
 					if (text[y * width + x] && at(x, y)) {
 						textRows++;
 						break;
@@ -399,7 +423,12 @@ export function layOut(
 	 * ``limit``: rows that belong with the part they touch rather than with
 	 * what follows (closer to it than to the rest, a few lines at most): the
 	 * last of them, else null. */
-	const edgeOf = (start: number, step: number, limit: number): number | null => {
+	const edgeOf = (
+		start: number,
+		step: number,
+		limit: number,
+		inRow: boolean[] = rowsIn(left, right)
+	): number | null => {
 		const within = (y: number) => (step < 0 ? y >= limit : y <= limit);
 		let y = start;
 		let near = 0;
@@ -468,7 +497,14 @@ export function layOut(
 
 	/** Rows ``y0``–``y1`` cut at the gap ``gutter`` into stretches across
 	 * it (wide) and stretches in two columns. */
-	const bandsOf = (y0: number, y1: number, [gutterLeft, gutterRight]: [number, number]) => {
+	const bandsOf = (
+		y0: number,
+		y1: number,
+		[gutterLeft, gutterRight]: [number, number],
+		x0 = left,
+		x1 = right
+	) => {
+		const rows = rowsIn(x0, x1);
 		// Rows crossing the gap are across the page. A few crossing rows
 		// alone (a rule, an equation reaching over) are not; a crossing line
 		// is whole, its accents and descenders with it.
@@ -476,7 +512,7 @@ export function layOut(
 		// (justified to them, or hanging out at a reference's start).
 		const inset = Math.max(0, Math.floor((gutterRight - gutterLeft + 1 - 3) / 4));
 		const crosses = Array.from({ length: y1 - y0 + 1 }, (_, i) => {
-			if (!inRow[y0 + i]) return false;
+			if (!rows[y0 + i]) return false;
 			for (let x = gutterLeft + inset; x <= gutterRight - inset; x++)
 				if (at(x, y0 + i)) return true;
 			return false;
@@ -485,8 +521,8 @@ export function layOut(
 			if (b - a + 1 < 4) for (let i = a; i <= b; i++) crosses[i] = false;
 		const lastRow = crosses.length - 1;
 		for (const [a, b] of runs(crosses)) {
-			for (let i = a - 1; i >= Math.max(0, a - LINE_REACH) && inRow[y0 + i]; i--) crosses[i] = true;
-			for (let i = b + 1; i <= Math.min(lastRow, b + LINE_REACH) && inRow[y0 + i]; i++)
+			for (let i = a - 1; i >= Math.max(0, a - LINE_REACH) && rows[y0 + i]; i--) crosses[i] = true;
+			for (let i = b + 1; i <= Math.min(lastRow, b + LINE_REACH) && rows[y0 + i]; i++)
 				crosses[i] = true;
 		}
 		type Band = { y0: number; y1: number; wide: boolean };
@@ -522,9 +558,9 @@ export function layOut(
 		for (const band of bands)
 			if (
 				!band.wide &&
-				(drawn(left, right, band.y0, band.y1) ||
-					!filled(left, gutterLeft - 1, band.y0, band.y1) ||
-					!filled(gutterRight + 1, right, band.y0, band.y1))
+				(drawn(x0, x1, band.y0, band.y1) ||
+					!filled(x0, gutterLeft - 1, band.y0, band.y1) ||
+					!filled(gutterRight + 1, x1, band.y0, band.y1))
 			)
 				band.wide = true;
 		const merged = bands.reduce<Band[]>((out, band) => {
@@ -535,19 +571,19 @@ export function layOut(
 		}, []);
 		// A figure keeps the drawn rows next to it (its top panels standing
 		// either side of the columns' gap), up to the first line of text.
-		const sketch = (y: number) => inRow[y] && drawn(left, right, y, y);
+		const sketch = (y: number) => rows[y] && drawn(x0, x1, y, y);
 		merged.forEach((band, i) => {
-			if (!band.wide || !drawn(left, right, band.y0, band.y1)) return;
+			if (!band.wide || !drawn(x0, x1, band.y0, band.y1)) return;
 			const above = merged[i - 1];
 			if (above && !above.wide) {
 				let y = band.y0 - 1;
-				while (y > above.y0 && (sketch(y) || (!inRow[y] && sketch(y - 1)))) y--;
+				while (y > above.y0 && (sketch(y) || (!rows[y] && sketch(y - 1)))) y--;
 				if (y < band.y0 - 1) [band.y0, above.y1] = [y + 1, y];
 			}
 			const below = merged[i + 1];
 			if (below && !below.wide) {
 				let y = band.y1 + 1;
-				while (y < below.y1 && (sketch(y) || (!inRow[y] && sketch(y + 1)))) y++;
+				while (y < below.y1 && (sketch(y) || (!rows[y] && sketch(y + 1)))) y++;
 				if (y > band.y1 + 1) [band.y1, below.y0] = [y - 1, y];
 			}
 		});
@@ -558,7 +594,7 @@ export function layOut(
 			if (!band.wide) return;
 			const above = merged[i - 1];
 			if (above && !above.wide) {
-				const edge = edgeOf(band.y0 - 1, -1, above.y0);
+				const edge = edgeOf(band.y0 - 1, -1, above.y0, rows);
 				if (edge !== null) {
 					band.y0 = edge;
 					above.y1 = edge - 1;
@@ -566,7 +602,7 @@ export function layOut(
 			}
 			const below = merged[i + 1];
 			if (below && !below.wide) {
-				const edge = edgeOf(band.y1 + 1, 1, below.y1);
+				const edge = edgeOf(band.y1 + 1, 1, below.y1, rows);
 				if (edge !== null) {
 					band.y1 = edge;
 					below.y0 = edge + 1;
@@ -591,6 +627,29 @@ export function layOut(
 	type Found = { x0: number; x1: number; y0: number; y1: number; wide: boolean; span?: number };
 	const found: Found[] = [];
 	let mainSpan = 0;
+	/** One side of a page's columns gap: a column, or (wider than half
+	 * the body: two of three columns) its own stretches, in two columns
+	 * where it has them, across the side where not. */
+	const sideParts = (
+		side: { x0: number; x1: number; y0: number; y1: number },
+		band: { y0: number; y1: number }
+	): Found[] => {
+		const column = [{ ...side, wide: false }];
+		if (side.x1 - side.x0 + 1 < bodyWidth * THIRD_COLUMN_SIDE) return column;
+		const own = gutterOf(band.y0, band.y1, side.x0, side.x1);
+		if (!own) return column;
+		const parts: Found[] = [];
+		for (const sub of bandsOf(band.y0, band.y1, own, side.x0, side.x1)) {
+			const a = sub.wide ? null : extent(side.x0, own[0] - 1, sub.y0, sub.y1);
+			const b = sub.wide ? null : extent(own[1] + 1, side.x1, sub.y0, sub.y1);
+			if (a && b) parts.push({ ...a, wide: false }, { ...b, wide: false });
+			else {
+				const all = extent(side.x0, side.x1, sub.y0, sub.y1);
+				if (all) parts.push({ ...all, wide: true });
+			}
+		}
+		return parts.some((part) => !part.wide) ? parts : column;
+	};
 	const place = (y0: number, y1: number, gutter: [number, number] | null, main: boolean) => {
 		const bands = gutter ? bandsOf(y0, y1, gutter) : [{ y0, y1, wide: true }];
 		for (const band of bands) {
@@ -598,10 +657,14 @@ export function layOut(
 				const one = extent(left, gutter[0] - 1, band.y0, band.y1);
 				const two = extent(gutter[1] + 1, right, band.y0, band.y1);
 				if (one && two) {
-					// Both columns as wide as the wider: their text alike.
-					const span = Math.max(one.x1 - one.x0, two.x1 - two.x0) + 1;
+					// Three columns: the gap nearest the middle leaves two on one
+					// side; that side has its own gap, and its own stretches
+					// across it (a title and abstract over two of the columns).
+					const parts = [one, two].flatMap((side) => sideParts(side, band));
+					// All columns as wide as the widest: their text alike.
+					const span = Math.max(...parts.filter((c) => !c.wide).map((c) => c.x1 - c.x0)) + 1;
 					if (main) mainSpan = Math.max(mainSpan, span);
-					found.push({ ...one, wide: false, span }, { ...two, wide: false, span });
+					for (const part of parts) found.push(part.wide ? part : { ...part, span });
 					continue;
 				}
 			}
