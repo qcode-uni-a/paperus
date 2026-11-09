@@ -14,6 +14,9 @@
 - **Fluent mode** leaves out text running up the margin (a publisher's
   "Downloaded from …" line, arXiv's stamp) by the PDF's own text, however
   close it sits to the columns; it showed as a sliver beside them.
+- **Fluent mode** reads a page's text before its references where a short
+  rule over the columns' gap sets them apart (Physical Review): the text
+  in its two columns first, then the references in theirs.
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.

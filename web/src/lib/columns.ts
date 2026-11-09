@@ -44,6 +44,10 @@ const FIGURE_GAP = 30;
 /** One side of a page's columns holding two of three: wider than this
  * share of the body (two columns' sides are each about half). */
 const THIRD_COLUMN_SIDE = 0.55;
+/** A rule over the columns' gap ending them: at least this share of the
+ * width long. */
+const RULE_ACROSS = 0.2;
+const RULE_ACROSS_MOST = 0.8;
 /** A stretch of two columns is at least this tall (a few lines). */
 const MIN_COLUMNS = 36;
 /** A running header or footer: a block of a line or two (with a rule, a
@@ -525,8 +529,26 @@ export function layOut(
 				if (at(x, y0 + i)) return true;
 			return false;
 		});
-		for (const [a, b] of runs(crosses))
-			if (b - a + 1 < 4) for (let i = a; i <= b; i++) crosses[i] = false;
+		// A rule drawn across the gap (between the text and the references)
+		// does end the columns above it: one unbroken line of ink over the
+		// gap, a fifth of the width long at least, short of the whole width
+		// (rules from edge to edge set off a title page's parts).
+		const middle = Math.round((gutterLeft + gutterRight) / 2);
+		const ruleAt = (y: number) => {
+			if (!at(middle, y)) return false;
+			let a = middle;
+			let b = middle;
+			while (a > x0 && at(a - 1, y)) a--;
+			while (b < x1 && at(b + 1, y)) b++;
+			const share = (b - a + 1) / (x1 - x0 + 1);
+			return share >= RULE_ACROSS && share <= RULE_ACROSS_MOST;
+		};
+		for (const [a, b] of runs(crosses)) {
+			if (b - a + 1 >= 4) continue;
+			let rule = false;
+			for (let i = a; i <= b; i++) if (ruleAt(y0 + i)) rule = true;
+			if (!rule) for (let i = a; i <= b; i++) crosses[i] = false;
+		}
 		const lastRow = crosses.length - 1;
 		for (const [a, b] of runs(crosses)) {
 			for (let i = a - 1; i >= Math.max(0, a - LINE_REACH) && rows[y0 + i]; i--) crosses[i] = true;
@@ -692,6 +714,9 @@ export function layOut(
 				else blocks.push(block);
 			}
 			for (const [b0, b1] of blocks) {
+				// A rule alone (a few rows) is no piece: the view draws its own
+				// line between pieces.
+				if (b1 - b0 + 1 < 4) continue;
 				const all = extent(left, right, b0, b1);
 				if (all) found.push({ ...all, wide: true });
 			}
