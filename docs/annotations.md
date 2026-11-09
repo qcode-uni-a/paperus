@@ -34,6 +34,11 @@ the page's lower left (`rects` [x1, y1, x2, y2], or `paths` [x, y, …] with a
 - A phone: a round button at the bottom opens the tools and colours; with
   a tool in hand one finger works it and two fingers scroll. The popup is a
   sheet at the bottom of the screen.
+- Fluent mode (the toolbar's toggle; on by itself for two-column papers
+  on a phone, as last chosen otherwise): the pages cut into pieces in
+  reading order (`web/src/lib/columns.ts`, from where a page has ink and
+  text), each a window onto its page, so all of this works there too; a
+  selection over a column break makes one annotation on both columns.
 - The list (the toolbar's list button): all annotations by page, found by
   their words, comments, tags or author, filtered by colour or to one's own;
   a click goes to one. "Add note from all" gathers them into a note on the

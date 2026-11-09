@@ -10,19 +10,28 @@ function escape(text: string): string {
  * given, a title in its document information (paperus uses it as the
  * paper's title when nothing better is found). */
 export function makePdf(pages: string[][], title?: string): Buffer {
+	return makePdfFrom(
+		pages.map((lines) => {
+			const text = lines.map((line) => `(${escape(line)}) Tj T* `).join('');
+			return `BT /F1 11 Tf 14 TL 72 720 Td ${text}ET`;
+		}),
+		title
+	);
+}
+
+/** A PDF of one page per content stream, in Helvetica (``/F1``). */
+function makePdfFrom(streams: string[], title?: string): Buffer {
 	const objects: string[] = [];
-	const kids = pages.map((_, i) => `${4 + 2 * i} 0 R`).join(' ');
+	const kids = streams.map((_, i) => `${4 + 2 * i} 0 R`).join(' ');
 	objects.push('<< /Type /Catalog /Pages 2 0 R >>');
-	objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`);
+	objects.push(`<< /Type /Pages /Kids [${kids}] /Count ${streams.length} >>`);
 	objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-	pages.forEach((lines, i) => {
+	streams.forEach((stream, i) => {
 		const content = 4 + 2 * i + 1;
 		objects.push(
 			'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]' +
 				` /Resources << /Font << /F1 3 0 R >> >> /Contents ${content} 0 R >>`
 		);
-		const text = lines.map((line) => `(${escape(line)}) Tj T* `).join('');
-		const stream = `BT /F1 11 Tf 14 TL 72 720 Td ${text}ET`;
 		objects.push(
 			`<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`
 		);
@@ -44,4 +53,28 @@ export function makePdf(pages: string[][], title?: string): Buffer {
 	for (const offset of offsets) out += `${String(offset).padStart(10, '0')} 00000 n \n`;
 	out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R${info} >>\nstartxref\n${xref}\n%%EOF\n`;
 	return Buffer.from(out, 'latin1');
+}
+
+/** A line of text placed on a page (PDF points from the lower left). */
+export type Placed = { x: number; y: number; text: string; size?: number };
+
+/** A PDF of placed lines and horizontal rules ([x1, x2, y]), one page per
+ * entry: for layouts such as two columns under a running header. */
+export function makeLayoutPdf(
+	pages: { lines: Placed[]; rules?: [number, number, number][] }[],
+	title?: string
+): Buffer {
+	return makePdfFrom(
+		pages.map(({ lines, rules = [] }) => {
+			const text = lines
+				.map(
+					({ x, y, text: words, size = 10 }) =>
+						`BT /F1 ${size} Tf ${x} ${y} Td (${escape(words)}) Tj ET `
+				)
+				.join('');
+			const drawn = rules.map(([x1, x2, y]) => `${x1} ${y} m ${x2} ${y} l S `).join('');
+			return `0.6 w ${drawn}${text}`;
+		}),
+		title
+	);
 }

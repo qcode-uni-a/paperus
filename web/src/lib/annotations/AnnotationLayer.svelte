@@ -22,13 +22,17 @@
 		store,
 		index,
 		viewport,
-		label
+		label,
+		clip = null
 	}: {
 		store: FileAnnotations;
 		/** The page, from 0. */
 		index: number;
 		viewport: Viewport;
 		label: string | null;
+		/** Only this part of the page is shown (fluent mode, a piece of it):
+		 * its annotations alone get their anchor and their popup here. */
+		clip?: Box | null;
 	} = $props();
 
 	let root = $state<HTMLDivElement>();
@@ -357,6 +361,18 @@
 		await store.change(a.id, { position: { ...a.position, rects } });
 	}
 
+	/** The annotation is shown here (its middle in the shown part). */
+	function here(a: AnnotationOut): boolean {
+		if (!clip) return true;
+		const box = outline(a);
+		if (!box) return false;
+		const x = box.left + box.width / 2;
+		const y = box.top + box.height / 2;
+		return (
+			x >= clip.left && x <= clip.left + clip.width && y >= clip.top && y <= clip.top + clip.height
+		);
+	}
+
 	const shift = (a: AnnotationOut) =>
 		dragging?.id === a.id ? `translate(${dragging.dx}px, ${dragging.dy}px)` : undefined;
 </script>
@@ -454,7 +470,7 @@
 			{#if b}
 				<button
 					type="button"
-					id="annotation-{a.id}"
+					id={here(a) ? `annotation-${a.id}` : undefined}
 					class="mark-html {a.kind}"
 					class:mine={a.mine}
 					class:tools={store.tool !== 'select'}
@@ -491,7 +507,7 @@
 			{#if box}
 				<span
 					class="anchor"
-					id="annotation-{a.id}"
+					id={here(a) ? `annotation-${a.id}` : undefined}
 					style:left="{box.left}px"
 					style:top="{box.top}px"
 					style:width="{box.width}px"
@@ -514,7 +530,7 @@
 		></div>
 	{/if}
 
-	{#if selected}
+	{#if selected && here(selected)}
 		{@const box = outline(selected)}
 		{#if box}<AnnotationPopup {store} annotation={selected} {box} pageWidth={viewport.width} />{/if}
 	{/if}

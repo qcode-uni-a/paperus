@@ -8,6 +8,9 @@ export type Section = {
 	page: number;
 	/** Distance from the page's top edge, in PDF points (null: the top). */
 	top: number | null;
+	/** Distance from the page's left edge, in PDF points (null: unknown);
+	 * in fluent mode, which column. */
+	left: number | null;
 	/** 0 for chapters, 1 for their sections, 2 below. */
 	depth: number;
 };
@@ -24,15 +27,55 @@ export async function contents(pdf: PDFDocumentProxy): Promise<Section[]> {
 	return headings(pdf).catch(() => []);
 }
 
+/** Where a heading is on its page (PDF points from the top and the left
+ * edge), found by its words nearest ``top``: a bookmark that gives only a
+ * height does not say which column (and may point well above it). */
+async function headingOf(
+	pdf: PDFDocumentProxy,
+	texts: Map<number, Promise<TextItem[]>>,
+	number: number,
+	title: string,
+	top: number | null
+): Promise<{ top: number; left: number } | null> {
+	const page = await pdf.getPage(number);
+	if (!texts.has(number))
+		texts.set(
+			number,
+			page
+				.getTextContent()
+				.then((content) => content.items.filter((item): item is TextItem => 'str' in item))
+		);
+	const items = await texts.get(number)!;
+	const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+	const wanted = plain(title);
+	const upper = page.view[3];
+	let best: { top: number; left: number; distance: number } | null = null;
+	for (const item of items) {
+		const words = plain(item.str);
+		if (words.length < 3 || !(wanted.startsWith(words) || words.startsWith(wanted))) continue;
+		const size = Math.hypot(item.transform[2], item.transform[3]);
+		const at = Math.max(0, upper - item.transform[5] - size);
+		const distance = top === null ? at : Math.abs(at - top);
+		if (distance < 250 && (!best || distance < best.distance))
+			best = { top: at, left: item.transform[4] - page.view[0], distance };
+	}
+	return best && { top: best.top, left: best.left };
+}
+
 type OutlineEntry = { title: string; dest: unknown; items?: OutlineEntry[] };
 
 async function outline(pdf: PDFDocumentProxy): Promise<Section[]> {
 	const found: Section[] = [];
+	const texts = new Map<number, Promise<TextItem[]>>();
 	async function walk(entries: OutlineEntry[] | null | undefined, depth: number) {
 		for (const entry of entries ?? []) {
 			if (found.length >= MAX_SECTIONS) return;
 			const place = await destination(pdf, entry.dest).catch(() => null);
 			const title = tidy(entry.title);
+			if (place && title && place.left === null) {
+				const heading = await headingOf(pdf, texts, place.page, title, place.top).catch(() => null);
+				if (heading) Object.assign(place, heading);
+			}
 			if (place && title) found.push({ title, depth, ...place });
 			if (depth < 2) await walk(entry.items, depth + 1);
 		}
@@ -44,7 +87,7 @@ async function outline(pdf: PDFDocumentProxy): Promise<Section[]> {
 async function destination(
 	pdf: PDFDocumentProxy,
 	dest: unknown
-): Promise<{ page: number; top: number | null } | null> {
+): Promise<{ page: number; top: number | null; left: number | null } | null> {
 	const explicit = typeof dest === 'string' ? await pdf.getDestination(dest) : dest;
 	if (!Array.isArray(explicit) || explicit.length === 0) return null;
 	const [ref, kind, ...args] = explicit as [unknown, { name?: string } | undefined, ...unknown[]];
@@ -54,16 +97,21 @@ async function destination(
 			: await pdf.getPageIndex(ref as Parameters<PDFDocumentProxy['getPageIndex']>[0]);
 	const page = await pdf.getPage(index + 1);
 	const upper = page.view[3];
-	// XYZ left top zoom, FitH top, FitBH top: a height from the bottom.
+	// XYZ left top zoom, FitH top, FitBH top, FitR left bottom right top:
+	// a height from the bottom.
 	const height =
 		kind?.name === 'XYZ'
 			? args[1]
 			: kind?.name === 'FitH' || kind?.name === 'FitBH'
 				? args[0]
-				: null;
+				: kind?.name === 'FitR'
+					? Math.max(Number(args[1]), Number(args[3]))
+					: null;
+	const left = kind?.name === 'XYZ' ? args[0] : null;
 	return {
 		page: index + 1,
-		top: typeof height === 'number' ? Math.max(0, upper - height) : null
+		top: typeof height === 'number' ? Math.max(0, upper - height) : null,
+		left: typeof left === 'number' ? Math.max(0, left - page.view[0]) : null
 	};
 }
 
@@ -72,12 +120,12 @@ const NUMBERED = /^(?:(\d{1,2}(?:\.\d{1,2}){0,2})\.?|([IVX]{1,5})\.|([A-H])\.)\s
 const NAMED =
 	/^(?:abstract|introduction|background|related work|methods?|materials and methods|model|theory|setup|experiment(?:s|al setup)?|results(?: and discussion)?|discussion|conclusions?|summary(?: and outlook)?|outlook|acknowledge?ments?|references|bibliography|appendi(?:x|ces)\b.*|supplementary.*)$/i;
 
-type Line = { text: string; size: number; bold: boolean; y: number };
+type Line = { text: string; size: number; bold: boolean; x: number; y: number };
 
 /** Headings in the text: numbered ones and the usual names (Abstract,
  * Introduction, References, …), set larger or bolder than the body text. */
 async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
-	const pages: { number: number; upper: number; lines: Line[] }[] = [];
+	const pages: { number: number; upper: number; start: number; lines: Line[] }[] = [];
 	const sizes: number[] = [];
 	for (let number = 1; number <= Math.min(pdf.numPages, MAX_PAGES_READ); number++) {
 		const page = await pdf.getPage(number);
@@ -102,7 +150,7 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 			for (const item of row) {
 				const x = item.transform[4];
 				if (!line || x - end > item.size * 2.5) {
-					line = { text: '', size: 0, bold: true, y: item.transform[5] };
+					line = { text: '', size: 0, bold: true, x, y: item.transform[5] };
 					lines.push(line);
 				}
 				line.text +=
@@ -115,6 +163,7 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 		pages.push({
 			number,
 			upper: page.view[3],
+			start: page.view[0],
 			lines: lines.sort((a, b) => b.y - a.y)
 		});
 	}
@@ -122,7 +171,7 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 	const body = sizes.sort((a, b) => a - b)[Math.floor(sizes.length / 2)];
 
 	const found: Section[] = [];
-	for (const { number, upper, lines } of pages) {
+	for (const { number, upper, start, lines } of pages) {
 		for (const line of lines) {
 			const text = tidy(line.text);
 			if (text.length < 3 || text.length > 90 || found.length >= MAX_SECTIONS) continue;
@@ -139,6 +188,7 @@ async function headings(pdf: PDFDocumentProxy): Promise<Section[]> {
 				title: text,
 				page: number,
 				top: Math.max(0, upper - line.y - line.size),
+				left: Math.max(0, line.x - start),
 				depth: Math.min(depth, 2)
 			});
 		}

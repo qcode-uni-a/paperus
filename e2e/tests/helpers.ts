@@ -16,18 +16,25 @@ export type Paper = { id: string; title: string; word: string };
 
 /** Uploads a PDF through Add → Upload files, opens it and waits until the
  * worker has read it (its embedded title replaces the file name); ``more``:
- * further pages, a list of lines each. */
-export async function uploadPaper(page: Page, name: string, more: string[][] = []): Promise<Paper> {
+ * further pages, a list of lines each; ``make``: another PDF instead. */
+export async function uploadPaper(
+	page: Page,
+	name: string,
+	more: string[][] = [],
+	make?: (title: string, word: string) => Buffer
+): Promise<Paper> {
 	const word = unique(name.toLowerCase());
 	const title = `On the ${word} problem in end-to-end testing`;
-	const pdf = makePdf(
-		[
-			[title, 'A. Tester', '', `Abstract. We study the ${word} effect in libraries.`],
-			['Results', `The ${word} effect is real and measurable.`],
-			...more
-		],
-		title
-	);
+	const pdf = make
+		? make(title, word)
+		: makePdf(
+				[
+					[title, 'A. Tester', '', `Abstract. We study the ${word} effect in libraries.`],
+					['Results', `The ${word} effect is real and measurable.`],
+					...more
+				],
+				title
+			);
 	await page.goto('/');
 	await page.getByTitle('Add papers and notes').click();
 	const chooser = page.waitForEvent('filechooser');

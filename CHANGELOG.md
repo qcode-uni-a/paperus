@@ -18,6 +18,15 @@
   them written in as standard PDF annotations (any reader shows them); the
   paperus export carries them (and importing it brings them back);
   assistants read them with `get_annotations`.
+- **Fluent mode** (the viewer's toggle; on by itself for two-column papers
+  on a phone): the pages cut into pieces in reading order, one column
+  across the screen, the columns running on into each other, without
+  margins, running headers and footers; figures stay whole, a part across
+  the page keeps only its own ink, and a faint line names what follows a
+  break ("Right column", "Page 3"). Selecting, highlighting (also over a
+  column break), notes and the pen work as on the page (see
+  [annotations](docs/annotations.md)). The contents also jump to headings
+  in the right column, and read bookmarks that mark a rectangle (`FitR`).
 - **Sharp when zoomed by pinching**: the PDF pages on screen are drawn
   again at the zoom once it settles, instead of blurring as an enlarged
   picture (pages away from the screen go back to the usual sharpness).

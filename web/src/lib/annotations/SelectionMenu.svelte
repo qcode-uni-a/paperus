@@ -23,7 +23,8 @@
 		store: FileAnnotations;
 		/** The viewer: only selections in its pages. */
 		root: HTMLElement | undefined;
-		viewportOf: (page: number) => Viewport | undefined;
+		/** Of a page's box (``data-page``; in fluent mode a piece's). */
+		viewportOf: (node: HTMLElement) => Viewport | undefined;
 		labelOf: (index: number) => string | null;
 	} = $props();
 
@@ -36,7 +37,7 @@
 			return;
 		}
 		const range = selection.getRangeAt(0);
-		const start = range.startContainer.parentElement?.closest('.page');
+		const start = range.startContainer.parentElement?.closest<HTMLElement>('[data-page]');
 		if (
 			!start ||
 			!root?.contains(start) ||
@@ -45,11 +46,26 @@
 			shown = null;
 			return;
 		}
-		const page = Number(start.id.replace('page-', ''));
-		const bounds = range.getBoundingClientRect();
+		const page = Number(start.dataset.page);
+		// Over the first and last lines selected (the range's own box also
+		// takes in the page layers between pieces in fluent mode), below the
+		// site's header.
+		const box = (node: Node) =>
+			(node.nodeType === Node.TEXT_NODE
+				? node.parentElement!
+				: (node as Element)
+			).getBoundingClientRect();
+		const first = box(range.startContainer);
+		const last = box(range.endContainer);
+		const header =
+			parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) ||
+			72;
 		shown = {
-			x: Math.min(Math.max(bounds.left + bounds.width / 2, 150), window.innerWidth - 150),
-			y: Math.max(bounds.top - 8, 60),
+			x: Math.min(
+				Math.max((Math.min(first.left, last.left) + Math.max(first.right, last.right)) / 2, 150),
+				window.innerWidth - 150
+			),
+			y: Math.max(Math.min(first.top, last.top) - 8, header + 52),
 			page,
 			range
 		};
@@ -73,18 +89,29 @@
 	async function make(kind: AnnotationKind, color: string, open = false) {
 		if (!shown) return;
 		const { page, range } = shown;
-		const viewport = viewportOf(page);
-		const node = document.getElementById(`page-${page}`);
-		if (!viewport || !node) return;
-		// The page's end of a selection running on into the next page.
-		const ownEnd = node.querySelector('.textLayer');
-		const part = range.cloneRange();
-		if (ownEnd && !ownEnd.contains(part.endContainer)) part.setEndAfter(ownEnd.lastChild ?? ownEnd);
-		const boxes = lineBoxes(part.getClientRects(), node.getBoundingClientRect());
-		const text = part.toString().replace(/\s+/g, ' ').trim();
+		// The page's text layers the selection covers: one, or in fluent
+		// mode the pieces it runs over (a column's end into the next). A
+		// selection running on into the next page keeps to this one.
+		const layers = [
+			...(root?.querySelectorAll<HTMLElement>(`[data-page="${page}"] .textLayer`) ?? [])
+		].filter((layer) => range.intersectsNode(layer));
+		const rects: number[][] = [];
+		const words: string[] = [];
+		for (const layer of layers) {
+			const node = layer.closest<HTMLElement>('[data-page]');
+			const viewport = node && viewportOf(node);
+			if (!node || !viewport) continue;
+			const part = range.cloneRange();
+			if (!layer.contains(part.startContainer)) part.setStart(layer, 0);
+			if (!layer.contains(part.endContainer)) part.setEnd(layer, layer.childNodes.length);
+			const boxes = lineBoxes(part.getClientRects(), node.getBoundingClientRect());
+			rects.push(...boxes.map((b) => boxToRect(viewport, b)));
+			words.push(part.toString());
+		}
+		const text = words.join(' ').replace(/\s+/g, ' ').trim();
 		window.getSelection()?.removeAllRanges();
 		shown = null;
-		if (!boxes.length || !text) return;
+		if (!rects.length || !text) return;
 		await store.add(
 			{
 				kind,
@@ -92,7 +119,7 @@
 				page_label: labelOf(page - 1),
 				color,
 				text,
-				position: { rects: boxes.map((b) => boxToRect(viewport, b)) }
+				position: { rects }
 			},
 			open
 		);

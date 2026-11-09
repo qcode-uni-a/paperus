@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { mdiOpenInNew } from '@mdi/js';
+	import { mdiOpenInNew, mdiTextLong } from '@mdi/js';
+	import { tick } from 'svelte';
+	import ColumnView from '#lib/ColumnView.svelte';
+	import { PageLayouts } from '#lib/pageLayouts.svelte.ts';
 	import Icon from '#lib/Icon.svelte';
 	import 'pdfjs-dist/web/pdf_viewer.css';
 	import {
@@ -58,6 +61,40 @@
 	let toolbar = $state<HTMLElement>();
 	let viewer = $state<HTMLElement>();
 
+	/** Fluent mode (two-column papers): the columns one after another. */
+	let layouts = $state.raw<PageLayouts | null>(null);
+	let fluent = $state(false);
+	let columnView = $state<ReturnType<typeof ColumnView>>();
+	/** The pieces' viewports in fluent mode (by ``data-piece``). */
+	const pieceViewports = new Map<string, Viewport>();
+	const FLUENT = 'paperus.fluent';
+
+	/** Fluent mode for a two-column paper: as last chosen, else on phones. */
+	function wantFluent(): boolean {
+		let chosen: string | null = null;
+		try {
+			chosen = localStorage.getItem(FLUENT);
+		} catch {
+			// No storage: the default.
+		}
+		if (chosen) return chosen === 'on';
+		return window.matchMedia('(max-width: 720px)').matches;
+	}
+
+	/** Fluent mode on or off, staying on the page being read. */
+	async function toggleFluent() {
+		const at = current;
+		fluent = !fluent;
+		try {
+			localStorage.setItem(FLUENT, fluent ? 'on' : 'off');
+		} catch {
+			// Not remembered.
+		}
+		await tick();
+		if (fluent) columnView?.show(at);
+		else document.getElementById(`page-${at}`)?.scrollIntoView();
+	}
+
 	// Annotations: loaded before the pages are drawn (the PDF's own marks
 	// are left out once they were taken in).
 	const store = $derived(fileId && itemId ? new FileAnnotations(fileId, itemId) : null);
@@ -78,7 +115,8 @@
 	function goTo(annotation: AnnotationOut) {
 		if (!store) return;
 		store.selected = annotation.id;
-		document.getElementById(`page-${annotation.page_index + 1}`)?.scrollIntoView();
+		if (fluent) columnView?.show(annotation.page_index + 1);
+		else document.getElementById(`page-${annotation.page_index + 1}`)?.scrollIntoView();
 		let tries = 0;
 		const look = () => {
 			const found = document.getElementById(`annotation-${annotation.id}`);
@@ -132,6 +170,14 @@
 				if (cancelled) return;
 				firstPage = { width: viewport.width, height: viewport.height };
 				labels = await doc.getPageLabels().catch(() => null);
+				const found = new PageLayouts(doc);
+				const two = await found.twoColumns();
+				if (cancelled) {
+					found.stop();
+					return;
+				}
+				layouts = found;
+				fluent = two && wantFluent();
 				pdf = doc;
 				contents(doc).then((found) => {
 					if (!cancelled) sections = found;
@@ -142,6 +188,9 @@
 			});
 		return () => {
 			cancelled = true;
+			layouts?.stop();
+			layouts = null;
+			fluent = false;
 			pdf = null;
 			sections = [];
 			viewports = {};
@@ -161,6 +210,7 @@
 
 	/** Where a chapter starts on the page, from the document's top. */
 	function offsetOf(section: Section): number | null {
+		if (fluent) return columnView?.offsetOf(section.page, section.top, section.left) ?? null;
 		const node = document.getElementById(`page-${section.page}`);
 		if (!node) return null;
 		return node.getBoundingClientRect().top + window.scrollY + (section.top ?? 0) * scale;
@@ -451,8 +501,20 @@
 					<AnnotationTools {store} />
 					<AnnotationsPanel {store} {title} go={goTo} />
 				{/if}
+				{#if layouts}
+					<button
+						class="fluent-toggle"
+						class:on={fluent}
+						aria-pressed={fluent}
+						title={fluent
+							? 'Fluent mode: the columns one after another (click for the pages)'
+							: 'Fluent mode: the columns one after another'}
+						aria-label="Fluent mode"
+						onclick={toggleFluent}><Icon path={mdiTextLong} size={20} /></button
+					>
+				{/if}
 				<!-- Phones zoom by pinching. -->
-				<div class="row zoom">
+				<div class="row zoom" class:hidden={fluent}>
 					<button
 						onclick={() => (zoomIndex = Math.max(0, zoomIndex - 1))}
 						disabled={zoomIndex === 0}
@@ -475,31 +537,60 @@
 				>
 			</div>
 		</div>
-		<div class="pages" bind:this={viewer}>
-			{#each pages as number (number)}
-				{#key scale}
-					<div
-						class="page"
-						id="page-{number}"
-						style:width="{(firstPage?.width ?? 0) * scale}px"
-						style:height="{(firstPage?.height ?? 0) * scale}px"
-						style:--total-scale-factor={scale}
-					>
-						<div class="sheet" {@attach page(number)}></div>
-						{#if store && viewports[number]}
-							<AnnotationLayer
-								{store}
-								index={number - 1}
-								viewport={viewports[number]}
-								label={labelOf(number - 1)}
-							/>
-						{/if}
-					</div>
-				{/key}
-			{/each}
-		</div>
+		{#if fluent && layouts}
+			<div class="pages fluent-desk" bind:this={viewer}>
+				<ColumnView
+					bind:this={columnView}
+					bind:current
+					doc={pdf}
+					{layouts}
+					width={Math.min(width, 560)}
+					{pinch}
+					{store}
+					{labelOf}
+					{leaveOut}
+					{mark}
+					{highlight}
+					{startPage}
+					viewports={pieceViewports}
+				/>
+			</div>
+		{:else}
+			<div class="pages" bind:this={viewer}>
+				{#each pages as number (number)}
+					{#key scale}
+						<div
+							class="page"
+							id="page-{number}"
+							data-page={number}
+							style:width="{(firstPage?.width ?? 0) * scale}px"
+							style:height="{(firstPage?.height ?? 0) * scale}px"
+							style:--total-scale-factor={scale}
+						>
+							<div class="sheet" {@attach page(number)}></div>
+							{#if store && viewports[number]}
+								<AnnotationLayer
+									{store}
+									index={number - 1}
+									viewport={viewports[number]}
+									label={labelOf(number - 1)}
+								/>
+							{/if}
+						</div>
+					{/key}
+				{/each}
+			</div>
+		{/if}
 		{#if store}
-			<SelectionMenu {store} root={viewer} viewportOf={(number) => viewports[number]} {labelOf} />
+			<SelectionMenu
+				{store}
+				root={viewer}
+				viewportOf={(node) =>
+					node.dataset.piece
+						? pieceViewports.get(node.dataset.piece)
+						: viewports[Number(node.dataset.page)]}
+				{labelOf}
+			/>
 		{/if}
 	{/if}
 </div>
@@ -552,6 +643,27 @@
 		.zoom {
 			display: none;
 		}
+	}
+	.zoom.hidden {
+		display: none;
+	}
+	.fluent-toggle {
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		padding: 0 !important;
+		border: none;
+		border-radius: 50%;
+		background: none;
+		color: var(--muted);
+	}
+	.fluent-toggle.on {
+		background: color-mix(in srgb, var(--royal) 14%, transparent);
+		color: var(--royal);
+	}
+	.pages.fluent-desk {
+		padding: 12px 0 32px;
 	}
 	.where {
 		flex: 1 1 auto;
