@@ -118,6 +118,16 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
         re.compile(r"/api/notes(/.*)?"),
         Scope.NOTES_WRITE,
     ),
+    (_READ, re.compile(r"/api/files/[^/]+/annotations"), Scope.PAPERS_READ),
+    # Annotations are one's own, like notes (readers of a paper make them).
+    (
+        ("POST", "PUT", "PATCH", "DELETE"),
+        re.compile(
+            r"/api/(files/[^/]+/annotations|annotations/[^/]+"
+            r"|items/[^/]+/annotation-sharing)"
+        ),
+        Scope.NOTES_WRITE,
+    ),
     (_READ, re.compile(r"/api/uploads/[^/]+"), Scope.PAPERS_READ),
     (_READ, re.compile(r"/api/(libraries|groups)(/.*)?"), Scope.GROUPS_READ),
     (_READ, re.compile(r"/api/auth/me"), Scope.PAPERS_READ),

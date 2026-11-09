@@ -27,6 +27,137 @@ export type Affiliation = {
 };
 
 /**
+ * AnnotationChange
+ */
+export type AnnotationChange = {
+    /**
+     * Color
+     */
+    color?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Text
+     */
+    text?: string | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string> | null;
+    position?: Position | null;
+    /**
+     * Page Label
+     */
+    page_label?: string | null;
+};
+
+/**
+ * AnnotationIn
+ */
+export type AnnotationIn = {
+    kind: AnnotationKind;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label?: string | null;
+    position: Position;
+    /**
+     * Color
+     */
+    color?: string;
+    /**
+     * Text
+     */
+    text?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string>;
+};
+
+/**
+ * AnnotationKind
+ *
+ * As PDF annotations (Zotero's kinds, plus strike-through).
+ */
+export type AnnotationKind = 'highlight' | 'underline' | 'strikeout' | 'note' | 'text' | 'image' | 'ink';
+
+/**
+ * AnnotationOut
+ */
+export type AnnotationOut = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * File Id
+     */
+    file_id: string;
+    kind: AnnotationKind;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Position
+     */
+    position: {
+        [key: string]: unknown;
+    };
+    /**
+     * Color
+     */
+    color: string;
+    /**
+     * Text
+     */
+    text: string | null;
+    /**
+     * Comment
+     */
+    comment: string | null;
+    /**
+     * Tags
+     */
+    tags: Array<string>;
+    /**
+     * Imported
+     */
+    imported: boolean;
+    /**
+     * Mine
+     */
+    mine: boolean;
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+};
+
+/**
  * Apart
  */
 export type Apart = {
@@ -1030,6 +1161,32 @@ export type ExportPartOut = {
  * ExportStatus
  */
 export type ExportStatus = 'waiting' | 'running' | 'done' | 'failed' | 'expired';
+
+/**
+ * FileAnnotations
+ */
+export type FileAnnotations = {
+    /**
+     * Annotations
+     */
+    annotations: Array<AnnotationOut>;
+    /**
+     * Hide File Marks
+     */
+    hide_file_marks: boolean;
+    /**
+     * Shared
+     */
+    shared: boolean;
+    /**
+     * Can Share
+     */
+    can_share: boolean;
+    /**
+     * Colors
+     */
+    colors?: Array<string>;
+};
 
 /**
  * FileLink
@@ -2794,6 +2951,37 @@ export type Person = {
 };
 
 /**
+ * Position
+ *
+ * Where on the page: ``rects`` (x1, y1, x2, y2 each) for every kind but
+ * ink, ``paths`` (x, y pairs) with a ``width`` for ink; ``font_size`` for
+ * words written on the page; ``rotation`` (degrees) of a sticky note or
+ * written words, as PDF annotations have.
+ */
+export type Position = {
+    /**
+     * Rects
+     */
+    rects?: Array<Array<number>>;
+    /**
+     * Paths
+     */
+    paths?: Array<Array<number>>;
+    /**
+     * Width
+     */
+    width?: number | null;
+    /**
+     * Font Size
+     */
+    font_size?: number | null;
+    /**
+     * Rotation
+     */
+    rotation?: number;
+};
+
+/**
  * Preview
  *
  * The clashes for the owner choices given.
@@ -3310,6 +3498,16 @@ export type SetupState = {
      * Backups
      */
     backups: Array<BackupOut>;
+};
+
+/**
+ * Sharing
+ */
+export type Sharing = {
+    /**
+     * Shared
+     */
+    shared: boolean;
 };
 
 /**
@@ -6064,6 +6262,156 @@ export type RestoreFileResponses = {
 };
 
 export type RestoreFileResponse = RestoreFileResponses[keyof RestoreFileResponses];
+
+export type FileAnnotationsData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/annotations';
+};
+
+export type FileAnnotationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FileAnnotationsError = FileAnnotationsErrors[keyof FileAnnotationsErrors];
+
+export type FileAnnotationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: FileAnnotations;
+};
+
+export type FileAnnotationsResponse = FileAnnotationsResponses[keyof FileAnnotationsResponses];
+
+export type AddAnnotationData = {
+    body: AnnotationIn;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/annotations';
+};
+
+export type AddAnnotationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddAnnotationError = AddAnnotationErrors[keyof AddAnnotationErrors];
+
+export type AddAnnotationResponses = {
+    /**
+     * Successful Response
+     */
+    201: AnnotationOut;
+};
+
+export type AddAnnotationResponse = AddAnnotationResponses[keyof AddAnnotationResponses];
+
+export type DeleteAnnotationData = {
+    body?: never;
+    path: {
+        /**
+         * Annotation Id
+         */
+        annotation_id: string;
+    };
+    query?: never;
+    url: '/api/annotations/{annotation_id}';
+};
+
+export type DeleteAnnotationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteAnnotationError = DeleteAnnotationErrors[keyof DeleteAnnotationErrors];
+
+export type DeleteAnnotationResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteAnnotationResponse = DeleteAnnotationResponses[keyof DeleteAnnotationResponses];
+
+export type ChangeAnnotationData = {
+    body: AnnotationChange;
+    path: {
+        /**
+         * Annotation Id
+         */
+        annotation_id: string;
+    };
+    query?: never;
+    url: '/api/annotations/{annotation_id}';
+};
+
+export type ChangeAnnotationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangeAnnotationError = ChangeAnnotationErrors[keyof ChangeAnnotationErrors];
+
+export type ChangeAnnotationResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnnotationOut;
+};
+
+export type ChangeAnnotationResponse = ChangeAnnotationResponses[keyof ChangeAnnotationResponses];
+
+export type ShareAnnotationsData = {
+    body: Sharing;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/annotation-sharing';
+};
+
+export type ShareAnnotationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ShareAnnotationsError = ShareAnnotationsErrors[keyof ShareAnnotationsErrors];
+
+export type ShareAnnotationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Sharing;
+};
+
+export type ShareAnnotationsResponse = ShareAnnotationsResponses[keyof ShareAnnotationsResponses];
 
 export type SearchData = {
     body?: never;

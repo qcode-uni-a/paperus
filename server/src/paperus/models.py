@@ -701,6 +701,9 @@ class File(Record, Trashable, Base):
     )
     text_error: Mapped[str | None]
     ocr_status: Mapped[str | None] = mapped_column(String(16), index=True)
+    annotations_read: Mapped[bool] = mapped_column(server_default=text("false"))
+    """The PDF's own annotations were taken in as ``Annotation`` rows (of
+    the person who uploaded it), so pages are drawn without them."""
 
     version: Mapped[Version] = relationship(back_populates="files")
     blob: Mapped[Blob] = relationship(lazy="joined", innerjoin=True)
@@ -1138,4 +1141,72 @@ class PinnedCollection(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class AnnotationKind(StrEnum):
+    """As PDF annotations (Zotero's kinds, plus strike-through)."""
+
+    HIGHLIGHT = "highlight"
+    """Highlight: text marked (``rects``)."""
+    UNDERLINE = "underline"
+    STRIKEOUT = "strikeout"
+    NOTE = "note"
+    """Text (a sticky note): a spot (``rects``: one small square)."""
+    TEXT = "text"
+    """FreeText: words written on the page (``rects``, ``font_size``)."""
+    IMAGE = "image"
+    """Square: an area, e.g. a figure or an equation (``rects``: one)."""
+    INK = "ink"
+    """Ink: drawn by hand (``paths``, ``width``)."""
+
+
+class Annotation(Record, Base):
+    """A person's mark on a file's page: where (PDF points from the page's
+    lower left, as in PDF annotations: ``rects`` [x1, y1, x2, y2], or
+    ``paths`` [x, y, x, y, …] with a ``width``), its colour, the text it
+    marks, a comment and tags. Seen by its person, and by those who may
+    read the paper if the person shares their annotations of it
+    (``AnnotationShare``). See ``paperus.annotations``."""
+
+    __tablename__ = "annotations"
+
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    """An ``AnnotationKind``."""
+    page_index: Mapped[int]
+    """From 0."""
+    page_label: Mapped[str | None] = mapped_column(String(32))
+    """As the PDF numbers its pages ("iv", "12"), if it does."""
+    position: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    color: Mapped[str] = mapped_column(String(7))
+    """"#ffd400"."""
+    tags: Mapped[list[str]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    imported: Mapped[bool] = mapped_column(server_default=text("false"))
+    """Taken in from the PDF itself."""
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # Named like SQLAlchemy's text(): after the defaults that use it.
+    text: Mapped[str | None] = mapped_column(Text)
+    """The text marked, or written (``text``)."""
+    comment: Mapped[str | None] = mapped_column(Text)
+
+
+class AnnotationShare(Base):
+    """A person shows their annotations of a paper to everyone who may read
+    it (its group)."""
+
+    __tablename__ = "annotation_shares"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True, index=True
     )

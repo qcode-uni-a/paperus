@@ -3125,6 +3125,244 @@
         }
       }
     },
+    "/api/files/{file_id}/annotations": {
+      "get": {
+        "tags": [
+          "annotations"
+        ],
+        "summary": "File Annotations",
+        "description": "The file's annotations the person sees: their own, and those others\nshare of this paper.",
+        "operationId": "file_annotations",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAnnotations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "annotations"
+        ],
+        "summary": "Add Annotation",
+        "description": "A new annotation of the person's (anyone who may read the paper may\nannotate it, readers too).",
+        "operationId": "add_annotation",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/annotations/{annotation_id}": {
+      "patch": {
+        "tags": [
+          "annotations"
+        ],
+        "summary": "Change Annotation",
+        "description": "Change one's annotation: only the fields given (an empty comment\nremoves it).",
+        "operationId": "change_annotation",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Annotation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "annotations"
+        ],
+        "summary": "Delete Annotation",
+        "operationId": "delete_annotation",
+        "parameters": [
+          {
+            "name": "annotation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Annotation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/items/{item_id}/annotation-sharing": {
+      "put": {
+        "tags": [
+          "annotations"
+        ],
+        "summary": "Share Annotations",
+        "description": "Show one's annotations of the paper to everyone who may read it (or\nstop).",
+        "operationId": "share_annotations",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sharing"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sharing"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
@@ -7509,6 +7747,280 @@
         ],
         "title": "Affiliation"
       },
+      "AnnotationChange": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Position"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          }
+        },
+        "type": "object",
+        "title": "AnnotationChange"
+      },
+      "AnnotationIn": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AnnotationKind"
+          },
+          "page_index": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Page Index"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "default": "#ffd400"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "page_index",
+          "position"
+        ],
+        "title": "AnnotationIn"
+      },
+      "AnnotationKind": {
+        "type": "string",
+        "enum": [
+          "highlight",
+          "underline",
+          "strikeout",
+          "note",
+          "text",
+          "image",
+          "ink"
+        ],
+        "title": "AnnotationKind",
+        "description": "As PDF annotations (Zotero's kinds, plus strike-through)."
+      },
+      "AnnotationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AnnotationKind"
+          },
+          "page_index": {
+            "type": "integer",
+            "title": "Page Index"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "position": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Position"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "imported": {
+            "type": "boolean",
+            "title": "Imported"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "file_id",
+          "kind",
+          "page_index",
+          "page_label",
+          "position",
+          "color",
+          "text",
+          "comment",
+          "tags",
+          "imported",
+          "mine",
+          "author",
+          "created_at",
+          "changed_at"
+        ],
+        "title": "AnnotationOut"
+      },
       "Apart": {
         "properties": {
           "other_id": {
@@ -9199,6 +9711,54 @@
           "expired"
         ],
         "title": "ExportStatus"
+      },
+      "FileAnnotations": {
+        "properties": {
+          "annotations": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationOut"
+            },
+            "type": "array",
+            "title": "Annotations"
+          },
+          "hide_file_marks": {
+            "type": "boolean",
+            "title": "Hide File Marks"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          },
+          "can_share": {
+            "type": "boolean",
+            "title": "Can Share"
+          },
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Colors",
+            "default": [
+              "#ffd400",
+              "#ff6666",
+              "#5fb236",
+              "#2ea8e5",
+              "#a28ae5",
+              "#e56eee",
+              "#f19837",
+              "#aaaaaa"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "annotations",
+          "hide_file_marks",
+          "shared",
+          "can_share"
+        ],
+        "title": "FileAnnotations"
       },
       "FileLink": {
         "properties": {
@@ -12407,6 +12967,68 @@
         ],
         "title": "Person"
       },
+      "Position": {
+        "properties": {
+          "rects": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Rects"
+          },
+          "paths": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Paths"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "font_size": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 200.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Size"
+          },
+          "rotation": {
+            "type": "integer",
+            "exclusiveMaximum": 360.0,
+            "minimum": 0.0,
+            "title": "Rotation",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "Position",
+        "description": "Where on the page: ``rects`` (x1, y1, x2, y2 each) for every kind but\nink, ``paths`` (x, y pairs) with a ``width`` for ink; ``font_size`` for\nwords written on the page; ``rotation`` (degrees) of a sticky note or\nwritten words, as PDF annotations have."
+      },
       "Preview": {
         "properties": {
           "tags": {
@@ -13341,6 +13963,19 @@
           "backups"
         ],
         "title": "SetupState"
+      },
+      "Sharing": {
+        "properties": {
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shared"
+        ],
+        "title": "Sharing"
       },
       "SimilarItem": {
         "properties": {

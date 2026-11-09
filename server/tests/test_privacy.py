@@ -63,6 +63,15 @@ def private_library(db: Session, blobs: BlobStore, ada: Person) -> dict[str, str
     collection = ada.post("/api/collections", {"name": f"{SECRET} shelf"}).json()
     ada.post(f"/api/collections/{collection['id']}/items", {"item_ids": [item_id]})
     note = ada.note(f"{SECRET} thoughts", items=[item_id])["id"]
+    annotation = ada.post(
+        f"/api/files/{file['id']}/annotations",
+        {
+            "kind": "highlight",
+            "page_index": 0,
+            "position": {"rects": [[72, 700, 200, 712]]},
+            "comment": f"{SECRET} remark",
+        },
+    ).json()
     authors.link_waiting(db)
     found = ada.get("/api/authors", {"q": "Zebracorn"}).json()
     record = db.get(File, uuid.UUID(file["id"]))
@@ -75,6 +84,7 @@ def private_library(db: Session, blobs: BlobStore, ada: Person) -> dict[str, str
         "tag_id": next(t["id"] for t in tag if t["name"] == f"{SECRET}-tag"),
         "collection_id": collection["id"],
         "note_id": note,
+        "annotation_id": annotation["id"],
         "author_id": found[0]["id"],
         "user_id": ada.id,
         "position": "1",

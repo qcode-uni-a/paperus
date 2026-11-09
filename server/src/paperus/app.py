@@ -39,6 +39,7 @@ from paperus.api import (
     trash,
     users,
 )
+from paperus.api import annotations as annotation_api
 from paperus.api import authors as author_api
 from paperus.api import tokens as token_api
 from paperus.config import Settings
@@ -111,6 +112,7 @@ def create_app(
     app.include_router(references.router)
     app.include_router(author_api.router)
     app.include_router(files.router)
+    app.include_router(annotation_api.router)
     app.include_router(search.router)
     app.include_router(citations.router)
     app.include_router(notes.router)

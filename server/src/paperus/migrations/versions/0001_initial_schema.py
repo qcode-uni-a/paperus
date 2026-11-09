@@ -901,6 +901,12 @@ def upgrade() -> None:
         ),
         sa.Column("text_error", sa.String(), nullable=True),
         sa.Column("ocr_status", sa.String(length=16), nullable=True),
+        sa.Column(
+            "annotations_read",
+            sa.Boolean(),
+            server_default=sa.text("false"),
+            nullable=False,
+        ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_by", sa.Uuid(), nullable=True),
         sa.ForeignKeyConstraint(
@@ -995,6 +1001,56 @@ def upgrade() -> None:
         op.f("ix_author_changes_author_id"), "author_changes", ["author_id"]
     )
     op.create_index(op.f("ix_author_changes_other_id"), "author_changes", ["other_id"])
+    op.create_table(
+        "annotations",
+        sa.Column("id", sa.Uuid(), server_default=sa.text("uuidv7()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column("file_id", sa.Uuid(), nullable=False),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
+        sa.Column("kind", sa.String(length=16), nullable=False),
+        sa.Column("page_index", sa.Integer(), nullable=False),
+        sa.Column("page_label", sa.String(length=32), nullable=True),
+        sa.Column("position", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("color", sa.String(length=7), nullable=False),
+        sa.Column("text", sa.Text(), nullable=True),
+        sa.Column("comment", sa.Text(), nullable=True),
+        sa.Column(
+            "tags",
+            postgresql.JSONB(astext_type=sa.Text()),
+            server_default=sa.text("'[]'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "imported", sa.Boolean(), server_default=sa.text("false"), nullable=False
+        ),
+        sa.Column(
+            "changed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["file_id"], ["files.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_annotations_file_id"), "annotations", ["file_id"])
+    op.create_index(op.f("ix_annotations_user_id"), "annotations", ["user_id"])
+    op.create_table(
+        "annotation_shares",
+        sa.Column("user_id", sa.Uuid(), nullable=False),
+        sa.Column("item_id", sa.Uuid(), nullable=False),
+        sa.ForeignKeyConstraint(["item_id"], ["items.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("user_id", "item_id"),
+    )
+    op.create_index(
+        op.f("ix_annotation_shares_item_id"), "annotation_shares", ["item_id"]
+    )
     # Users and libraries refer to each other: this one once both exist.
     op.create_foreign_key(
         "fk_users_default_library_id_libraries",
@@ -1012,6 +1068,8 @@ def downgrade() -> None:
     op.drop_constraint(
         "fk_users_default_library_id_libraries", "users", type_="foreignkey"
     )
+    op.drop_table("annotation_shares")
+    op.drop_table("annotations")
     op.drop_table("author_changes")
     op.drop_index(op.f("ix_file_chunks_chunk_sha256"), table_name="file_chunks")
     op.drop_table("file_chunks")
