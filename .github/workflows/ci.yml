@@ -143,6 +143,23 @@ jobs:
             e2e/server-logs/
           retention-days: 7
 
+  update:
+    name: Update from the last release (Docker Compose)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving major tag; pin an exact version
+      - uses: docker/setup-buildx-action@v4
+      # This version's server image (the images job's cache), loaded for compose.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/qcode-uni-a/paperus-server:ci
+          cache-from: type=gha,scope=server
+      # The last release with a small library, updated to it, checked.
+      - run: deploy/update-test/run.sh ci release
+
   client:
     name: TypeScript client (generate, build)
     runs-on: ubuntu-latest

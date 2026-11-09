@@ -421,7 +421,13 @@ see issue #37).
 
 - **CI** (`.github/workflows/ci.yml`) on every push and pull request: the
   pre-commit hooks on all files, then the server, the ML service, the
-  website, the TypeScript client and both container images.
+  website, the TypeScript client and both container images. And the
+  update test (`deploy/update-test/run.sh`): an installation from
+  `deploy/compose.yaml` on the last release, filled with two people, a
+  group, papers, a PDF, tags, a collection, notes and a highlight, updated
+  to the new server image with `docker compose up -d`; then everything must
+  still be there and each person see what they did before. Locally: build
+  the image as `ghcr.io/qcode-uni-a/paperus-server:ci` first.
 - **Dependabot** (`.github/dependabot.yml`) opens update pull requests every
   Monday: Python (uv), npm, the base images (python, node, uv, Postgres),
   GitHub Actions and the pre-commit hooks. Minor and patch updates come

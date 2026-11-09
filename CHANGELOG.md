@@ -11,6 +11,10 @@
 - **First start with Docker Compose**: creating the first administrator
   failed (an error 500) when `CONTACT_EMAIL` in `.env` was left empty, as
   `example.env` has it; empty now means no address.
+- **Updates tested**: each change is checked by updating an installation of
+  the last release, with people, a group, papers, a PDF, notes and
+  annotations in it, the way `docs/operations.md` says
+  (`deploy/update-test/`).
 
 ## 0.0.18 (2026-11-09)
 
