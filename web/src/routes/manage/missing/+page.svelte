@@ -61,12 +61,15 @@
 	// The paperus browser extension, if installed and connected here: it
 	// marks the page, and gets PDFs at the publishers with one's own access.
 	let extension = $state(false);
+	let extensionVersion = $state('');
 	let fetching = $state<{ done: number; total: number } | null>(null);
 	$effect(() => {
 		// Set by the extension's page script, possibly after this ran.
 		const root = document.documentElement;
-		const check = () =>
-			(extension = (root.dataset.paperusExtensionFeatures ?? '').split(' ').includes('get-pdfs'));
+		const check = () => {
+			extension = (root.dataset.paperusExtensionFeatures ?? '').split(' ').includes('get-pdfs');
+			extensionVersion = root.dataset.paperusExtension ?? '';
+		};
 		check();
 		const marked = new MutationObserver(check);
 		marked.observe(root, {
@@ -128,9 +131,10 @@
 		}, SHOWN_SAVED_MS + 900);
 	}
 
-	/** Ask the extension to get these papers' PDFs at their publishers. */
-	function getWithExtension(papers: MissingPaper[], section: Section) {
-		const wanted = papers
+	/** The papers the extension can get (a publisher's page or an open copy
+	 * to try, and the person may add the file). */
+	function gettable(papers: MissingPaper[], section: Section) {
+		return papers
 			.filter((p) => writable(p) && (publisherLink(p) || p.refused?.length))
 			.map((p) => ({
 				item_id: p.item.id,
@@ -140,6 +144,19 @@
 				// Open copies that refused the server: the browser may get them.
 				copies: p.refused ?? []
 			}));
+	}
+	/** Both lists: the papers with no file first. */
+	const allGettable = $derived([
+		...gettable(lists.file?.papers ?? [], 'file'),
+		...gettable(lists.journal?.papers ?? [], 'journal')
+	]);
+
+	/** Ask the extension to get these papers' PDFs at their publishers. */
+	function getWithExtension(papers: MissingPaper[], section: Section) {
+		send(gettable(papers, section));
+	}
+
+	function send(wanted: ReturnType<typeof gettable>) {
 		if (!wanted.length) return;
 		for (const p of wanted) problems[p.item_id] = '';
 		fetching = { done: 0, total: wanted.length };
@@ -516,7 +533,26 @@
 	</aside>
 {/if}
 
-{#if !extension}
+{#if extension}
+	<aside class="extension connected">
+		<strong
+			>Browser extension connected{extensionVersion ? ` (version ${extensionVersion})` : ''}</strong
+		>
+		<p>
+			It gets the PDFs from the publishers with your access: your campus network or your login. It
+			opens each paper at its publisher in a tab of its own, saves the PDF and closes the tab; keep
+			this page open meanwhile.
+		</p>
+		{#if allGettable.length}
+			<button class="primary" onclick={() => send(allGettable)} disabled={fetching !== null}
+				>Get all {allGettable.length.toLocaleString()}
+				{allGettable.length === 1 ? 'PDF' : 'PDFs'} with the extension</button
+			>
+		{:else if lists.file && lists.journal}
+			<p class="muted">Nothing it could get: no paper here links its publisher.</p>
+		{/if}
+	</aside>
+{:else}
 	<aside class="extension">
 		<strong>Get PDFs with your own access</strong>
 		<p>
@@ -524,6 +560,10 @@
 			page can then fetch the PDFs from the publishers for you, through your campus network or
 			login, one paper or all at once. Until then, open a paper at the publisher and save its PDF by
 			hand.
+		</p>
+		<p class="muted">
+			Installed and connected already? Open paperus at the address the extension is connected to
+			(its settings show it): this page is {location.origin}.
 		</p>
 		<a
 			href="https://github.com/qcode-uni-a/paperus/tree/main/extension#readme"
@@ -764,6 +804,9 @@
 	}
 	.extension p {
 		margin: 0;
+	}
+	.extension.connected {
+		border-left-color: var(--success);
 	}
 	.fetching {
 		color: var(--royal);

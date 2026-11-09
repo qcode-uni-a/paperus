@@ -14,6 +14,10 @@
   GPU it does not use, and its basic settings: the model for search by
   meaning (best chosen while the library is empty), reranking and OCR,
   each with its model.
+- **Manage → Missing**: with the browser extension connected, a box says
+  so (with its version) and gets all the PDFs it can with one button,
+  instead of the box that asks to install it; that box now says the page
+  must be opened at the address the extension is connected to.
 - **Browser extension**: a paper saved without its PDF (the PDF behind a
   login, or its upload failed) is a warning now, an amber "!" with the
   reason, no longer a green tick; an upload that failed after the paper
