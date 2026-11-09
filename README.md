@@ -35,8 +35,9 @@ by meaning takes 2–3 GB).
 1. Download [`deploy/compose.yaml`](deploy/compose.yaml) and
    [`deploy/example.env`](deploy/example.env) into a new folder; rename
    `example.env` to `.env`.
-2. In `.env`, set the folders for files, database, backups and models, and
-   `CONTACT_EMAIL` (metadata services ask for one). Random secrets for
+2. In `.env`, set the folders for files, database, backups and models
+   (`CONTACT_EMAIL`, which metadata services ask for, can also be given
+   later under Administration → Settings → Server). Random secrets for
    `DB_PASSWORD` and `ML_TOKEN` in one go:
    ```sh
    sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(openssl rand -hex 16)/; s/^ML_TOKEN=.*/ML_TOKEN=$(openssl rand -hex 32)/" .env
