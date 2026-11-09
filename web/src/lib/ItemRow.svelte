@@ -12,30 +12,61 @@
 	import { none } from '#lib/transitions.ts';
 	import type { TransitionConfig } from 'svelte/transition';
 	import { writtenName } from '#lib/names.svelte.ts';
+	import type { Selection } from '#lib/selection.svelte.ts';
 
 	/** ``note``: a line above the title, e.g. why it is in a list;
 	 * ``leave``: how the row goes when it leaves its list; ``done``: shown
-	 * as just done (e.g. its PDF saved), before it leaves. */
+	 * as just done (e.g. its PDF saved), before it leaves; ``selection``:
+	 * the list's picked rows (a box to pick this one). */
 	let {
 		item,
 		note,
 		actions,
 		leave = none,
-		done = false
+		done = false,
+		selection
 	}: {
 		item: Item;
 		note?: string;
 		actions?: Snippet;
 		leave?: (node: Element) => TransitionConfig;
 		done?: boolean;
+		selection?: Selection;
 	} = $props();
+
+	const picked = $derived(selection?.has(item.id) ?? false);
+
+	/** While picking, a click on the row (its title too) picks it; other
+	 * links and buttons do what they do. */
+	function pickRow(event: MouseEvent) {
+		if (!selection?.active) return;
+		const target = event.target as HTMLElement;
+		if (target.closest('input, button, a:not(.title)')) return;
+		event.preventDefault();
+		selection.toggle(item.id, event.shiftKey);
+	}
 
 	const authors = $derived(shortAuthors(item.authors));
 	// The names shown (as shortAuthors: up to three, else two and "et al.").
 	const shown = $derived(item.authors.length <= 3 ? item.authors : item.authors.slice(0, 2));
 </script>
 
-<li out:leave class:done data-place={item.id}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions (the box is the control; the row only a larger target) -->
+<li
+	out:leave
+	class:done
+	class:picking={selection?.active}
+	class:picked
+	data-place={item.id}
+	onclick={pickRow}
+>
+	{#if selection}<input
+			type="checkbox"
+			class="pick"
+			checked={picked}
+			aria-label="Select “{item.title}”"
+			onclick={(event) => selection.toggle(item.id, event.shiftKey)}
+		/>{/if}
 	<span class="corner"
 		><FileIcon files={item.files ?? []} />{#if isShared(item.library_id)}<SharedIcon
 				owner={item.library_id}
@@ -99,6 +130,46 @@
 		padding-inline: 12px;
 		outline-color: var(--success);
 		border-bottom-color: transparent;
+	}
+	/* The box to pick the row: in the margin, seen on hover (or while
+	   picking); on narrow screens only while picking, inside the row. */
+	.pick {
+		position: absolute;
+		top: 17px;
+		left: -34px;
+		width: 18px;
+		height: 18px;
+		margin: 0;
+		opacity: 0;
+		accent-color: var(--royal);
+		cursor: pointer;
+	}
+	li:hover .pick,
+	.pick:focus-visible,
+	li.picking .pick {
+		opacity: 1;
+	}
+	li.picking {
+		cursor: pointer;
+	}
+	li.picked {
+		background: color-mix(in srgb, var(--royal) 7%, transparent);
+		box-shadow: -40px 0 0 color-mix(in srgb, var(--royal) 7%, transparent);
+	}
+	@media (max-width: 760px), (pointer: coarse) {
+		.pick {
+			display: none;
+		}
+		li.picking {
+			padding-left: 34px;
+		}
+		li.picking .pick {
+			display: block;
+			left: 4px;
+		}
+		li.picked {
+			box-shadow: none;
+		}
 	}
 	.note {
 		color: var(--muted);

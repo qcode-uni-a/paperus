@@ -21,6 +21,7 @@ from paperus.api import (
     auth,
     avatars,
     backups,
+    bulk,
     citations,
     duplicates,
     exports,
@@ -120,6 +121,7 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(avatars.router)
     app.include_router(items.router)
+    app.include_router(bulk.router)
     app.include_router(references.router)
     app.include_router(author_api.router)
     app.include_router(files.router)

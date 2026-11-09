@@ -14,6 +14,8 @@
 	import LibraryFilter from '#lib/LibraryFilter.svelte';
 	import { fromAddress, isEmpty, toQuery } from '#lib/libraryFilter.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
+	import BulkBar from '#lib/BulkBar.svelte';
+	import { Selection } from '#lib/selection.svelte.ts';
 
 	const PAGE = 50;
 	// The most the server lists at once.
@@ -44,6 +46,7 @@
 	}
 
 	let items = $state<Item[]>([]);
+	const selection = new Selection(() => items.map((item) => item.id));
 	/** The getting-started steps are shown (they say how to add papers). */
 	let starting = $state(false);
 	let more = $state(false);
@@ -297,8 +300,9 @@
 	{:else}
 		<LibraryFilter count={heading} />
 		<ul class="items">
-			{#each items as item (item.id)}<ItemRow {item} />{/each}
+			{#each items as item (item.id)}<ItemRow {item} {selection} />{/each}
 		</ul>
+		<BulkBar {selection} {items} onchange={() => loadUpTo(items.length)} />
 		{#if more}
 			<div {@attach loadMoreNearby} class="more">
 				<button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button>
@@ -312,6 +316,10 @@
 		{(total ?? items.length).toLocaleString()}
 		{(total ?? items.length) === 1 ? 'item' : 'items'}
 	</h1>
+	{#if items.length && !selection.active}<button
+			class="select"
+			onclick={() => (selection.active = true)}>Select</button
+		>{/if}
 {/snippet}
 
 <style>
@@ -337,6 +345,10 @@
 	/* Beside the Filter button. */
 	.count.listed {
 		margin: 0;
+	}
+	.select {
+		margin-left: auto;
+		padding: 3px 12px;
 	}
 	ul {
 		margin: 0;

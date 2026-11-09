@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Bulk edits** in the library and in collections: pick papers (a box on
+  each row, Shift for a range, or Select), then tag them (or take a tag
+  off), add them to a collection (or take them out of this one), give them
+  to another owner, star, archive, export their citations or move them to
+  the trash (with Undo). Papers one may not change are skipped, with the
+  reason. On the server: `POST /api/items/bulk` (not for access tokens).
 - **Administrator setup**: a step for the machine learning service after
   the administrator: whether it answers (and if not, what to check),
   whether it runs on the GPU or the CPU, with the start page's advice for a

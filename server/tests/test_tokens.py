@@ -308,6 +308,7 @@ ROUTES = {
     ("GET", "/api/items"): "papers.read",
     ("POST", "/api/items"): "papers.write",
     ("DELETE", "/api/items/{item_id}"): "papers.write",
+    ("POST", "/api/items/bulk"): None,
     ("GET", "/api/items/lookup"): "papers.read",
     ("GET", "/api/items/{item_id}"): "papers.read",
     ("DELETE", "/api/items/{item_id}/archive"): "papers.write",

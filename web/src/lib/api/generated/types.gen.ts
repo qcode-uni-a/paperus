@@ -5,6 +5,38 @@ export type ClientOptions = {
 };
 
 /**
+ * AddTag
+ */
+export type AddTag = {
+    /**
+     * Kind
+     */
+    kind: 'tag';
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
+ * AddToCollection
+ */
+export type AddToCollection = {
+    /**
+     * Kind
+     */
+    kind: 'collect';
+    /**
+     * Collection Id
+     */
+    collection_id: string;
+};
+
+/**
  * Affiliation
  */
 export type Affiliation = {
@@ -165,6 +197,16 @@ export type Apart = {
      * Other Id
      */
     other_id: string;
+};
+
+/**
+ * Archive
+ */
+export type Archive = {
+    /**
+     * Kind
+     */
+    kind: 'archive';
 };
 
 /**
@@ -523,6 +565,56 @@ export type BodyUploadToVersion = {
      */
     upload: Blob | File;
     role?: FileRole;
+};
+
+/**
+ * BulkIn
+ */
+export type BulkIn = {
+    /**
+     * Item Ids
+     */
+    item_ids: Array<string>;
+    /**
+     * Action
+     */
+    action: ({
+        kind: 'trash';
+    } & Trash) | ({
+        kind: 'restore';
+    } & Restore) | ({
+        kind: 'archive';
+    } & Archive) | ({
+        kind: 'unarchive';
+    } & Unarchive) | ({
+        kind: 'star';
+    } & Star) | ({
+        kind: 'unstar';
+    } & Unstar) | ({
+        kind: 'tag';
+    } & AddTag) | ({
+        kind: 'untag';
+    } & RemoveTag) | ({
+        kind: 'collect';
+    } & AddToCollection) | ({
+        kind: 'uncollect';
+    } & RemoveFromCollection) | ({
+        kind: 'owner';
+    } & GiveTo);
+};
+
+/**
+ * BulkOut
+ */
+export type BulkOut = {
+    /**
+     * Done
+     */
+    done: Array<string>;
+    /**
+     * Skipped
+     */
+    skipped: Array<Skipped>;
 };
 
 /**
@@ -1329,6 +1421,23 @@ export type GettingStarted = {
      */
     assistant: boolean;
     server: ServerSteps | null;
+};
+
+/**
+ * GiveTo
+ *
+ * To another owner the person may add to (see ``PUT
+ * /api/items/{id}/owner``).
+ */
+export type GiveTo = {
+    /**
+     * Kind
+     */
+    kind: 'owner';
+    /**
+     * Library Id
+     */
+    library_id: string;
 };
 
 /**
@@ -3250,6 +3359,34 @@ export type ReferencesOut = {
 };
 
 /**
+ * RemoveFromCollection
+ */
+export type RemoveFromCollection = {
+    /**
+     * Kind
+     */
+    kind: 'uncollect';
+    /**
+     * Collection Id
+     */
+    collection_id: string;
+};
+
+/**
+ * RemoveTag
+ */
+export type RemoveTag = {
+    /**
+     * Kind
+     */
+    kind: 'untag';
+    /**
+     * Tag Id
+     */
+    tag_id: string;
+};
+
+/**
  * RemovedTags
  */
 export type RemovedTags = {
@@ -3303,6 +3440,18 @@ export type Report = {
      * Removed
      */
     removed?: number;
+};
+
+/**
+ * Restore
+ *
+ * Out of the trash.
+ */
+export type Restore = {
+    /**
+     * Kind
+     */
+    kind: 'restore';
 };
 
 /**
@@ -3607,6 +3756,20 @@ export type SimilarItem = {
 };
 
 /**
+ * Skipped
+ */
+export type Skipped = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
  * Split
  */
 export type Split = {
@@ -3614,6 +3777,16 @@ export type Split = {
      * Item Ids
      */
     item_ids: Array<string>;
+};
+
+/**
+ * Star
+ */
+export type Star = {
+    /**
+     * Kind
+     */
+    kind: 'star';
 };
 
 /**
@@ -4046,6 +4219,16 @@ export type TokenOut = {
 };
 
 /**
+ * Trash
+ */
+export type Trash = {
+    /**
+     * Kind
+     */
+    kind: 'trash';
+};
+
+/**
  * TrashRules
  */
 export type TrashRules = {
@@ -4067,6 +4250,16 @@ export type Trashed = {
      * Trashed
      */
     trashed: number;
+};
+
+/**
+ * Unarchive
+ */
+export type Unarchive = {
+    /**
+     * Kind
+     */
+    kind: 'unarchive';
 };
 
 /**
@@ -4109,6 +4302,16 @@ export type UnreadableFile = {
      * Can Download
      */
     can_download?: boolean;
+};
+
+/**
+ * Unstar
+ */
+export type Unstar = {
+    /**
+     * Kind
+     */
+    kind: 'unstar';
 };
 
 /**
@@ -5452,6 +5655,31 @@ export type MergeItemResponses = {
 };
 
 export type MergeItemResponse = MergeItemResponses[keyof MergeItemResponses];
+
+export type BulkData = {
+    body: BulkIn;
+    path?: never;
+    query?: never;
+    url: '/api/items/bulk';
+};
+
+export type BulkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type BulkError = BulkErrors[keyof BulkErrors];
+
+export type BulkResponses = {
+    /**
+     * Successful Response
+     */
+    200: BulkOut;
+};
+
+export type BulkResponse = BulkResponses[keyof BulkResponses];
 
 export type ListReferencesData = {
     body?: never;

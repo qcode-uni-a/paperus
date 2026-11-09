@@ -147,11 +147,13 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
 
 
 # A person's own view of the library (stars, pinned collections, what they
-# opened), and imports (they make collections): not for assistants and
-# scripts, even where a rule above matches.
+# opened), imports (they make collections), and changes to many papers at
+# once (the website's selection: they need several scopes; assistants have
+# their own tools): not for assistants and scripts, even where a rule above
+# matches.
 _CLOSED = re.compile(
     r"/api/(items/[^/]+/(favourite|viewed|references/import)"
-    r"|collections/[^/]+/pin)"
+    r"|items/bulk|collections/[^/]+/pin)"
 )
 
 

@@ -1826,6 +1826,48 @@
         }
       }
     },
+    "/api/items/bulk": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Bulk",
+        "description": "Apply one action to each of the papers; those the person may not\nchange so (or cannot see) are skipped with the reason, the others are\nchanged together.",
+        "operationId": "bulk",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/references": {
       "get": {
         "tags": [
@@ -7747,6 +7789,59 @@
   },
   "components": {
     "schemas": {
+      "AddTag": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "tag",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "AddTag"
+      },
+      "AddToCollection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "collect",
+            "title": "Kind"
+          },
+          "collection_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Collection Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "collection_id"
+        ],
+        "title": "AddToCollection"
+      },
       "Affiliation": {
         "properties": {
           "name": {
@@ -8076,6 +8171,20 @@
           "other_id"
         ],
         "title": "Apart"
+      },
+      "Archive": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "archive",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Archive"
       },
       "ArxivImportIn": {
         "properties": {
@@ -8664,6 +8773,105 @@
           "upload"
         ],
         "title": "Body_upload_to_version"
+      },
+      "BulkIn": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Item Ids"
+          },
+          "action": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Trash"
+              },
+              {
+                "$ref": "#/components/schemas/Restore"
+              },
+              {
+                "$ref": "#/components/schemas/Archive"
+              },
+              {
+                "$ref": "#/components/schemas/Unarchive"
+              },
+              {
+                "$ref": "#/components/schemas/Star"
+              },
+              {
+                "$ref": "#/components/schemas/Unstar"
+              },
+              {
+                "$ref": "#/components/schemas/AddTag"
+              },
+              {
+                "$ref": "#/components/schemas/RemoveTag"
+              },
+              {
+                "$ref": "#/components/schemas/AddToCollection"
+              },
+              {
+                "$ref": "#/components/schemas/RemoveFromCollection"
+              },
+              {
+                "$ref": "#/components/schemas/GiveTo"
+              }
+            ],
+            "title": "Action",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "archive": "#/components/schemas/Archive",
+                "collect": "#/components/schemas/AddToCollection",
+                "owner": "#/components/schemas/GiveTo",
+                "restore": "#/components/schemas/Restore",
+                "star": "#/components/schemas/Star",
+                "tag": "#/components/schemas/AddTag",
+                "trash": "#/components/schemas/Trash",
+                "unarchive": "#/components/schemas/Unarchive",
+                "uncollect": "#/components/schemas/RemoveFromCollection",
+                "unstar": "#/components/schemas/Unstar",
+                "untag": "#/components/schemas/RemoveTag"
+              }
+            }
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids",
+          "action"
+        ],
+        "title": "BulkIn"
+      },
+      "BulkOut": {
+        "properties": {
+          "done": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Done"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/Skipped"
+            },
+            "type": "array",
+            "title": "Skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "done",
+          "skipped"
+        ],
+        "title": "BulkOut"
       },
       "Choices": {
         "properties": {
@@ -10054,6 +10262,27 @@
           "server"
         ],
         "title": "GettingStarted"
+      },
+      "GiveTo": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "owner",
+            "title": "Kind"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "library_id"
+        ],
+        "title": "GiveTo",
+        "description": "To another owner the person may add to (see ``PUT\n/api/items/{id}/owner``)."
       },
       "GroupChange": {
         "properties": {
@@ -13568,6 +13797,46 @@
         ],
         "title": "ReferencesOut"
       },
+      "RemoveFromCollection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "uncollect",
+            "title": "Kind"
+          },
+          "collection_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Collection Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "collection_id"
+        ],
+        "title": "RemoveFromCollection"
+      },
+      "RemoveTag": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "untag",
+            "title": "Kind"
+          },
+          "tag_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Tag Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "tag_id"
+        ],
+        "title": "RemoveTag"
+      },
       "RemovedTags": {
         "properties": {
           "links": {
@@ -13642,6 +13911,21 @@
           "unused_bytes"
         ],
         "title": "Report"
+      },
+      "Restore": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "restore",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Restore",
+        "description": "Out of the trash."
       },
       "RestoreCheckOut": {
         "properties": {
@@ -14216,6 +14500,25 @@
         ],
         "title": "SimilarItem"
       },
+      "Skipped": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "reason"
+        ],
+        "title": "Skipped"
+      },
       "Split": {
         "properties": {
           "item_ids": {
@@ -14234,6 +14537,20 @@
           "item_ids"
         ],
         "title": "Split"
+      },
+      "Star": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "star",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Star"
       },
       "Stats": {
         "properties": {
@@ -15056,6 +15373,20 @@
         ],
         "title": "TokenOut"
       },
+      "Trash": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "trash",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Trash"
+      },
       "TrashRules": {
         "properties": {
           "days": {
@@ -15093,6 +15424,20 @@
           "trashed"
         ],
         "title": "Trashed"
+      },
+      "Unarchive": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unarchive",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Unarchive"
       },
       "UnreadableFile": {
         "properties": {
@@ -15156,6 +15501,20 @@
           "writable"
         ],
         "title": "UnreadableFile"
+      },
+      "Unstar": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "unstar",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "Unstar"
       },
       "Usage": {
         "properties": {

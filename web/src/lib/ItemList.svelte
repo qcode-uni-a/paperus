@@ -4,6 +4,9 @@
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
+	import BulkBar from '#lib/BulkBar.svelte';
+	import { organize } from '#lib/organize.svelte.ts';
+	import { Selection } from '#lib/selection.svelte.ts';
 
 	/** Items of a collection, loading more while scrolling. */
 	let { collection, nested = false }: { collection: string; nested?: boolean } = $props();
@@ -12,6 +15,7 @@
 	// The most the server lists at once.
 	const MOST = 200;
 	let items = $state<Item[]>([]);
+	const selection = new Selection(() => items.map((item) => item.id));
 	let total = $state<number | null>(null);
 	let more = $state(false);
 	let loading = false;
@@ -85,14 +89,26 @@
 </script>
 
 {#if total !== null}
-	<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
+	<div class="head">
+		<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
+		{#if total > 0 && !selection.active}<button
+				class="select"
+				onclick={() => (selection.active = true)}>Select</button
+			>{/if}
+	</div>
 {/if}
 {#if total === 0}
 	<p class="muted">No items here yet. Add them with + above, or drop files here.</p>
 {/if}
 <ul>
-	{#each items as item (item.id)}<ItemRow {item} />{/each}
+	{#each items as item (item.id)}<ItemRow {item} {selection} />{/each}
 </ul>
+<BulkBar
+	{selection}
+	{items}
+	collection={organize.collections.find((c) => c.id === collection)}
+	onchange={() => loadUpTo(items.length)}
+/>
 {#if more}
 	<div {@attach loadMoreNearby} class="more">
 		<button onclick={() => load(items.at(-1)?.id)}>Show more</button>
@@ -100,6 +116,15 @@
 {/if}
 
 <style>
+	.head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+	.select {
+		padding: 3px 12px;
+	}
 	.count {
 		font-family: var(--sans);
 		font-size: var(--step-0);
