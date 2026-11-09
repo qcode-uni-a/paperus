@@ -112,6 +112,14 @@ test.describe('on a phone', () => {
 				)
 				.toEqual([390 - 16 - 56, 800 - 16 - 56, 56]);
 		}
+		// The page on screen drawn again that much sharper.
+		const canvasWidth = () =>
+			page.evaluate(() => document.querySelector<HTMLCanvasElement>('#page-1 canvas')!.width);
+		const usual = await page.evaluate(
+			() => document.querySelector<HTMLElement>('#page-1 canvas')!.offsetWidth * devicePixelRatio
+		);
+		await page.mouse.wheel(0, -2000);
+		await expect.poll(canvasWidth).toBeGreaterThanOrEqual(Math.floor(usual * 2) - 1);
 		await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
 		await button.click();
 		await expect(page.getByRole('button', { name: 'Pen', exact: true }).last()).toBeVisible();

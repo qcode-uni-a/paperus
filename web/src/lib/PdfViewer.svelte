@@ -88,6 +88,33 @@
 		look();
 	}
 
+	/** The browser's pinch zoom once it settles (1 unzoomed): the pages on
+	 * screen are then drawn again that much sharper, else the browser only
+	 * enlarges their pictures and the letters blur. */
+	let pinch = $state(1);
+	$effect(() => {
+		const seen = window.visualViewport;
+		if (!seen) return;
+		let timer = 0;
+		const settle = () => {
+			clearTimeout(timer);
+			timer = window.setTimeout(() => {
+				pinch = Math.max(1, Math.round(seen.scale * 4) / 4);
+			}, 250);
+		};
+		seen.addEventListener('resize', settle);
+		return () => {
+			clearTimeout(timer);
+			seen.removeEventListener('resize', settle);
+		};
+	});
+	/** Each drawn page's check whether to draw it again (page number from 1). */
+	const sharpen = new Map<number, () => void>();
+	$effect(() => {
+		void pinch;
+		for (const check of sharpen.values()) check();
+	});
+
 	const scale = $derived(
 		firstPage && width
 			? (Math.min(width - DESK_PADDING, MAX_WIDTH) / firstPage.width) * ZOOMS[zoomIndex]
@@ -253,7 +280,13 @@
 		return any;
 	}
 
-	/** Render a page (canvas + selectable text) once it comes near the screen. */
+	/** A page's picture holds at most this many pixels (phones refuse
+	 * larger canvases or run out of memory). */
+	const MAX_PIXELS = 2 ** 24;
+
+	/** Render a page (canvas + selectable text) once it comes near the
+	 * screen; on screen while pinch-zoomed, drawn again that much sharper;
+	 * back to the usual sharpness once it leaves the screen's neighbourhood. */
 	function page(number: number) {
 		return (node: HTMLDivElement) => {
 			const doc = pdf;
@@ -262,10 +295,87 @@
 			let rendering: RenderTask | undefined;
 			let text: TextLayer | undefined;
 			let started = false;
+			let onScreen = false;
+			let near = false;
+			/** What the picture is drawn with, once it is. */
+			let drawn: {
+				pdfPage: Awaited<ReturnType<PDFDocumentProxy['getPage']>>;
+				viewport: ReturnType<Awaited<ReturnType<PDFDocumentProxy['getPage']>>['getViewport']>;
+				hiding: boolean;
+				ratio: number;
+			} | null = null;
+			let redrawing: RenderTask | undefined;
+
+			const usual = () => window.devicePixelRatio || 1;
+			/** Pixels per CSS pixel for the picture: the screen's, times the
+			 * pinch zoom while on screen, within MAX_PIXELS. */
+			function wanted(): number {
+				if (!drawn) return usual();
+				const { width: w, height: h } = drawn.viewport;
+				const most = Math.sqrt(MAX_PIXELS / (w * h));
+				return onScreen ? Math.max(usual(), Math.min(usual() * pinch, most)) : usual();
+			}
+
+			function canvasFor(ratio: number) {
+				const { width: w, height: h } = drawn!.viewport;
+				const canvas = document.createElement('canvas');
+				canvas.width = Math.floor(w * ratio);
+				canvas.height = Math.floor(h * ratio);
+				canvas.style.width = `${w}px`;
+				canvas.style.height = `${h}px`;
+				return canvas;
+			}
+
+			function draw(canvas: HTMLCanvasElement, ratio: number): RenderTask {
+				const { pdfPage, viewport, hiding } = drawn!;
+				return pdfPage.render({
+					canvas,
+					viewport,
+					transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
+					annotationMode: hiding ? AnnotationMode.ENABLE_STORAGE : AnnotationMode.ENABLE
+				});
+			}
+
+			/** Draw again if the picture is not as sharp as wanted: sharper
+			 * on screen (drawn aside, then swapped in, so nothing flashes);
+			 * away from the screen, shrunk from the sharp one. */
+			function check() {
+				if (!drawn) return;
+				const ratio = wanted();
+				if (Math.abs(ratio - drawn.ratio) < 0.01) return;
+				const old = node.querySelector('canvas');
+				if (!old) return;
+				redrawing?.cancel();
+				redrawing = undefined;
+				const canvas = canvasFor(ratio);
+				if (ratio < drawn.ratio) {
+					if (near) return;
+					canvas.getContext('2d')?.drawImage(old, 0, 0, canvas.width, canvas.height);
+					old.replaceWith(canvas);
+					drawn.ratio = ratio;
+					return;
+				}
+				const task = draw(canvas, ratio);
+				redrawing = task;
+				task.promise.then(
+					() => {
+						if (redrawing !== task || !drawn) return;
+						node.querySelector('canvas')?.replaceWith(canvas);
+						drawn.ratio = ratio;
+						redrawing = undefined;
+					},
+					() => {}
+				);
+			}
 
 			const nearby = new IntersectionObserver(
 				async ([entry]) => {
-					if (!entry.isIntersecting || started) return;
+					near = entry.isIntersecting;
+					if (!near) {
+						check();
+						return;
+					}
+					if (started) return;
 					started = true;
 					const pdfPage = await doc.getPage(number);
 					const viewport = pdfPage.getViewport({ scale: pageScale });
@@ -273,23 +383,14 @@
 					sheet.style.width = `${viewport.width}px`;
 					sheet.style.height = `${viewport.height}px`;
 
-					const ratio = window.devicePixelRatio || 1;
-					const canvas = document.createElement('canvas');
-					canvas.width = Math.floor(viewport.width * ratio);
-					canvas.height = Math.floor(viewport.height * ratio);
-					canvas.style.width = `${viewport.width}px`;
-					canvas.style.height = `${viewport.height}px`;
+					drawn = { pdfPage, viewport, hiding: false, ratio: usual() };
+					const canvas = canvasFor(drawn.ratio);
 					const layer = document.createElement('div');
 					layer.className = 'textLayer';
 					node.replaceChildren(canvas, layer);
 
-					const hiding = await leaveOut(doc, pdfPage, number - 1);
-					rendering = pdfPage.render({
-						canvas,
-						viewport,
-						transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
-						annotationMode: hiding ? AnnotationMode.ENABLE_STORAGE : AnnotationMode.ENABLE
-					});
+					drawn.hiding = await leaveOut(doc, pdfPage, number - 1);
+					rendering = draw(canvas, drawn.ratio);
 					viewports = { ...viewports, [number]: viewport };
 					await rendering.promise.catch(() => {});
 					text = new TextLayer({
@@ -299,6 +400,7 @@
 					});
 					await text.render().catch(() => {});
 					if (highlight && highlight.page === number) mark(layer, highlight.text);
+					check();
 				},
 				{ rootMargin: '800px 0px' }
 			);
@@ -308,15 +410,24 @@
 				},
 				{ threshold: 0.5 }
 			);
+			const seen = new IntersectionObserver(([entry]) => {
+				onScreen = entry.isIntersecting;
+				if (onScreen) check();
+			});
 			const sheet = node.parentElement ?? node;
 			nearby.observe(sheet);
 			visible.observe(sheet);
+			seen.observe(sheet);
+			sharpen.set(number, check);
 			if (number === startPage && number > 1) sheet.scrollIntoView();
 
 			return () => {
+				sharpen.delete(number);
 				nearby.disconnect();
 				visible.disconnect();
+				seen.disconnect();
 				rendering?.cancel();
+				redrawing?.cancel();
 				text?.cancel();
 				node.replaceChildren();
 			};
