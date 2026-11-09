@@ -8,6 +8,9 @@
   searched by their title alone. It follows a manual edit of the abstract
   and a new version too. A new migration (`0003`) makes those passages
   again for the papers already there.
+- **First start with Docker Compose**: creating the first administrator
+  failed (an error 500) when `CONTACT_EMAIL` in `.env` was left empty, as
+  `example.env` has it; empty now means no address.
 
 ## 0.0.18 (2026-11-09)
 

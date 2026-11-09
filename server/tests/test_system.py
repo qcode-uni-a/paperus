@@ -1,9 +1,11 @@
 """Settings kept in the database: the vectors in use and the backup
 schedule."""
 
+import pytest
 from sqlalchemy.orm import Session
 
 from paperus import system
+from paperus.config import Settings
 
 
 def test_vectors_in_use(db: Session) -> None:
@@ -22,3 +24,11 @@ def test_backup_schedule(db: Session) -> None:
     system.save_backup_config(db, chosen)
     db.commit()
     assert system.load_backup_config(db) == chosen
+
+
+def test_an_empty_contact_email_is_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """As compose passes ``CONTACT_EMAIL=`` from example.env: no address."""
+    monkeypatch.setenv("PAPERUS_CONTACT_EMAIL", "")
+    settings = Settings()
+    assert settings.contact_email is None
+    assert system.defaults(settings).contact_email is None

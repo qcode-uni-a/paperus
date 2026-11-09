@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -64,3 +65,9 @@ class Settings(BaseSettings):
     @property
     def exports_folder(self) -> Path:
         return self.export_path or self.storage_path / "exports"
+
+    @field_validator("contact_email")
+    @classmethod
+    def _none_if_empty(cls, value: str | None) -> str | None:
+        """Empty is unset: compose passes an empty ``CONTACT_EMAIL`` as ""."""
+        return (value or "").strip() or None
