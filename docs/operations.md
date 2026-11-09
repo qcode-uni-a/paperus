@@ -274,6 +274,13 @@ publisher that refuses PDFs shows up without asking around. The night's
 tidy-up deletes entries older than two weeks, and beyond the newest
 100,000.
 
+`deploy/compose.yaml` rotates each container's own log (Docker keeps it in
+one file that grows without end by default): Docker's `local` driver, five
+files of 10 MB each, compressed; `docker compose logs` reads all of them.
+An installation made before this keeps its old `compose.yaml` until the new
+one is copied over; `docker compose up -d` then recreates the containers
+with it (their old log goes with them).
+
 ## Monitoring (Prometheus)
 
 The server and the ML service can serve Prometheus metrics, each on a port

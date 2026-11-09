@@ -15,6 +15,16 @@ x-paperus-env: &paperus-env
   # Prometheus metrics (see docs/operations.md, Monitoring):
   # PAPERUS_METRICS_PORT: 9464
 
+# Each container's log (docker compose logs) rotated: Docker's default
+# keeps it in one file that grows without end. The last 50 MB stay,
+# compressed; Administration → Logs keeps two weeks of the server's and the
+# worker's in the database.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "5"
+
 services:
   server:
     image: ghcr.io/qcode-uni-a/paperus-server:${PAPERUS_VERSION:-release}
@@ -29,6 +39,7 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    logging: *logging
 
   worker:
     image: ghcr.io/qcode-uni-a/paperus-server:${PAPERUS_VERSION:-release}
@@ -45,6 +56,7 @@ services:
       server:
         condition: service_healthy
     restart: unless-stopped
+    logging: *logging
 
   ml:
     # For an NVIDIA GPU: add "-cuda" to the tag and the "devices" lines below,
@@ -59,6 +71,7 @@ services:
     volumes:
       - ${MODEL_CACHE_LOCATION}:/cache
     restart: unless-stopped
+    logging: *logging
 
   db:
     image: pgvector/pgvector:pg18
@@ -76,3 +89,4 @@ services:
       interval: 5s
       retries: 20
     restart: unless-stopped
+    logging: *logging

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Container logs rotated**: `deploy/compose.yaml` keeps at most five
+  files of 10 MB per container (Docker's default log grows without end).
+  Copy the new `compose.yaml` over the old one, then `docker compose up -d`.
 - **Logs under Administration → Logs**: what the server and the worker log
   (also in `docker compose logs`) and the browser extensions' warnings and
   errors (a PDF they could not get, and why, with the page's address), the
