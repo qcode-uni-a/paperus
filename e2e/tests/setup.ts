@@ -11,6 +11,13 @@ setup('first run: create the administrator', async ({ page }) => {
 	await page.getByLabel('Password again').fill(ADMIN.password);
 	await page.getByRole('button', { name: 'Create and start' }).click();
 
+	// Then the machine learning service: none in these tests, so it does
+	// not answer, and the step is skipped.
+	await expect(page.getByRole('heading', { name: 'Machine learning' })).toBeVisible();
+	await expect(page.getByText('The ML service does not answer.')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Save and continue' })).toBeDisabled();
+	await page.getByRole('button', { name: 'Skip' }).click();
+
 	// Then the optional OIDC login, skipped.
 	await expect(page.getByRole('heading', { name: 'OIDC login' })).toBeVisible();
 	await page.getByRole('button', { name: 'Skip' }).click();

@@ -10,19 +10,29 @@
 		createGroup,
 		errorMessage,
 		getConfig,
+		gettingStarted,
+		mlStatus,
 		restoreOnFirstStart,
 		setConfig,
 		setOidcSecret,
 		setupState
 	} from '#lib/api/client.ts';
-	import type { ProviderFound, RestoreCheckOut, SetupState } from '#lib/api/generated/types.gen.ts';
+	import type {
+		GpuStep,
+		MlStatus,
+		ProviderFound,
+		RestoreCheckOut,
+		SetupState,
+		SystemConfig
+	} from '#lib/api/generated/types.gen.ts';
 	import { formatDateTime } from '#lib/dates.svelte.ts';
+	import { ELSEWHERE_HELP, gpuAdvice } from '#lib/gpu.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	/** First start: a new administrator, or a backup restored. */
 	let setup = $state<SetupState | null>(null);
 	// Back from linking the OIDC login: on to the group.
-	let choice = $state<'new' | 'restore' | 'oidc' | 'group' | null>(
+	let choice = $state<'new' | 'restore' | 'ml' | 'oidc' | 'group' | null>(
 		page.url.searchParams.get('step') === 'group' ? 'group' : null
 	);
 	let error = $state('');
@@ -32,7 +42,8 @@
 		setupState().then(({ data }) => {
 			setup = data ?? null;
 			// Set up already (e.g. someone else was faster): to the login.
-			if (data && !data.needed && choice !== 'oidc' && choice !== 'group') goto(resolve('/login'));
+			if (data && !data.needed && !['ml', 'oidc', 'group'].includes(choice ?? ''))
+				goto(resolve('/login'));
 		});
 	});
 
@@ -58,7 +69,62 @@
 		}
 		session.user = data.user;
 		session.checked = true;
-		// Next, optionally: the OIDC login.
+		// Next: the machine learning service.
+		choice = 'ml';
+	}
+
+	// The machine learning service: does it answer, where does it run, and
+	// its basic settings (all also later, under Administration).
+	let ml = $state<MlStatus | null>(null);
+	let gpu = $state<GpuStep | null>(null);
+	let config = $state<SystemConfig | null>(null);
+	let embeddingModel = $state('');
+	let rerank = $state<'auto' | 'on' | 'off'>('auto');
+	let ocr = $state(true);
+	const answers = $derived(ml?.services.some((s) => s.ok) ?? false);
+	const embedders = $derived(ml?.models.filter((m) => m.task === 'embedding') ?? []);
+	const advice = $derived(gpu ? gpuAdvice(gpu) : null);
+
+	async function checkMl() {
+		const [status, steps] = await Promise.all([mlStatus(), gettingStarted()]);
+		ml = status.data ?? null;
+		gpu = steps.data?.server?.gpu ?? null;
+	}
+
+	$effect(() => {
+		if (choice !== 'ml') return;
+		getConfig().then(({ data }) => {
+			config = data ?? null;
+			if (data) {
+				embeddingModel = data.embedding_model;
+				rerank = data.rerank ?? 'auto';
+				ocr = data.ocr ?? true;
+			}
+		});
+		void checkMl();
+		// Again while it starts (it may be downloading its first model).
+		const timer = setInterval(() => {
+			if (!answers || ml?.service?.loading?.length) void checkMl();
+		}, 3000);
+		return () => clearInterval(timer);
+	});
+
+	async function saveMl(event: SubmitEvent) {
+		event.preventDefault();
+		if (!config) return;
+		error = '';
+		busy = true;
+		const { error: failure } = await setConfig({
+			body: { ...config, embedding_model: embeddingModel, rerank, ocr }
+		});
+		busy = false;
+		if (failure) error = errorMessage(failure);
+		else await toOidc();
+	}
+
+	// Next, optionally: the OIDC login.
+	async function toOidc() {
+		error = '';
 		choice = 'oidc';
 		const info = await authentication();
 		redirectUri = info.data?.redirect_uri ?? '';
@@ -209,6 +275,98 @@
 			<div class="buttons">
 				<button type="button" onclick={() => (choice = null)}>Back</button>
 				<button class="primary" disabled={busy}>Create and start</button>
+			</div>
+		</form>
+	{:else if choice === 'ml'}
+		<form onsubmit={saveMl}>
+			<h2>Machine learning</h2>
+			<p class="muted">
+				The ML service finds papers by what is meant, reads scanned pages (OCR) and puts the best
+				answers first. Without it, paperus searches by words. Also later, under Administration →
+				Settings → Machine learning.
+			</p>
+			{#if !ml}
+				<p class="muted">Asking the ML service…</p>
+			{:else if !answers}
+				<div class="check warn" role="status">
+					<p><strong>The ML service does not answer.</strong></p>
+					<ul class="services">
+						{#each ml.services as service (service.url)}
+							<li><code>{service.url}</code>: {service.error}</li>
+						{/each}
+					</ul>
+					<p class="muted">
+						Just started, it may still be getting ready; this page asks again every few seconds.
+						Otherwise see <code>docker compose logs ml</code>: <code>ML_TOKEN</code> in
+						<code>.env</code> must be the same for paperus and the ML service, and
+						<code>ML_URLS</code> must name it if it runs on another machine.
+					</p>
+				</div>
+			{:else}
+				<div class="check" class:warn={advice && !advice.done} role="status">
+					<p>
+						<strong>The ML service answers</strong>{ml.service
+							? ml.service.device === 'cuda'
+								? ` and runs on the GPU${advice?.done ? ` (${gpu?.card})` : ''}.`
+								: ` and runs on the CPU (${ml.service.cores} cores).`
+							: '.'}
+						{#if ml.service?.loading?.length}
+							Loading {ml.service.loading.join(', ')}…
+						{/if}
+					</p>
+					{#if advice && !advice.done}
+						<p><strong>{advice.title}.</strong> {advice.text}</p>
+						<p>
+							{#each advice.links as [href, text], i (href)}{#if i}{' · '}{/if}<a
+									{href}
+									target="_blank"
+									rel="noopener">{text}</a
+								>{/each}
+						</p>
+					{:else if ml.service?.device !== 'cuda'}
+						<p class="muted">
+							On a CPU, search by meaning works, but reading a large library takes hours. The ML
+							service can also run on another machine with an NVIDIA GPU (<a
+								href={ELSEWHERE_HELP}
+								target="_blank"
+								rel="noopener">On another machine</a
+							>).
+						</p>
+					{/if}
+				</div>
+				{#if config && embedders.length}
+					<label
+						>Model for search by meaning
+						<select bind:value={embeddingModel}>
+							{#each embedders as model (model.name)}
+								<option value={model.name}
+									>{model.name}{model.download_mb ? ` (${model.download_mb} MB)` : ''}</option
+								>
+							{/each}
+						</select>
+					</label>
+					{@const described = embedders.find((m) => m.name === embeddingModel)}
+					<p class="muted small">
+						{described?.description ?? ''} Choose it now, while the library is empty: changing it later
+						computes the vectors of the whole library again.
+					</p>
+					<label
+						>Reranking
+						<select bind:value={rerank}>
+							<option value="auto">Automatic: on when the ML service runs on a GPU</option>
+							<option value="on">Always (searches take seconds on a CPU)</option>
+							<option value="off">Off</option>
+						</select>
+					</label>
+					<label class="inline"
+						><input type="checkbox" bind:checked={ocr} /> Read scanned pages (OCR)</label
+					>
+				{/if}
+			{/if}
+			{#if error}<p class="error">{error}</p>{/if}
+			<div class="buttons">
+				<button type="button" onclick={toOidc}>Skip</button>
+				<button class="primary" disabled={busy || !answers || !config}>Save and continue</button>
 			</div>
 		</form>
 	{:else if choice === 'oidc'}
@@ -427,8 +585,24 @@
 		font-weight: 600;
 	}
 	label input,
-	label textarea {
+	label textarea,
+	label select {
 		font-weight: 400;
+	}
+	label.inline {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 400;
+	}
+	label.inline input {
+		flex: none;
+		width: auto;
+		margin: 0;
+	}
+	.services {
+		margin: 0 0 12px;
+		gap: 2px;
 	}
 	.optional {
 		color: var(--muted);

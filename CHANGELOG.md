@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Administrator setup**: a step for the machine learning service after
+  the administrator: whether it answers (and if not, what to check),
+  whether it runs on the GPU or the CPU, with the start page's advice for a
+  GPU it does not use, and its basic settings: the model for search by
+  meaning (best chosen while the library is empty), reranking and OCR.
 - **Search by title and abstract** also finds a paper by the abstract in
   its own details (from Crossref, an import or typed in), not only by one
   found for it elsewhere: in 0.0.18, more than half of the papers were

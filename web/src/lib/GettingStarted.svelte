@@ -2,7 +2,8 @@
 	import { mdiCheckCircle, mdiCircleOutline } from '@mdi/js';
 	import { resolve } from '$app/paths';
 	import { gettingStarted, markHintSeen } from '#lib/api/client.ts';
-	import type { GettingStarted, GpuStep } from '#lib/api/generated/types.gen.ts';
+	import type { GettingStarted } from '#lib/api/generated/types.gen.ts';
+	import { ELSEWHERE_HELP, gpuAdvice } from '#lib/gpu.ts';
 	import Icon from '#lib/Icon.svelte';
 	import { session } from '#lib/session.svelte.ts';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -11,10 +12,6 @@
 	 * administrators also what the server needs before others rely on it. */
 	const HINT = 'getting-started';
 	const EXTENSION_HELP = 'https://github.com/qcode-uni-a/paperus/tree/main/extension#readme';
-	const GPU_HELP =
-		'https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-an-nvidia-gpu';
-	const ELSEWHERE_HELP =
-		'https://github.com/qcode-uni-a/paperus/blob/main/docs/operations.md#on-another-machine';
 
 	/** Whether the steps are shown (the page leaves out its own hint then). */
 	let { shown = $bindable(false) }: { shown?: boolean } = $props();
@@ -36,53 +33,6 @@
 		/** Said also once done. */
 		doneText?: string;
 	};
-
-	/** Whether the machine learning service uses the machine's GPU, and if
-	 * not, what to change. */
-	function gpuStep(gpu: GpuStep): Step {
-		const links: [string, string][] = [[GPU_HELP, 'On an NVIDIA GPU']];
-		const has = `This machine has a GPU, the ${gpu.card}`;
-		const faster =
-			'search by meaning, OCR and reranking run many times faster on it (embedding about 20 times)';
-		switch (gpu.advice) {
-			case 'in_use':
-				return {
-					done: true,
-					title: 'Machine learning on the GPU',
-					text: '',
-					doneText: `Runs on the ${gpu.card}.`,
-					links: []
-				};
-			case 'use_cuda_image':
-				return {
-					done: false,
-					title: 'Use the GPU for machine learning',
-					text: `${has}, but the ML service runs its CPU image. With the -cuda image, ${faster}.`,
-					links: [...links, [ELSEWHERE_HELP, 'Or on another machine']]
-				};
-			case 'pass_gpu':
-				return {
-					done: false,
-					title: 'Give the ML service the GPU',
-					text: `${has}, but the ML service runs on the CPU${gpu.problem ? `: ${gpu.problem}` : ''}. Pass the GPU to its container (devices in compose.yaml).`,
-					links
-				};
-			case 'update_driver':
-				return {
-					done: false,
-					title: 'Update the NVIDIA driver',
-					text: `${has}. The ML service's -cuda image needs NVIDIA's driver ${gpu.driver_needed} or newer; this machine has ${gpu.driver}.`,
-					links
-				};
-			case 'install_driver':
-				return {
-					done: false,
-					title: 'Install the NVIDIA driver',
-					text: `${has}. With NVIDIA's driver (${gpu.driver_needed} or newer) and the ML service's -cuda image, ${faster}.`,
-					links
-				};
-		}
-	}
 
 	const mine = $derived<Step[]>(
 		steps
@@ -139,7 +89,7 @@
 						text: 'It does not answer: search finds words only, not meaning, and scans stay unread.',
 						links: [[resolve('/admin/server'), 'Server status']]
 					},
-					...(steps.server.gpu ? [gpuStep(steps.server.gpu)] : []),
+					...(steps.server.gpu ? [gpuAdvice(steps.server.gpu)] : []),
 					{
 						done: steps.server.people,
 						title: 'Add people',
