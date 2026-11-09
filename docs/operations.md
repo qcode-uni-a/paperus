@@ -140,14 +140,38 @@ sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 nvidia-ctk cdi list    # nvidia.com/gpu=all, nvidia.com/gpu=0, …
 ```
 
-In `compose.yaml`, the GPU by its CDI name (Docker 28 and newer):
+The toolkit comes from NVIDIA's package repository (see NVIDIA's
+"Installing the NVIDIA Container Toolkit"); on Ubuntu or Debian:
+
+```sh
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+```
+
+With Secure Boot on, prefer a driver whose kernel modules come signed by
+the distribution (on Ubuntu the `linux-modules-nvidia-<version>-…`
+packages, listed by `ubuntu-drivers list`); a DKMS build needs a key
+enrolled at the machine on the next boot.
+
+The GPU by its CDI name (Docker 28 and newer), best in a
+`compose.override.yaml` next to `compose.yaml`: Compose reads it on top,
+and it survives replacing `compose.yaml` with a newer one
+(`docker compose config` shows the merged result):
 
 ```yaml
+services:
   ml:
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}-cuda
     devices:
       - nvidia.com/gpu=all
 ```
+
+A check that containers reach the GPU: `docker run --rm --device
+nvidia.com/gpu=all ubuntu nvidia-smi`.
 
 The older form, `deploy.resources.reservations.devices` with
 `driver: nvidia` (or `docker run --gpus all`), needs the NVIDIA runtime

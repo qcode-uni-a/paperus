@@ -47,8 +47,9 @@ services:
     restart: unless-stopped
 
   ml:
-    # For an NVIDIA GPU: add "-cuda" to the tag and the "devices" lines below
-    # (see docs/operations.md, "On an NVIDIA GPU").
+    # For an NVIDIA GPU: add "-cuda" to the tag and the "devices" lines below,
+    # best in a compose.override.yaml (see docs/operations.md, "On an NVIDIA
+    # GPU").
     image: ghcr.io/qcode-uni-a/paperus-ml:${PAPERUS_VERSION:-release}
     # devices:
     #   - nvidia.com/gpu=all
