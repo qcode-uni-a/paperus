@@ -28,26 +28,57 @@ export async function analysePage(
 	const view = page.getViewport({ scale: 1 });
 	const canvas = makeCanvas(Math.ceil(view.width), Math.ceil(view.height));
 	await page.render({ canvas, viewport: view }).promise;
-	const text = await textBoxes(page, view, canvas.width, canvas.height);
-	const layout = layOut(inkOf(canvas), canvas.width, canvas.height, first, text);
+	const { text, turned } = await textBoxes(page, view, canvas.width, canvas.height);
+	// Turned text (a download line running up the margin, arXiv's stamp) is
+	// no part of the page's reading: its ink goes, however close it sits.
+	const ink = inkOf(canvas);
+	for (const [x0, y0, x1, y1] of turned)
+		for (let row = y0; row <= y1; row++)
+			ink.fill(0, row * canvas.width + x0, row * canvas.width + x1 + 1);
+	const layout = layOut(ink, canvas.width, canvas.height, first, text);
 	canvas.width = 0;
 	return { width: view.width, height: view.height, view, layout };
 }
 
 /** Where a page has text (its glyphs' boxes, one pixel a point): ink
- * outside them is drawn (figures). */
+ * outside them is drawn (figures). ``turned``: the boxes of text set
+ * upright or upside down (x0, y0, x1, y1). */
 async function textBoxes(
 	page: PDFPageProxy,
 	view: PageViewport,
 	width: number,
 	height: number
-): Promise<Uint8Array> {
+): Promise<{ text: Uint8Array; turned: [number, number, number, number][] }> {
 	const boxes = new Uint8Array(width * height);
+	const turned: [number, number, number, number][] = [];
 	const content = await page.getTextContent();
 	for (const item of content.items) {
 		if (!('str' in item) || !item.str.trim()) continue;
-		const [, , c, d, e, f] = item.transform as number[];
+		const [a, b, c, d, e, f] = item.transform as number[];
 		const size = Math.hypot(c, d);
+		// Along the line (a, b), and up from it (c, d): its four corners.
+		if (Math.abs(b) > Math.abs(a)) {
+			const along = Math.hypot(a, b);
+			const [ux, uy] = [a / along, b / along];
+			const [vx, vy] = [c / size, d / size];
+			const corners = [
+				[0, -0.3],
+				[item.width, -0.3],
+				[0, 1],
+				[item.width, 1]
+			].map(([s, t]) =>
+				view.convertToViewportPoint(e + ux * s + vx * t * size, f + uy * s + vy * t * size)
+			) as [number, number][];
+			const xs = corners.map(([x]) => x);
+			const ys = corners.map(([, y]) => y);
+			turned.push([
+				Math.max(0, Math.floor(Math.min(...xs)) - 1),
+				Math.max(0, Math.floor(Math.min(...ys)) - 1),
+				Math.min(width - 1, Math.ceil(Math.max(...xs)) + 1),
+				Math.min(height - 1, Math.ceil(Math.max(...ys)) + 1)
+			]);
+			continue;
+		}
 		const [x, y] = view.convertToViewportPoint(e, f) as [number, number];
 		const x0 = Math.max(0, Math.floor(x));
 		const x1 = Math.min(width - 1, Math.ceil(x + item.width));
@@ -55,5 +86,5 @@ async function textBoxes(
 		const y1 = Math.min(height - 1, Math.ceil(y + size * 0.3));
 		for (let row = y0; row <= y1; row++) boxes.fill(1, row * width + x0, row * width + x1 + 1);
 	}
-	return boxes;
+	return { text: boxes, turned };
 }

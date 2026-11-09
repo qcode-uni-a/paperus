@@ -168,11 +168,19 @@ export function layOut(
 		return false;
 	});
 	const across = joined(runs(inColumn), SIDE_GAP);
-	while (across.length > 1 && across[0][1] - across[0][0] < MARGIN_NOTE) across.shift();
-	while (across.length > 1 && across.at(-1)![1] - across.at(-1)![0] < MARGIN_NOTE) across.pop();
+	// Pieces reach at most halfway to a margin note (a download line turned
+	// upright beside the text, arXiv's stamp): none of it shows.
+	let noteLeft = -1;
+	let noteRight = width;
+	while (across.length > 1 && across[0][1] - across[0][0] < MARGIN_NOTE)
+		noteLeft = across.shift()![1];
+	while (across.length > 1 && across.at(-1)![1] - across.at(-1)![0] < MARGIN_NOTE)
+		noteRight = across.pop()![0];
 	if (!across.length) return whole;
 	const left = across[0][0];
 	const right = across.at(-1)![1];
+	const leftmost = noteLeft < 0 ? 0 : Math.ceil((noteLeft + left) / 2);
+	const rightmost = noteRight >= width ? width : Math.floor((right + noteRight) / 2);
 	const bodyWidth = right - left + 1;
 
 	// The body down: lines of ink; a running header and footer left out.
@@ -699,9 +707,9 @@ export function layOut(
 	const most =
 		mainSpan || Math.max(0, ...found.filter((f) => !f.wide).map((f) => f.span!)) || bodyWidth;
 	const pieces = found.map((f): Piece => ({
-		x: Math.max(0, f.x0 - pad),
+		x: Math.max(leftmost, f.x0 - pad),
 		y: Math.max(0, f.y0 - pad),
-		width: Math.min(width, f.x1 + pad + 1) - Math.max(0, f.x0 - pad),
+		width: Math.min(rightmost, f.x1 + pad + 1) - Math.max(leftmost, f.x0 - pad),
 		height: Math.min(height, f.y1 + pad + 1) - Math.max(0, f.y0 - pad),
 		wide: f.wide,
 		span: (f.wide ? Math.max(f.x1 - f.x0 + 1, most) : f.span!) + 2 * pad
