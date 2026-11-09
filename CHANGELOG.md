@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fluent mode** leaves out a page number centred under the text also
+  where LaTeX preprints set it, well above the page's bottom edge (11-16%
+  up), and where IEEE's sits close under the columns. Three new layout
+  twins test it (a thesis's contents, lecture notes, an IEEE conference
+  page).
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.

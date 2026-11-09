@@ -50,6 +50,15 @@ const EDGE = 0.09;
 /** A logo or mark in a corner, leaving the middle empty, may be taller. */
 const CORNER_BLOCK = 70;
 const CORNER_EDGE = 0.14;
+/** A page number centred under the text: one short line (points), in
+ * the page's lower part (LaTeX sets it well above the edge band), narrow
+ * and about in the middle (shares of the text's width). */
+const PAGE_NUMBER_SPAN = 14;
+const PAGE_NUMBER_EDGE = 0.2;
+const PAGE_NUMBER_WIDTH = 0.08;
+const PAGE_NUMBER_OFF_CENTRE = 0.05;
+/** It may sit this close under the text (IEEE's, under the columns). */
+const PAGE_NUMBER_GAP = 3;
 /** Lines closer than this belong to one block. */
 const BLOCK_GAP = 6;
 
@@ -185,8 +194,34 @@ export function layOut(
 	// Running headers and footers (page numbers, journal lines, logos)
 	// left out: up to two blocks at each edge, apart from the body. On the
 	// first page only a small one above the title, or a mark in a corner.
-	const blocks = joined(lines, BLOCK_GAP);
 	const span = (block: [number, number]) => block[1] - block[0] + 1;
+	const pageNumber = (block: [number, number]) => {
+		if (span(block) > PAGE_NUMBER_SPAN || height - block[0] >= height * PAGE_NUMBER_EDGE)
+			return false;
+		let x0 = right;
+		let x1 = left;
+		for (let y = block[0]; y <= block[1]; y++)
+			for (let x = left; x <= right; x++)
+				if (at(x, y)) {
+					x0 = Math.min(x0, x);
+					x1 = Math.max(x1, x);
+				}
+		// Centred under the text, or on the page (an equation reaching into
+		// one margin moves the text's middle).
+		const middle = (x0 + x1) / 2;
+		const off = bodyWidth * PAGE_NUMBER_OFF_CENTRE;
+		return (
+			x1 - x0 <= bodyWidth * PAGE_NUMBER_WIDTH &&
+			(Math.abs(middle - (left + bodyWidth / 2)) <= off || Math.abs(middle - width / 2) <= off)
+		);
+	};
+	// A page number close under the text (closer than lines of one block
+	// are; IEEE's sits so under the columns) goes before lines are blocks.
+	if (lines.length > 1) {
+		const [before, last] = lines.slice(-2);
+		if (last[0] - before[1] - 1 >= PAGE_NUMBER_GAP && pageNumber(last)) lines.pop();
+	}
+	const blocks = joined(lines, BLOCK_GAP);
 	const middleFrom = Math.round(left + bodyWidth * 0.3);
 	const middleTo = Math.round(left + bodyWidth * 0.7);
 	const inCorner = ([y0, y1]: [number, number]) => {
@@ -209,7 +244,9 @@ export function layOut(
 	for (let i = 0; i < 2 && blocks.length > 1; i++) {
 		const foot = blocks.at(-1)!;
 		const before = blocks.at(-2)!;
-		if (!edgeBlock(foot, false) || foot[0] - before[1] - 1 < SIDE_GAP) break;
+		const gap = foot[0] - before[1] - 1;
+		const number = pageNumber(foot);
+		if (!(number || edgeBlock(foot, false)) || gap < (number ? PAGE_NUMBER_GAP : SIDE_GAP)) break;
 		blocks.pop();
 	}
 	const body = lines.filter(([a]) => a >= blocks[0][0] && a <= blocks.at(-1)![1]);
