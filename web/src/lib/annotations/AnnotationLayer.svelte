@@ -318,12 +318,28 @@
 		}
 	}
 
+	/** The eraser takes one's own annotations it passes over: a pen stroke
+	 * near its line, anything else within its boxes (a highlight's lines, a
+	 * note, words, an area). Undo brings them back. */
 	const erasing = new Set<string>();
+	const SLACK = 4;
 	function erase(x: number, y: number) {
 		for (const a of marks) {
-			if (a.kind !== 'ink' || !a.mine || erasing.has(a.id)) continue;
-			const width = Math.max(8, ((a.position.width as number) ?? 1) * scale);
-			if (strokes(a).some((points) => distanceToPath(points, x, y) <= width)) {
+			if (!a.mine || erasing.has(a.id)) continue;
+			let hit: boolean;
+			if (a.kind === 'ink') {
+				const width = Math.max(8, ((a.position.width as number) ?? 1) * scale);
+				hit = strokes(a).some((points) => distanceToPath(points, x, y) <= width);
+			} else {
+				hit = boxes(a).some(
+					(b) =>
+						x >= b.left - SLACK &&
+						x <= b.left + b.width + SLACK &&
+						y >= b.top - SLACK &&
+						y <= b.top + b.height + SLACK
+				);
+			}
+			if (hit) {
 				erasing.add(a.id);
 				store.remove(a.id).finally(() => erasing.delete(a.id));
 			}

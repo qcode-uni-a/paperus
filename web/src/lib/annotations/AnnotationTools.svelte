@@ -39,7 +39,7 @@
 		{ tool: 'text', label: 'Text', short: 'Text', icon: mdiFormatText },
 		{ tool: 'image', label: 'Area (figure, equation)', short: 'Area', icon: mdiSelectionDrag },
 		{ tool: 'ink', label: 'Pen', short: 'Pen', icon: mdiDraw },
-		{ tool: 'eraser', label: 'Eraser (pen strokes)', short: 'Eraser', icon: mdiEraser }
+		{ tool: 'eraser', label: 'Eraser', short: 'Eraser', icon: mdiEraser }
 	];
 
 	let colorsOpen = $state(false);
@@ -109,6 +109,21 @@
 		const key = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && store.tool !== 'select' && !store.selected) {
 				store.tool = 'select';
+			}
+			// The annotation open in its popup, if one's own: Delete (or
+			// Backspace) deletes it; Ctrl+Z brings it back.
+			const open = store.current;
+			if (
+				(event.key === 'Delete' || event.key === 'Backspace') &&
+				!event.ctrlKey &&
+				!event.metaKey &&
+				!event.altKey &&
+				open?.mine &&
+				!typing(event.target)
+			) {
+				event.preventDefault();
+				void store.remove(open.id);
+				return;
 			}
 			if (
 				(event.ctrlKey || event.metaKey) &&

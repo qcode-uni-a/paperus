@@ -60,7 +60,7 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	for (let i = 1; i <= 10; i++) await page.mouse.move(sheet.x + 100 + i * 15, y + (i % 2) * 10);
 	await page.mouse.up();
 	await expect.poll(() => count(page, file)).toBe(2);
-	await tools.getByRole('button', { name: 'Eraser (pen strokes)' }).click();
+	await tools.getByRole('button', { name: 'Eraser', exact: true }).click();
 	await page.mouse.move(sheet.x + 160, y - 20);
 	await page.mouse.down();
 	await page.mouse.move(sheet.x + 160, y + 30, { steps: 8 });
@@ -76,6 +76,25 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	await expect(
 		tools.getByRole('button', { name: 'Undo the change to the highlight' })
 	).toBeEnabled();
+	await tools.getByRole('button', { name: 'Select text' }).click();
+
+	// Delete deletes the open annotation; Ctrl+Z brings it back, comment too.
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await expect(popup).toBeVisible();
+	await page.keyboard.press('Delete');
+	await expect.poll(() => count(page, file)).toBe(0);
+	await page.keyboard.press('ControlOrMeta+z');
+	await expect.poll(() => count(page, file)).toBe(1);
+
+	// The eraser takes highlights too (and Ctrl+Z brings it back again).
+	await tools.getByRole('button', { name: 'Eraser', exact: true }).click();
+	await page.mouse.move(box.x + 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+	await page.mouse.up();
+	await expect.poll(() => count(page, file)).toBe(0);
+	await page.keyboard.press('ControlOrMeta+z');
+	await expect.poll(() => count(page, file)).toBe(1);
 	await tools.getByRole('button', { name: 'Select text' }).click();
 
 	// Listed; gathered into a note on the paper.

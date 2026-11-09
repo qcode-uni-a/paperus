@@ -173,7 +173,7 @@
 			/>
 		</div>
 		<footer>
-			<button class="delete" onclick={() => store.remove(annotation.id)}
+			<button class="delete" title="Delete (Del)" onclick={() => store.remove(annotation.id)}
 				><Icon path={mdiDeleteOutline} size={18} />Delete</button
 			>
 		</footer>

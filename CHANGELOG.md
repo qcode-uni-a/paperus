@@ -5,6 +5,9 @@
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.
+- **Annotations**: Delete (or Backspace) deletes the annotation open in its
+  popup, if it is one's own; the eraser takes highlights, underlines,
+  strike-throughs, notes, words and areas too, not only pen strokes.
 - **Container logs rotated**: `deploy/compose.yaml` keeps at most five
   files of 10 MB per container (Docker's default log grows without end).
   Copy the new `compose.yaml` over the old one, then `docker compose up -d`.
