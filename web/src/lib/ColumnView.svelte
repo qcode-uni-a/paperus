@@ -280,13 +280,14 @@
 		};
 	}
 
-	/** What follows a break, so that a sentence cut off makes sense: the
-	 * next page, the other column, a part across the page. */
+	/** What follows a break where reading jumps, so that a sentence cut off
+	 * makes sense: the next page, the other column, a part across the page
+	 * after a column (none between parts across the page). */
 	function seamOf(page: number, index: number): string {
 		if (index === 0) return `Page ${labelOf(page) ?? page + 1}`;
 		const pieces = layouts.pages[page]!.layout.pieces;
 		const [before, p] = [pieces[index - 1], pieces[index]];
-		if (p.wide) return 'Full width';
+		if (p.wide) return before.wide ? '' : 'Full width';
 		return !before.wide && p.x > before.x + before.width / 2 ? 'Right column' : 'Left column';
 	}
 
@@ -366,7 +367,7 @@
 		{:else}
 			{#each found.layout.pieces as p, index (index)}
 				{@const k = scaleOf(p)}
-				{#if i > 0 || index > 0}
+				{#if (i > 0 || index > 0) && seamOf(i, index)}
 					<div class="seam" aria-hidden="true">
 						<span>{seamOf(i, index)}</span>
 					</div>

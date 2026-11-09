@@ -4,3 +4,5 @@ node_modules/
 package-lock.json
 src/lib/api/generated/
 src/lib/api/openapi.json
+# Written by tests/twins/measure.py and review.ts
+tests/twins/pages/

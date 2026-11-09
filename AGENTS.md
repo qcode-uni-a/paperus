@@ -17,7 +17,10 @@ close them from commits with "Fixes #n".
   without asking.
 - Frontend and browser extension in TypeScript.
 - Tests: server and ML service keep line coverage above 95% (CI checks with
-  `pytest --cov`); browser journeys in `e2e/` (Playwright, `npm test` there).
+  `pytest --cov`); browser journeys in `e2e/` (Playwright, `npm test` there);
+  fluent mode's page layouts on layout twins (`web/tests/twins/`,
+  `npm run test:layout`): never check in a paper's PDF, only its measured
+  layout.
 
 ## Guidelines
 

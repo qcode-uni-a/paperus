@@ -167,7 +167,7 @@ export function layOut(
 		const reach = atTop ? block[1] : height - block[0];
 		if (inCorner(block) && span(block) <= CORNER_BLOCK && reach < height * CORNER_EDGE) return true;
 		if (reach >= height * EDGE) return false;
-		if (atTop && first) return span(block) <= 12 && block[1] < height * 0.06;
+		if (atTop && first) return span(block) <= 12 && block[1] < height * 0.075;
 		return span(block) <= EDGE_BLOCK;
 	};
 	for (let i = 0; i < 2 && blocks.length > 1; i++) {
@@ -259,8 +259,22 @@ export function layOut(
 				}
 			}
 		}
+		// Enough of the page's text beside the gap (a page that is mostly
+		// figure has little).
+		let textRows = inkRows;
+		if (text) {
+			textRows = 0;
+			for (let y = y0; y <= y1; y++) {
+				if (!inRow[y]) continue;
+				for (let x = left; x <= right; x++)
+					if (text[y * width + x] && at(x, y)) {
+						textRows++;
+						break;
+					}
+			}
+		}
 		const most = Math.max(...free);
-		if (most < Math.max(MIN_COLUMNS, inkRows * 0.2)) return null;
+		if (most < Math.max(MIN_COLUMNS * 1.5, textRows * 0.2)) return null;
 		const quiet = runs([...free].map((rows) => rows >= most * 0.9));
 		const middle = starts / 2;
 		const [a, b] = quiet.sort(
@@ -270,19 +284,58 @@ export function layOut(
 	};
 
 	/** From row ``start`` going ``step`` (up -1, down 1) no further than
-	 * ``limit``: the last row before blank space, if within a few lines
-	 * (else null). */
+	 * ``limit``: rows that belong with the part they touch rather than with
+	 * what follows (closer to it than to the rest, a few lines at most): the
+	 * last of them, else null. */
 	const edgeOf = (start: number, step: number, limit: number): number | null => {
-		let last = start + -step;
-		let blank = 0;
-		for (let y = start; step < 0 ? y >= limit : y <= limit; y += step) {
+		const within = (y: number) => (step < 0 ? y >= limit : y <= limit);
+		let y = start;
+		let near = 0;
+		while (within(y) && !inRow[y]) {
+			near++;
+			y += step;
+		}
+		if (!within(y) || near >= BLOCK_SPLIT) return null;
+		let last = y;
+		let far = 0;
+		for (; within(y); y += step) {
 			if (Math.abs(y - start) > MIN_COLUMNS) return null;
 			if (inRow[y]) {
+				if (far >= BLOCK_SPLIT) break;
 				last = y;
-				blank = 0;
-			} else if (++blank >= BLOCK_SPLIT) break;
+				far = 0;
+			} else far++;
 		}
-		return last === start + -step ? null : last;
+		return far >= BLOCK_SPLIT && far > near ? last : null;
+	};
+
+	/** Lines (of text, or a figure) filling most of ``x0``–``x1``: a few at
+	 * least in rows ``y0``–``y1``, as a column of text has. A line is a run
+	 * of rows with much ink (lines of dense text touch; between them a row
+	 * has little). */
+	const filled = (x0: number, x1: number, y0: number, y1: number) => {
+		const counts = Array.from({ length: y1 - y0 + 1 }, (_, i) => {
+			let count = 0;
+			for (let x = x0; x <= x1; x++) if (at(x, y0 + i)) count++;
+			return count;
+		});
+		const most = Math.max(0, ...counts);
+		if (!most) return false;
+		let full = 0;
+		for (const [a, b] of runs(counts.map((count) => count >= most * 0.3))) {
+			if (b - a < 2) continue; // a rule, not a line
+			let from = x1;
+			let to = x0;
+			for (let y = y0 + a; y <= y0 + b; y++)
+				for (let x = x0; x <= x1; x++)
+					if (at(x, y)) {
+						if (x < from) from = x;
+						if (x > to) to = x;
+					}
+			if (to - from >= (x1 - x0) * 0.6) full++;
+			if (full >= 3) return true;
+		}
+		return false;
 	};
 
 	/** Rows ``y0``–``y1`` cut at the gap ``gutter`` into stretches across
@@ -330,19 +383,47 @@ export function layOut(
 			else bands.push({ y0: y0 + i, y1: y0 + stop, wide: wide || short });
 			i = stop + 1;
 		}
-		// Two "columns" of drawing are a figure's panels: across the page.
+		// Two "columns" of drawing are a figure's panels; two of a few lines,
+		// or of lines short of the column (a title's words in large type,
+		// equations and their numbers), are not columns either: across the
+		// page.
 		for (const band of bands)
-			if (!band.wide && drawn(left, right, band.y0, band.y1)) band.wide = true;
+			if (
+				!band.wide &&
+				(drawn(left, right, band.y0, band.y1) ||
+					!filled(left, gutterLeft - 1, band.y0, band.y1) ||
+					!filled(gutterRight + 1, right, band.y0, band.y1))
+			)
+				band.wide = true;
 		const merged = bands.reduce<Band[]>((out, band) => {
 			const last = out.at(-1);
 			if (last && last.wide === band.wide) last.y1 = band.y1;
 			else out.push({ ...band });
 			return out;
 		}, []);
-		// A figure keeps what touches it above and below (its panels'
-		// labels, an axis), up to blank space, if that is short.
+		// A figure keeps the drawn rows next to it (its top panels standing
+		// either side of the columns' gap), up to the first line of text.
+		const sketch = (y: number) => inRow[y] && drawn(left, right, y, y);
 		merged.forEach((band, i) => {
 			if (!band.wide || !drawn(left, right, band.y0, band.y1)) return;
+			const above = merged[i - 1];
+			if (above && !above.wide) {
+				let y = band.y0 - 1;
+				while (y > above.y0 && (sketch(y) || (!inRow[y] && sketch(y - 1)))) y--;
+				if (y < band.y0 - 1) [band.y0, above.y1] = [y + 1, y];
+			}
+			const below = merged[i + 1];
+			if (below && !below.wide) {
+				let y = band.y1 + 1;
+				while (y < below.y1 && (sketch(y) || (!inRow[y] && sketch(y + 1)))) y++;
+				if (y > band.y1 + 1) [band.y1, below.y0] = [y - 1, y];
+			}
+		});
+		// A part across the page keeps what touches it above and below (a
+		// figure's labels, an axis, the short last line of a caption or of
+		// the authors), if that is closer to it than to the columns.
+		merged.forEach((band, i) => {
+			if (!band.wide) return;
 			const above = merged[i - 1];
 			if (above && !above.wide) {
 				const edge = edgeOf(band.y0 - 1, -1, above.y0);
@@ -363,50 +444,65 @@ export function layOut(
 		return merged.filter((band) => band.y1 >= band.y0);
 	};
 
-	// The page's two columns run on over any blank space. The parts across
-	// them (and a page without columns) are cut into blocks at blank space,
-	// each keeping only its own ink: an abstract narrower than the page
-	// fills the screen too. A figure's blocks (its panels) stay together.
-	type Found = { x0: number; x1: number; y0: number; y1: number; wide: boolean };
+	// The page's two columns run on over any blank space. A part across
+	// them may have columns of its own (a box beside the abstract above the
+	// body's columns); else it is cut into blocks at blank space, each
+	// keeping only its own ink: an abstract narrower than the page fills
+	// the screen too. A figure's blocks (its panels) stay together.
+	type Found = { x0: number; x1: number; y0: number; y1: number; wide: boolean; span?: number };
 	const found: Found[] = [];
-	const gutter = gutterOf(top, bottom);
-	const bands = gutter ? bandsOf(top, bottom, gutter) : [{ y0: top, y1: bottom, wide: true }];
-	for (const band of bands) {
-		if (!band.wide && gutter) {
-			const one = extent(left, gutter[0] - 1, band.y0, band.y1);
-			const two = extent(gutter[1] + 1, right, band.y0, band.y1);
-			if (one && two) {
-				found.push({ ...one, wide: false }, { ...two, wide: false });
-				continue;
+	let mainSpan = 0;
+	const place = (y0: number, y1: number, gutter: [number, number] | null, main: boolean) => {
+		const bands = gutter ? bandsOf(y0, y1, gutter) : [{ y0, y1, wide: true }];
+		for (const band of bands) {
+			if (!band.wide && gutter) {
+				const one = extent(left, gutter[0] - 1, band.y0, band.y1);
+				const two = extent(gutter[1] + 1, right, band.y0, band.y1);
+				if (one && two) {
+					// Both columns as wide as the wider: their text alike.
+					const span = Math.max(one.x1 - one.x0, two.x1 - two.x0) + 1;
+					if (main) mainSpan = Math.max(mainSpan, span);
+					found.push({ ...one, wide: false, span }, { ...two, wide: false, span });
+					continue;
+				}
+			}
+			if (main && !drawn(left, right, band.y0, band.y1)) {
+				const own = gutterOf(band.y0, band.y1);
+				if (own && (!gutter || own[1] < gutter[0] || own[0] > gutter[1])) {
+					place(band.y0, band.y1, own, false);
+					continue;
+				}
+			}
+			const blocks: [number, number][] = [];
+			for (const block of joined(runs(inRow, band.y0, band.y1), BLOCK_SPLIT)) {
+				const last = blocks.at(-1);
+				const figure = (b: [number, number]) => drawn(left, right, b[0], b[1]);
+				if (last && block[0] - last[1] - 1 < FIGURE_GAP && (figure(last) || figure(block)))
+					last[1] = block[1];
+				else blocks.push(block);
+			}
+			for (const [b0, b1] of blocks) {
+				const all = extent(left, right, b0, b1);
+				if (all) found.push({ ...all, wide: true });
 			}
 		}
-		const blocks: [number, number][] = [];
-		for (const block of joined(runs(inRow, band.y0, band.y1), BLOCK_SPLIT)) {
-			const last = blocks.at(-1);
-			const figure = (b: [number, number]) => drawn(left, right, b[0], b[1]);
-			if (last && block[0] - last[1] - 1 < FIGURE_GAP && (figure(last) || figure(block)))
-				last[1] = block[1];
-			else blocks.push(block);
-		}
-		for (const [b0, b1] of blocks) {
-			const all = extent(left, right, b0, b1);
-			if (all) found.push({ ...all, wide: true });
-		}
-	}
+	};
+	place(top, bottom, gutterOf(top, bottom), true);
 
 	// Two columns over a good part of the page, not just a figure with its
-	// caption beside it.
+	// caption beside it. A part across the page is never shown larger than
+	// the columns' text (else the body's).
 	const inColumns = found.filter((f) => !f.wide).reduce((sum, f) => sum + f.y1 - f.y0 + 1, 0) / 2;
 	const columns = inColumns >= (bottom - top + 1) * 0.3;
-	const columnWidth = Math.max(0, ...found.filter((f) => !f.wide).map((f) => f.x1 - f.x0 + 1));
-	const most = columnWidth || bodyWidth;
+	const most =
+		mainSpan || Math.max(0, ...found.filter((f) => !f.wide).map((f) => f.span!)) || bodyWidth;
 	const pieces = found.map((f): Piece => ({
 		x: Math.max(0, f.x0 - pad),
 		y: Math.max(0, f.y0 - pad),
 		width: Math.min(width, f.x1 + pad + 1) - Math.max(0, f.x0 - pad),
 		height: Math.min(height, f.y1 + pad + 1) - Math.max(0, f.y0 - pad),
 		wide: f.wide,
-		span: Math.max(f.x1 - f.x0 + 1, most) + 2 * pad
+		span: (f.wide ? Math.max(f.x1 - f.x0 + 1, most) : f.span!) + 2 * pad
 	}));
 	return { columns, pieces };
 }

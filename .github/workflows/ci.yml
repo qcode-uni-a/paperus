@@ -76,7 +76,7 @@ jobs:
       - run: uv run pytest -q --cov --cov-fail-under=95
 
   web:
-    name: Website (prettier, svelte-check, build)
+    name: Website (prettier, svelte-check, build, fluent mode's layouts)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -92,6 +92,8 @@ jobs:
       - run: npm run lint
       - run: npm run check
       - run: npm run build
+      # Fluent mode on layout twins of real papers' pages (built with python3).
+      - run: npm run test:layout
 
   e2e:
     name: End-to-end (Playwright)

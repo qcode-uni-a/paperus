@@ -27,6 +27,8 @@
   column break), notes and the pen work as on the page (see
   [annotations](docs/annotations.md)). The contents also jump to headings
   in the right column, and read bookmarks that mark a rectangle (`FitR`).
+  Tested on layout twins of 31 pages of 20 journals (their measured layout,
+  no content; `npm run test:layout`).
 - **Sharp when zoomed by pinching**: the PDF pages on screen are drawn
   again at the zoom once it settles, instead of blurring as an enlarged
   picture (pages away from the screen go back to the usual sharpness).
