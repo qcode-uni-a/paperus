@@ -493,6 +493,9 @@
 	{#if pdfFile}
 		<PdfViewer
 			url="/api/files/{pdfFile.id}/content"
+			fileId={pdfFile.id}
+			itemId={item.id}
+			title={plainTitle(item.title)}
 			{startPage}
 			highlight={highlight && page.url.searchParams.get('file') === pdfFile.id ? highlight : null}
 		/>

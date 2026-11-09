@@ -139,7 +139,7 @@ def add_annotation(
         kind=body.kind,
         page_index=body.page_index,
         page_label=body.page_label,
-        position=body.position.model_dump(exclude_none=True),
+        position=body.position.model_dump(exclude_defaults=True),
         color=body.color,
         text=body.text,
         comment=body.comment,
@@ -178,7 +178,7 @@ def change_annotation(
         tags=body.tags if body.tags is not None else annotation.tags,
     )
     annotation.page_label = checked.page_label
-    annotation.position = checked.position.model_dump(exclude_none=True)
+    annotation.position = checked.position.model_dump(exclude_defaults=True)
     annotation.color = checked.color
     annotation.text = checked.text or None
     annotation.comment = checked.comment or None

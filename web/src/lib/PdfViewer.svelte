@@ -3,6 +3,7 @@
 	import Icon from '#lib/Icon.svelte';
 	import 'pdfjs-dist/web/pdf_viewer.css';
 	import {
+		AnnotationMode,
 		getDocument,
 		GlobalWorkerOptions,
 		TextLayer,
@@ -12,18 +13,32 @@
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import PdfContents from '#lib/PdfContents.svelte';
 	import { contents, type Section } from '#lib/pdfContents.ts';
+	import AnnotationLayer from '#lib/annotations/AnnotationLayer.svelte';
+	import AnnotationsPanel from '#lib/annotations/AnnotationsPanel.svelte';
+	import AnnotationTools from '#lib/annotations/AnnotationTools.svelte';
+	import SelectionMenu from '#lib/annotations/SelectionMenu.svelte';
+	import { FileAnnotations, type AnnotationOut } from '#lib/annotations/annotations.svelte.ts';
+	import type { Viewport } from '#lib/annotations/geometry.ts';
 
 	GlobalWorkerOptions.workerSrc = workerUrl;
 
 	let {
 		url,
 		startPage = 1,
-		highlight = null
+		highlight = null,
+		fileId = null,
+		itemId = null,
+		title = ''
 	}: {
 		url: string;
 		startPage?: number;
 		/** A passage to mark on its page (e.g. from a search result). */
 		highlight?: { page: number; text: string } | null;
+		/** With these, the file's annotations are shown and made. */
+		fileId?: string | null;
+		itemId?: string | null;
+		/** The paper's (for a note gathered from the annotations). */
+		title?: string;
 	} = $props();
 
 	const MAX_WIDTH = 1000;
@@ -41,6 +56,37 @@
 	/** The chapter being read: the last one starting above the reading line. */
 	let reading = $state(-1);
 	let toolbar = $state<HTMLElement>();
+	let viewer = $state<HTMLElement>();
+
+	// Annotations: loaded before the pages are drawn (the PDF's own marks
+	// are left out once they were taken in).
+	const store = $derived(fileId && itemId ? new FileAnnotations(fileId, itemId) : null);
+	$effect(() => {
+		store?.load();
+	});
+	/** Each drawn page's viewport (page number from 1), for the layers. */
+	let viewports = $state.raw<Record<number, Viewport>>({});
+	let labels = $state.raw<string[] | null>(null);
+	const labelOf = (index: number) => labels?.[index] ?? null;
+	// Pages are drawn again at another zoom: their old viewports are gone.
+	$effect(() => {
+		void scale;
+		viewports = {};
+	});
+
+	/** To an annotation: its page, then the annotation once drawn. */
+	function goTo(annotation: AnnotationOut) {
+		if (!store) return;
+		store.selected = annotation.id;
+		document.getElementById(`page-${annotation.page_index + 1}`)?.scrollIntoView();
+		let tries = 0;
+		const look = () => {
+			const found = document.getElementById(`annotation-${annotation.id}`);
+			if (found) found.scrollIntoView({ block: 'center' });
+			else if (tries++ < 30) setTimeout(look, 100);
+		};
+		look();
+	}
 
 	const scale = $derived(
 		firstPage && width
@@ -58,6 +104,7 @@
 				const viewport = (await doc.getPage(1)).getViewport({ scale: 1 });
 				if (cancelled) return;
 				firstPage = { width: viewport.width, height: viewport.height };
+				labels = await doc.getPageLabels().catch(() => null);
 				pdf = doc;
 				contents(doc).then((found) => {
 					if (!cancelled) sections = found;
@@ -70,6 +117,7 @@
 			cancelled = true;
 			pdf = null;
 			sections = [];
+			viewports = {};
 			task.destroy();
 		};
 	});
@@ -189,8 +237,9 @@
 					started = true;
 					const pdfPage = await doc.getPage(number);
 					const viewport = pdfPage.getViewport({ scale: pageScale });
-					node.style.width = `${viewport.width}px`;
-					node.style.height = `${viewport.height}px`;
+					const sheet = node.parentElement ?? node;
+					sheet.style.width = `${viewport.width}px`;
+					sheet.style.height = `${viewport.height}px`;
 
 					const ratio = window.devicePixelRatio || 1;
 					const canvas = document.createElement('canvas');
@@ -205,8 +254,10 @@
 					rendering = pdfPage.render({
 						canvas,
 						viewport,
-						transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0]
+						transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
+						annotationMode: store?.hideFileMarks ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
 					});
+					viewports = { ...viewports, [number]: viewport };
 					await rendering.promise.catch(() => {});
 					text = new TextLayer({
 						textContentSource: pdfPage.streamTextContent(),
@@ -224,9 +275,10 @@
 				},
 				{ threshold: 0.5 }
 			);
-			nearby.observe(node);
-			visible.observe(node);
-			if (number === startPage && number > 1) node.scrollIntoView();
+			const sheet = node.parentElement ?? node;
+			nearby.observe(sheet);
+			visible.observe(sheet);
+			if (number === startPage && number > 1) sheet.scrollIntoView();
 
 			return () => {
 				nearby.disconnect();
@@ -242,7 +294,7 @@
 <div class="viewer" bind:clientWidth={width}>
 	{#if error}
 		<p class="error">Could not open the PDF: {error}</p>
-	{:else if !pdf}
+	{:else if !pdf || (store && !store.loaded)}
 		<p class="muted">Opening PDF…</p>
 	{:else}
 		<div class="toolbar" bind:this={toolbar}>
@@ -251,6 +303,10 @@
 				<span class="muted">{current} / {pdf.numPages}</span>
 			</div>
 			<div class="row">
+				{#if store}
+					<AnnotationTools {store} />
+					<AnnotationsPanel {store} {title} go={goTo} />
+				{/if}
 				<!-- Phones zoom by pinching. -->
 				<div class="row zoom">
 					<button
@@ -275,7 +331,7 @@
 				>
 			</div>
 		</div>
-		<div class="pages">
+		<div class="pages" bind:this={viewer}>
 			{#each pages as number (number)}
 				{#key scale}
 					<div
@@ -284,11 +340,23 @@
 						style:width="{(firstPage?.width ?? 0) * scale}px"
 						style:height="{(firstPage?.height ?? 0) * scale}px"
 						style:--total-scale-factor={scale}
-						{@attach page(number)}
-					></div>
+					>
+						<div class="sheet" {@attach page(number)}></div>
+						{#if store && viewports[number]}
+							<AnnotationLayer
+								{store}
+								index={number - 1}
+								viewport={viewports[number]}
+								label={labelOf(number - 1)}
+							/>
+						{/if}
+					</div>
 				{/key}
 			{/each}
 		</div>
+		{#if store}
+			<SelectionMenu {store} root={viewer} viewportOf={(number) => viewports[number]} {labelOf} />
+		{/if}
 	{/if}
 </div>
 
@@ -355,8 +423,16 @@
 			0 4px 16px rgb(27 36 64 / 0.1);
 		max-width: none;
 	}
+	.sheet {
+		position: absolute;
+		inset: 0;
+	}
 	.page :global(canvas) {
 		display: block;
+	}
+	/* Above the annotations' colours (selectable), below their notes. */
+	.page :global(.textLayer) {
+		z-index: 2;
 	}
 	/* The passage one came for (text layer spans are transparent text). */
 	.page :global(.textLayer span.passage) {
