@@ -221,6 +221,38 @@
 		(first as HTMLElement | null)?.scrollIntoView({ block: 'center' });
 	}
 
+	/** The PDF's own annotations taken in as paperus's (found by where they
+	 * sit) are marked deleted for PDF.js, so the page is drawn without
+	 * them; the rest of the PDF's stay. Whether any were. */
+	async function leaveOut(
+		doc: PDFDocumentProxy,
+		pdfPage: Awaited<ReturnType<PDFDocumentProxy['getPage']>>,
+		index: number
+	): Promise<boolean> {
+		const marks = store?.hiddenMarks.filter((m) => m.page_index === index) ?? [];
+		if (!marks.length) return false;
+		const own = (await pdfPage.getAnnotations()) as {
+			id: string;
+			rect: number[];
+			popupRef?: string | null;
+		}[];
+		let any = false;
+		for (const mark of marks) {
+			const found = own.find((a) =>
+				a.rect?.every((value, i) => Math.abs(value - mark.rect[i]) < 1)
+			);
+			if (!found) continue;
+			doc.annotationStorage.setValue(`pdfjs_internal_editor_paperus_${found.id}`, {
+				pageIndex: index,
+				id: found.id,
+				deleted: true,
+				popupRef: found.popupRef ?? undefined
+			});
+			any = true;
+		}
+		return any;
+	}
+
 	/** Render a page (canvas + selectable text) once it comes near the screen. */
 	function page(number: number) {
 		return (node: HTMLDivElement) => {
@@ -251,11 +283,12 @@
 					layer.className = 'textLayer';
 					node.replaceChildren(canvas, layer);
 
+					const hiding = await leaveOut(doc, pdfPage, number - 1);
 					rendering = pdfPage.render({
 						canvas,
 						viewport,
 						transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0],
-						annotationMode: store?.hideFileMarks ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
+						annotationMode: hiding ? AnnotationMode.ENABLE_STORAGE : AnnotationMode.ENABLE
 					});
 					viewports = { ...viewports, [number]: viewport };
 					await rendering.promise.catch(() => {});

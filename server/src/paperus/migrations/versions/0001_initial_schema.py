@@ -901,12 +901,7 @@ def upgrade() -> None:
         ),
         sa.Column("text_error", sa.String(), nullable=True),
         sa.Column("ocr_status", sa.String(length=16), nullable=True),
-        sa.Column(
-            "annotations_read",
-            sa.Boolean(),
-            server_default=sa.text("false"),
-            nullable=False,
-        ),
+        sa.Column("file_marks", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_by", sa.Uuid(), nullable=True),
         sa.ForeignKeyConstraint(

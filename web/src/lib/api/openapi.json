@@ -9721,9 +9721,13 @@
             "type": "array",
             "title": "Annotations"
           },
-          "hide_file_marks": {
-            "type": "boolean",
-            "title": "Hide File Marks"
+          "hidden_marks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Hidden Marks"
           },
           "shared": {
             "type": "boolean",
@@ -9754,7 +9758,7 @@
         "type": "object",
         "required": [
           "annotations",
-          "hide_file_marks",
+          "hidden_marks",
           "shared",
           "can_share"
         ],

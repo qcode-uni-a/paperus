@@ -9,6 +9,11 @@
   list by page to find them and gather them into a note; on a phone the
   tools sit behind a round button and two fingers scroll. Each person's
   own; "Show mine to the group" shares one's annotations of a paper.
+- **A PDF's own annotations become paperus's**: highlights, notes, words
+  and pen strokes made in another reader are taken in once when the file
+  is read (as the uploader's: editable, searchable in the list), and the
+  page is drawn without their painted copies; other annotations of the PDF
+  stay as they are.
 - **Abstracts**: shown (folded) on a paper's page. A paper whose details
   have none gets OpenAlex's (asked anyway for its authors), else the
   paragraph after the "Abstract" heading of its PDF; its details' own,

@@ -69,8 +69,9 @@ function remembered(): { color: string; inkWidth: number } {
 export class FileAnnotations {
 	list = $state<AnnotationOut[]>([]);
 	loaded = $state(false);
-	/** Draw the pages without the PDF's own annotations (taken in). */
-	hideFileMarks = $state(false);
+	/** The PDF's own annotations left out when drawing its pages (taken
+	 * in): where each sat. */
+	hiddenMarks = $state.raw<{ page_index: number; rect: number[] }[]>([]);
 	shared = $state(false);
 	canShare = $state(false);
 	tool = $state<Tool>('select');
@@ -107,7 +108,7 @@ export class FileAnnotations {
 		const { data } = await fileAnnotations({ path: { file_id: this.fileId } });
 		if (data) {
 			this.list = data.annotations;
-			this.hideFileMarks = data.hide_file_marks;
+			this.hiddenMarks = data.hidden_marks as { page_index: number; rect: number[] }[];
 			this.shared = data.shared;
 			this.canShare = data.can_share;
 		}

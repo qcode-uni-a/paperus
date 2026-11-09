@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from paperus.models import File
+from paperus.processing import process_file
+from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
 from tests.people import Person, group
 
@@ -118,22 +120,81 @@ def test_what_is_refused(client: TestClient, db: Session) -> None:
     assert ada.post(url, highlight()).status_code == 409
 
 
-def test_pages_without_the_files_own_marks(client: TestClient, db: Session) -> None:
+ANNOTATED = {
+    0: [
+        "/Subtype /Highlight /Rect [70 715 250 735]"
+        " /QuadPoints [72 734 240 734 72 716 240 716] /C [1 0.83 0] /Contents (Key)",
+        "/Subtype /Ink /Rect [100 100 200 200] /InkList [[100 100 150 150 200 120]]"
+        " /C [0 0 1]",
+        "/Subtype /FreeText /Rect [300 300 400 330] /Contents (Words)"
+        " /DA (/Helv 14 Tf 1 0 0 rg)",
+        "/Subtype /FreeText /Rect [300 400 400 430]",
+        "/Subtype /Text /Rect [500 700 520 720] /Contents (A note)",
+        "/Subtype /Link /Rect [0 0 10 10]",
+    ]
+}
+
+
+def test_a_pdfs_own_annotations_taken_in(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
     root = Person(client, db, "root", admin=True)
     ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
     chair = group(root, "Chair", ada)
     ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "member"})
     paper = ada.add("Marked", chair["library_id"])
-    file_id = upload(ada, paper["id"])
-    url = f"/api/files/{file_id}/annotations"
-    assert ada.get(url).json()["hide_file_marks"] is False
-    file = db.get(File, uuid.UUID(file_id))
-    assert file is not None
-    file.annotations_read = True
+    pdf = make_pdf([["Line one of the text here"]], annotations=ANNOTATED)
+    file_id = ada.post(
+        f"/api/items/{paper['id']}/files",
+        files={"upload": ("marked.pdf", pdf, "application/pdf")},
+    ).json()["id"]
+    process_file(db, blobs, uuid.UUID(file_id))
     db.commit()
-    # The uploader sees them as annotations; others the file as it is,
-    # until the uploader shares theirs.
-    assert ada.get(url).json()["hide_file_marks"] is True
-    assert bob.get(url).json()["hide_file_marks"] is False
+    url = f"/api/files/{file_id}/annotations"
+    seen = ada.get(url).json()
+    found = {a["kind"]: a for a in seen["annotations"]}
+    # Words without words, and links, stay in the PDF.
+    assert sorted(found) == ["highlight", "ink", "note", "text"]
+    assert all(a["imported"] and a["mine"] for a in found.values())
+    assert (found["highlight"]["text"], found["highlight"]["comment"]) == (
+        "Line one of the text here",
+        "Key",
+    )
+    assert found["highlight"]["position"]["rects"] == [[72.0, 716.0, 240.0, 734.0]]
+    assert (found["text"]["text"], found["text"]["color"]) == ("Words", "#ff0000")
+    assert found["text"]["position"]["font_size"] == 14
+    assert found["ink"]["color"] == "#0000ff"
+    assert found["note"]["color"] == "#ffd400"  # none given: yellow
+    assert len(seen["hidden_marks"]) == 4
+    assert {"page_index": 0, "rect": [70.0, 715.0, 250.0, 735.0]} in seen[
+        "hidden_marks"
+    ]
+
+    # Others see the file as it is, until the uploader shares.
+    assert bob.get(url).json()["hidden_marks"] == []
     ada.put(f"/api/items/{paper['id']}/annotation-sharing", {"shared": True})
-    assert bob.get(url).json()["hide_file_marks"] is True
+    assert len(bob.get(url).json()["hidden_marks"]) == 4
+    # Deleted: still left out of the page (not drawn twice, nor back).
+    ada.delete(f"/api/annotations/{found['ink']['id']}")
+    after = ada.get(url).json()
+    assert len(after["annotations"]) == 3 and len(after["hidden_marks"]) == 4
+    # Read again: taken in once only.
+    assert ada.post(f"/api/files/{file_id}/read-again").status_code == 202
+    db.expire_all()
+    process_file(db, blobs, uuid.UUID(file_id))
+    db.commit()
+    assert len(ada.get(url).json()["annotations"]) == 3
+
+
+def test_pages_without_the_files_own_marks(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Plain")
+    file_id = upload(ada, paper["id"])
+    process_file(db, blobs, uuid.UUID(file_id))
+    db.commit()
+    # Nothing to take in: nothing left out.
+    assert ada.get(f"/api/files/{file_id}/annotations").json()["hidden_marks"] == []
+    file = db.get(File, uuid.UUID(file_id))
+    assert file is not None and file.file_marks == []

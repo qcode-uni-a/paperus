@@ -5,13 +5,26 @@ def _escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
 
-def make_pdf(pages: list[list[str]], title: str | None = None) -> bytes:
-    """A PDF with one page per entry, each entry a list of text lines."""
+def make_pdf(
+    pages: list[list[str]],
+    title: str | None = None,
+    annotations: dict[int, list[str]] | None = None,
+) -> bytes:
+    """A PDF with one page per entry, each entry a list of text lines;
+    ``annotations``: per page (from 0), annotation dictionaries' contents
+    ("/Subtype /Highlight /Rect [...] ...")."""
     objects: list[bytes] = []
     page_count = len(pages)
     font_id = 3
     first_page_id = 4
     kids = " ".join(f"{first_page_id + 2 * i} 0 R" for i in range(page_count))
+    # Annotations come after the pages, numbered in order.
+    next_id = first_page_id + 2 * page_count
+    annots: dict[int, list[int]] = {}
+    for index in sorted(annotations or {}):
+        for _ in (annotations or {})[index]:
+            annots.setdefault(index, []).append(next_id)
+            next_id += 1
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
     objects.append(f"<< /Type /Pages /Kids [{kids}] /Count {page_count} >>".encode())
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
@@ -21,7 +34,13 @@ def make_pdf(pages: list[list[str]], title: str | None = None) -> bytes:
             (
                 "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]"
                 f" /Resources << /Font << /F1 {font_id} 0 R >> >>"
-                f" /Contents {content_id} 0 R >>"
+                f" /Contents {content_id} 0 R"
+                + (
+                    " /Annots [" + " ".join(f"{n} 0 R" for n in annots[i]) + "]"
+                    if i in annots
+                    else ""
+                )
+                + " >>"
             ).encode()
         )
         text = "".join(f"({_escape(line)}) Tj T* " for line in lines)
@@ -30,6 +49,9 @@ def make_pdf(pages: list[list[str]], title: str | None = None) -> bytes:
             b"<< /Length %d >>\nstream\n%s\nendstream" % (len(stream), stream)
         )
 
+    for index in sorted(annotations or {}):
+        for body in (annotations or {})[index]:
+            objects.append(f"<< /Type /Annot {body} >>".encode())
     info = ""
     if title is not None:
         objects.append(f"<< /Title ({_escape(title)}) >>".encode())

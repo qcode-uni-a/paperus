@@ -47,6 +47,21 @@ Annotations are their person's. Anyone who may read a paper may annotate it
 with everyone who may read it (`annotation_shares`); they show with the
 person's name and can be gathered into notes, not changed.
 
+## A PDF's own annotations
+
+Annotations made in another reader (Zotero, Acrobat, a tablet) come along
+in the PDF. When the file is read, they are taken in once, as annotations
+of the person who uploaded it (`paperus.pdf.annotations` with PDFium,
+`paperus.annotations.take_in`): highlights, underlines (squiggly ones too),
+strike-throughs, sticky notes, words on the page, squares and pen strokes,
+with their colour, comment, the text they mark and the page label. Where
+each sat in the PDF is kept (`files.file_marks`); the viewer then draws the
+pages without exactly those (PDF.js's annotation storage marks them
+deleted) for whoever sees the uploader's annotations, also after one was
+deleted, and draws the file as it is for others. Annotations paperus does
+not take in (links, forms, stamps, words on the page without words) stay
+in the PDF as drawn.
+
 ## API
 
 `GET /api/files/{id}/annotations` (those one sees, in reading order, and

@@ -11,7 +11,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import abstracts
+from paperus import abstracts, annotations, pdf
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
 from paperus.storage import BlobStore
@@ -144,6 +144,20 @@ def _identify(
         log.warning("identifying file %s failed", file.id, exc_info=True)
 
 
+def _take_in_annotations(db: Session, blobs: BlobStore, file: File) -> None:
+    """A PDF's own annotations, once, as its uploader's (see
+    ``paperus.annotations``); a PDF they cannot be read from keeps them."""
+    if file.media_type != PDF or file.file_marks is not None:
+        return
+    try:
+        with blobs.local_file(file.blob_sha256) as path:
+            found = pdf.annotations(path)
+    except Exception:
+        log.warning("annotations of file %s not read", file.id, exc_info=True)
+        return
+    annotations.take_in(db, file, found)
+
+
 def process_file(
     db: Session,
     blobs: BlobStore,
@@ -167,6 +181,7 @@ def process_file(
     if _copy_manifest(db, file):
         file.text_status = TextStatus.DONE
         _identify(db, blobs, http, file)
+        _take_in_annotations(db, blobs, file)
         db.commit()
         return file.ocr_status == OcrStatus.PENDING
     try:
@@ -194,6 +209,7 @@ def process_file(
         if file.version is not None:
             found = abstracts.from_pages(read.first_pages)
             abstracts.take(file.version.item, found, replace=False)
+        _take_in_annotations(db, blobs, file)
     db.commit()
     return file.ocr_status == OcrStatus.PENDING
 

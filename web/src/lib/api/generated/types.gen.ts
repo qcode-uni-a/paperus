@@ -1171,9 +1171,11 @@ export type FileAnnotations = {
      */
     annotations: Array<AnnotationOut>;
     /**
-     * Hide File Marks
+     * Hidden Marks
      */
-    hide_file_marks: boolean;
+    hidden_marks: Array<{
+        [key: string]: unknown;
+    }>;
     /**
      * Shared
      */

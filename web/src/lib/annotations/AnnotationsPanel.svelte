@@ -33,7 +33,16 @@
 	let panel = $state<HTMLElement>();
 
 	const others = $derived(store.list.some((a) => !a.mine));
-	const used = $derived(COLORS.filter((c) => store.list.some((a) => a.color === c.value)));
+	// Zotero's colours first, then others the PDF's own annotations brought.
+	const used = $derived(
+		[...new Set(store.list.map((a) => a.color))]
+			.map((value) => ({ value, name: colorName(value) }))
+			.sort(
+				(a, b) =>
+					((COLORS.findIndex((c) => c.value === a.value) + 99) % 99) -
+					((COLORS.findIndex((c) => c.value === b.value) + 99) % 99)
+			)
+	);
 	const shown = $derived(
 		store.list.filter((a) => {
 			if (onlyMine && !a.mine) return false;

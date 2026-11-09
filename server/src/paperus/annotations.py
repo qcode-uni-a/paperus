@@ -10,8 +10,10 @@ the person shares their annotations of that paper (``AnnotationShare``,
 
 A PDF's own annotations (made in another reader) are taken in once, when the
 file is read, as annotations of the person who uploaded it
-(``Annotation.imported``); the viewer then draws the pages without them for
-those who see these, and as the file has them for others.
+(``Annotation.imported``), and where each sat is kept (``File.file_marks``):
+the viewer draws the pages without those for whoever sees the uploader's
+annotations (also after one of them was deleted), and as the file has them
+for others. Annotations of kinds paperus does not know stay in the PDF.
 """
 
 import re
@@ -157,11 +159,60 @@ def share(db: Session, user_id: uuid.UUID, item: Item, shared: bool) -> None:
         db.delete(found)
 
 
-def file_marks_hidden(db: Session, user_id: uuid.UUID, file: File) -> bool:
-    """Whether the viewer draws the pages without the PDF's own annotations:
-    they were taken in, and the person sees them (their own, or shared)."""
-    if not file.annotations_read or file.uploaded_by is None:
-        return False
-    return file.uploaded_by == user_id or shares(
-        db, file.uploaded_by, file.version.item_id
-    )
+def hidden_marks(db: Session, user_id: uuid.UUID, file: File) -> list[dict[str, Any]]:
+    """The PDF's own annotations the viewer leaves out when drawing the
+    pages ({page_index, rect}): those taken in, if the person sees the
+    uploader's annotations (their own, or shared)."""
+    if not file.file_marks or file.uploaded_by is None:
+        return []
+    uploader = file.uploaded_by
+    if uploader == user_id or shares(db, uploader, file.version.item_id):
+        return file.file_marks
+    return []
+
+
+# Defaults for annotations whose PDF gives no colour (as most readers draw).
+_DEFAULT_COLORS = {AnnotationKind.TEXT: "#000000", AnnotationKind.INK: "#ff6666"}
+
+
+def _color_of(kind: AnnotationKind, color: str | None) -> str:
+    """The PDF's colour; black or none means "unset" for marks that are
+    never black (yellow, as other readers show them)."""
+    if color and (color != "#000000" or kind in _DEFAULT_COLORS):
+        return color
+    return _DEFAULT_COLORS.get(kind, COLORS[0])
+
+
+def take_in(db: Session, file: File, found: list[dict[str, Any]]) -> int:
+    """The PDF's own annotations (``paperus.pdf.annotations``) as its
+    uploader's, once; where each sat is kept. Annotations without enough to
+    show (words on the page without words) stay in the PDF. Does not commit.
+    Returns how many were taken in."""
+    if file.file_marks is not None or file.uploaded_by is None:
+        return 0
+    marks = []
+    for entry in found:
+        kind = AnnotationKind(entry["kind"])
+        if kind == AnnotationKind.TEXT and not entry.get("text"):
+            continue
+        position: dict[str, Any] = {}
+        for key in ("rects", "paths", "width", "font_size"):
+            if entry.get(key):
+                position[key] = entry[key]
+        db.add(
+            Annotation(
+                file_id=file.id,
+                user_id=file.uploaded_by,
+                kind=kind,
+                page_index=entry["page_index"],
+                page_label=(entry.get("page_label") or None),
+                position=position,
+                color=_color_of(kind, entry.get("color")),
+                text=entry.get("text"),
+                comment=entry.get("comment"),
+                imported=True,
+            )
+        )
+        marks.append({"page_index": entry["page_index"], "rect": entry["rect"]})
+    file.file_marks = marks
+    return len(marks)

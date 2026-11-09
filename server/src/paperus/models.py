@@ -701,9 +701,10 @@ class File(Record, Trashable, Base):
     )
     text_error: Mapped[str | None]
     ocr_status: Mapped[str | None] = mapped_column(String(16), index=True)
-    annotations_read: Mapped[bool] = mapped_column(server_default=text("false"))
-    """The PDF's own annotations were taken in as ``Annotation`` rows (of
-    the person who uploaded it), so pages are drawn without them."""
+    file_marks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    """The PDF's own annotations taken in as ``Annotation`` rows (of the
+    person who uploaded it): where each sits in the PDF ({page_index,
+    rect}), so pages are drawn without them. None: not read yet."""
 
     version: Mapped[Version] = relationship(back_populates="files")
     blob: Mapped[Blob] = relationship(lazy="joined", innerjoin=True)

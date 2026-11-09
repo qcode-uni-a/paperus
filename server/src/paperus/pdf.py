@@ -8,8 +8,10 @@ time limit, and a broken PDF can at worst end its own helper.
 """
 
 import contextlib
+import ctypes
 import logging
 import os
+import re
 import resource
 import struct
 import threading
@@ -19,8 +21,10 @@ from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from multiprocessing import get_context
 from pathlib import Path
+from typing import Any
 
 import pypdfium2
+import pypdfium2.raw as pdfium_c
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +105,15 @@ def title(path: Path) -> str | None:
     return _run(_title, path)
 
 
+def annotations(path: Path) -> list[dict[str, Any]]:
+    """The PDF's own annotations of the kinds paperus knows (see
+    ``paperus.annotations``): each with ``kind``, ``page_index``,
+    ``page_label``, ``rects`` or ``paths`` and ``width`` (PDF points),
+    ``color`` ("#rrggbb"), ``text`` (marked, or written), ``comment``,
+    ``font_size``."""
+    return _run(_annotations, path)
+
+
 def render(path: Path, index: int) -> bytes:
     """Page ``index`` (from 0) as a greyscale PNG, for OCR."""
     return _run(_render, path, index)
@@ -169,3 +182,187 @@ def _render(path: str, index: int) -> bytes:
         bitmap.close()
         page.close()
         return image
+
+
+# PDF annotation subtypes as paperus's kinds (squiggly as underline).
+_KINDS = {
+    pdfium_c.FPDF_ANNOT_HIGHLIGHT: "highlight",
+    pdfium_c.FPDF_ANNOT_UNDERLINE: "underline",
+    pdfium_c.FPDF_ANNOT_SQUIGGLY: "underline",
+    pdfium_c.FPDF_ANNOT_STRIKEOUT: "strikeout",
+    pdfium_c.FPDF_ANNOT_TEXT: "note",
+    pdfium_c.FPDF_ANNOT_FREETEXT: "text",
+    pdfium_c.FPDF_ANNOT_SQUARE: "image",
+    pdfium_c.FPDF_ANNOT_INK: "ink",
+}
+_MARKS_TEXT = {"highlight", "underline", "strikeout"}
+_FONT_SIZE = re.compile(rb"([\d.]+)\s+Tf")
+_TEXT_COLOR = re.compile(rb"([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg")
+_TEXT_GREY = re.compile(rb"([\d.]+)\s+g\b")
+_HIDDEN = 2
+_LINE_WIDTH = re.compile(r"([\d.]+)\s+w\b")
+
+
+def _wide(read: Callable[..., int], *args: object) -> str:
+    """A UTF-16 string PDFium writes into a buffer (asked for its size first)."""
+    size = read(*args, None, 0)
+    if size <= 2:
+        return ""
+    buffer = (ctypes.c_ushort * (size // 2))()
+    read(*args, buffer, size)
+    return bytes(buffer)[: size - 2].decode("utf-16-le", errors="replace")
+
+
+def _color(annot: Any) -> str | None:  # noqa: ANN401 (a PDFium handle)
+    """Its colour (C). PDFium gives none while the annotation has a drawn
+    appearance, so that is dropped first: only in this copy in memory,
+    never saved."""
+    r, g, b, a = (ctypes.c_uint() for _ in range(4))
+    kind = pdfium_c.FPDFANNOT_COLORTYPE_Color
+    if not pdfium_c.FPDFAnnot_GetColor(annot, kind, r, g, b, a):
+        pdfium_c.FPDFAnnot_SetAP(annot, pdfium_c.FPDF_ANNOT_APPEARANCEMODE_NORMAL, None)
+        if not pdfium_c.FPDFAnnot_GetColor(annot, kind, r, g, b, a):
+            return None
+    return f"#{r.value:02x}{g.value:02x}{b.value:02x}"
+
+
+def _clean(text: str) -> str:
+    """Words as read: hyphenation marks (U+0002, soft hyphens) joined up,
+    control characters and spacing tidied."""
+    text = re.sub(r"[\u0002\u00ad]\s*", "", text)
+    text = re.sub(r"[\u0000-\u0008\u000b-\u001f]", " ", text)
+    return " ".join(text.split())
+
+
+def _rect(annot: Any) -> list[float] | None:  # noqa: ANN401
+    """Where the annotation sits (its /Rect), lower left first."""
+    rect = pdfium_c.FS_RECTF()
+    if not pdfium_c.FPDFAnnot_GetRect(annot, rect):
+        return None
+    return [
+        round(min(rect.left, rect.right), 3),
+        round(min(rect.bottom, rect.top), 3),
+        round(max(rect.left, rect.right), 3),
+        round(max(rect.bottom, rect.top), 3),
+    ]
+
+
+def _rects(annot: Any) -> list[list[float]]:  # noqa: ANN401
+    """Each marked line (its quad points), else the annotation's rect."""
+    found = []
+    for index in range(pdfium_c.FPDFAnnot_CountAttachmentPoints(annot)):
+        quad = pdfium_c.FS_QUADPOINTSF()
+        if pdfium_c.FPDFAnnot_GetAttachmentPoints(annot, index, quad):
+            xs = [quad.x1, quad.x2, quad.x3, quad.x4]
+            ys = [quad.y1, quad.y2, quad.y3, quad.y4]
+            found.append([min(xs), min(ys), max(xs), max(ys)])
+    if not found and (whole := _rect(annot)) is not None:
+        found.append(whole)
+    return [[round(v, 3) for v in r] for r in found]
+
+
+def _paths(annot: Any) -> list[list[float]]:  # noqa: ANN401
+    found = []
+    for index in range(pdfium_c.FPDFAnnot_GetInkListCount(annot)):
+        count = pdfium_c.FPDFAnnot_GetInkListPath(annot, index, None, 0)
+        if count < 1:
+            continue
+        points = (pdfium_c.FS_POINTF * count)()
+        pdfium_c.FPDFAnnot_GetInkListPath(annot, index, points, count)
+        found.append([round(v, 2) for p in points for v in (p.x, p.y)])
+    return found
+
+
+def _line_width(annot: Any) -> float:  # noqa: ANN401
+    """A pen stroke's width: as its drawn appearance has it ("2 w"), else
+    its border (PDFium does not give /BS), else 1."""
+    drawn = _wide(
+        pdfium_c.FPDFAnnot_GetAP, annot, pdfium_c.FPDF_ANNOT_APPEARANCEMODE_NORMAL
+    )
+    if found := _LINE_WIDTH.search(drawn):
+        return max(0.25, min(float(found.group(1)), 50.0))
+    horizontal, vertical, width = (ctypes.c_float() for _ in range(3))
+    if pdfium_c.FPDFAnnot_GetBorder(annot, horizontal, vertical, width):
+        return max(0.25, min(width.value, 50.0)) if width.value > 0 else 1.0
+    return 1.0
+
+
+def _text_under(text_page: Any, rects: list[list[float]]) -> str:  # noqa: ANN401
+    parts = []
+    for left, bottom, right, top in rects:
+        args = (text_page, left, top, right, bottom)
+        count = pdfium_c.FPDFText_GetBoundedText(*args, None, 0)
+        if count > 0:
+            buffer = (ctypes.c_ushort * (count + 1))()
+            pdfium_c.FPDFText_GetBoundedText(*args, buffer, count + 1)
+            parts.append(bytes(buffer)[: count * 2].decode("utf-16-le", "replace"))
+    return _clean(" ".join(parts))
+
+
+def _annotations(path: str) -> list[dict[str, Any]]:
+    found = []
+    with _open(path) as pdf:
+        for index in range(len(pdf)):
+            page = pdf[index]
+            text_page = page.get_textpage()
+            label = _wide(pdfium_c.FPDF_GetPageLabel, pdf.raw, index) or None
+            for number in range(pdfium_c.FPDFPage_GetAnnotCount(page.raw)):
+                annot = pdfium_c.FPDFPage_GetAnnot(page.raw, number)
+                try:
+                    entry = _annotation(annot, text_page.raw)
+                finally:
+                    pdfium_c.FPDFPage_CloseAnnot(annot)
+                if entry is not None:
+                    found.append({**entry, "page_index": index, "page_label": label})
+            text_page.close()
+            page.close()
+    return found
+
+
+def _annotation(annot: Any, text_page: Any) -> dict[str, Any] | None:  # noqa: ANN401
+    kind = _KINDS.get(pdfium_c.FPDFAnnot_GetSubtype(annot))
+    if kind is None or pdfium_c.FPDFAnnot_GetFlags(annot) & _HIDDEN:
+        return None
+    where = _rect(annot)
+    if where is None:
+        return None
+    # Before the colour: reading that may drop the drawn appearance.
+    width = _line_width(annot) if kind == "ink" else None
+    contents = _wide(pdfium_c.FPDFAnnot_GetStringValue, annot, b"Contents").strip()
+    if kind == "text" and not contents:
+        # Rich text (XHTML) only: its words.
+        rich = _wide(pdfium_c.FPDFAnnot_GetStringValue, annot, b"RC")
+        contents = re.sub(r"<[^>]+>", " ", rich).strip()
+    entry: dict[str, Any] = {
+        "kind": kind,
+        "rect": where,
+        "color": _color(annot),
+        "comment": _clean(contents) if kind != "text" else contents,
+        "text": None,
+    }
+    entry["comment"] = entry["comment"] or None
+    if kind == "ink":
+        entry["paths"] = _paths(annot)
+        entry["width"] = width
+        return entry if entry["paths"] else None
+    entry["rects"] = _rects(annot)
+    if not entry["rects"]:
+        return None
+    if kind in _MARKS_TEXT:
+        entry["text"] = _text_under(text_page, entry["rects"]) or None
+    elif kind == "text":
+        # Words on the page: their contents are the words, not a comment.
+        entry["text"], entry["comment"] = entry["comment"], None
+        style = _wide(pdfium_c.FPDFAnnot_GetStringValue, annot, b"DA").encode()
+        size = _FONT_SIZE.search(style)
+        entry["font_size"] = float(size.group(1)) if size else 12.0
+        # The words' colour is in the style (C is the box's background).
+        if rgb := _TEXT_COLOR.search(style):
+            channels = [min(255, round(float(v) * 255)) for v in rgb.groups()]
+            entry["color"] = "#{:02x}{:02x}{:02x}".format(*channels)
+        elif grey := _TEXT_GREY.search(style):
+            level = min(255, round(float(grey.group(1)) * 255))
+            entry["color"] = f"#{level:02x}{level:02x}{level:02x}"
+        else:
+            entry["color"] = "#000000"
+    return entry

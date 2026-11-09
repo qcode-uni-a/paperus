@@ -45,9 +45,9 @@ class AnnotationOut(BaseModel):
 class FileAnnotations(BaseModel):
     annotations: list[AnnotationOut]
     """Those the person sees, in reading order."""
-    hide_file_marks: bool
-    """Draw the pages without the PDF's own annotations (they are among
-    these, taken in)."""
+    hidden_marks: list[dict[str, Any]]
+    """The PDF's own annotations to leave out when drawing its pages
+    ({page_index, rect}: taken in, among these)."""
     shared: bool
     """The person shares their annotations of this paper."""
     can_share: bool
@@ -118,7 +118,7 @@ def file_annotations(
             _out(db, access, a, names)
             for a in annotations.of_file(db, access.user.id, file)
         ],
-        hide_file_marks=annotations.file_marks_hidden(db, access.user.id, file),
+        hidden_marks=annotations.hidden_marks(db, access.user.id, file),
         shared=annotations.shares(db, access.user.id, item.id),
         can_share=item.library_id in access.group_libraries.values(),
     )
