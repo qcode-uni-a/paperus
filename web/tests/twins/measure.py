@@ -27,8 +27,12 @@ EDGE = 0.09
 # A figure's parts (panels) at most this far apart (points).
 PANEL_GAP = 3
 FIGURE_GAP = 24
-# A figure's silhouette: where it has ink, in cells this large (points).
-CELL = 6
+# A figure's silhouette: where it has ink, sampled in cells of SAMPLE
+# points, kept in cells of CELL (two by two: ink where two of the four
+# have it), coarse enough to say where the panels and the gaps are, not
+# what the figure shows.
+SAMPLE = 6
+CELL = 12
 
 
 def lines_of(page: pdfium.PdfPage, turned: list | None = None) -> list[dict]:
@@ -190,8 +194,8 @@ def silhouette(
     pixels, stride = bytes(bitmap.buffer), bitmap.stride
     height = page.get_size()[1]
     left, top = box[0], height - box[3]
-    columns = max(1, round((box[2] - box[0]) / CELL))
-    rows = max(1, round((box[3] - box[1]) / CELL))
+    columns = max(1, round((box[2] - box[0]) / SAMPLE))
+    rows = max(1, round((box[3] - box[1]) / SAMPLE))
 
     def labelled(x: float, y: float) -> bool:
         return any(
@@ -203,18 +207,33 @@ def silhouette(
     for r in range(rows):
         row = ""
         for c in range(columns):
-            x0, y0 = int(left + c * CELL), int(top + r * CELL)
+            x0, y0 = int(left + c * SAMPLE), int(top + r * SAMPLE)
             ink = total = 0
-            for y in range(y0, min(y0 + CELL, bitmap.height)):
-                for x in range(x0, min(x0 + CELL, bitmap.width)):
+            for y in range(y0, min(y0 + SAMPLE, bitmap.height)):
+                for x in range(x0, min(x0 + SAMPLE, bitmap.width)):
                     total += 1
                     ink += pixels[y * stride + x] < 215
-            centre = (x0 + CELL / 2, y0 + CELL / 2)
+            centre = (x0 + SAMPLE / 2, y0 + SAMPLE / 2)
             row += (
                 "1" if total and ink / total > 0.12 and not labelled(*centre) else "0"
             )
         out.append(row)
-    return out
+    # Two by two into cells of CELL: ink where two of the four have it.
+    step = CELL // SAMPLE
+    return [
+        "".join(
+            "1"
+            if sum(
+                out[rr][cc] == "1"
+                for rr in range(r, min(r + step, len(out)))
+                for cc in range(c, min(c + step, len(out[0])))
+            )
+            >= 2
+            else "0"
+            for c in range(0, len(out[0]), step)
+        )
+        for r in range(0, len(out), step)
+    ]
 
 
 def plain(text: str) -> str:
