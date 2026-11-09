@@ -12,6 +12,13 @@
   login, or its upload failed) is a warning now, an amber "!" with the
   reason, no longer a green tick; an upload that failed after the paper
   was saved no longer reads as "Not saved".
+- **Browser extension, publishers**: Nature's PDFs are saved again in
+  Firefox (it failed with "Permission denied to access property
+  constructor"); APS's (Physical Review) are fetched from the article's own
+  site (its PDF link points to link.aps.org over plain HTTP, which the page
+  may not fetch from: "NetworkError"); ScienceDirect's are found by the
+  page's "View PDF" link, as its pages name no PDF; a robot check in front
+  of a paper ("Just a moment…") is no longer saved as a paper.
 - **Search by title and abstract** also finds a paper by the abstract in
   its own details (from Crossref, an import or typed in), not only by one
   found for it elsewhere: in 0.0.18, more than half of the papers were

@@ -19,6 +19,13 @@ const ROBOT_CHECK =
 const NO_ACCESS =
 	/sign in|log ?in|institutional (access|login)|access through your (institution|organization)|purchase (this )?(article|pdf)|buy (this )?article|rent this|subscribe|get access|access options|check access|shibboleth|openathens|seamless access/i;
 
+/** The page itself is a check for robots (Cloudflare's "Just a moment…"),
+ * not the paper: by its captcha or its title only (an article may well
+ * mention captchas). */
+export function isRobotCheck(signals: Signals): boolean {
+	return signals.captcha || ROBOT_CHECK.test(signals.title);
+}
+
 export function causeOf(signals: Signals): Cause {
 	const words = `${signals.title}\n${signals.text}`;
 	if (signals.captcha || ROBOT_CHECK.test(words)) return 'robot-check';

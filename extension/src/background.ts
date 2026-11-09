@@ -2,7 +2,13 @@
  * its PDF (fetched in the page, with the reader's own access); an open PDF
  * is saved as it is, paperus reads its details. The button's menu (right
  * click) saves to another owner. */
-import { type Cause, causeOf, EXPLAINED, signalsOfHtml } from "./causes";
+import {
+  type Cause,
+  causeOf,
+  EXPLAINED,
+  isRobotCheck,
+  signalsOfHtml,
+} from "./causes";
 import {
   fetchPdf,
   idsInUrl,
@@ -240,6 +246,15 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
     doi: page.doi ?? inUrl.doi,
     arxiv: page.arxiv ?? inUrl.arxiv,
   };
+  // Without a DOI or arXiv ID the page's title names the paper: not that
+  // of a check for robots in front of it.
+  if (
+    !info.doi &&
+    !info.arxiv &&
+    !page.isPdf &&
+    isRobotCheck(await inPage(tab.id!, pageSignals))
+  )
+    throw new PaperusError(EXPLAINED["robot-check"]);
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
     : page.isPdf || page.pdfUrl
@@ -385,7 +400,9 @@ async function upload(
       "/api/items/{item_id}/files",
       { method: "POST", path: { item_id: itemId }, form },
     );
-    return status === 404 ? "The paper was not found when its PDF was added." : null;
+    return status === 404
+      ? "The paper was not found when its PDF was added."
+      : null;
   } catch (error) {
     const why = error instanceof Error ? error.message : String(error);
     return `Uploading the PDF failed: ${why.replace(/[^.]$/, "$&.")}`;

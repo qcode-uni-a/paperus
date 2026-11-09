@@ -43,6 +43,37 @@ export function idsInUrl(url: string): { doi: string | null; arxiv: string | nul
 /** The paper's details from the page: Highwire/Google Scholar tags
  * (citation_*) and Dublin Core (the address: see idsInUrl). */
 export function readPage(): PageInfo {
+	/** Where to fetch the PDF from within the page: its citation_pdf_url,
+	 * over HTTPS on an HTTPS page (else the browser blocks it); if that is
+	 * another site (APS: link.aps.org, which the page may not fetch from),
+	 * the page's own link to the PDF with the paper's DOI, if it has one. */
+	const pdfOf = (link: string | null, doi: string | null): string | null => {
+		// The page's own links to the PDF of this paper: they name its DOI
+		// (APS: /prb/pdf/10.1103/…) or the article's id in the page's address
+		// (ScienceDirect: …/pii/S0010…/pdfft?…, as it names no
+		// citation_pdf_url); never just any PDF the page links.
+		const article = location.pathname.split('/').filter(Boolean).at(-1) ?? '';
+		const names = (href: URL) => {
+			const path = decodeURIComponent(href.pathname).toLowerCase();
+			return (
+				(!!doi && path.includes(doi.toLowerCase())) ||
+				(article.length >= 8 && path.includes(article.toLowerCase()))
+			);
+		};
+		const own = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')]
+			.map((a) => new URL(a.href, location.href))
+			.find(
+				(href) =>
+					href.origin === location.origin &&
+					href.pathname !== location.pathname &&
+					/\/pdf(\/|$)|\.pdf$|\/pdfft$/i.test(href.pathname) &&
+					names(href)
+			);
+		if (!link) return own?.href ?? null;
+		const pdf = new URL(link, location.href);
+		if (pdf.protocol === 'http:' && location.protocol === 'https:') pdf.protocol = 'https:';
+		return pdf.origin === location.origin ? pdf.href : (own ?? pdf).href;
+	};
 	const meta = (...names: string[]): string | null => {
 		for (const name of names) {
 			const tag = document.querySelector<HTMLMetaElement>(
@@ -61,15 +92,15 @@ export function readPage(): PageInfo {
 		text?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
 	const url = location.href;
 	const isPdf = document.contentType === 'application/pdf';
-	const pdfLink = meta('citation_pdf_url');
+	const doi = doiIn(meta('citation_doi', 'dc.identifier', 'prism.doi', 'bepress_citation_doi'));
 	return {
 		url,
 		isPdf,
 		// A PDF's title is its file name: none, paperus reads the PDF instead.
 		title: meta('citation_title', 'dc.title', 'og:title') ?? (isPdf ? null : document.title || null),
-		doi: doiIn(meta('citation_doi', 'dc.identifier', 'prism.doi', 'bepress_citation_doi')),
+		doi,
 		arxiv: meta('citation_arxiv_id'),
-		pdfUrl: pdfLink ? new URL(pdfLink, url).href : null,
+		pdfUrl: pdfOf(meta('citation_pdf_url'), doi),
 		authors: metas('citation_author').length ? metas('citation_author') : metas('dc.creator'),
 		date: meta('citation_publication_date', 'citation_date', 'citation_online_date', 'dc.date'),
 		journal: meta('citation_journal_title', 'citation_conference_title', 'prism.publicationName'),
@@ -94,10 +125,13 @@ export async function fetchPdf(
 	try {
 		const response = await fetch(url, { credentials: 'include' });
 		const buffer = await response.arrayBuffer();
-		const bytes = new Uint8Array(buffer);
-		const head = String.fromCharCode(...bytes.slice(0, 5));
+		// Views on the buffer, never .slice() or .subarray(): in some pages
+		// (Nature's) Firefox refuses those their "constructor".
+		const part = (start: number, length: number) =>
+			new Uint8Array(buffer, start, Math.max(0, Math.min(length, buffer.byteLength - start)));
+		const head = String.fromCharCode.apply(null, Array.from(part(0, 5)));
 		if (!response.ok || head !== '%PDF-') {
-			const html = new TextDecoder().decode(bytes.slice(0, 100_000));
+			const html = new TextDecoder().decode(part(0, 100_000));
 			return {
 				error: response.ok
 					? 'The PDF link gave a web page, not a PDF.'
@@ -108,10 +142,10 @@ export async function fetchPdf(
 		}
 		if (buffer.byteLength > maxBytes) return { error: 'The PDF is larger than paperus takes.' };
 		let binary = '';
-		for (let i = 0; i < bytes.length; i += 0x8000) {
-			binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+		for (let i = 0; i < buffer.byteLength; i += 0x8000) {
+			binary += String.fromCharCode.apply(null, Array.from(part(i, 0x8000)));
 		}
-		return { base64: btoa(binary), size: bytes.length };
+		return { base64: btoa(binary), size: buffer.byteLength };
 	} catch (error) {
 		return { error: `The PDF could not be fetched: ${String(error)}` };
 	}
