@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.0.17 (2026-11-09)
+
+- **Database**: the one migration (`0001`) gained `items.abstract`, the
+  tables `annotations` and `annotation_shares`, and `files.file_marks`. An
+  installation of 0.0.16 (none exist besides the developer's) adds them as
+  in that migration.
+- **Firefox add-on**: public on addons.mozilla.org; each release hands its
+  version in from now on.
 
 - **Annotations in the PDF viewer** (see [annotations](docs/annotations.md)):
   highlights, underlines and strike-throughs (select text, then a colour),
