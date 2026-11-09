@@ -1255,6 +1255,44 @@ export type ExportPartOut = {
 export type ExportStatus = 'waiting' | 'running' | 'done' | 'failed' | 'expired';
 
 /**
+ * ExtensionReport
+ */
+export type ExtensionReport = {
+    /**
+     * Level
+     */
+    level: 'info' | 'warning' | 'error';
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * At
+     */
+    at?: string | null;
+    /**
+     * Context
+     */
+    context?: {
+        [key: string]: string | number | number | boolean | null;
+    } | null;
+};
+
+/**
+ * ExtensionReports
+ */
+export type ExtensionReports = {
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Entries
+     */
+    entries: Array<ExtensionReport>;
+};
+
+/**
  * FileAnnotations
  */
 export type FileAnnotations = {
@@ -2123,6 +2161,60 @@ export type LinkIn = {
      * Page
      */
     page?: number | null;
+};
+
+/**
+ * LogEntryOut
+ */
+export type LogEntryOut = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Level
+     */
+    level: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Logger
+     */
+    logger: string;
+    /**
+     * Message
+     */
+    message: string;
+    /**
+     * Username
+     */
+    username?: string | null;
+    /**
+     * Context
+     */
+    context?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * LogPage
+ */
+export type LogPage = {
+    /**
+     * Entries
+     */
+    entries: Array<LogEntryOut>;
+    /**
+     * More
+     */
+    more: boolean;
 };
 
 /**
@@ -5680,6 +5772,77 @@ export type BulkResponses = {
 };
 
 export type BulkResponse = BulkResponses[keyof BulkResponses];
+
+export type ReadLogsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Level
+         */
+        level?: 'debug' | 'info' | 'warning' | 'error' | 'critical';
+        /**
+         * Source
+         */
+        source?: Array<string> | null;
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Before
+         */
+        before?: number | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/admin/logs';
+};
+
+export type ReadLogsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReadLogsError = ReadLogsErrors[keyof ReadLogsErrors];
+
+export type ReadLogsResponses = {
+    /**
+     * Successful Response
+     */
+    200: LogPage;
+};
+
+export type ReadLogsResponse = ReadLogsResponses[keyof ReadLogsResponses];
+
+export type ReportData = {
+    body: ExtensionReports;
+    path?: never;
+    query?: never;
+    url: '/api/logs';
+};
+
+export type ReportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ReportError = ReportErrors[keyof ReportErrors];
+
+export type ReportResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type ReportResponse = ReportResponses[keyof ReportResponses];
 
 export type ListReferencesData = {
     body?: never;

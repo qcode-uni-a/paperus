@@ -108,7 +108,7 @@ export const SETTINGS: {
 	{
 		slug: 'logging',
 		title: 'Logging',
-		subtitle: 'How much the server and the worker write to their logs',
+		subtitle: 'How much the server and the worker write to their logs (read them under Logs)',
 		icon: mdiTextBoxOutline,
 		status: (c) => {
 			const level = c.log_level ?? 'info';

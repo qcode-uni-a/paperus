@@ -26,6 +26,7 @@ from paperus import (
     authors,
     integrity,
     item_references,
+    logbook,
     missing,
     ocr,
     published,
@@ -533,6 +534,7 @@ def make_job_app(settings: Settings) -> App:
 def run_worker(settings: Settings) -> None:
     global _context
     engine = make_engine(settings.database_url)
+    logbook.install(engine, "worker")
     _context = WorkerContext(
         engine=engine,
         sessions=make_sessionmaker(engine),
@@ -709,8 +711,8 @@ KEEP_FAILED_JOBS = timedelta(days=30)
 @tasks.task(name="tidy", queue="backup", queueing_lock="tidy", pass_context=True)
 async def tidy(job: JobContext, timestamp: int) -> None:
     """Every hour: retry jobs whose worker stopped (killed mid-job). At
-    twenty past the night hour also: delete finished jobs and expired login
-    sessions, which nothing else removes."""
+    twenty past the night hour also: delete finished jobs, expired login
+    sessions and old log entries, which nothing else removes."""
     manager = job.app.job_manager
     for stalled in await manager.get_stalled_jobs():
         log.info(
@@ -734,14 +736,19 @@ async def tidy(job: JobContext, timestamp: int) -> None:
         include_aborted=True,
     )
 
-    def remove_sessions() -> int:
+    def remove_sessions_and_log() -> tuple[int, int]:
         with context.sessions() as db:
             removed = auth.remove_expired_sessions(db)
+            entries = logbook.prune(db)
             db.commit()
-            return removed
+            return removed, entries
 
-    sessions = await asyncio.to_thread(remove_sessions)
-    log.info("tidied up: old jobs deleted, %d expired login sessions", sessions)
+    sessions, entries = await asyncio.to_thread(remove_sessions_and_log)
+    log.info(
+        "tidied up: old jobs deleted, %d expired login sessions, %d log entries",
+        sessions,
+        entries,
+    )
 
 
 def queue_tidy(app: App) -> None:

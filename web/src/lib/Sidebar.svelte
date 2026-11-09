@@ -21,6 +21,7 @@
 		mdiServer,
 		mdiStarOutline,
 		mdiTagMultipleOutline,
+		mdiTextBoxSearchOutline,
 		mdiTrashCanOutline
 	} from '@mdi/js';
 	import { manageCounts } from '#lib/api/client.ts';
@@ -53,7 +54,8 @@
 		[resolve('/admin/jobs'), 'Jobs', mdiBriefcaseOutline],
 		[settingsPath, 'Settings', mdiCogOutline],
 		[resolve('/admin/backups'), 'Backups', mdiBackupRestore],
-		[resolve('/admin/server'), 'Server stats', mdiServer]
+		[resolve('/admin/server'), 'Server stats', mdiServer],
+		[resolve('/admin/logs'), 'Logs', mdiTextBoxSearchOutline]
 	] as const;
 
 	const MAIN = [

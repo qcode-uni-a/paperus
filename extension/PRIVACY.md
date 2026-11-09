@@ -18,6 +18,10 @@ What it sends to your paperus, and when:
   access), downloads the PDF the page links and sends it to your paperus.
   For that it asks you once for access to websites; it uses it only for
   these requests and for the paperus button.
+- **When something goes wrong** (a paper saved without its PDF, a PDF it
+  could not get, an error): what happened, with the page's address and
+  the extension's version, for the administrators of your paperus
+  (Administration → Logs). Papers saved without trouble are not reported.
 
 On your paperus' own pages, a small script tells paperus that the
 extension is installed and passes on such requests; it reads nothing

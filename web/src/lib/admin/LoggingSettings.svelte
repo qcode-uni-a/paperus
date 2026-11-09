@@ -42,7 +42,7 @@
 <SettingRow
 	id="log-level"
 	title="Log level"
-	description="How much the server and the worker write to their logs (docker compose logs). Applies within a minute, no restart."
+	description="How much the server and the worker write to their logs: under Administration → Logs (the last two weeks) and in docker compose logs. Applies within a minute, no restart."
 >
 	<select id="log-level" bind:value={level}>
 		{#each LEVELS as [value, label] (value)}<option {value}>{label}</option>{/each}

@@ -9,6 +9,7 @@ import {
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
+import { logIssue } from "./log";
 import {
   fetchPdf,
   idsInUrl,
@@ -186,6 +187,11 @@ async function saveTab(
   await badge(tabId, "…");
   try {
     const result = await saveFrom(tab, owner);
+    if (result.warning)
+      logIssue("warning", result.text, {
+        page: tab.url ?? null,
+        item: result.link,
+      });
     if (result.warning) await badge(tabId, "!", "#b26a00");
     else await badge(tabId, "✓", "#1e7a3e");
     await tell(
@@ -200,6 +206,13 @@ async function saveTab(
       error instanceof PaperusError
         ? error.message
         : `Not saved: ${String(error)}`;
+    // Ours are explained to the person; anything else is a fault here.
+    logIssue(error instanceof PaperusError ? "warning" : "error", text, {
+      page: tab.url ?? null,
+      ...(error instanceof PaperusError
+        ? {}
+        : { stack: String((error as Error)?.stack ?? "").slice(0, 2000) }),
+    });
     await badge(tabId, "!", "#c0392b");
     await tell(tabId, text, null, "error");
     return { ok: false, text };
@@ -683,8 +696,14 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
   const failed: { item_id: string; reason: string; cause: Cause }[] = [];
   for (const [index, paper] of papers.entries()) {
     const problem = await getOne(paper);
-    if (problem) failed.push({ item_id: paper.item_id, ...problem });
-    else saved++;
+    if (problem) {
+      failed.push({ item_id: paper.item_id, ...problem });
+      logIssue("warning", `No PDF for “${paper.title}”: ${problem.reason}`, {
+        page: paper.url,
+        cause: problem.cause,
+        item: paper.item_id,
+      });
+    } else saved++;
     await report({
       type: "getPdfsProgress",
       done: index + 1,

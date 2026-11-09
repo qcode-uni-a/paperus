@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
 
-from paperus import metrics, system, tokens
+from paperus import logbook, metrics, system, tokens
 from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
@@ -30,6 +30,7 @@ from paperus.api import (
     health,
     imports,
     items,
+    logs,
     manage,
     notes,
     oauth,
@@ -69,6 +70,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        # The log in the database too (Administration → Logs); not in tests,
+        # which bring their own job app.
+        if job_app is None:
+            logbook.install(engine, "server")
         # Log level and contact email as set in the administration.
         try:
             with app.state.sessionmaker() as db:
@@ -122,6 +127,7 @@ def create_app(
     app.include_router(avatars.router)
     app.include_router(items.router)
     app.include_router(bulk.router)
+    app.include_router(logs.router)
     app.include_router(references.router)
     app.include_router(author_api.router)
     app.include_router(files.router)

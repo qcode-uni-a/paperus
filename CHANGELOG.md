@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Logs under Administration → Logs**: what the server and the worker log
+  (also in `docker compose logs`) and the browser extensions' warnings and
+  errors (a PDF they could not get, and why, with the page's address), the
+  last two weeks, by level, source and words. A new migration (`0004`)
+  adds the table `log_entries`.
 - **Bulk edits** in the library and in collections: pick papers (a box on
   each row, Shift for a range, or Select), then tag them (or take a tag
   off), add them to a collection (or take them out of this one), give them

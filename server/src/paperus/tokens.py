@@ -132,6 +132,8 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
     (_READ, re.compile(r"/api/(libraries|groups)(/.*)?"), Scope.GROUPS_READ),
     (_READ, re.compile(r"/api/auth/me"), Scope.PAPERS_READ),
     (("POST", "DELETE"), re.compile(r"/api/items/[^/]+/tags(/.*)?"), Scope.TAGS_WRITE),
+    # The browser extension's warnings and errors (its tokens add papers).
+    (("POST",), re.compile(r"/api/logs"), Scope.PAPERS_WRITE),
     (("POST", "PATCH", "DELETE"), re.compile(r"/api/tags(/.*)?"), Scope.TAGS_WRITE),
     (
         ("POST", "PATCH", "DELETE"),

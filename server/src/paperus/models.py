@@ -14,6 +14,7 @@ from sqlalchemy import (
     Computed,
     DateTime,
     ForeignKey,
+    Identity,
     Index,
     Integer,
     LargeBinary,
@@ -788,6 +789,29 @@ class SystemSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class LogEntry(Base):
+    """One line of the log, from the server, the worker or someone's browser
+    extension (``paperus.logbook``; Administration → Logs)."""
+
+    __tablename__ = "log_entries"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    level: Mapped[str] = mapped_column(String(10))
+    source: Mapped[str] = mapped_column(String(16))
+    """"server", "worker" or "extension"."""
+    logger: Mapped[str] = mapped_column(String(100))
+    message: Mapped[str] = mapped_column(Text)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    """Who reported it (the extension's entries)."""
+    context: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """E.g. the page the extension was on."""
 
 
 class Tag(Record, Base):

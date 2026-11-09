@@ -261,6 +261,19 @@ memory; the ML service gives back what a batch needed after each run, so
 models and other programs share the card. If reranking fails or takes
 longer than 15 s, results come in the usual order.
 
+## Logs
+
+The server and the worker write their log to the container's output
+(`docker compose logs server worker`) and, for the last two weeks, into the
+database, where administrators read it under Administration → Logs: by
+level, by source and by words. paperus's own messages are kept at the level
+set under Settings → Logging, other libraries' from warnings up. People's
+browser extensions add their warnings and errors there too (a paper saved
+without its PDF and why, with the page's address and who it was), so a
+publisher that refuses PDFs shows up without asking around. The night's
+tidy-up deletes entries older than two weeks, and beyond the newest
+100,000.
+
 ## Monitoring (Prometheus)
 
 The server and the ML service can serve Prometheus metrics, each on a port
