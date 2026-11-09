@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.19 (2026-11-09)
 
 - **Fluent mode reads more pages right**: a column's last lines beside the
   other's equations above an equation across the page; wide equations
