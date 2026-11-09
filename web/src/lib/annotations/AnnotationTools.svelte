@@ -10,7 +10,8 @@
 		mdiFormatUnderline,
 		mdiMarker,
 		mdiPen,
-		mdiSelectionDrag
+		mdiSelectionDrag,
+		mdiUndo
 	} from '@mdi/js';
 	import Icon from '#lib/Icon.svelte';
 	import {
@@ -93,10 +94,32 @@
 		colorsOpen = false;
 	}
 
+	const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+	const undoKeys = isMac ? '⌘Z' : 'Ctrl+Z';
+	const undoTitle = $derived(
+		store.undoLabel ? `${store.undoLabel} (${undoKeys})` : 'Nothing to undo'
+	);
+
+	/** Where typing has its own undo (a comment, the words on the page). */
+	const typing = (target: EventTarget | null) =>
+		target instanceof HTMLElement &&
+		(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
 	$effect(() => {
 		const key = (event: KeyboardEvent) => {
 			if (event.key === 'Escape' && store.tool !== 'select' && !store.selected) {
 				store.tool = 'select';
+			}
+			if (
+				(event.ctrlKey || event.metaKey) &&
+				!event.shiftKey &&
+				!event.altKey &&
+				event.key.toLowerCase() === 'z' &&
+				!typing(event.target) &&
+				store.history.length
+			) {
+				event.preventDefault();
+				void store.undo();
 			}
 		};
 		window.addEventListener('keydown', key);
@@ -150,6 +173,13 @@
 			onclick={() => choose(tool)}><Icon {path} size={18} /></button
 		>
 	{/each}
+	<button
+		class="tool"
+		aria-label={store.undoLabel ?? 'Undo'}
+		title={undoTitle}
+		disabled={!store.history.length}
+		onclick={() => store.undo()}><Icon path={mdiUndo} size={18} /></button
+	>
 	<div class="color">
 		<button
 			class="current"
@@ -176,6 +206,12 @@
 						onclick={() => choose(tool)}><Icon {path} size={22} /><span>{short}</span></button
 					>
 				{/each}
+				<button
+					class="fab-tool"
+					aria-label={store.undoLabel ?? 'Undo'}
+					disabled={!store.history.length}
+					onclick={() => store.undo()}><Icon path={mdiUndo} size={22} /><span>Undo</span></button
+				>
 			</div>
 			{@render colors()}
 		</div>
@@ -207,9 +243,13 @@
 		background: none;
 		color: var(--muted);
 	}
-	.tool:hover {
+	.tool:hover:not(:disabled) {
 		background: var(--rail);
 		color: var(--ink);
+	}
+	.tool:disabled,
+	.fab-tool:disabled {
+		opacity: 0.4;
 	}
 	.tool.active {
 		background: color-mix(in srgb, var(--royal) 14%, transparent);

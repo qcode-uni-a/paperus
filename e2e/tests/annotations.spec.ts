@@ -66,6 +66,16 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	await page.mouse.move(sheet.x + 160, y + 30, { steps: 8 });
 	await page.mouse.up();
 	await expect.poll(() => count(page, file)).toBe(1);
+
+	// Undo: Ctrl+Z brings the stroke back; the button (saying what it takes
+	// back) takes it away again; the comment's change comes next.
+	await page.keyboard.press('ControlOrMeta+z');
+	await expect.poll(() => count(page, file)).toBe(2);
+	await tools.getByRole('button', { name: 'Undo adding the pen stroke' }).click();
+	await expect.poll(() => count(page, file)).toBe(1);
+	await expect(
+		tools.getByRole('button', { name: 'Undo the change to the highlight' })
+	).toBeEnabled();
 	await tools.getByRole('button', { name: 'Select text' }).click();
 
 	// Listed; gathered into a note on the paper.

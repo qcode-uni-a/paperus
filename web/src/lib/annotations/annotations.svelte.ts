@@ -66,8 +66,20 @@ function remembered(): { color: string; inkWidth: number } {
 	}
 }
 
+/** One step to undo: what reverses it, and what it was, in words. */
+type Step =
+	| { undo: 'remove'; id: string; what: string }
+	| { undo: 'change'; id: string; before: AnnotationChange; keys: string; at: number; what: string }
+	| { undo: 'add'; snapshot: AnnotationOut; what: string };
+
+/** Changes to the same annotation's same fields within this long are one
+ * step (e.g. a comment written in several goes). */
+const ONE_STEP_MS = 3000;
+
 export class FileAnnotations {
 	list = $state<AnnotationOut[]>([]);
+	/** What one did here, the last last (Undo, Ctrl+Z). */
+	history = $state<Step[]>([]);
 	loaded = $state(false);
 	/** The PDF's own annotations left out when drawing its pages (taken
 	 * in): where each sat. */
@@ -123,7 +135,8 @@ export class FileAnnotations {
 		return this.list.find((a) => a.id === this.selected);
 	}
 
-	async add(input: AnnotationIn, open = false): Promise<AnnotationOut | null> {
+	/** ``record``: false while undoing (that is no step of its own). */
+	async add(input: AnnotationIn, open = false, record = true): Promise<AnnotationOut | null> {
 		const { data, error } = await addAnnotation({
 			path: { file_id: this.fileId },
 			body: input
@@ -134,10 +147,12 @@ export class FileAnnotations {
 		}
 		this.list = [...this.list, data].sort(order);
 		if (open) this.selected = data.id;
+		if (record) this.history.push({ undo: 'remove', id: data.id, what: `adding ${named(data)}` });
 		return data;
 	}
 
-	async change(id: string, changes: AnnotationChange) {
+	async change(id: string, changes: AnnotationChange, record = true) {
+		const old = this.list.find((a) => a.id === id);
 		const { data, error } = await changeAnnotation({
 			path: { annotation_id: id },
 			body: changes
@@ -147,16 +162,80 @@ export class FileAnnotations {
 			return;
 		}
 		this.list = this.list.map((a) => (a.id === id ? data : a)).sort(order);
+		if (!record || !old) return;
+		const keys = Object.keys(changes).sort().join(' ');
+		const last = this.history.at(-1);
+		if (
+			last?.undo === 'change' &&
+			last.id === id &&
+			last.keys === keys &&
+			Date.now() - last.at < ONE_STEP_MS
+		) {
+			last.at = Date.now(); // the same step goes on: it undoes to before it began
+			return;
+		}
+		const before = Object.fromEntries(
+			Object.keys(changes).map((key) => [key, old[key as keyof AnnotationOut]])
+		) as AnnotationChange;
+		this.history.push({
+			undo: 'change',
+			id,
+			before,
+			keys,
+			at: Date.now(),
+			what: `the change to ${named(old)}`
+		});
 	}
 
-	async remove(id: string) {
+	async remove(id: string, record = true) {
 		const before = this.list;
+		const gone = before.find((a) => a.id === id);
 		this.list = this.list.filter((a) => a.id !== id);
 		if (this.selected === id) this.selected = null;
 		const { error } = await deleteAnnotation({ path: { annotation_id: id } });
 		if (error) {
 			this.list = before;
 			notify({ kind: 'warning', title: 'Not removed', text: errorMessage(error) });
+			return;
+		}
+		if (record && gone)
+			this.history.push({ undo: 'add', snapshot: gone, what: `deleting ${named(gone)}` });
+	}
+
+	/** "Undo adding the highlight", for the button; null with nothing to undo. */
+	get undoLabel(): string | null {
+		const last = this.history.at(-1);
+		return last ? `Undo ${last.what}` : null;
+	}
+
+	/** Take back the last step: what was added goes, a change is reversed,
+	 * what was deleted comes back (as a new annotation: later steps that
+	 * name it follow it there). */
+	async undo() {
+		const step = this.history.pop();
+		if (!step) return;
+		if (step.undo === 'remove') await this.remove(step.id, false);
+		else if (step.undo === 'change') await this.change(step.id, step.before, false);
+		else {
+			const { snapshot: a } = step;
+			const back = await this.add(
+				{
+					kind: a.kind,
+					page_index: a.page_index,
+					page_label: a.page_label,
+					position: a.position as AnnotationIn['position'],
+					color: a.color,
+					text: a.text,
+					comment: a.comment,
+					tags: a.tags
+				},
+				false,
+				false
+			);
+			if (!back) return;
+			for (const other of this.history) {
+				if (other.undo !== 'add' && other.id === a.id) other.id = back.id;
+			}
 		}
 	}
 
@@ -171,6 +250,12 @@ export class FileAnnotations {
 		}
 		this.shared = shared;
 	}
+}
+
+/** "the highlight", "the pen stroke": for what Undo takes back. */
+function named(a: AnnotationOut): string {
+	const name = a.kind === 'ink' ? 'pen stroke' : KIND_NAMES[a.kind].toLowerCase();
+	return `the ${name}`;
 }
 
 /** Reading order: by page, then from the top, then from the left (as the
