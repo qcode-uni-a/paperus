@@ -20,7 +20,7 @@ import httpx2
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from paperus import library, metadata
+from paperus import library, metadata, notifications
 from paperus.identifiers import Scheme, implied_by_doi, is_arxiv_doi, normalize
 from paperus.models import (
     Identifier,
@@ -170,6 +170,7 @@ def add_published(
     except library.IdentifierTaken:
         return None
     log.info("published version of %s found via %s: %s", item.id, source, value)
+    notifications.published(db, item, version)
     return version
 
 

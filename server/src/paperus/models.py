@@ -818,6 +818,26 @@ class LogEntry(Base):
     """E.g. the page the extension was on."""
 
 
+class Notification(Base):
+    """Something that happened that concerns a person (``paperus.notifications``):
+    papers added to one of their groups, a published version found."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    """"added" or "published"."""
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """What to say: the paper, the group, who, how many."""
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Tag(Record, Base):
     """A label for items; names are unique per library regardless of case.
 

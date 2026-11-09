@@ -28,6 +28,7 @@ from paperus import (
     item_references,
     logbook,
     missing,
+    notifications,
     ocr,
     published,
     readable,
@@ -712,7 +713,8 @@ KEEP_FAILED_JOBS = timedelta(days=30)
 async def tidy(job: JobContext, timestamp: int) -> None:
     """Every hour: retry jobs whose worker stopped (killed mid-job). At
     twenty past the night hour also: delete finished jobs, expired login
-    sessions and old log entries, which nothing else removes."""
+    sessions, old log entries and notifications, which nothing else
+    removes."""
     manager = job.app.job_manager
     for stalled in await manager.get_stalled_jobs():
         log.info(
@@ -739,13 +741,14 @@ async def tidy(job: JobContext, timestamp: int) -> None:
     def remove_sessions_and_log() -> tuple[int, int]:
         with context.sessions() as db:
             removed = auth.remove_expired_sessions(db)
-            entries = logbook.prune(db)
+            entries = logbook.prune(db) + notifications.prune(db)
             db.commit()
             return removed, entries
 
     sessions, entries = await asyncio.to_thread(remove_sessions_and_log)
     log.info(
-        "tidied up: old jobs deleted, %d expired login sessions, %d log entries",
+        "tidied up: old jobs deleted, %d expired login sessions, %d log entries"
+        " and notifications",
         sessions,
         entries,
     )

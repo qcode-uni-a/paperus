@@ -9,6 +9,7 @@
 	import SearchBar from '#lib/SearchBar.svelte';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import ThemeToggle from '#lib/ThemeToggle.svelte';
+	import NotificationBell from '#lib/NotificationBell.svelte';
 	import AddMenu from '#lib/AddMenu.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
 	import Toasts from '#lib/Toasts.svelte';
@@ -69,8 +70,8 @@
 		{#if session.user && !noSearch}<div class="find"><SearchBar /></div>{:else}<span class="spacer"
 			></span>{/if}
 		<div class="end">
-			{#if session.user}<AddMenu />{/if}
-			<ThemeToggle />
+			{#if session.user}<AddMenu /><NotificationBell />{/if}
+			<span class="theme"><ThemeToggle /></span>
 			{#if session.user}<UserMenu />{/if}
 		</div>
 	</header>
@@ -122,6 +123,13 @@
 	@media (max-width: 900px) {
 		header {
 			grid-template-columns: auto minmax(0, 1fr) auto;
+		}
+	}
+	/* On a phone the bell takes the theme button's place (the theme is in
+	   Settings too). */
+	@media (max-width: 520px) {
+		.theme {
+			display: none;
 		}
 	}
 	@media (max-width: 720px) {

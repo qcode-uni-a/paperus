@@ -58,6 +58,8 @@ def current_access(request: Request, user: CurrentUser, db: DB) -> Access:
     """What the person may read and change (see ``paperus.access``),
     narrowed to an access token's owners if it has a limit."""
     token = getattr(request.state, "access_token", None)
+    # Who acts, for notifications (papers given to a group: by whom).
+    db.info["paperus_actor"] = user.id
     only = None
     if token is not None and token.library_ids is not None:
         only = [uuid.UUID(i) for i in token.library_ids]

@@ -74,6 +74,18 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 
 	// bob, in the group, finds the shared paper but not the private one.
 	const asBob = await logIn(browser, bob.username, bob.password);
+	// He is told, under the bell: the administrator added the paper.
+	const bell = asBob.page.getByRole('button', { name: 'Notifications: 1 new' });
+	await expect(bell).toBeVisible();
+	await bell.click();
+	const notices = asBob.page.getByRole('dialog', { name: 'Notifications' });
+	await expect(
+		notices.getByRole('link', { name: `admin added “${paper.title}” to ${groupName}` })
+	).toBeVisible();
+	await asBob.page.keyboard.press('Escape');
+	await expect(
+		asBob.page.getByRole('button', { name: 'Notifications', exact: true })
+	).toBeVisible();
 	await asBob.page.goto(`/?q=${paper.word}`);
 	await expect(asBob.page.getByRole('link', { name: paper.title })).toBeVisible();
 	await asBob.page.getByRole('link', { name: paper.title }).click();

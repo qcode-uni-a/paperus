@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Notifications**, under a bell in the header: papers others add to
+  one of your groups (uploaded, by DOI, with the extension, imported or
+  given to the group; counted together, "Ada added 12 papers to Optics
+  lab"), and a published version found for one of your preprints. Opening
+  the list marks them read; old ones go after a month (read) or three
+  (all). A new migration (`0006`) adds the table `notifications`. On a
+  phone the bell takes the theme button's place (the theme is in
+  Settings).
+
 ## 0.0.19 (2026-11-09)
 
 - **Fluent mode reads more pages right**: a column's last lines beside the

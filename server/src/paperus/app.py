@@ -33,6 +33,7 @@ from paperus.api import (
     logs,
     manage,
     notes,
+    notifications,
     oauth,
     organize,
     references,
@@ -128,6 +129,7 @@ def create_app(
     app.include_router(items.router)
     app.include_router(bulk.router)
     app.include_router(logs.router)
+    app.include_router(notifications.router)
     app.include_router(references.router)
     app.include_router(author_api.router)
     app.include_router(files.router)

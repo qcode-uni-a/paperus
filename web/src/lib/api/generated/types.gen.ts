@@ -2965,6 +2965,48 @@ export type NoteOut = {
 };
 
 /**
+ * NotificationOut
+ */
+export type NotificationOut = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Data
+     */
+    data: {
+        [key: string]: unknown;
+    };
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Read
+     */
+    read: boolean;
+};
+
+/**
+ * Notifications
+ */
+export type Notifications = {
+    /**
+     * Notifications
+     */
+    notifications: Array<NotificationOut>;
+    /**
+     * Unread
+     */
+    unread: number;
+};
+
+/**
  * OcrStatus
  *
  * Pages without text (scans) are read by OCR in the ML service;
@@ -3352,6 +3394,16 @@ export type Queued = {
      * Started At
      */
     started_at?: string | null;
+};
+
+/**
+ * Read
+ */
+export type Read = {
+    /**
+     * Ids
+     */
+    ids?: Array<number> | null;
 };
 
 /**
@@ -5931,6 +5983,61 @@ export type ReportResponses = {
 };
 
 export type ReportResponse = ReportResponses[keyof ReportResponses];
+
+export type ListNotificationsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/me/notifications';
+};
+
+export type ListNotificationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListNotificationsError = ListNotificationsErrors[keyof ListNotificationsErrors];
+
+export type ListNotificationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Notifications;
+};
+
+export type ListNotificationsResponse = ListNotificationsResponses[keyof ListNotificationsResponses];
+
+export type MarkNotificationsReadData = {
+    body: Read;
+    path?: never;
+    query?: never;
+    url: '/api/me/notifications/read';
+};
+
+export type MarkNotificationsReadErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MarkNotificationsReadError = MarkNotificationsReadErrors[keyof MarkNotificationsReadErrors];
+
+export type MarkNotificationsReadResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type MarkNotificationsReadResponse = MarkNotificationsReadResponses[keyof MarkNotificationsReadResponses];
 
 export type ListReferencesData = {
     body?: never;
