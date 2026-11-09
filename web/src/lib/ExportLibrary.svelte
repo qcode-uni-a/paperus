@@ -26,6 +26,11 @@
 		{ key: 'collections', label: 'Collections', help: 'also smart ones, and which are pinned' },
 		{ key: 'references', label: 'Reference lists', help: 'what each paper cites' },
 		{
+			key: 'annotations',
+			label: 'Annotations',
+			help: 'your highlights, comments and drawings on the PDFs'
+		},
+		{
 			key: 'authors',
 			label: 'Authors as people',
 			help: 'who is who (splits, merges, ids) and where they were'
@@ -47,12 +52,21 @@
 	// What a format cannot hold, and why (as the server's export.CANNOT_HOLD).
 	const CANNOT: Record<Format, Partial<Record<keyof Include, string>>> = {
 		paperus: {},
-		zotero: { references: 'not in Zotero RDF', authors: 'names only in Zotero RDF' },
-		jabref: { references: 'not in BibTeX', authors: 'names only in BibTeX' },
+		zotero: {
+			references: 'not in Zotero RDF',
+			authors: 'names only in Zotero RDF',
+			annotations: 'not yet: download a PDF with them instead'
+		},
+		jabref: {
+			references: 'not in BibTeX',
+			authors: 'names only in BibTeX',
+			annotations: 'not in BibTeX'
+		},
 		mendeley: {
 			references: 'not in RIS',
 			collections: 'RIS has none',
-			authors: 'names only in RIS'
+			authors: 'names only in RIS',
+			annotations: 'not in RIS'
 		}
 	};
 	let format = $state<Format>('paperus');
@@ -63,6 +77,7 @@
 		tags: true,
 		collections: true,
 		references: true,
+		annotations: true,
 		authors: true,
 		archived: true
 	});

@@ -1,16 +1,20 @@
 """Annotations: a person's own, shared per paper with those who may read it."""
 
+import tempfile
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus import pdf
 from paperus.models import File
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
 from tests.people import Person, group
+from tests.test_mcp import Assistant, token
 
 
 def upload(person: Person, item_id: str) -> str:
@@ -143,10 +147,10 @@ def test_a_pdfs_own_annotations_taken_in(
     chair = group(root, "Chair", ada)
     ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "member"})
     paper = ada.add("Marked", chair["library_id"])
-    pdf = make_pdf([["Line one of the text here"]], annotations=ANNOTATED)
+    marked = make_pdf([["Line one of the text here"]], annotations=ANNOTATED)
     file_id = ada.post(
         f"/api/items/{paper['id']}/files",
-        files={"upload": ("marked.pdf", pdf, "application/pdf")},
+        files={"upload": ("marked.pdf", marked, "application/pdf")},
     ).json()["id"]
     process_file(db, blobs, uuid.UUID(file_id))
     db.commit()
@@ -178,6 +182,24 @@ def test_a_pdfs_own_annotations_taken_in(
     ada.delete(f"/api/annotations/{found['ink']['id']}")
     after = ada.get(url).json()
     assert len(after["annotations"]) == 3 and len(after["hidden_marks"]) == 4
+    # Assistants read them too.
+    assistant = Assistant(client, token(ada, "papers.read"))
+    read = assistant.call("get_annotations", paper_id=paper["id"])
+    assert sorted(a["kind"] for a in read["annotations"]) == [
+        "highlight",
+        "note",
+        "text",
+    ]
+    # Downloaded with them written in: the PDF's own taken in are replaced.
+    download = ada.get(f"/api/files/{file_id}/annotated")
+    assert download.status_code == 200
+    assert "marked%20%28annotated%29.pdf" in download.headers["content-disposition"]
+    with tempfile.TemporaryDirectory() as folder:
+        written = Path(folder) / "a.pdf"
+        written.write_bytes(download.content)
+        kinds = sorted(a["kind"] for a in pdf.annotations(written))
+    # Its own wordless text box stays; the three left are written once.
+    assert kinds == ["highlight", "note", "text", "text"]
     # Read again: taken in once only.
     assert ada.post(f"/api/files/{file_id}/read-again").status_code == 202
     db.expire_all()

@@ -220,7 +220,29 @@ def build(client: TestClient, db: Session) -> Rich:
     rich.pdfs["radar"] = make_pdf([["Radar gaps over the Alps", "Page one"]])
     rich.pdfs["lab"] = make_pdf([["Qubits in the lab"]])
     rich.pdfs["secret"] = make_pdf([["Bob's secret plan"]])
-    upload(ada, radar.id, "radar.pdf", rich.pdfs["radar"], "application/pdf", "main")
+    radar_pdf = upload(
+        ada, radar.id, "radar.pdf", rich.pdfs["radar"], "application/pdf", "main"
+    )
+    # Ada's annotations of it, shown to those who may read the paper.
+    for mark in (
+        {
+            "kind": "highlight",
+            "page_index": 0,
+            "position": {"rects": [[72, 700, 200, 712]]},
+            "color": "#5fb236",
+            "text": "Radar gaps",
+            "comment": "Key",
+            "tags": ["method"],
+        },
+        {
+            "kind": "ink",
+            "page_index": 0,
+            "position": {"paths": [[1, 2, 3, 4]], "width": 2},
+        },
+    ):
+        made = ada.post(f"/api/files/{radar_pdf['id']}/annotations", mark)
+        assert made.status_code == 201, made.text
+    ada.put(f"/api/items/{radar.id}/annotation-sharing", {"shared": True})
     upload(ada, radar.id, "data.csv", b"x,y\n1,2\n", "text/csv", "supplementary")
     upload(bob, lab_paper.id, "lab.pdf", rich.pdfs["lab"], "application/pdf", "main")
     upload(bob, secret.id, "s.pdf", rich.pdfs["secret"], "application/pdf", "main")

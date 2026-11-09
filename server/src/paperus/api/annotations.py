@@ -1,15 +1,18 @@
 """Annotations on a file's pages (``paperus.annotations``): listed with the
 file, made and changed by their person, shared per paper."""
 
+import tempfile
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from paperus import annotations
+from paperus import annotations, pdf
 from paperus.access import Access
 from paperus.annotations import AnnotationIn, Position
 from paperus.api.deps import DB, CurrentAccess
@@ -204,3 +207,47 @@ def share_annotations(
     annotations.share(db, access.user.id, item, body.shared)
     db.commit()
     return body
+
+
+@router.get("/api/files/{file_id}/annotated")
+def annotated_file(
+    file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> Response:
+    """The PDF with the annotations the person sees written in, as standard
+    PDF annotations any reader shows (the PDF's own that were taken in are
+    replaced, not doubled)."""
+    file = _file(db, access, file_id)
+    if file.media_type != "application/pdf":
+        raise HTTPException(422, "only PDFs take annotations")
+    added = [
+        {
+            "kind": a.kind,
+            "page_index": a.page_index,
+            "position": a.position,
+            "color": a.color,
+            "text": a.text,
+            "comment": a.comment,
+        }
+        for a in annotations.of_file(db, access.user.id, file)
+    ]
+    removed = annotations.hidden_marks(db, access.user.id, file)
+    with (
+        request.app.state.blobs.local_file(file.blob_sha256) as path,
+        tempfile.TemporaryDirectory() as folder,
+    ):
+        out = Path(folder) / "annotated.pdf"
+        try:
+            pdf.with_annotations(path, out, added, removed)
+        except pdf.PdfError as error:
+            raise HTTPException(422, "the PDF could not be written") from error
+        data = out.read_bytes()
+    stem = file.filename.removesuffix(".pdf").removesuffix(".PDF")
+    name = f"{stem} (annotated).pdf"
+    return Response(
+        data,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename*=utf-8''{quote(name)}",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

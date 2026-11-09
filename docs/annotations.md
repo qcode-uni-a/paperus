@@ -62,10 +62,23 @@ deleted, and draws the file as it is for others. Annotations paperus does
 not take in (links, forms, stamps, words on the page without words) stay
 in the PDF as drawn.
 
+## Taking them along
+
+- "Download with annotations" (the list): the PDF with the annotations one
+  sees written in as standard PDF annotations (PDFium, `paperus.pdf.
+  with_annotations`), for any reader; the PDF's own that were taken in are
+  replaced, not doubled.
+- The paperus export carries one's annotations (`annotations`), whom one
+  shows them (`annotation_shares`) and the files' `file_marks`; importing
+  it brings them back (once). Zotero, BibTeX and RIS exports do not hold
+  them yet: writing them into the exported PDFs is still to come.
+- Assistants read them with `get_annotations` (see [AI](ai.md)).
+
 ## API
 
 `GET /api/files/{id}/annotations` (those one sees, in reading order, and
-whether pages are drawn without the PDF's own marks), `POST` there,
+the PDF's own marks to leave out when drawing), `POST` there,
 `PATCH`/`DELETE /api/annotations/{id}`, `PUT
-/api/items/{id}/annotation-sharing`. Tokens: reading with `papers.read`,
-the rest with `notes.write`.
+/api/items/{id}/annotation-sharing`, `GET /api/files/{id}/annotated` (the
+PDF with them). Tokens: reading with `papers.read` (the PDF with
+`files.read`), the rest with `notes.write`.

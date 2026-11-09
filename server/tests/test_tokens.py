@@ -241,6 +241,7 @@ ROUTES = {
     ("GET", "/api/authors"): "papers.read",
     ("GET", "/api/authors/{author_id}"): "papers.read",
     ("GET", "/api/files/{file_id}/annotations"): "papers.read",
+    ("GET", "/api/files/{file_id}/annotated"): "files.read",
     ("POST", "/api/files/{file_id}/annotations"): "notes.write",
     ("PATCH", "/api/annotations/{annotation_id}"): "notes.write",
     ("DELETE", "/api/annotations/{annotation_id}"): "notes.write",

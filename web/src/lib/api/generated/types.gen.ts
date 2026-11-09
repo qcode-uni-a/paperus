@@ -1645,6 +1645,10 @@ export type Include = {
      */
     files?: boolean;
     /**
+     * Annotations
+     */
+    annotations?: boolean;
+    /**
      * Archived
      */
     archived?: boolean;
@@ -6414,6 +6418,34 @@ export type ShareAnnotationsResponses = {
 };
 
 export type ShareAnnotationsResponse = ShareAnnotationsResponses[keyof ShareAnnotationsResponses];
+
+export type AnnotatedFileData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/annotated';
+};
+
+export type AnnotatedFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnnotatedFileError = AnnotatedFileErrors[keyof AnnotatedFileErrors];
+
+export type AnnotatedFileResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type SearchData = {
     body?: never;

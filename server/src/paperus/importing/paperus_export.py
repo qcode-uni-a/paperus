@@ -42,7 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import authors, library, notes, organize
+from paperus import annotations, authors, library, notes, organize
 from paperus.access import Access
 from paperus.export import (
     ADDED_LATER,
@@ -57,6 +57,8 @@ from paperus.identifiers import Scheme
 from paperus.importing.apply import Report, _reason, item_with_file
 from paperus.importing.choices import Choices, GroupSuggestion
 from paperus.models import (
+    Annotation,
+    AnnotationKind,
     Author,
     Authorship,
     AuthorSource,
@@ -925,6 +927,10 @@ def _item(run: _Run, row: sqlite3.Row) -> None:
         item.collection_links.append(
             CollectionItem(collection_id=holding.id, added_by=run.me)
         )
+    if "annotation_shares" in run.tables and any(
+        run.rows("SELECT 1 FROM annotation_shares WHERE item_id = ?", row["id"])
+    ):
+        annotations.share(run.db, run.me, item, True)
     for star in run.rows("SELECT * FROM favourites WHERE item_id = ?", row["id"]):
         if run.db.get(Favourite, (run.me, item.id)) is None:
             item.favourites.append(
@@ -1006,10 +1012,11 @@ def _new_identifiers(
 def _files(
     run: _Run, item: Item, rows: list[sqlite3.Row], versions: dict[str, Version]
 ) -> None:
-    present = {f.blob_sha256 for v in item.versions for f in v.files}
+    present = {f.blob_sha256: f for v in item.versions for f in v.files}
     for row in rows:
         sha = bytes.fromhex(_text(row["sha256"]))
         if sha in present:
+            _annotations(run, present[sha], row)
             continue
         version = versions.get(str(row["version_id"])) or library.preferred_version(
             item
@@ -1032,12 +1039,62 @@ def _files(
             uploaded_by=run.user(row["uploaded_by"]),
             deleted_at=_optional_time(row["deleted_at"]),
             deleted_by=run.user(row["deleted_by"]),
+            file_marks=_marks(row),
         )
         run.db.add(file)
         run.db.flush()
-        present.add(sha)
+        present[sha] = file
+        _annotations(run, file, row)
         run.new_files.append(file.id)
         run.report.files += 1
+
+
+def _marks(row: sqlite3.Row) -> list[dict[str, Any]] | None:
+    """Where the PDF's own annotations taken in sat (exports since
+    annotations; None: read the PDF's again)."""
+    # A row's "in" looks at its values, not its columns.
+    if "file_marks" not in row.keys() or row["file_marks"] is None:  # noqa: SIM118
+        return None
+    try:
+        marks = json.loads(_text(row["file_marks"]))
+    except ValueError:
+        return None
+    return marks if isinstance(marks, list) else None
+
+
+def _annotations(run: _Run, file: File, row: sqlite3.Row) -> None:
+    """The person's annotations of the file, as theirs here (one already
+    here from an earlier import of this export is not added again)."""
+    if "annotations" not in run.tables:
+        return
+    for mark in run.rows("SELECT * FROM annotations WHERE file_id = ?", row["id"]):
+        if run.db.get(Annotation, _uuid(mark["id"])) is not None:
+            continue
+        try:
+            position = _object(mark["position"])
+            tags = json.loads(_text(mark["tags"]))
+        except ValueError:
+            continue
+        run.db.add(
+            Annotation(
+                **keep_id(run.db, Annotation, mark["id"]),
+                created_at=_time(mark["created_at"]),
+                file_id=file.id,
+                user_id=run.me,
+                kind=_choice(mark["kind"], AnnotationKind, AnnotationKind.HIGHLIGHT),
+                page_index=_int(mark["page_index"]) or 0,
+                page_label=_optional_text(mark["page_label"], 32),
+                position=position,
+                color=_text(mark["color"], 7) or "#ffd400",
+                tags=[str(t)[:100] for t in tags][:50]
+                if isinstance(tags, list)
+                else [],
+                imported=bool(mark["imported"]),
+                changed_at=_time(mark["changed_at"]),
+                text=_optional_text(mark["text"]),
+                comment=_optional_text(mark["comment"]),
+            )
+        )
 
 
 def _store(run: _Run, row: sqlite3.Row, sha: bytes, label: str) -> bytes | None:

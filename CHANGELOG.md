@@ -14,6 +14,10 @@
   is read (as the uploader's: editable, searchable in the list), and the
   page is drawn without their painted copies; other annotations of the PDF
   stay as they are.
+- **Annotations travel**: "Download with annotations" gives the PDF with
+  them written in as standard PDF annotations (any reader shows them); the
+  paperus export carries them (and importing it brings them back);
+  assistants read them with `get_annotations`.
 - **Abstracts**: shown (folded) on a paper's page. A paper whose details
   have none gets OpenAlex's (asked anyway for its authors), else the
   paragraph after the "Abstract" heading of its PDF; its details' own,

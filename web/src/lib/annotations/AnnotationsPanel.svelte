@@ -188,6 +188,15 @@
 						/> Show mine to the group</label
 					>
 				{/if}
+				{#if store.list.length}
+					<a
+						class="download"
+						href="/api/files/{store.fileId}/annotated"
+						download
+						title="The PDF with these annotations written in, for any PDF reader"
+						>Download with annotations</a
+					>
+				{/if}
 				{#if shown.length}
 					<button onclick={toNote}
 						>Add note from {shown.length === store.list.length ? 'all' : 'these'}</button
@@ -325,6 +334,9 @@
 	}
 	.share input {
 		width: auto;
+	}
+	.download {
+		font-size: var(--step--1);
 	}
 	.visually-hidden {
 		position: absolute;

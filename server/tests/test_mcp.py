@@ -114,6 +114,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "search",
         "get_passage",
         "get_abstracts",
+        "get_annotations",
         "get_document",
         "get_file",
         "export_citations",

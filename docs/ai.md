@@ -22,7 +22,7 @@ no token by hand (claude.ai, ChatGPT) sign in with OAuth instead: add
 password or the OIDC login) and allow what it may do; read-only unless the
 person ticks changes. See "Connected apps" below. Tools: `search`
 (papers, best first, each with its best passages; compact JSON, optional
-abstracts), `get_abstracts`, `get_passage`, `get_document` (details with file download links, or text by
+abstracts), `get_abstracts`, `get_annotations` (the person's highlights, comments and drawings on a paper, and those shared with them), `get_passage`, `get_document` (details with file download links, or text by
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
 `list_collections`, `list_documents`, `find_similar` (papers closest in
 meaning, by the average of their passages' vectors), `get_references` (a

@@ -114,6 +114,17 @@ def annotations(path: Path) -> list[dict[str, Any]]:
     return _run(_annotations, path)
 
 
+def with_annotations(
+    path: Path, out: Path, added: list[dict[str, Any]], removed: list[dict[str, Any]]
+) -> None:
+    """A copy of the PDF at ``out`` with ``added`` written in as standard
+    PDF annotations (each as ``paperus.annotations`` keeps them: kind,
+    page_index, position, color, text, comment) and the PDF's own
+    annotations at ``removed`` ({page_index, rect}: taken in, so not
+    twice) taken out."""
+    _run(_with_annotations, path, str(out), added, removed)
+
+
 def render(path: Path, index: int) -> bytes:
     """Page ``index`` (from 0) as a greyscale PNG, for OCR."""
     return _run(_render, path, index)
@@ -366,3 +377,103 @@ def _annotation(annot: Any, text_page: Any) -> dict[str, Any] | None:  # noqa: A
         else:
             entry["color"] = "#000000"
     return entry
+
+
+_SUBTYPES = {
+    "highlight": pdfium_c.FPDF_ANNOT_HIGHLIGHT,
+    "underline": pdfium_c.FPDF_ANNOT_UNDERLINE,
+    "strikeout": pdfium_c.FPDF_ANNOT_STRIKEOUT,
+    "note": pdfium_c.FPDF_ANNOT_TEXT,
+    "text": pdfium_c.FPDF_ANNOT_FREETEXT,
+    "image": pdfium_c.FPDF_ANNOT_SQUARE,
+    "ink": pdfium_c.FPDF_ANNOT_INK,
+}
+
+
+def _set_text(annot: Any, key: bytes, value: str) -> None:  # noqa: ANN401
+    encoded = value.encode("utf-16-le") + b"\0\0"
+    buffer = (ctypes.c_ushort * (len(encoded) // 2)).from_buffer_copy(encoded)
+    pdfium_c.FPDFAnnot_SetStringValue(annot, key, buffer)
+
+
+def _write(page: Any, entry: dict[str, Any]) -> None:  # noqa: ANN401
+    kind = entry["kind"]
+    annot = pdfium_c.FPDFPage_CreateAnnot(page, _SUBTYPES[kind])
+    if not annot:
+        return
+    try:
+        color = entry.get("color") or "#ffd400"
+        rgb = [int(color[i : i + 2], 16) for i in (1, 3, 5)]
+        position = entry.get("position") or {}
+        rects = position.get("rects") or []
+        if kind != "text":
+            pdfium_c.FPDFAnnot_SetColor(
+                annot, pdfium_c.FPDFANNOT_COLORTYPE_Color, *rgb, 255
+            )
+        for left, bottom, right, top in rects if kind in _MARKS_TEXT else []:
+            quad = pdfium_c.FS_QUADPOINTSF(
+                left, top, right, top, left, bottom, right, bottom
+            )
+            pdfium_c.FPDFAnnot_AppendAttachmentPoints(annot, quad)
+        if kind == "ink":
+            width = float(position.get("width") or 1)
+            xs, ys = [], []
+            for path in position.get("paths") or []:
+                points = (pdfium_c.FS_POINTF * (len(path) // 2))()
+                for i in range(len(path) // 2):
+                    points[i].x, points[i].y = path[2 * i], path[2 * i + 1]
+                    xs.append(path[2 * i])
+                    ys.append(path[2 * i + 1])
+                pdfium_c.FPDFAnnot_AddInkStroke(annot, points, len(path) // 2)
+            pdfium_c.FPDFAnnot_SetBorder(annot, 0, 0, width)
+            if xs:
+                rects = [
+                    [min(xs) - width, min(ys) - width, max(xs) + width, max(ys) + width]
+                ]
+        if rects:
+            left = min(r[0] for r in rects)
+            bottom = min(r[1] for r in rects)
+            right = max(r[2] for r in rects)
+            top = max(r[3] for r in rects)
+            pdfium_c.FPDFAnnot_SetRect(
+                annot, pdfium_c.FS_RECTF(left, top, right, bottom)
+            )
+        if kind == "text":
+            size = float(position.get("font_size") or 12)
+            r, g, b = (v / 255 for v in rgb)
+            _set_text(annot, b"DA", f"/Helv {size:g} Tf {r:.3f} {g:.3f} {b:.3f} rg")
+            _set_text(annot, b"Contents", entry.get("text") or "")
+        elif entry.get("comment"):
+            _set_text(annot, b"Contents", entry["comment"])
+        pdfium_c.FPDFAnnot_SetFlags(annot, pdfium_c.FPDF_ANNOT_FLAG_PRINT)
+    finally:
+        pdfium_c.FPDFPage_CloseAnnot(annot)
+
+
+def _with_annotations(
+    path: str, out: str, added: list[dict[str, Any]], removed: list[dict[str, Any]]
+) -> None:
+    with _open(path) as pdf:
+        for index in sorted({m["page_index"] for m in removed}):
+            if index >= len(pdf):
+                continue
+            page = pdf[index]
+            gone = [m["rect"] for m in removed if m["page_index"] == index]
+            # From the end, so the numbers of those before stay.
+            for number in reversed(range(pdfium_c.FPDFPage_GetAnnotCount(page.raw))):
+                annot = pdfium_c.FPDFPage_GetAnnot(page.raw, number)
+                where = _rect(annot)
+                pdfium_c.FPDFPage_CloseAnnot(annot)
+                if where and any(
+                    all(abs(a - b) < 1 for a, b in zip(where, rect, strict=True))
+                    for rect in gone
+                ):
+                    pdfium_c.FPDFPage_RemoveAnnot(page.raw, number)
+            page.close()
+        for entry in added:
+            if entry["kind"] not in _SUBTYPES or entry["page_index"] >= len(pdf):
+                continue
+            page = pdf[entry["page_index"]]
+            _write(page.raw, entry)
+            page.close()
+        pdf.save(out)

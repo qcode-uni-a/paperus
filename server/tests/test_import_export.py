@@ -28,6 +28,8 @@ from paperus.export import TABLES
 from paperus.importing import paperus_export
 from paperus.importing.run import run_import
 from paperus.models import (
+    Annotation,
+    AnnotationShare,
     Author,
     Authorship,
     Blob,
@@ -255,6 +257,8 @@ def counts(db: Session) -> dict[str, int]:
             ItemReference,
             Favourite,
             PinnedCollection,
+            Annotation,
+            AnnotationShare,
         )
     }
 
@@ -705,7 +709,7 @@ def test_hostile_and_foreign_zips(
 
 @pytest.mark.parametrize(
     "left_out",
-    ["notes", "tags", "collections", "references", "files", "archived"],
+    ["notes", "tags", "collections", "references", "files", "annotations", "archived"],
 )
 def test_any_part_may_be_missing(
     client: TestClient,
@@ -737,7 +741,9 @@ def test_any_part_may_be_missing(
             "pinned_collections",
         },
         "references": {"item_references"},
-        "files": {"files"},
+        # Annotations need their files.
+        "files": {"files", "annotations"},
+        "annotations": {"annotations", "annotation_shares"},
         "archived": set(),
     }[left_out]
     for table, count in found.items():

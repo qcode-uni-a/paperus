@@ -48,6 +48,8 @@ from paperus.importing import Export as ProgramExport
 from paperus.importing import ExportedFile, ExportedNote, ExportedPaper
 from paperus.library import KIND_PREFERENCE
 from paperus.models import (
+    Annotation,
+    AnnotationShare,
     Author,
     Authorship,
     Blob,
@@ -113,6 +115,8 @@ class Include(BaseModel):
     their affiliations on each paper)."""
     files: bool = True
     """The files themselves (their rows are kept, marked not included)."""
+    annotations: bool = True
+    """One's own annotations of the files, and whom one shares them with."""
     archived: bool = True
     """Archived papers (left out entirely if not)."""
 
@@ -208,7 +212,8 @@ CREATE TABLE files (
   size INTEGER NOT NULL,
   included INTEGER NOT NULL,
   path TEXT,
-  part INTEGER
+  part INTEGER,
+  file_marks TEXT
 );
 CREATE TABLE tags (
   id TEXT PRIMARY KEY,
@@ -242,6 +247,27 @@ CREATE TABLE collection_items (
   added_by TEXT REFERENCES users (id),
   created_at TEXT NOT NULL,
   PRIMARY KEY (collection_id, item_id)
+);
+CREATE TABLE annotations (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  file_id TEXT NOT NULL REFERENCES files (id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES users (id),
+  kind TEXT NOT NULL,
+  page_index INTEGER NOT NULL,
+  page_label TEXT,
+  position TEXT NOT NULL,
+  color TEXT NOT NULL,
+  tags TEXT NOT NULL,
+  imported INTEGER NOT NULL,
+  changed_at TEXT NOT NULL,
+  text TEXT,
+  comment TEXT
+);
+CREATE TABLE annotation_shares (
+  user_id TEXT NOT NULL REFERENCES users (id),
+  item_id TEXT NOT NULL REFERENCES items (id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, item_id)
 );
 CREATE TABLE notes (
   id TEXT PRIMARY KEY,
@@ -339,7 +365,7 @@ CREATE INDEX ix_pinned_collections_collection_id ON pinned_collections (collecti
 """
 
 # Tables of later exports: an import reads them if there.
-ADDED_LATER = ["authors", "authorships"]
+ADDED_LATER = ["authors", "authorships", "annotations", "annotation_shares"]
 TABLES = [
     "paperus",
     "users",
@@ -934,6 +960,23 @@ COLUMNS: dict[str, list[Any]] = {
         CollectionItem.added_by,
         CollectionItem.created_at,
     ],
+    "annotations": [
+        Annotation.id,
+        Annotation.created_at,
+        Annotation.file_id,
+        Annotation.user_id,
+        Annotation.kind,
+        Annotation.page_index,
+        Annotation.page_label,
+        Annotation.position,
+        Annotation.color,
+        Annotation.tags,
+        Annotation.imported,
+        Annotation.changed_at,
+        Annotation.text,
+        Annotation.comment,
+    ],
+    "annotation_shares": [AnnotationShare.user_id, AnnotationShare.item_id],
     "notes": [
         Note.id,
         Note.created_at,
@@ -1061,7 +1104,11 @@ class Seen:
     def files(self) -> Iterator[Any]:
         """With ``of_item``, the paper; in the trash only with the trash."""
         query = (
-            select(*COLUMNS["files"], Version.item_id.label("of_item"))
+            select(
+                *COLUMNS["files"],
+                File.file_marks.label("file_marks"),
+                Version.item_id.label("of_item"),
+            )
             .join(Version, Version.id == File.version_id)
             .join(Item, Item.id == Version.item_id)
             .where(Item.library_id.in_(self.owners))
@@ -1177,6 +1224,23 @@ class Seen:
                     Author.id.in_(ordered[start : start + 1000])
                 )
             )
+
+    def annotations(self) -> Iterator[Any]:
+        """The person's own annotations of the exported files."""
+        return self._of_items(
+            "annotations",
+            (File, File.id == Annotation.file_id),
+            (Version, Version.id == File.version_id),
+            (Item, Item.id == Version.item_id),
+            keep=lambda row: row.user_id == self.person,
+        )
+
+    def annotation_shares(self) -> Iterator[Any]:
+        """Whom the person shows their annotations of exported papers."""
+        query = select(*COLUMNS["annotation_shares"]).where(
+            AnnotationShare.user_id == self.person
+        )
+        return (row for row in self.db.execute(query) if row.item_id in self.item_ids)
 
     def favourites(self) -> Iterator[Any]:
         """The person's own stars."""
@@ -1378,11 +1442,12 @@ def _paperus(
         for row in seen.files():
             known = files.add(row, papers.stems.get(row.of_item, "Untitled"))
             yield (
-                *tuple(row)[:-1],
+                *tuple(row)[: len(COLUMNS["files"])],
                 files.sizes.get(row.blob_sha256, 0),
                 int(known is not None),
                 f"{FILES}/{known.name}" if known else None,
                 _PLACEHOLDER_PART if known else None,
+                row.file_marks,
             )
 
     out.insert("files", file_rows())
@@ -1396,6 +1461,7 @@ def _paperus(
         "collection_notes",
         *(["item_references"] if options.include.references else []),
         *(["authors", "authorships"] if options.include.authors else []),
+        *(["annotations", "annotation_shares"] if options.include.annotations else []),
         "favourites",
         "pinned_collections",
     ):
@@ -1575,15 +1641,18 @@ CANNOT_HOLD: dict[str, dict[str, str]] = {
     "zotero": {
         "references": "Zotero RDF has no reference lists",
         "authors": "Zotero RDF has authors as names only",
+        "annotations": "not yet in this format (download a PDF with them instead)",
     },
     "jabref": {
         "references": "BibTeX has no reference lists",
         "authors": "BibTeX has authors as names only",
+        "annotations": "BibTeX has no annotations",
     },
     "mendeley": {
         "references": "RIS has no reference lists",
         "collections": "RIS has no collections",
         "authors": "RIS has authors as names only",
+        "annotations": "RIS has no annotations",
     },
 }
 """What each program's format cannot hold, and why (for the website)."""
