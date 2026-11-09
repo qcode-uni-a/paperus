@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fluent mode reads more pages right**: a column's last lines beside the
+  other's equations above an equation across the page; wide equations
+  with their numbers (no longer cut into two "columns" before the
+  numbers); the references' first lines at a page's foot under a rule; a
+  page whose right column starts with a large figure.
 - **Links in a paper work**, in both views: to a reference, a chapter, a
   figure or an equation it goes there, and Back returns; web links (only
   http, https and mailto) open in a tab of their own.

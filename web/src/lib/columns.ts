@@ -44,6 +44,9 @@ const FIGURE_GAP = 30;
 /** One side of a page's columns holding two of three: wider than this
  * share of the body (two columns' sides are each about half). */
 const THIRD_COLUMN_SIDE = 0.55;
+/** Points of blank space inside a line of text at most (word spaces of
+ * a justified line; an equation's parts stand further apart). */
+const LINE_GAP = 24;
 /** A rule over the columns' gap ending them: at least this share of the
  * width long. */
 const RULE_ACROSS = 0.2;
@@ -152,7 +155,7 @@ export function layOut(
 	const at = (x: number, y: number) => ink[y * width + x] === 1;
 	/** Mostly drawn, not written: a figure (its ink outside the page's
 	 * text boxes, ``text``). */
-	const drawn = (x0: number, x1: number, y0: number, y1: number) => {
+	const drawn = (x0: number, x1: number, y0: number, y1: number, share = 0.5) => {
 		if (!text) return false;
 		let all = 0;
 		let outside = 0;
@@ -162,7 +165,7 @@ export function layOut(
 					all++;
 					if (!text[y * width + x]) outside++;
 				}
-		return all > 50 && outside > all * 0.5;
+		return all > 50 && outside > all * share;
 	};
 	const whole: PageLayout = { columns: false, pieces: [] };
 
@@ -374,11 +377,14 @@ export function layOut(
 		const to = Math.round(x0 + across * 0.7);
 		const starts = to - from + 1 - GUTTER;
 		if (starts <= 0) return null;
-		// A figure's own gaps (between its panels) are not columns.
+		// A figure's own gaps (between its panels) are not columns: drawing
+		// on both sides of the middle. (A figure in one column, text in the
+		// other, does not hide their gap.)
 		const figures = new Map<string, boolean>();
+		const half = Math.round(x0 + across / 2);
 		const figure = (a: number, b: number) => {
 			const key = `${a}-${b}`;
-			if (!figures.has(key)) figures.set(key, drawn(x0, x1, a, b));
+			if (!figures.has(key)) figures.set(key, drawn(x0, half, a, b) && drawn(half + 1, x1, a, b));
 			return figures.get(key)!;
 		};
 		/** Per strip: ink rows in long uncrossed stretches; the current one. */
@@ -473,7 +479,7 @@ export function layOut(
 	 * least in rows ``y0``–``y1``, as a column of text has. A line is a run
 	 * of rows with much ink (lines of dense text touch; between them a row
 	 * has little). */
-	const filled = (x0: number, x1: number, y0: number, y1: number) => {
+	const filled = (x0: number, x1: number, y0: number, y1: number, whole = false) => {
 		const counts = Array.from({ length: y1 - y0 + 1 }, (_, i) => {
 			let count = 0;
 			for (let x = x0; x <= x1; x++) if (at(x, y0 + i)) count++;
@@ -484,15 +490,24 @@ export function layOut(
 		let full = 0;
 		for (const [a, b] of runs(counts.map((count) => count >= most * 0.3))) {
 			if (b - a < 2) continue; // a rule, not a line
+			// Across most of the side; with ``whole``, without a wide gap
+			// inside (an equation's "h.c." and its number, far apart, are no
+			// line of text).
 			let from = x1;
 			let to = x0;
-			for (let y = y0 + a; y <= y0 + b; y++)
-				for (let x = x0; x <= x1; x++)
-					if (at(x, y)) {
-						if (x < from) from = x;
-						if (x > to) to = x;
-					}
-			if (to - from >= (x1 - x0) * 0.6) full++;
+			let gap = 0;
+			let widest = 0;
+			for (let x = x0; x <= x1; x++) {
+				let ink = false;
+				for (let y = y0 + a; y <= y0 + b && !ink; y++) ink = at(x, y);
+				if (ink) {
+					if (from <= to) widest = Math.max(widest, gap);
+					if (x < from) from = x;
+					to = x;
+					gap = 0;
+				} else gap++;
+			}
+			if (to - from >= (x1 - x0) * 0.6 && (!whole || widest <= LINE_GAP)) full++;
 			if (full >= 3) return true;
 		}
 		return false;
@@ -514,7 +529,10 @@ export function layOut(
 		y1: number,
 		[gutterLeft, gutterRight]: [number, number],
 		x0 = left,
-		x1 = right
+		x1 = right,
+		/** A gap found within a part across the page (beside an abstract,
+		 * or before equations' numbers): lines of text whole only. */
+		inside = false
 	) => {
 		const rows = rowsIn(x0, x1);
 		// Rows crossing the gap are across the page. A few crossing rows
@@ -585,16 +603,13 @@ export function layOut(
 		// or of lines short of the column (a title's words in large type,
 		// equations and their numbers), are not columns either: across the
 		// page.
-		// Lines down at least half of a side's rows (an equation's too).
-		const lined = (a: number, b: number, band: { y0: number; y1: number }) => {
-			let count = 0;
-			for (let y = band.y0; y <= band.y1; y++)
-				for (let x = a; x <= b; x++)
-					if (at(x, y)) {
-						count++;
-						break;
-					}
-			return count >= (band.y1 - band.y0 + 1) * 0.5;
+		// Lines of text (runs of rows with ink) on a side: at least two.
+		const twoLines = (a: number, b: number, band: { y0: number; y1: number }) => {
+			const inked = Array.from({ length: band.y1 - band.y0 + 1 }, (_, i) => {
+				for (let x = a; x <= b; x++) if (at(x, band.y0 + i)) return true;
+				return false;
+			});
+			return runs(inked).filter(([s, e]) => e - s >= 3).length >= 2;
 		};
 		// Nothing at all in the gap (not even a rule's or an equation's few
 		// rows).
@@ -603,27 +618,50 @@ export function layOut(
 				for (let x = gutterLeft + inset; x <= gutterRight - inset; x++) if (at(x, y)) return false;
 			return true;
 		};
+		// Columns full of lines on both sides somewhere here: the page is set
+		// in columns (else the looser test below does not apply: a one-column
+		// page's figure labels may stand in two rows of short lines).
+		// (Also with a figure in one of them, where nothing crosses the gap:
+		// a figure at a column's top, its caption and text under it.)
+		const full = (band: { y0: number; y1: number; wide: boolean }) =>
+			!band.wide &&
+			filled(x0, gutterLeft - 1, band.y0, band.y1, inside) &&
+			filled(gutterRight + 1, x1, band.y0, band.y1, inside) &&
+			(!drawn(x0, x1, band.y0, band.y1) || clear(band));
+		const inColumns = bands.some(full);
 		for (const band of bands) {
-			if (band.wide) continue;
+			if (band.wide || full(band)) continue;
 			if (drawn(x0, x1, band.y0, band.y1)) {
 				band.wide = true;
 				continue;
 			}
-			const one = filled(x0, gutterLeft - 1, band.y0, band.y1);
-			const two = filled(gutterRight + 1, x1, band.y0, band.y1);
-			if (one && two) continue;
-			// One column of lines beside one mostly an equation, a clear gap
-			// between them, more than a few lines down: columns still.
-			const tall = band.y1 - band.y0 + 1 >= MIN_COLUMNS * 2;
-			// (Not a figure beside the text: the other side is text too.)
-			const other: [number, number] = one ? [gutterRight + 1, x1] : [x0, gutterLeft - 1];
+			// One side full of lines here (the other mostly an equation)
+			// says columns as well as full ones elsewhere on the page.
+			const oneFull =
+				filled(x0, gutterLeft - 1, band.y0, band.y1, inside) ||
+				filled(gutterRight + 1, x1, band.y0, band.y1, inside);
+			// Columns with few full lines (one mostly equations, the
+			// references' first lines at a page's foot, a column's last two
+			// lines beside the other's equations) are columns still where the
+			// gap between them is clear, in the middle (not the gap before
+			// equations' numbers), both sides have two lines at least,
+			// neither is a drawing (a figure beside the text), they go on for
+			// a few lines, and the page is set in columns (full ones elsewhere,
+			// or one side full here).
+			const tall = band.y1 - band.y0 + 1 >= MIN_COLUMNS;
+			const centred =
+				Math.abs((gutterLeft + gutterRight) / 2 - (x0 + x1) / 2) <= (x1 - x0 + 1) * 0.1;
 			if (
-				(one || two) &&
+				(inColumns || oneFull) &&
 				tall &&
+				centred &&
 				clear(band) &&
-				lined(x0, gutterLeft - 1, band) &&
-				lined(gutterRight + 1, x1, band) &&
-				!drawn(other[0], other[1], band.y0, band.y1)
+				twoLines(x0, gutterLeft - 1, band) &&
+				twoLines(gutterRight + 1, x1, band) &&
+				// (an equation's bars and roots are a little drawing; a figure
+				// is more)
+				!drawn(x0, gutterLeft - 1, band.y0, band.y1, 0.3) &&
+				!drawn(gutterRight + 1, x1, band.y0, band.y1, 0.3)
 			)
 				continue;
 			band.wide = true;
@@ -716,7 +754,7 @@ export function layOut(
 		return parts.some((part) => !part.wide) ? parts : column;
 	};
 	const place = (y0: number, y1: number, gutter: [number, number] | null, main: boolean) => {
-		const bands = gutter ? bandsOf(y0, y1, gutter) : [{ y0, y1, wide: true }];
+		const bands = gutter ? bandsOf(y0, y1, gutter, left, right, !main) : [{ y0, y1, wide: true }];
 		for (const band of bands) {
 			if (!band.wide && gutter) {
 				const one = extent(left, gutter[0] - 1, band.y0, band.y1);
