@@ -53,6 +53,13 @@
 		fabOpen = false;
 	}
 
+	/** The round button lives in the page's body: inside the sticky toolbar,
+	 * phone browsers let a fixed element jitter and shift as the page scrolls. */
+	function toBody(node: HTMLElement) {
+		document.body.append(node);
+		return { destroy: () => node.remove() };
+	}
+
 	function pick(color: string) {
 		store.color = color;
 		store.remember();
@@ -129,7 +136,7 @@
 	</div>
 </div>
 
-<div class="fab-area">
+<div class="fab-area" use:toBody>
 	{#if fabOpen}
 		<div class="fab-menu" role="toolbar" aria-label="Annotate">
 			<div class="fab-tools">
