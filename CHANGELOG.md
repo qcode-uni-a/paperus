@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.18 (2026-11-09)
 
 - **Search finds papers by their title and abstract**, with or without a
   file; a match of the searched words in a title or abstract ranks higher

@@ -569,7 +569,7 @@ wheels = [
 
 [[package]]
 name = "paperus-ml"
-version = "0.0.17"
+version = "0.0.18"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
