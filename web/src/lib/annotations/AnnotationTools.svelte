@@ -62,7 +62,7 @@
 		document.body.append(node);
 		const seen = window.visualViewport;
 		function follow() {
-			if (!seen || Math.abs(seen.scale - 1) < 0.01) {
+			if (!seen || seen.scale < 1.05) {
 				node.removeAttribute('style');
 				return;
 			}
@@ -289,12 +289,11 @@
 			   high by the bar's height. */
 			position: fixed;
 			right: 16px;
-			top: calc(100dvh - 16px - env(safe-area-inset-bottom, 0px));
-			transform: translateY(-100%);
+			top: calc(100dvh - 72px - env(safe-area-inset-bottom, 0px));
 			z-index: 20;
-			display: grid;
-			justify-items: end;
-			gap: 10px;
+			display: block;
+			width: 56px;
+			height: 56px;
 		}
 		.fab {
 			display: grid;
@@ -313,7 +312,11 @@
 				0 0 0 4px var(--mark),
 				0 4px 14px rgb(0 0 0 / 0.3);
 		}
+		/* Above the button. */
 		.fab-menu {
+			position: absolute;
+			right: 0;
+			bottom: calc(100% + 10px);
 			display: grid;
 			gap: 10px;
 			max-height: calc(100vh - 180px);
