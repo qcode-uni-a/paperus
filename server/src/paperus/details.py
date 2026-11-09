@@ -1,9 +1,9 @@
 """A paper's details (title and abstract) as one search passage
 (``ItemChunk``): search finds a paper by them, with or without a file, and
 ranks such a match above one in some text. Kept current on every change of
-an item's title or abstract (a hook on the session, so every way of
-changing them counts); vectors for search by meaning follow in the
-embedding sweep."""
+an item's title or abstract, its versions or its manual edits (a hook on
+the session, so every way of changing them counts); vectors for search by
+meaning follow in the embedding sweep."""
 
 import hashlib
 
@@ -11,12 +11,20 @@ from sqlalchemy import event, inspect
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, UOWTransaction
 
-from paperus.models import Chunk, Item, ItemChunk
+from paperus.abstracts import plain
+from paperus.library import citation_csl
+from paperus.models import Chunk, Item, ItemChunk, Version
 
 
 def text_of(item: Item) -> str:
-    """What is searched: the title, then the abstract (if any)."""
-    return "\n\n".join(part for part in (item.title, item.abstract) if part)
+    """What is searched: the title, then the abstract the paper shows (its
+    details' own, else one found for it), if any."""
+    abstract = citation_csl(item).get("abstract")
+    return "\n\n".join(
+        part
+        for part in (item.title, plain(str(abstract)) if abstract else None)
+        if part
+    )
 
 
 def index(db: Session, item: Item) -> None:
@@ -39,19 +47,23 @@ def index(db: Session, item: Item) -> None:
 
 def _changed(item: Item) -> bool:
     state = inspect(item)
-    return state.attrs.title.history.has_changes() or (
-        state.attrs.abstract.history.has_changes()
+    return any(
+        state.attrs[name].history.has_changes()
+        for name in ("title", "abstract", "overrides")
     )
 
 
 @event.listens_for(Session, "before_flush")
 def _note_changes(db: Session, flush: UOWTransaction, instances: object) -> None:
-    """Remember the items whose title or abstract is new (indexed once they
-    are written, when new ones have their ids)."""
+    """Remember the items whose title or abstract may be new (indexed once
+    they are written, when new ones have their ids): new or changed, or with
+    a version added, changed or removed."""
     pending = db.info.setdefault("paperus_details", set())
-    for obj in (*db.new, *db.dirty):
+    for obj in (*db.new, *db.dirty, *db.deleted):
         if isinstance(obj, Item) and (obj in db.new or _changed(obj)):
             pending.add(obj)
+        elif isinstance(obj, Version) and obj.item is not None:
+            pending.add(obj.item)
 
 
 @event.listens_for(Session, "after_flush_postexec")

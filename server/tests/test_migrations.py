@@ -61,3 +61,37 @@ def test_0002_gives_papers_there_are_their_details(
         "Rainfall records",
         "Snowfall records\n\nDaily depths.",
     ]
+
+
+def test_0003_gives_papers_the_abstract_of_their_details(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """An installation of 0.0.18 updated: a paper whose abstract came with
+    its details (0002 took only those found for it) found by it too."""
+    response = logged_in.post(
+        "/api/items",
+        json={
+            "metadata": {
+                "title": "Glacier retreat",
+                "abstract": "<jats:p>Ice loss in the Alps.</jats:p>",
+            }
+        },
+    )
+    item_id = uuid.UUID(response.json()["id"])
+    title_only = db.get(ItemChunk, item_id)
+    assert title_only is not None
+    db.merge(Chunk(sha256=b"\0" * 32, text="Glacier retreat"))
+    title_only.chunk_sha256 = b"\0" * 32
+    db.commit()
+    db.close()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.downgrade(config, "0002")
+    command.upgrade(config, "head")
+
+    text = db.scalar(
+        select(Chunk.text)
+        .join(ItemChunk, ItemChunk.chunk_sha256 == Chunk.sha256)
+        .where(ItemChunk.item_id == item_id)
+    )
+    assert text == "Glacier retreat\n\nIce loss in the Alps."

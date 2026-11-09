@@ -72,6 +72,45 @@ def test_details_follow_the_title_and_abstract(
     assert hit["kind"] == "details"
 
 
+def test_details_take_the_abstract_the_paper_shows(
+    logged_in: TestClient, db: Session
+) -> None:
+    """Its details' own abstract (as text), a manual edit of it, a new
+    version's."""
+    response = logged_in.post(
+        "/api/items",
+        json={
+            "metadata": {
+                "title": "Glacier retreat",
+                "abstract": "<jats:p>Ice loss in the Alps.</jats:p>",
+            }
+        },
+    )
+    item_id = response.json()["id"]
+    assert details_of(db, item_id) == "Glacier retreat\n\nIce loss in the Alps."
+
+    response = logged_in.put(
+        f"/api/items/{item_id}/overrides",
+        json={"abstract": "Ice loss since 1850."},
+        headers={"If-Match": response.headers["ETag"]},
+    )
+    assert response.status_code == 200, response.text
+    assert details_of(db, item_id) == "Glacier retreat\n\nIce loss since 1850."
+    [hit] = search(logged_in, "1850", mode="keyword")
+    assert hit["kind"] == "details"
+
+    other = add_item(logged_in, "Glacier records")
+    response = logged_in.post(
+        f"/api/items/{other}/versions",
+        json={
+            "kind": "published",
+            "metadata": {"title": "Glacier records", "abstract": "Lengths."},
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert details_of(db, other) == "Glacier records\n\nLengths."
+
+
 def test_a_title_match_comes_before_a_mention(
     logged_in: TestClient, db: Session, blobs: BlobStore
 ) -> None:

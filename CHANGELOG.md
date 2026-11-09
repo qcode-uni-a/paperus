@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Search by title and abstract** also finds a paper by the abstract in
+  its own details (from Crossref, an import or typed in), not only by one
+  found for it elsewhere: in 0.0.18, more than half of the papers were
+  searched by their title alone. It follows a manual edit of the abstract
+  and a new version too. A new migration (`0003`) makes those passages
+  again for the papers already there.
+
 ## 0.0.18 (2026-11-09)
 
 - **Search finds papers by their title and abstract**, with or without a
