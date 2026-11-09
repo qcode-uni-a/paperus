@@ -202,6 +202,13 @@ export class FileAnnotations {
 			this.history.push({ undo: 'add', snapshot: gone, what: `deleting ${named(gone)}` });
 	}
 
+	/** Gone as if never made: a text annotation left without words. It
+	 * leaves no step to undo either. */
+	async discard(id: string) {
+		this.history = this.history.filter((step) => step.undo === 'add' || step.id !== id);
+		await this.remove(id, false);
+	}
+
 	/** "Undo adding the highlight", for the button; null with nothing to undo. */
 	get undoLabel(): string | null {
 		const last = this.history.at(-1);

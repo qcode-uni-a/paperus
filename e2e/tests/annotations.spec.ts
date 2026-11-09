@@ -16,6 +16,16 @@ async function select(page: Page, text: string) {
 	}, text);
 }
 
+/** Where the file's (only) annotation is on the screen now (the page may
+ * have scrolled), shown whole. */
+async function where(page: Page, file: string) {
+	const [only] = (await (await page.request.get(`/api/files/${file}/annotations`)).json())
+		.annotations;
+	const mark = page.locator(`#annotation-${only.id}`);
+	await mark.scrollIntoViewIfNeeded();
+	return (await mark.boundingBox())!;
+}
+
 async function count(page: Page, file: string): Promise<number> {
 	const listed = await (await page.request.get(`/api/files/${file}/annotations`)).json();
 	return listed.annotations.length;
@@ -79,7 +89,8 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	await tools.getByRole('button', { name: 'Select text' }).click();
 
 	// Delete deletes the open annotation; Ctrl+Z brings it back, comment too.
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	const here = await where(page, file);
+	await page.mouse.click(here.x + here.width / 2, here.y + here.height / 2);
 	await expect(popup).toBeVisible();
 	await page.keyboard.press('Delete');
 	await expect.poll(() => count(page, file)).toBe(0);
@@ -88,9 +99,10 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 
 	// The eraser takes highlights too (and Ctrl+Z brings it back again).
 	await tools.getByRole('button', { name: 'Eraser', exact: true }).click();
-	await page.mouse.move(box.x + 2, box.y + box.height / 2);
+	const there = await where(page, file);
+	await page.mouse.move(there.x + 2, there.y + there.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+	await page.mouse.move(there.x + there.width / 2, there.y + there.height / 2, { steps: 4 });
 	await page.mouse.up();
 	await expect.poll(() => count(page, file)).toBe(0);
 	await page.keyboard.press('ControlOrMeta+z');
@@ -104,6 +116,33 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	await list.getByRole('button', { name: 'Add note from all' }).click();
 	await expect(page).toHaveURL(/\/notes\//);
 	await expect(page.getByText(/We study the/)).toBeVisible();
+});
+
+test('words on the page without words are discarded', async ({ page }) => {
+	const paper = await uploadPaper(page, 'Wordless');
+	const pdf = page.locator('#page-1');
+	await expect(pdf.locator('.textLayer span').first()).toBeVisible({ timeout: 20_000 });
+	const file = (await (await page.request.get(`/api/items/${paper.id}`)).json()).versions[0]
+		.files[0].id;
+	const tools = page.getByRole('toolbar', { name: 'Annotate' }).first();
+	const sheet = (await pdf.boundingBox())!;
+	const popup = page.getByRole('dialog', { name: 'Text' });
+
+	// Closed without words: gone, and nothing to undo.
+	await tools.getByRole('button', { name: 'Text', exact: true }).click();
+	await page.mouse.click(sheet.x + 120, Math.max(sheet.y, 0) + 250);
+	await expect(popup).toBeVisible();
+	await expect.poll(() => count(page, file)).toBe(1);
+	await page.keyboard.press('Escape');
+	await expect(popup).toBeHidden();
+	await expect.poll(() => count(page, file)).toBe(0);
+	await expect(tools.getByRole('button', { name: 'Undo' })).toBeDisabled();
+
+	// With words: kept.
+	await page.mouse.click(sheet.x + 120, Math.max(sheet.y, 0) + 250);
+	await popup.getByLabel('Text').fill('See section 2');
+	await popup.getByRole('button', { name: 'Close' }).click();
+	await expect.poll(() => count(page, file)).toBe(1);
 });
 
 test.describe('on a phone', () => {

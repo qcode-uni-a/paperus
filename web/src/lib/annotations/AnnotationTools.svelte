@@ -107,7 +107,13 @@
 
 	$effect(() => {
 		const key = (event: KeyboardEvent) => {
-			if (event.key === 'Escape' && store.tool !== 'select' && !store.selected) {
+			// Esc puts the tool away, unless it just closed a popup.
+			if (
+				event.key === 'Escape' &&
+				!event.defaultPrevented &&
+				store.tool !== 'select' &&
+				!store.selected
+			) {
 				store.tool = 'select';
 			}
 			// The annotation open in its popup, if one's own: Delete (or

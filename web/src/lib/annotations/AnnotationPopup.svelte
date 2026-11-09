@@ -30,6 +30,21 @@
 	let words = $state('');
 	let tag = $state('');
 	let commentField = $state<HTMLTextAreaElement>();
+	let wordsField = $state<HTMLTextAreaElement>();
+
+	// Words on the page without words are none: when the popup lets go of
+	// one (closed, another one opened, a click elsewhere), a new one is
+	// discarded, one whose words were all deleted is deleted (Undo brings it
+	// back). Before the reset below, while ``words`` are still its own.
+	$effect(() => {
+		const id = annotation.id;
+		return () => {
+			const left = store.list.find((a) => a.id === id);
+			if (left?.kind !== 'text' || !left.mine || words.trim()) return;
+			if (left.text?.trim()) store.remove(id);
+			else store.discard(id);
+		};
+	});
 
 	// Start from the annotation each time another one opens.
 	$effect(() => {
@@ -42,7 +57,10 @@
 	$effect(() => {
 		if (!annotation?.mine) return;
 		const fresh = Date.now() - new Date(annotation.created_at).getTime() < 3000;
-		if (fresh && !annotation.comment && annotation.kind !== 'text') commentField?.focus();
+		if (!fresh) return;
+		if (annotation.kind === 'text') {
+			if (!annotation.text) wordsField?.focus();
+		} else if (!annotation.comment) commentField?.focus();
 	});
 
 	const left = $derived(Math.max(8, Math.min(box.left, pageWidth - WIDTH - 8)));
@@ -54,7 +72,9 @@
 		if (!annotation) return;
 		const changes: { comment?: string; text?: string } = {};
 		if (comment !== (annotation.comment ?? '')) changes.comment = comment;
-		if (annotation.kind === 'text' && words !== (annotation.text ?? '')) changes.text = words;
+		// No words: not saved as such (see above: it goes when the popup closes).
+		if (annotation.kind === 'text' && words.trim() && words !== (annotation.text ?? ''))
+			changes.text = words;
 		if (Object.keys(changes).length) store.change(annotation.id, changes);
 	}
 
@@ -108,8 +128,12 @@
 	{#if annotation.mine}
 		{#if annotation.kind === 'text'}
 			<label class="field"
-				>Text <textarea bind:value={words} rows="3" onblur={save} placeholder="Words on the page"
-				></textarea></label
+				>Text <textarea
+					bind:this={wordsField}
+					bind:value={words}
+					rows="3"
+					onblur={save}
+					placeholder="Words on the page"></textarea></label
 			>
 			<label class="inline"
 				>Size <select
