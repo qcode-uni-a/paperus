@@ -45,7 +45,7 @@ for (const file of readdirSync(join(HERE, 'pages')).sort()) {
 		const [, height] = spec.size;
 		spec.lines.forEach((line, i) => {
 			if (line.role !== 'furniture' || pieceOf[i] < 0) return;
-			if (line.box[1] < height * 0.06 || line.box[3] > height * 0.94) return;
+			if (line.box[1] < height * 0.04 || line.box[3] > height * 0.96) return;
 			const [x, y] = middle(line.box);
 			const inFigure = spec.figures.some(
 				({ box: [x0, y0, x1, y1] }) => x >= x0 - 4 && x <= x1 + 4 && y >= y0 - 4 && y <= y1 + 4
@@ -64,7 +64,7 @@ for (const file of readdirSync(join(HERE, 'pages')).sort()) {
 		// Lines left out at the page's top or bottom edge: a header or a
 		// footer the measuring missed.
 		const edge = (line: Spec['lines'][number]) =>
-			line.box[3] < spec.size[1] * 0.1 || line.box[1] > spec.size[1] * 0.9;
+			line.box[3] < spec.size[1] * 0.12 || line.box[1] > spec.size[1] * 0.88;
 		let order = 0;
 		for (const { line, piece } of body) {
 			if (piece < 0 && edge(line)) {
@@ -87,7 +87,10 @@ for (const file of readdirSync(join(HERE, 'pages')).sort()) {
 					([a, b, c, d]) => c > a && d > b && (c - a) * (d - b) > (x1 - x0) * (y1 - y0) * 0.05
 				)
 				.map((box) => box.map((v) => Math.round(v * 10) / 10) as [number, number, number, number]);
-			if (parts.length > 1) figure.parts = parts;
+			// Divided, or partly left out (a cover's picture reaching into the
+			// margin): what is shown, each part whole.
+			const shown = parts.reduce((sum, [a, b, c, d]) => sum + (c - a) * (d - b), 0);
+			if (parts.length > 1 || shown < (x1 - x0) * (y1 - y0) * 0.9) figure.parts = parts;
 			else delete figure.parts;
 		}
 		writeFileSync(path, JSON.stringify(spec, null, 1) + '\n');

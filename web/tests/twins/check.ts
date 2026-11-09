@@ -90,6 +90,17 @@ export function check(spec: Spec, layout: PageLayout): Checked {
 		}
 	}
 
+	// Pieces side by side or one after another, not over each other (their
+	// half-line margins aside).
+	pieces.forEach((a, i) =>
+		pieces.slice(i + 1).forEach((b, k) => {
+			const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+			const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+			if (w > 6 && h > 6 && w * h > Math.min(a.width * a.height, b.width * b.height) * 0.1)
+				problems.push(`pieces ${i} and ${i + 1 + k} overlap`);
+		})
+	);
+
 	// Running headers and footers: in no piece.
 	spec.lines.forEach((line, i) => {
 		if (line.role === 'furniture' && pieceOf[i] >= 0)

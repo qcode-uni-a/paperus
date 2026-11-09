@@ -92,6 +92,36 @@ function joined(found: [number, number][], gap: number): [number, number][] {
 	return out;
 }
 
+/** Long thin upright lines (a rule between columns, a box's side, a
+ * plot's axis) left out: across them every row has ink, as if the page
+ * were one line. */
+function withoutUprights(ink: Uint8Array, width: number, height: number): Uint8Array {
+	const out = new Uint8Array(ink);
+	const LONG = 80;
+	for (let x = 0; x < width; x++) {
+		let start = -1;
+		for (let y = 0; y <= height; y++) {
+			const on = y < height && ink[y * width + x] === 1;
+			if (on && start < 0) start = y;
+			if (on || start < 0) continue;
+			if (y - start >= LONG) {
+				// Thin: little ink a few points either side along it.
+				let beside = 0;
+				for (let r = start; r < y; r++) {
+					if (x >= 3 && ink[r * width + x - 3]) beside++;
+					if (x + 3 < width && ink[r * width + x + 3]) beside++;
+				}
+				if (beside < (y - start) * 0.4)
+					for (let r = start; r < y; r++)
+						for (let dx = -1; dx <= 1; dx++)
+							if (x + dx >= 0 && x + dx < width) out[r * width + x + dx] = 0;
+			}
+			start = -1;
+		}
+	}
+	return out;
+}
+
 /** A page's pieces from its ink (``width`` × ``height`` pixels, one a
  * point). ``first``: the document's first page (its top line is a title,
  * not a running header). */
@@ -102,6 +132,7 @@ export function layOut(
 	first = false,
 	text: Uint8Array | null = null
 ): PageLayout {
+	ink = withoutUprights(ink, width, height);
 	const at = (x: number, y: number) => ink[y * width + x] === 1;
 	/** Mostly drawn, not written: a figure (its ink outside the page's
 	 * text boxes, ``text``). */
@@ -149,7 +180,7 @@ export function layOut(
 	for (let y = 0; y < height * EDGE; y++) if (inRow[y] && rule(y)) headEnd = y;
 	let footStart = height;
 	for (let y = height - 1; y > height * (1 - EDGE); y--) if (inRow[y] && rule(y)) footStart = y;
-	const lines = runs(inRow).filter(([a, b]) => a > headEnd && b < footStart);
+	const lines = runs(inRow, headEnd + 1, footStart - 1);
 	if (!lines.length) return whole;
 	// Running headers and footers (page numbers, journal lines, logos)
 	// left out: up to two blocks at each edge, apart from the body. On the
@@ -299,9 +330,11 @@ export function layOut(
 		let last = y;
 		let far = 0;
 		for (; within(y); y += step) {
-			if (Math.abs(y - start) > MIN_COLUMNS) return null;
 			if (inRow[y]) {
 				if (far >= BLOCK_SPLIT) break;
+				// The rows themselves a few lines at most (the space after
+				// them may be wide).
+				if (Math.abs(y - start) > MIN_COLUMNS) return null;
 				last = y;
 				far = 0;
 			} else far++;
@@ -344,9 +377,13 @@ export function layOut(
 		// Rows crossing the gap are across the page. A few crossing rows
 		// alone (a rule, an equation reaching over) are not; a crossing line
 		// is whole, its accents and descenders with it.
+		// The gap's middle half: a column's lines may reach into its edges
+		// (justified to them, or hanging out at a reference's start).
+		const inset = Math.max(0, Math.floor((gutterRight - gutterLeft + 1 - 3) / 4));
 		const crosses = Array.from({ length: y1 - y0 + 1 }, (_, i) => {
 			if (!inRow[y0 + i]) return false;
-			for (let x = gutterLeft; x <= gutterRight; x++) if (at(x, y0 + i)) return true;
+			for (let x = gutterLeft + inset; x <= gutterRight - inset; x++)
+				if (at(x, y0 + i)) return true;
 			return false;
 		});
 		for (const [a, b] of runs(crosses))
@@ -441,7 +478,14 @@ export function layOut(
 				}
 			}
 		});
-		return merged.filter((band) => band.y1 >= band.y0);
+		// Stretched bands may have reached into each other: none overlaps.
+		let last = y0 - 1;
+		return merged.filter((band) => {
+			band.y0 = Math.max(band.y0, last + 1);
+			if (band.y1 < band.y0) return false;
+			last = band.y1;
+			return true;
+		});
 	};
 
 	// The page's two columns run on over any blank space. A part across
