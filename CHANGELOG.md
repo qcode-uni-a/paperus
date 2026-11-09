@@ -11,6 +11,9 @@
   the first gap found left two of them as one piece, too small to read on
   a phone. A title and abstract over two of the columns stay whole above
   them.
+- **Fluent mode** leaves out text running up the margin (a publisher's
+  "Downloaded from …" line, arXiv's stamp) by the PDF's own text, however
+  close it sits to the columns; it showed as a sliver beside them.
 - **Undo for annotations**: an Undo button in the annotation tools (it
   says what it takes back) and Ctrl+Z (⌘Z): adding, changing (a comment
   written in several goes is one step) and deleting, the eraser's too.
