@@ -999,6 +999,19 @@ class NoteChunk(Base):
     chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
 
 
+class ItemChunk(Base):
+    """A paper's details (its title and abstract) as one search passage, so
+    that search finds it by them, with or without a file, and ranks such a
+    match higher. Kept current on every change (``paperus.details``)."""
+
+    __tablename__ = "item_chunks"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    chunk_sha256: Mapped[bytes] = mapped_column(ForeignKey("chunks.sha256"), index=True)
+
+
 class ImportStatus(StrEnum):
     NEEDS_CHOICES = "needs_choices"
     """A paperus export: waiting for the person to choose where each of its

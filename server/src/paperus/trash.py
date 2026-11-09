@@ -18,6 +18,7 @@ from paperus.models import (
     Import,
     ImportPart,
     Item,
+    ItemChunk,
     Note,
     NoteChunk,
     Version,
@@ -79,7 +80,8 @@ def _count(result: object) -> int:
 
 def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
     """Remove stored contents no file or waiting import uses, and passages no
-    file or note uses (with their vectors); returns (contents, bytes)."""
+    file, note or paper's details use (with their vectors); returns
+    (contents, bytes)."""
     orphans = db.execute(
         select(Blob.sha256, Blob.size).where(
             ~exists().where(File.blob_sha256 == Blob.sha256),
@@ -93,6 +95,7 @@ def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
         delete(Chunk).where(
             ~exists().where(FileChunk.chunk_sha256 == Chunk.sha256),
             ~exists().where(NoteChunk.chunk_sha256 == Chunk.sha256),
+            ~exists().where(ItemChunk.chunk_sha256 == Chunk.sha256),
         )
     )
     db.commit()

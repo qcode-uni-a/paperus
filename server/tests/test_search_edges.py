@@ -54,7 +54,8 @@ def add(
 def titles(person: Person, **params: str) -> list[str]:
     response = person.get("/api/search", params={"q": "rain", **params})
     assert response.status_code == 200, response.text
-    return sorted(p["item_title"] for p in response.json())
+    # The papers found (each may be found by its title and by its text).
+    return sorted({p["item_title"] for p in response.json()})
 
 
 def test_one_owners_papers(

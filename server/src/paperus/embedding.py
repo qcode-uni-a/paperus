@@ -13,6 +13,8 @@ from paperus.models import (
     Embedding,
     File,
     FileChunk,
+    Item,
+    ItemChunk,
     Note,
     NoteChunk,
     TextStatus,
@@ -129,3 +131,26 @@ def notes_missing_embeddings(
             .limit(limit)
         )
     )
+
+
+def details_missing_embeddings(
+    db: Session, model: str, limit: int = 1000
+) -> list[Chunk]:
+    """Papers' details passages (title and abstract) lacking a vector."""
+    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
+    return list(
+        db.scalars(
+            select(Chunk)
+            .join(ItemChunk, ItemChunk.chunk_sha256 == Chunk.sha256)
+            .join(Item, Item.id == ItemChunk.item_id)
+            .where(Item.deleted_at.is_(None), Chunk.sha256.not_in(has_vector))
+            .distinct()
+            .limit(limit)
+        )
+    )
+
+
+def embed_details(db: Session, ml: MLClient, model: str) -> int:
+    """Embed papers' details passages that lack a vector; returns the count."""
+    vectors = ml.vectors_name(model)
+    return _embed(db, ml, model, vectors, details_missing_embeddings(db, vectors))

@@ -12797,7 +12797,8 @@
             "type": "string",
             "enum": [
               "paper",
-              "note"
+              "note",
+              "details"
             ],
             "title": "Kind",
             "default": "paper"

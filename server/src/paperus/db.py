@@ -9,6 +9,9 @@ def make_engine(database_url: str) -> Engine:
 
 
 def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
+    # Hooks on every session: change numbers, papers' details for search.
+    from paperus import changes, details  # noqa: F401
+
     return sessionmaker(engine, expire_on_commit=False)
 
 

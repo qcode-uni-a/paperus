@@ -2847,7 +2847,7 @@ export type Passage = {
     /**
      * Kind
      */
-    kind?: 'paper' | 'note';
+    kind?: 'paper' | 'note' | 'details';
     /**
      * Item Id
      */

@@ -238,7 +238,8 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                 source = passage.item_id or passage.note_id
                 if source is None:
                     continue
-                key = (passage.kind, source)
+                # A paper's details (title, abstract) and its passages: one.
+                key = ("note" if passage.kind == "note" else "paper", source)
                 found = groups.get(key)
                 if found is None:
                     if len(groups) == max(1, min(limit, 20)):
@@ -260,7 +261,7 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                     )
                     continue
                 item_id = source_id
-                files = {p.file_id for p in found}
+                files = {p.file_id for p in found if p.kind == "paper"}
                 paper: dict[str, Any] = {
                     "title": found[0].item_title,
                     "paper_id": str(item_id),
@@ -280,7 +281,9 @@ def build_mcp(state: Any) -> MCPServer:  # noqa: ANN401 (Starlette's app.state)
                 if len(files) == 1:
                     paper["file_id"] = str(found[0].file_id)
                 paper["passages"] = [
-                    {
+                    {"in": "title and abstract", "text": _plain(p.snippet)}
+                    if p.kind == "details"
+                    else {
                         **({} if len(files) == 1 else {"file_id": str(p.file_id)}),
                         "n": p.position,
                         "page": p.page,

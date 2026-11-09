@@ -72,7 +72,8 @@
 		const bySource = new Map<string, Group>();
 		for (const passage of passages ?? []) {
 			const id = passage.item_id ?? passage.note_id ?? '';
-			const kind = passage.kind ?? 'paper';
+			// A paper's details (title, abstract) belong with its passages.
+			const kind = passage.kind === 'note' ? 'note' : 'paper';
 			const authors = shortAuthors(passage.item_authors ?? []);
 			const year = passage.item_year ? `(${passage.item_year})` : '';
 			const byline = [authors, year].filter(Boolean).join(' ');
@@ -241,7 +242,11 @@
 						<ul class="passages">
 							{#each allOf[group.id] ?? group.passages as passage (passage.passage_id)}
 								<li>
-									{#if group.kind === 'paper'}
+									{#if passage.kind === 'details'}
+										<a class="where" href={resolve('/items/[id]', { id: group.id })}
+											>Title, abstract</a
+										>
+									{:else if group.kind === 'paper'}
 										<a
 											class="where"
 											href="{resolve('/items/[id]', { id: group.id })}?{new URLSearchParams({

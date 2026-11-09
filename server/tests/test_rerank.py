@@ -55,8 +55,9 @@ def test_auto_reranks_only_on_a_gpu(
     assert [h["item_title"] for h in hits] == ["Light rain", hits[1]["item_title"]]
     assert len(hits) == 2
     assert all(h["reranked"] for h in hits)
-    # It had more hits to choose from than were asked for.
-    assert len(fake_ml.reranked[-1]["passages"]) == 3
+    # It had more hits to choose from than were asked for (each paper's
+    # passage and its details, title and abstract).
+    assert len(fake_ml.reranked[-1]["passages"]) == 6
 
 
 def test_on_off_and_failures(

@@ -269,15 +269,17 @@ def test_missing_embeddings_and_another_model_file(
         "queue_missing_embeddings succeeded": 1,
         "embed_file succeeded": 1,
         "embed_note succeeded": 1,
+        "embed_details succeeded": 1,
     }
-    assert embedded(db) == 2
+    # The file's passage, the note's, the paper's details.
+    assert embedded(db) == 3
 
     # The ML service now runs another file of the model (a GPU's): its
     # vectors differ, so everything is embedded again.
     fake_ml.variant = "fp16"
     root.post("/api/admin/jobs/embeddings")
     run_jobs(worker)
-    assert embedded(db, "bge-m3@fp16") == 2
+    assert embedded(db, "bge-m3@fp16") == 3
     assert system.vectors_in_use(db, "bge-m3") == "bge-m3@fp16"
     root.post("/api/admin/jobs/embeddings")
     assert run_jobs(worker) == {"queue_missing_embeddings succeeded": 1}

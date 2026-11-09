@@ -32,14 +32,19 @@ QUERY_TIMEOUT = 30.0
 # search waits for it before showing them in the usual order.
 RERANK_POOL = 40
 RERANK_TIMEOUT = 15.0
+# A match in a paper's title or abstract (its details) counts this much more
+# than one in a passage of some text.
+DETAILS_WEIGHT = 2.0
 
 
 class Passage(BaseModel):
     passage_id: str
-    """``<file id>#<position>`` (or the note's id for notes): stable while the
-    text is unchanged."""
-    kind: Literal["paper", "note"] = "paper"
-    """From a paper's file, or from a note."""
+    """``<file id>#<position>`` (or the note's id for notes; ``<paper
+    id>#details`` for a paper's details): stable while the text is
+    unchanged."""
+    kind: Literal["paper", "note", "details"] = "paper"
+    """From a paper's file, from a note, or a paper's details (its title and
+    abstract)."""
     item_id: uuid.UUID | None
     """The paper (not for notes)."""
     item_title: str
@@ -96,9 +101,20 @@ _SEARCH = text(
           AND (cardinality(CAST(:types AS text[])) = 0
                OR 'note' = ANY(CAST(:types AS text[])))
           AND CAST(:item AS uuid) IS NULL
+        UNION ALL
+        -- A paper's details: its title and abstract, with or without a file.
+        SELECT 'details', i.id, 0, NULL, ic.chunk_sha256, false,
+               NULL, i.id, i.title
+        FROM item_chunks ic JOIN items i ON i.id = ic.item_id
+        WHERE i.deleted_at IS NULL
+          AND (i.archived_at IS NULL OR :archived OR CAST(:item AS uuid) IS NOT NULL)
+          AND i.library_id = ANY(CAST(:libraries AS uuid[]))
+          AND (cardinality(CAST(:types AS text[])) = 0
+               OR i.type = ANY(CAST(:types AS text[])))
+          AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
     ),
     keyword AS (
-        SELECT vis.source_id, vis.position, row_number() OVER (
+        SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
                    ORDER BY ts_rank_cd(c.tsv, q.tsq) DESC, vis.source_id, vis.position
                ) AS rank
         FROM visible vis JOIN chunks c ON c.sha256 = vis.chunk_sha256, q
@@ -106,7 +122,7 @@ _SEARCH = text(
         ORDER BY rank LIMIT :candidates
     ),
     meaning AS (
-        SELECT vis.source_id, vis.position, row_number() OVER (
+        SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
                    ORDER BY e.embedding <=> CAST(:vector AS halfvec),
                             vis.source_id, vis.position
                ) AS rank
@@ -117,13 +133,16 @@ _SEARCH = text(
         ORDER BY rank LIMIT :candidates
     ),
     fused AS (
-        SELECT source_id, position, sum(1.0 / ({RRF_K} + rank)) AS score,
+        SELECT source_id, position,
+               sum(CASE WHEN kind = 'details' AND source = 'keyword'
+                        THEN {DETAILS_WEIGHT} ELSE 1.0 END
+                   / ({RRF_K} + rank)) AS score,
                bool_or(source = 'keyword') AS by_keyword,
                bool_or(source = 'meaning') AS by_meaning
         FROM (
-            SELECT source_id, position, rank, 'keyword' AS source FROM keyword
+            SELECT source_id, position, kind, rank, 'keyword' AS source FROM keyword
             UNION ALL
-            SELECT source_id, position, rank, 'meaning' AS source FROM meaning
+            SELECT source_id, position, kind, rank, 'meaning' AS source FROM meaning
         ) AS candidates
         GROUP BY source_id, position
     ),
@@ -242,7 +261,8 @@ def run_search(
     )
     passages = [
         Passage(
-            passage_id=f"{row['source_id']}#{row['position']}",
+            passage_id=f"{row['source_id']}#"
+            + ("details" if row["kind"] == "details" else str(row["position"])),
             kind=row["kind"],
             item_id=row["item_id"],
             item_title=row["item_title"],

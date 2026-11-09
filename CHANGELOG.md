@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Search finds papers by their title and abstract**, with or without a
+  file; a match of the searched words in a title or abstract ranks higher
+  than one in some text (`item_chunks`, added to the one migration). On
+  the evaluation questions: the right paper first 68% of the time (was
+  66%), among the first five 93% (was 89%).
+
 ## 0.0.17 (2026-11-09)
 
 - **Database**: the one migration (`0001`) gained `items.abstract`, the

@@ -39,6 +39,8 @@ from paperus.backup import create_backup, due, last_backup_time, prune
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
 from paperus.embedding import (
+    details_missing_embeddings,
+    embed_details,
     embed_file,
     embed_note,
     files_missing_embeddings,
@@ -218,6 +220,23 @@ def embed_a_note(note_id: str) -> None:
     log.info("embedded %d chunks of note %s", count, note_id)
 
 
+@tasks.task(
+    name="embed_details",
+    queue="ml",
+    retry=RetryStrategy(
+        max_attempts=10, exponential_wait=2, retry_exceptions={MLUnavailable}
+    ),
+)
+def embed_papers_details() -> None:
+    """Papers' titles and abstracts (``paperus.details``), all at once: each
+    is one short passage."""
+    context = _worker_context()
+    with context.sessions() as db:
+        model = load_config(db, context.settings).embedding_model
+        count = embed_details(db, context.ml, model)
+    log.info("embedded %d papers' details", count)
+
+
 @tasks.periodic(cron="*/10 * * * *")
 @tasks.task(
     name="queue_missing_embeddings",
@@ -244,6 +263,8 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
             queue_embedding(job.app, file_id)
         for note_id in notes_missing_embeddings(db, vectors):
             queue_note_embedding(job.app, note_id)
+        if details_missing_embeddings(db, vectors, limit=1):
+            _queue(job.app, "embed_details", "embed-details")
 
 
 def queue_embedding_sweep(app: App) -> None:

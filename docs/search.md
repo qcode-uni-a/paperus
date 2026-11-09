@@ -4,6 +4,11 @@
 
 - Full text of papers and other files, split into chunks; scanned pages
   and images by their text read with OCR (below).
+- Each paper's details: its title and abstract as one more passage
+  (`item_chunks`, kept current on every change by `paperus.details`), so a
+  paper is found by them with or without a file. A keyword match there
+  counts double in the fusion (`DETAILS_WEIGHT`); one by meaning counts
+  like any passage (a title and abstract match many questions loosely).
 - Notes (Markdown, split by heading or paragraph).
 - Annotations: highlighted text plus the comment, linked to the passage.
 - Optionally tags and collection descriptions.
@@ -244,3 +249,19 @@ HNSW (`m = 16`, `ef_construction = 64`), median time and recall by
   first, which an HNSW index cannot serve as it is; it would need to ask
   the index for the nearest passages of one model and filter after
   (iterative scan), with a partial index per model.
+
+### Titles and abstracts (2026-11-09)
+
+Each paper's title and abstract became one more passage (see "What is
+indexed"). On the 44 questions, without reranking:
+
+| Mode, questions | Before (hit@1 / hit@5 / MRR) | Details, both kinds of match ×2 | Details, keyword matches ×2 |
+| --- | --- | --- | --- |
+| Hybrid, all | 0.66 / 0.89 / 0.76 | 0.64 / 0.91 / 0.76 | **0.68 / 0.93 / 0.78** |
+| Hybrid, meaning | 0.64 / 0.92 / 0.76 | 0.60 / 0.84 / 0.71 | 0.68 / 0.92 / 0.78 |
+| Hybrid, German | 0.25 / 0.25 / 0.25 | 0.75 / 1.00 / 0.83 | 0.25 / 0.75 / 0.40 |
+| Meaning, all | 0.68 / 0.89 / 0.77 | 0.57 / 0.91 / 0.72 | 0.70 / 0.93 / 0.79 |
+
+Weighting matches by meaning too lets summaries (which match many questions
+loosely) push the passage that answers down; weighting keyword matches only
+is better or equal on every kind of question, and kept.
