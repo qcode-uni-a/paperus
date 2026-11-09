@@ -1,5 +1,6 @@
-/** Why saving went wrong, where the page could not show it (a browser's own
- * PDF viewer lets no extension in); and, if access to the PDF's site is
+/** Why saving went wrong, or saved only the paper without its PDF, where
+ * the page could not show it (a browser's own PDF viewer lets no extension
+ * in); and, if access to the PDF's site is
  * what is missing, a button that asks for it (only an extension page may,
  * and only on a click) and saves again. */
 
@@ -11,6 +12,10 @@ const site = query.get('site');
 const tabId = Number(query.get('tab'));
 
 $('text').textContent = query.get('text') ?? '';
+if (query.get('outcome') === 'warning') {
+	$('heading').textContent = 'Saved without its PDF';
+	document.title = 'paperus: saved without its PDF';
+}
 $('allow').hidden = !site;
 
 $('allow').addEventListener('click', async () => {

@@ -28,7 +28,10 @@ const FIREFOX = chrome.runtime.getURL("").startsWith("moz-extension:");
 type Pdf =
   | { base64: string; size: number }
   | { error: string; status?: number; html?: string };
-type Saved = { ok: true; text: string; link: string };
+/** Saved; with ``warning``, only in part: the paper without its PDF. */
+type Saved = { ok: true; text: string; link: string; warning?: boolean };
+/** How the badge and the note look: saved, saved in part, not saved. */
+type Outcome = "ok" | "warning" | "error";
 /** A library one may add to, named for menus and messages. */
 interface Owner {
   id: string;
@@ -177,8 +180,14 @@ async function saveTab(
   await badge(tabId, "…");
   try {
     const result = await saveFrom(tab, owner);
-    await badge(tabId, "✓", "#1e7a3e");
-    await tell(tabId, result.text, result.link, true);
+    if (result.warning) await badge(tabId, "!", "#b26a00");
+    else await badge(tabId, "✓", "#1e7a3e");
+    await tell(
+      tabId,
+      result.text,
+      result.link,
+      result.warning ? "warning" : "ok",
+    );
     return result;
   } catch (error) {
     const text =
@@ -186,7 +195,7 @@ async function saveTab(
         ? error.message
         : `Not saved: ${String(error)}`;
     await badge(tabId, "!", "#c0392b");
-    await tell(tabId, text, null, false);
+    await tell(tabId, text, null, "error");
     return { ok: false, text };
   } finally {
     refreshMenu(); // groups one joined since
@@ -194,20 +203,20 @@ async function saveTab(
 }
 
 /** In the page's corner; where no extension may go (a PDF viewer), as the
- * button's tooltip, and why it went wrong in a small window (with a button
+ * button's tooltip, and what went wrong in a small window (with a button
  * that allows access to the PDF's site, if that is missing). */
 async function tell(
   tabId: number,
   text: string,
   link: string | null,
-  ok: boolean,
+  outcome: Outcome,
 ): Promise<void> {
   try {
-    await inPage(tabId, showNote, text, link, ok);
+    await inPage(tabId, showNote, text, link, outcome);
   } catch {
     await chrome.action.setTitle({ tabId, title: text });
-    if (ok) return;
-    const query = new URLSearchParams({ text, tab: String(tabId) });
+    if (outcome === "ok") return;
+    const query = new URLSearchParams({ text, tab: String(tabId), outcome });
     if (tabId === pdfWithoutAccess) {
       const url = (await chrome.tabs.get(tabId).catch(() => null))?.url;
       if (url) query.set("site", site(url));
@@ -335,34 +344,52 @@ async function save(
   }
   const item = added.data;
   const known = added.status === 200;
-  let fileNote: string;
+  const hasPdf = item.files?.some((f) => f.media_type === "application/pdf");
+  // Why the paper is saved without its PDF, if it is.
+  let missing: string | null = null;
+  let fileNote = "";
   if ("error" in pdf) {
-    fileNote = ` ${pdfProblem(pdf)}`;
+    if (hasPdf) fileNote = " It has a PDF already.";
+    else missing = pdfProblem(pdf);
   } else {
     const bytes = decode(pdf);
     if (await holder(bytes)) {
       fileNote = " The PDF is there already.";
     } else {
-      const form = new FormData();
-      form.append(
-        "upload",
-        new Blob([bytes], { type: "application/pdf" }),
-        filename(page),
-      );
-      await call<Api.UploadToItemData>("/api/items/{item_id}/files", {
-        method: "POST",
-        path: { item_id: item.id },
-        form,
-      });
-      fileNote = " With its PDF.";
+      missing = await upload(item.id, bytes, filename(page));
+      if (!missing) fileNote = " With its PDF.";
     }
   }
   const where = owner ? owner.name : "paperus";
-  return {
-    ok: true,
-    text: `${known ? "Already in paperus" : `Saved to ${where}`}: “${item.title}”.${fileNote}`,
-    link: await itemLink(item.id),
-  };
+  const saved = `${known ? "Already in paperus" : `Saved to ${where}`}: “${item.title}”`;
+  return missing
+    ? {
+        ok: true,
+        warning: true,
+        text: `${saved}, without its PDF. ${missing}`,
+        link: await itemLink(item.id),
+      }
+    : { ok: true, text: `${saved}.${fileNote}`, link: await itemLink(item.id) };
+}
+
+/** Add the PDF to the paper: null if it was, else why not. */
+async function upload(
+  itemId: string,
+  bytes: Uint8Array<ArrayBuffer>,
+  name: string,
+): Promise<string | null> {
+  const form = new FormData();
+  form.append("upload", new Blob([bytes], { type: "application/pdf" }), name);
+  try {
+    const { status } = await call<Api.UploadToItemData>(
+      "/api/items/{item_id}/files",
+      { method: "POST", path: { item_id: itemId }, form },
+    );
+    return status === 404 ? "The paper was not found when its PDF was added." : null;
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    return `Uploading the PDF failed: ${why.replace(/[^.]$/, "$&.")}`;
+  }
 }
 
 /** A PDF on its own: a new item from the file, whose details paperus reads

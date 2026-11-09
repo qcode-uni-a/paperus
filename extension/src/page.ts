@@ -137,7 +137,11 @@ export function pageSignals(): {
 }
 
 /** A small note in the page's corner: saved, or what went wrong. */
-export function showNote(text: string, link: string | null, ok: boolean): void {
+export function showNote(
+	text: string,
+	link: string | null,
+	outcome: 'ok' | 'warning' | 'error'
+): void {
 	document.getElementById('paperus-note')?.remove();
 	const host = document.createElement('div');
 	host.id = 'paperus-note';
@@ -157,7 +161,7 @@ export function showNote(text: string, link: string | null, ok: boolean): void {
 			'color:#1b2440',
 			'font:14px/1.4 system-ui,sans-serif',
 			'box-shadow:0 6px 24px rgba(27,36,64,.25)',
-			`border-left:4px solid ${ok ? '#2338a8' : '#c0392b'}`
+			`border-left:4px solid ${{ ok: '#2338a8', warning: '#b26a00', error: '#c0392b' }[outcome]}`
 		].join(';')
 	);
 	box.textContent = text;
@@ -171,5 +175,5 @@ export function showNote(text: string, link: string | null, ok: boolean): void {
 	}
 	shadow.append(box);
 	document.documentElement.append(host);
-	setTimeout(() => host.remove(), ok ? 6000 : 12000);
+	setTimeout(() => host.remove(), outcome === 'ok' ? 6000 : 12000);
 }

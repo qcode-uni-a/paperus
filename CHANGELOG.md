@@ -8,6 +8,10 @@
   GPU it does not use, and its basic settings: the model for search by
   meaning (best chosen while the library is empty), reranking and OCR,
   each with its model.
+- **Browser extension**: a paper saved without its PDF (the PDF behind a
+  login, or its upload failed) is a warning now, an amber "!" with the
+  reason, no longer a green tick; an upload that failed after the paper
+  was saved no longer reads as "Not saved".
 - **Search by title and abstract** also finds a paper by the abstract in
   its own details (from Crossref, an import or typed in), not only by one
   found for it elsewhere: in 0.0.18, more than half of the papers were
