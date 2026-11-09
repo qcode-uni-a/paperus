@@ -228,8 +228,52 @@ export function layOut(
 	);
 
 	/** Ink of the rows ``y0``–``y1`` between ``x0`` and ``x1``: its
-	 * extent, or null. */
+	 * extent, or null. A rule alone at its top or bottom edge, apart from
+	 * the rest (the marks above and below an equation across both
+	 * columns, a column's closing rule), is left out. */
 	const extent = (x0: number, x1: number, y0: number, y1: number) => {
+		const found = inkExtent(x0, x1, y0, y1);
+		if (!found) return null;
+		const count = (y: number) => {
+			let n = 0;
+			for (let x = x0; x <= x1; x++) if (at(x, y)) n++;
+			return n;
+		};
+		/** The longest unbroken stretch of ink in row ``y`` (a rule's is
+		 * long; text breaks at every letter). */
+		const stretch = (y: number) => {
+			let best = 0;
+			let run = 0;
+			for (let x = x0; x <= x1; x++) {
+				run = at(x, y) ? run + 1 : 0;
+				if (run > best) best = run;
+			}
+			return best;
+		};
+		const width = found.x1 - found.x0 + 1;
+		/** From the edge row ``from`` going ``step``: the first row past a
+		 * rule standing alone there (a tick beside it allowed), or null. */
+		const pastRule = (from: number, step: number, limit: number) => {
+			let y = from;
+			let rule = false;
+			for (; step < 0 ? y >= limit : y <= limit; y += step) {
+				const n = count(y);
+				if (!n) break;
+				if (Math.abs(y - from) > 8) return null;
+				if (stretch(y) >= width * 0.5) rule = true;
+				else if (n > width * 0.15) return null; // a line of text
+			}
+			if (!rule) return null;
+			while ((step < 0 ? y >= limit : y <= limit) && !count(y)) y += step;
+			return step < 0 ? (y >= limit ? y : null) : y <= limit ? y : null;
+		};
+		let [top, bottom] = [found.y0, found.y1];
+		top = pastRule(top, 1, bottom) ?? top;
+		bottom = pastRule(bottom, -1, top) ?? bottom;
+		return top === found.y0 && bottom === found.y1 ? found : inkExtent(x0, x1, top, bottom);
+	};
+
+	const inkExtent = (x0: number, x1: number, y0: number, y1: number) => {
 		let minX = Infinity;
 		let maxX = -1;
 		let minY = Infinity;
