@@ -53,11 +53,38 @@
 		fabOpen = false;
 	}
 
-	/** The round button lives in the page's body: inside the sticky toolbar,
-	 * phone browsers let a fixed element jitter and shift as the page scrolls. */
-	function toBody(node: HTMLElement) {
+	/** The round button stays at the bottom right of what is seen. It lives in
+	 * the page's body (inside the sticky toolbar phone browsers let it jitter);
+	 * zoomed in by pinching, a fixed element keeps to the unzoomed page and
+	 * drifts out of sight, so then it follows the visual viewport, at its
+	 * usual size. */
+	function toScreen(node: HTMLElement) {
 		document.body.append(node);
-		return { destroy: () => node.remove() };
+		const seen = window.visualViewport;
+		function follow() {
+			if (!seen || Math.abs(seen.scale - 1) < 0.01) {
+				node.removeAttribute('style');
+				return;
+			}
+			Object.assign(node.style, {
+				top: `${seen.offsetTop + seen.height}px`,
+				left: `${seen.offsetLeft + seen.width}px`,
+				right: 'auto',
+				bottom: 'auto',
+				transformOrigin: '0 0'
+			});
+			node.style.transform = `scale(${1 / seen.scale}) translate(calc(-100% - 16px), calc(-100% - 16px))`;
+		}
+		seen?.addEventListener('resize', follow);
+		seen?.addEventListener('scroll', follow);
+		follow();
+		return {
+			destroy() {
+				seen?.removeEventListener('resize', follow);
+				seen?.removeEventListener('scroll', follow);
+				node.remove();
+			}
+		};
 	}
 
 	function pick(color: string) {
@@ -136,7 +163,7 @@
 	</div>
 </div>
 
-<div class="fab-area" use:toBody>
+<div class="fab-area" use:toScreen>
 	{#if fabOpen}
 		<div class="fab-menu" role="toolbar" aria-label="Annotate">
 			<div class="fab-tools">

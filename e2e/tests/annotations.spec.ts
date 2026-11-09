@@ -93,6 +93,26 @@ test.describe('on a phone', () => {
 				return box.y > 800 - 120 && box.x > 390 - 120;
 			})
 			.toBe(true);
+		// Zoomed in by pinching too, at its usual size, whichever way one scrolls.
+		const cdp = await page.context().newCDPSession(page);
+		await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
+		for (const step of [600, -300]) {
+			await page.mouse.wheel(0, step);
+			await expect
+				.poll(() =>
+					page.evaluate(() => {
+						const seen = window.visualViewport!;
+						const box = document.querySelector('.fab')!.getBoundingClientRect();
+						return [
+							Math.round((box.x - seen.offsetLeft) * seen.scale),
+							Math.round((box.y - seen.offsetTop) * seen.scale),
+							Math.round(box.width * seen.scale)
+						];
+					})
+				)
+				.toEqual([390 - 16 - 56, 800 - 16 - 56, 56]);
+		}
+		await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
 		await button.click();
 		await expect(page.getByRole('button', { name: 'Pen', exact: true }).last()).toBeVisible();
 		const widths = await page.evaluate(() => ({
