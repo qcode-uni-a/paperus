@@ -85,6 +85,14 @@ test.describe('on a phone', () => {
 		await expect(page.locator('#page-1 .textLayer span').first()).toBeVisible({ timeout: 20_000 });
 		const button = page.getByRole('button', { name: 'Annotate' });
 		await expect(button).toBeVisible();
+		// At the screen's bottom right, also once the page is scrolled.
+		await page.mouse.wheel(0, 1500);
+		await expect
+			.poll(async () => {
+				const box = (await button.boundingBox())!;
+				return box.y > 800 - 120 && box.x > 390 - 120;
+			})
+			.toBe(true);
 		await button.click();
 		await expect(page.getByRole('button', { name: 'Pen', exact: true }).last()).toBeVisible();
 		const widths = await page.evaluate(() => ({

@@ -406,6 +406,14 @@
 		align-items: center;
 		gap: 8px;
 		padding: 6px 0;
+	}
+	/* The blur on a layer of its own: on the toolbar it would pin the phone's
+	   round annotate button (position: fixed) to the toolbar, not the screen. */
+	.toolbar::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
 		background: color-mix(in srgb, var(--paper) 94%, transparent);
 		backdrop-filter: blur(8px);
 	}
