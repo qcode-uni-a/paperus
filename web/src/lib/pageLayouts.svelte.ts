@@ -1,28 +1,60 @@
-import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { analysePage, type FoundPage } from '#lib/pageAnalysis.ts';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
+import { fileLayout } from '#lib/api/client.ts';
+import type { LayoutPiece, PageLayoutOut, PageLayoutsOut } from '#lib/api/generated/types.gen.ts';
 
-export type { FoundPage, PageViewport } from '#lib/pageAnalysis.ts';
+/** A part of a page, in PDF points from its top left (in reading order). */
+export type Piece = LayoutPiece;
 
-/** The pages' layouts for the column view, found in the background one
- * page at a time, those near the page being read first. */
+export type PageViewport = ReturnType<PDFPageProxy['getViewport']>;
+
+/** A page as the column view needs it: its size (PDF points) and pieces. */
+export type FoundPage = {
+	width: number;
+	height: number;
+	/** At scale 1; ``clone({ scale })`` for another. */
+	view: PageViewport;
+	layout: PageLayoutOut;
+};
+
+/** The pages' layouts for the column view, worked out on the server once
+ * per file (``paperus.page_layout``): fetched once, and each page's
+ * viewport taken in the background, those near the page being read first. */
 export class PageLayouts {
 	pages = $state.raw<(FoundPage | null)[]>([]);
 	#doc: PDFDocumentProxy;
+	#layouts: PageLayoutOut[];
 	#around = 1;
 	#running = false;
 	#stopped = false;
 
-	constructor(doc: PDFDocumentProxy) {
+	private constructor(doc: PDFDocumentProxy, layouts: PageLayoutOut[]) {
 		this.#doc = doc;
+		this.#layouts = layouts;
 		this.pages = Array.from({ length: doc.numPages }, () => null);
 	}
 
+	/** The file's layouts: null while the server is still working them out
+	 * (``waiting`` is told; ask again later), or if it cannot (no PDF it
+	 * can read, or another number of pages than this one). */
+	static async load(
+		doc: PDFDocumentProxy,
+		fileId: string,
+		waiting?: (seconds: number) => void
+	): Promise<PageLayouts | null> {
+		const { data, response } = await fileLayout({ path: { file_id: fileId } });
+		if (response?.status === 202) {
+			waiting?.(Number(response.headers.get('Retry-After')) || 3);
+			return null;
+		}
+		const pages = response?.ok ? (data as PageLayoutsOut).pages : null;
+		if (!pages || pages.length !== doc.numPages) return null;
+		return new PageLayouts(doc, pages);
+	}
+
 	/** Whether the paper is set in two columns: most of its first pages. */
-	async twoColumns(): Promise<boolean> {
-		const count = Math.min(3, this.pages.length);
-		for (let number = 1; number <= count; number++) await this.find(number);
-		const found = this.pages.slice(0, count).filter((page) => page?.layout.columns).length;
-		return found >= Math.min(2, count);
+	twoColumns(): boolean {
+		const first = this.#layouts.slice(0, 3);
+		return first.filter((page) => page.columns).length >= Math.min(2, first.length);
 	}
 
 	/** Find the rest, nearest to ``page`` first. */
@@ -56,22 +88,18 @@ export class PageLayouts {
 		this.#running = false;
 	}
 
-	/** One page's layout, from a picture of it at one pixel a point. */
+	/** One page's layout, with its viewport. */
 	async find(number: number): Promise<FoundPage | null> {
 		const known = this.pages[number - 1];
 		if (known) return known;
 		try {
-			const page = await this.#doc.getPage(number);
-			const found = await analysePage(
-				page,
-				(width, height) => Object.assign(document.createElement('canvas'), { width, height }),
-				number === 1
-			);
+			const view = (await this.#doc.getPage(number)).getViewport({ scale: 1 });
+			const layout = this.#layouts[number - 1];
 			if (this.#stopped || this.pages[number - 1]) return this.pages[number - 1];
 			const pages = [...this.pages];
-			pages[number - 1] = found;
+			pages[number - 1] = { width: view.width, height: view.height, view, layout };
 			this.pages = pages;
-			return found;
+			return pages[number - 1];
 		} catch {
 			return null;
 		}

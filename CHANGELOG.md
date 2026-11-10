@@ -15,6 +15,26 @@
   browser's own cache asks before using a copy (never a replaced or no
   longer reachable one).
 - A paper's abstract sits with the folded sections, above similar papers.
+- **Fluent mode's page layouts are worked out on the server**, once per
+  PDF, in a job of its own when a PDF is read (`page_layout`, queue
+  `layout`, as many at once as text extraction): fluent mode starts at
+  once instead of drawing each page a second time in the browser, also on
+  phones. PDFs added before are done in the background, a batch every ten
+  minutes, a paper being opened first; so are all again when an update
+  changes how pages are read. Until a paper's layouts are there, it opens
+  in the normal view and the fluent toggle appears when they are. A new
+  migration (`0007`) adds the table `page_layouts`; the server needs
+  numpy. Pages read more surely:
+  - the columns beside equations whose numbers reach into the gap between
+    the columns (Nature Physics' methods: no longer read in turns);
+  - a title in large type whose words stand either side of the gap
+    (no longer split in two);
+  - Science's third column beside the title, read whole after the second
+    (no longer its top first, twice as large);
+  - double-spaced pages (supplementary information): a paragraph one
+    piece, not each line;
+  - a narrow gap between columns (6 points), a rule however thick it is
+    drawn, a figure's labels under it.
 
 ## 0.0.19 (2026-11-09)
 

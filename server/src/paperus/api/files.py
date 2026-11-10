@@ -23,10 +23,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import library, open_access, system
+from paperus import library, open_access, page_layout, system
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
-from paperus.jobs import queue_text_extraction
+from paperus.jobs import LAYOUT_ASKED, queue_layout, queue_text_extraction
 from paperus.models import (
     Blob,
     Chunk,
@@ -37,6 +37,7 @@ from paperus.models import (
     Item,
     MetadataSource,
     OcrStatus,
+    PageLayouts,
     TextStatus,
     Version,
     VersionKind,
@@ -352,6 +353,61 @@ def download_file(
             **safety,
         },
     )
+
+
+class LayoutPiece(BaseModel):
+    """A part of a page, in PDF points from its top left."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+    wide: bool
+    """Across the page's width (else one column)."""
+    span: int
+    """The width that fills the screen (both columns' text the same size)."""
+
+
+class PageLayoutOut(BaseModel):
+    width: float
+    height: float
+    columns: bool
+    """Set in two columns (over a good part of the page)."""
+    pieces: list[LayoutPiece]
+    """In reading order."""
+
+
+class PageLayoutsOut(BaseModel):
+    version: int
+    """The layout code that made them (``current``: the server's now)."""
+    current: bool
+    pages: list[PageLayoutOut]
+
+
+@router.get(
+    "/api/files/{file_id}/layout",
+    response_model=PageLayoutsOut,
+    responses={202: {"description": "Being worked out: ask again soon"}},
+)
+def file_layout(
+    file_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> PageLayoutsOut | Response:
+    """Fluent mode's pieces of each page of a PDF, worked out on the
+    server once per content. 202 while they are being worked out (they are
+    then first in line); made by an older version of the code, they are
+    given while new ones are made. 404 if the PDF cannot be read."""
+    file = _get_file(db, access, file_id)
+    if file.media_type != PDF:
+        raise HTTPException(404, "not a PDF")
+    known = db.get(PageLayouts, file.blob_sha256)
+    current = known is not None and known.version == page_layout.VERSION
+    if not current:
+        queue_layout(request.app.state.jobs, file.blob_sha256, LAYOUT_ASKED)
+    if known is None:
+        return Response(status_code=202, headers={"Retry-After": "3"})
+    if not known.pages:
+        raise HTTPException(404, "the PDF's pages could not be read")
+    return PageLayoutsOut(version=known.version, current=current, pages=known.pages)
 
 
 class PassageText(BaseModel):

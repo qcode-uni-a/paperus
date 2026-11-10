@@ -2093,6 +2093,38 @@ export type KnownFile = {
 };
 
 /**
+ * LayoutPiece
+ *
+ * A part of a page, in PDF points from its top left.
+ */
+export type LayoutPiece = {
+    /**
+     * X
+     */
+    x: number;
+    /**
+     * Y
+     */
+    y: number;
+    /**
+     * Width
+     */
+    width: number;
+    /**
+     * Height
+     */
+    height: number;
+    /**
+     * Wide
+     */
+    wide: boolean;
+    /**
+     * Span
+     */
+    span: number;
+};
+
+/**
  * LibraryOut
  */
 export type LibraryOut = {
@@ -3063,6 +3095,46 @@ export type OwnerChoice = {
      * Library Id
      */
     library_id?: string | null;
+};
+
+/**
+ * PageLayoutOut
+ */
+export type PageLayoutOut = {
+    /**
+     * Width
+     */
+    width: number;
+    /**
+     * Height
+     */
+    height: number;
+    /**
+     * Columns
+     */
+    columns: boolean;
+    /**
+     * Pieces
+     */
+    pieces: Array<LayoutPiece>;
+};
+
+/**
+ * PageLayoutsOut
+ */
+export type PageLayoutsOut = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Current
+     */
+    current: boolean;
+    /**
+     * Pages
+     */
+    pages: Array<PageLayoutOut>;
 };
 
 /**
@@ -6682,6 +6754,40 @@ export type DownloadFileResponses = {
      */
     200: unknown;
 };
+
+export type FileLayoutData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query?: never;
+    url: '/api/files/{file_id}/layout';
+};
+
+export type FileLayoutErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FileLayoutError = FileLayoutErrors[keyof FileLayoutErrors];
+
+export type FileLayoutResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageLayoutsOut;
+    /**
+     * Being worked out: ask again soon
+     */
+    202: unknown;
+};
+
+export type FileLayoutResponse = FileLayoutResponses[keyof FileLayoutResponses];
 
 export type PassageTextData = {
     body?: never;

@@ -23,8 +23,10 @@ PAGES = Path(__file__).parent / "pages"
 WIDTHS = dict(
     zip(
         "abcdefghijklmnopqrstuvwxyz ",
-        [556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833]
-        + [556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 278],
+        [
+            *(556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833),
+            *(556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 278),
+        ],
         strict=True,
     )
 )
@@ -73,9 +75,8 @@ def page_stream(spec: dict) -> str:
             for r, row in enumerate(cells):
                 for c, cell in enumerate(row):
                     if cell == "1":
-                        out.append(
-                            f"{x + c * cw:.1f} {y + h - (r + 1) * ch:.1f} {cw:.1f} {ch:.1f} re f"
-                        )
+                        top = y + h - (r + 1) * ch
+                        out.append(f"{x + c * cw:.1f} {top:.1f} {cw:.1f} {ch:.1f} re f")
             continue
         for panel in figure["panels"]:
             x, y, w, h = box(spec, panel["box"])
@@ -114,7 +115,8 @@ def page_stream(spec: dict) -> str:
         size = max(3.0, line["size"])
         text, scale = words(rng, w, size)
         out.append(
-            f"BT /F1 {size:.1f} Tf {scale:.1f} Tz {x:.1f} {y + 0.22 * h:.1f} Td ({text}) Tj ET"
+            f"BT /F1 {size:.1f} Tf {scale:.1f} Tz "
+            f"{x:.1f} {y + 0.22 * h:.1f} Td ({text}) Tj ET"
         )
     return "\n".join(out)
 

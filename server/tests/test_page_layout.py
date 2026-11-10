@@ -1,0 +1,101 @@
+"""Fluent mode on layout twins of real papers' pages (``twins/``): each
+built (``twins.py``), read as the worker reads a page, and checked
+(``twins/check.py``). A twin with a ``todo`` is a known gap: expected to
+fail, and told when it passes."""
+
+import json
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pypdfium2
+import pytest
+
+from paperus import page_layout
+from paperus.page_layout import analyse, lay_out
+from tests.twins import twins
+from tests.twins.check import check
+
+SPECS = sorted(
+    (json.loads(path.read_text()) for path in twins.PAGES.glob("*.json")),
+    key=lambda spec: spec["name"],
+)
+
+
+def read(spec: dict[str, Any], tmp_path: Path) -> tuple[bool, list[Any]]:
+    path = tmp_path / f"{spec['name']}.pdf"
+    path.write_bytes(twins.pdf(spec))
+    with pypdfium2.PdfDocument(path) as pdf:
+        layout = analyse(pdf[0], spec["first"])
+    return layout["columns"], layout["pieces"]
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        pytest.param(
+            spec,
+            id=spec["name"],
+            marks=[pytest.mark.xfail(reason=spec["todo"], strict=True)]
+            if spec.get("todo")
+            else [],
+        )
+        for spec in SPECS
+    ],
+)
+def test_twin(spec: dict[str, Any], tmp_path: Path) -> None:
+    columns, pieces = read(spec, tmp_path)
+    problems, _ = check(spec, columns, pieces)
+    assert not problems, "\n".join(problems)
+
+
+def test_a_title_in_large_type_is_no_columns() -> None:
+    """A title's words either side of a gap in a part across the page (the
+    gap where the columns below have none): across the page still, known
+    by its type size."""
+    ink = np.zeros((800, 600), dtype=bool)
+    sizes = np.zeros((800, 600), dtype=np.float32)
+
+    def line(x0: int, x1: int, y0: int, y1: int, size: float) -> None:
+        # Letters: ink with thin gaps, as text has.
+        ink[y0:y1, x0:x1] = (np.arange(x0, x1) % 4 != 0)[None, :]
+        sizes[y0:y1, x0:x1] = size
+
+    for y in (60, 100, 140):
+        line(60, 360, y, y + 28, 30)
+        line(378, 540, y, y + 28, 30)
+    for y in range(200, 700, 12):
+        line(60, 290, y, y + 8, 9)
+        line(310, 540, y, y + 8, 9)
+    columns, pieces = lay_out(ink, True, sizes)
+    assert columns
+    title = [p for p in pieces if p["y"] < 180]
+    assert title
+    assert all(p["wide"] for p in title)
+    # Not known without the sizes: in two "columns".
+    _, unsized = page_layout.lay_out(ink, True, sizes.astype(bool))
+    assert not all(p["wide"] for p in unsized if p["y"] < 180)
+
+
+def test_a_third_column_beside_the_title_is_one_piece() -> None:
+    """Science's first page: the title over two columns, the third column
+    from the top; it is read whole, after the second."""
+    ink = np.zeros((760, 600), dtype=bool)
+    sizes = np.zeros((760, 600), dtype=np.float32)
+
+    def column(x0: int, x1: int, y0: int, y1: int) -> None:
+        for y in range(y0, y1, 11):
+            ink[y : y + 7, x0:x1] = (np.arange(x0, x1) % 4 != 0)[None, :]
+            sizes[y : y + 7, x0:x1] = 9
+
+    column(40, 380, 50, 220)  # title and abstract over the first two
+    column(40, 200, 240, 700)
+    column(220, 380, 240, 440)
+    column(400, 560, 50, 440)  # the third, from the top
+    ink[470:700, 230:560] = True  # a figure under the second and third
+    _, pieces = lay_out(ink, False, sizes)
+    third = [p for p in pieces if p["x"] > 390]
+    assert len(third) == 1
+    assert third[0]["y"] < 60
+    assert third[0]["y"] + third[0]["height"] > 430
+    assert pieces.index(third[0]) == len(pieces) - 2  # before the figure

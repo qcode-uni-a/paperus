@@ -55,6 +55,7 @@ def test_job_limits() -> None:
         "text": 4,
         "ml": 2,
         "ocr": 1,
+        "layout": 4,
         "import": 1,
         "backup": 1,
     }
@@ -111,7 +112,14 @@ def test_workers_outlast_errors(monkeypatch: pytest.MonkeyPatch) -> None:
         await run_workers(cast(App, app), limits, stop)
 
     asyncio.run(main())
-    defaults = [("text", 2), ("ml", 1), ("ocr", 1), ("import", 1), ("backup", 1)]
+    defaults = [
+        ("text", 2),
+        ("ml", 1),
+        ("ocr", 1),
+        ("layout", 2),
+        ("import", 1),
+        ("backup", 1),
+    ]
     assert app.started == [*defaults, ("text", 2)]
     assert sorted(app.cancelled) == sorted(defaults)
 

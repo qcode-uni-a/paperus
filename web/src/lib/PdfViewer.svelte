@@ -232,6 +232,22 @@
 		let task: PDFDocumentLoadingTask | null = null;
 		let cancelled = false;
 		let downloaded = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		/** The server still works out the layouts: asked again, and the
+		 * fluent toggle shown once they are there; switched to as if there
+		 * from the start if the paper has not been scrolled yet. */
+		let openedAt: number | null = null;
+		const later = (seconds: number) => {
+			timer = setTimeout(async () => {
+				const doc = pdf;
+				if (cancelled || !doc || !fileId) return;
+				const ready = await PageLayouts.load(doc, fileId, later).catch(() => null);
+				if (cancelled || !ready) return ready?.stop();
+				layouts = ready;
+				const still = openedAt !== null && Math.abs(window.scrollY - openedAt) < 40;
+				if (still && ready.twoColumns() && wantFluent()) fluent = true;
+			}, seconds * 1000);
+		};
 		error = '';
 		(async () => {
 			const data = kept ? await cachedPdf(...kept) : null;
@@ -248,19 +264,20 @@
 						(bytes) => keepPdf(...kept, bytes),
 						() => {}
 					);
+				const found = fileId ? PageLayouts.load(doc, fileId, later) : null;
 				const viewport = (await doc.getPage(1)).getViewport({ scale: 1 });
 				if (cancelled) return;
 				firstPage = { width: viewport.width, height: viewport.height };
 				labels = await doc.getPageLabels().catch(() => null);
-				const found = new PageLayouts(doc);
-				const two = await found.twoColumns();
+				const ready = await found?.catch(() => null);
 				if (cancelled) {
-					found.stop();
+					ready?.stop();
 					return;
 				}
-				layouts = found;
-				fluent = two && wantFluent();
+				layouts = ready ?? null;
+				fluent = !!ready?.twoColumns() && wantFluent();
 				pdf = doc;
+				openedAt = window.scrollY;
 				contents(doc).then((found) => {
 					if (!cancelled) sections = found;
 				});
@@ -270,6 +287,7 @@
 			});
 		return () => {
 			cancelled = true;
+			clearTimeout(timer);
 			layouts?.stop();
 			layouts = null;
 			fluent = false;

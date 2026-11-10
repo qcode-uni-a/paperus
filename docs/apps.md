@@ -26,7 +26,7 @@ or Python there).
 
 The interface is the website (`web/`), which every browser user needs
 anyway. The app wraps it rather than repeating it: the PDF reader, fluent
-mode (`columns.ts` and the layout twins), annotations, the library, search,
+mode (its page layouts come from the server), annotations, the library, search,
 notes and settings exist once.
 
 **Tauri 2** for all platforms: Windows, macOS, Linux, Android and iOS from

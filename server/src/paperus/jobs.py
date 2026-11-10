@@ -26,6 +26,7 @@ from paperus import (
     authors,
     integrity,
     item_references,
+    layouts,
     logbook,
     missing,
     notifications,
@@ -120,6 +121,11 @@ def extract_text(job: JobContext, file_id: str) -> None:
         scans = process_file(
             db, context.blobs, uuid.UUID(file_id), context.http, ocr=config.ocr
         )
+        sha256 = db.scalar(
+            select(File.blob_sha256).where(
+                File.id == uuid.UUID(file_id), File.media_type == layouts.PDF
+            )
+        )
         # A paper without reference list: never looked at, or its file has one.
         item_id = db.scalar(
             select(Version.item_id)
@@ -137,11 +143,48 @@ def extract_text(job: JobContext, file_id: str) -> None:
             )
         )
     queue_embedding(job.app, uuid.UUID(file_id))
+    if sha256 is not None:
+        queue_layout(job.app, sha256)
     if scans:
         queue_ocr(job.app, uuid.UUID(file_id))
     if item_id is not None and config.find_references:
         # Its PDF may have the reference list the paper has none of yet.
         queue_references(job.app, item_id)
+
+
+# Fluent mode's page layouts, once per file content: soon after a PDF is
+# read; first when the viewer asks for one; and in the background for the
+# PDFs without layouts of the current code (after an update that changed it).
+LAYOUT_ASKED = 10
+LAYOUT_LATER = -10
+
+
+@tasks.task(name="page_layout", queue="layout", retry=1)
+def page_layout(sha256: str) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        layouts.make(db, context.blobs, bytes.fromhex(sha256))
+
+
+@tasks.periodic(cron="*/10 * * * *")
+@tasks.task(
+    name="queue_outdated_layouts",
+    queue="layout",
+    queueing_lock="layout-sweep",
+    pass_context=True,
+)
+def queue_outdated_layouts(job: JobContext, timestamp: int) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        for sha256 in layouts.outdated(db):
+            queue_layout(job.app, sha256, LAYOUT_LATER)
+
+
+def queue_layout(app: App, sha256: bytes, priority: int = 0) -> bool:
+    """Queue a PDF's page layouts, unless queued already."""
+    return _queue(
+        app, "page_layout", f"layout-{sha256.hex()}", priority, sha256=sha256.hex()
+    )
 
 
 # Scanned pages, one file at a time (a few seconds per page on a CPU), in a
@@ -560,6 +603,7 @@ def job_limits(config: SystemConfig) -> dict[str, int]:
         "text": config.jobs_text,
         "ml": config.jobs_ml,
         "ocr": 1,
+        "layout": config.jobs_text,
         "import": config.jobs_import,
         "backup": 1,
     }

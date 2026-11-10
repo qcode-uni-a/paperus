@@ -26,6 +26,8 @@ from typing import Any
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
+from paperus import page_layout
+
 log = logging.getLogger(__name__)
 
 # Helpers at most; how many files are read at once is the worker's setting.
@@ -130,6 +132,11 @@ def render(path: Path, index: int) -> bytes:
     return _run(_render, path, index)
 
 
+def layouts(path: Path) -> list[page_layout.PageLayout]:
+    """Fluent mode's layout of each page (``paperus.page_layout``)."""
+    return _run(_layouts, path)
+
+
 def png(width: int, height: int, pixels: bytes, stride: int) -> bytes:
     """An 8-bit greyscale PNG of rows of pixels (``stride`` bytes apart)."""
     rows = b"".join(
@@ -181,6 +188,16 @@ def _pages(path: str) -> list[str]:
 def _title(path: str) -> str | None:
     with _open(path) as pdf:
         return pdf.get_metadata_dict().get("Title") or None
+
+
+def _layouts(path: str) -> list[page_layout.PageLayout]:
+    found = []
+    with _open(path) as pdf:
+        for index in range(len(pdf)):
+            page = pdf[index]
+            found.append(page_layout.analyse(page, index == 0))
+            page.close()
+    return found
 
 
 def _render(path: str, index: int) -> bytes:

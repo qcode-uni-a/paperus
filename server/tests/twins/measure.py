@@ -17,6 +17,7 @@ import re
 import sys
 from pathlib import Path
 from statistics import median
+from typing import Any
 
 import pypdfium2 as pdfium
 from pypdfium2 import raw
@@ -123,7 +124,9 @@ def joined(boxes: list[dict], gap: float) -> list[dict]:
     groups: dict[int, dict] = {}
     for i, b in enumerate(boxes):
         g = groups.setdefault(root(i), {"box": list(b["box"]), "parts": []})
-        g["box"] = [min(g["box"][0], b["box"][0]), min(g["box"][1], b["box"][1])] + [
+        g["box"] = [
+            min(g["box"][0], b["box"][0]),
+            min(g["box"][1], b["box"][1]),
             max(g["box"][2], b["box"][2]),
             max(g["box"][3], b["box"][3]),
         ]
@@ -138,7 +141,6 @@ def joined(boxes: list[dict], gap: float) -> list[dict]:
                     a["box"] = [
                         min(a["box"][0], c["box"][0]),
                         min(a["box"][1], c["box"][1]),
-                    ] + [
                         max(a["box"][2], c["box"][2]),
                         max(a["box"][3], c["box"][3]),
                     ]
@@ -153,7 +155,7 @@ def joined(boxes: list[dict], gap: float) -> list[dict]:
 
 def blank(obj: pdfium.PdfObject) -> bool:
     """A path only filled, in white (a frame behind a figure): no ink."""
-    if obj.type != raw.FPDF_PAGEOBJ_PATH:
+    if raw.FPDFPageObj_GetType(obj.raw) != raw.FPDF_PAGEOBJ_PATH:
         return False
     fill, stroke = ctypes.c_int(), ctypes.c_int()
     if not raw.FPDFPath_GetDrawMode(obj.raw, fill, stroke) or stroke.value:
@@ -177,7 +179,7 @@ def drawings_of(page: pdfium.PdfPage, width: float, height: float) -> tuple[list
         w, h = right - left, top - bottom
         if w * h > width * height * 0.8 or blank(obj):
             continue  # a background, a white frame
-        if h < 1.5 and w > 15 or w < 1.5 and h > 15:
+        if (h < 1.5 and w > 15) or (w < 1.5 and h > 15):
             rules.append([left, bottom, right, top])
         elif w >= 1 and h >= 1:
             parts.append({"box": [left, bottom, right, top], "kind": kind})
@@ -240,7 +242,7 @@ def plain(text: str) -> str:
     return re.sub(r"[\d\s]+", "", text.lower())
 
 
-def measure(path: Path, number: int) -> dict:
+def measure(path: Path, number: int) -> dict[str, Any]:
     pdf = pdfium.PdfDocument(path)
     page = pdf[number - 1]
     width, height = page.get_size()
@@ -284,7 +286,9 @@ def measure(path: Path, number: int) -> dict:
 
     marked = [f for f in figures if at_edge(f["box"])]
     figures = [f for f in figures if f not in marked]
-    small = [p for p in panels if not any(p in f["panels"] for f in figures)]
+    small: list[dict[str, Any]] = [
+        p for p in panels if not any(p in f["panels"] for f in figures)
+    ]
     small += [
         {"box": g["box"], "kind": "text"}
         for g in joined([{"box": b} for b in turned], 4)
@@ -387,13 +391,15 @@ def main() -> None:
         sys.argv[3],
         sys.argv[4],
     )
-    spec = {"name": name, "source": source, **measure(path, number)}
+    spec: dict[str, Any] = {"name": name, "source": source, **measure(path, number)}
     PAGES.mkdir(exist_ok=True)
     (PAGES / f"{name}.json").write_text(json.dumps(spec, indent=1) + "\n")
     lines = spec["lines"]
+    furniture = sum(line["role"] == "furniture" for line in lines)
     print(
-        f"{name}: {len(lines)} lines ({sum(line['role'] == 'furniture' for line in lines)} header/footer), "
-        f"{len(spec['figures'])} figures, {len(spec['rules'])} rules, {len(spec['marks'])} marks"
+        f"{name}: {len(lines)} lines ({furniture} header/footer), "
+        f"{len(spec['figures'])} figures, {len(spec['rules'])} rules, "
+        f"{len(spec['marks'])} marks"
     )
 
 

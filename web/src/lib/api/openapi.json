@@ -3246,6 +3246,53 @@
         }
       }
     },
+    "/api/files/{file_id}/layout": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "File Layout",
+        "description": "Fluent mode's pieces of each page of a PDF, worked out on the\nserver once per content. 202 while they are being worked out (they are\nthen first in line); made by an older version of the code, they are\ngiven while new ones are made. 404 if the PDF cannot be read.",
+        "operationId": "file_layout",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageLayoutsOut"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Being worked out: ask again soon"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}/passages/{position}": {
       "get": {
         "tags": [
@@ -11873,6 +11920,45 @@
         ],
         "title": "KnownFile"
       },
+      "LayoutPiece": {
+        "properties": {
+          "x": {
+            "type": "integer",
+            "title": "X"
+          },
+          "y": {
+            "type": "integer",
+            "title": "Y"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "wide": {
+            "type": "boolean",
+            "title": "Wide"
+          },
+          "span": {
+            "type": "integer",
+            "title": "Span"
+          }
+        },
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "width",
+          "height",
+          "wide",
+          "span"
+        ],
+        "title": "LayoutPiece",
+        "description": "A part of a page, in PDF points from its top left."
+      },
       "LibraryOut": {
         "properties": {
           "id": {
@@ -13551,6 +13637,63 @@
         "type": "object",
         "title": "OwnerChoice",
         "description": "Where one owner of the export goes."
+      },
+      "PageLayoutOut": {
+        "properties": {
+          "width": {
+            "type": "number",
+            "title": "Width"
+          },
+          "height": {
+            "type": "number",
+            "title": "Height"
+          },
+          "columns": {
+            "type": "boolean",
+            "title": "Columns"
+          },
+          "pieces": {
+            "items": {
+              "$ref": "#/components/schemas/LayoutPiece"
+            },
+            "type": "array",
+            "title": "Pieces"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "columns",
+          "pieces"
+        ],
+        "title": "PageLayoutOut"
+      },
+      "PageLayoutsOut": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageLayoutOut"
+            },
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "current",
+          "pages"
+        ],
+        "title": "PageLayoutsOut"
       },
       "Pair": {
         "properties": {

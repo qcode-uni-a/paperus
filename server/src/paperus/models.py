@@ -739,6 +739,26 @@ class OcrPage(Base):
     )
 
 
+class PageLayouts(Base):
+    """Fluent mode's pieces of each page of a PDF's contents
+    (``paperus.page_layout``), worked out once by the worker."""
+
+    __tablename__ = "page_layouts"
+
+    blob_sha256: Mapped[bytes] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int]
+    """``page_layout.VERSION`` of the code that made them: older ones are
+    made again."""
+    pages: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    """Per page: its size (points), whether it is set in two columns, its
+    pieces in reading order. Empty: the PDF could not be read."""
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Chunk(Base):
     """A passage of text, stored once per content hash."""
 

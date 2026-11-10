@@ -196,6 +196,7 @@ def test_an_upload_is_read_scanned_and_embedded(
     assert run_jobs(worker) == {
         # Read twice: the typed page first, then with the scan's text.
         "extract_text succeeded": 2,
+        "page_layout succeeded": 2,
         "ocr_file succeeded": 1,
         "embed_file succeeded": 2,
         "embed_note succeeded": 1,
@@ -220,6 +221,7 @@ def test_ocr_switched_off_and_on(
     file_id = upload(Person(client, db, "ada"), HALF_SCANNED)
     assert run_jobs(worker) == {
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
         "find_item_references succeeded": 1,
     }
@@ -234,6 +236,7 @@ def test_ocr_switched_off_and_on(
         "queue_pending_ocr succeeded": 1,
         "ocr_file succeeded": 1,
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
     }
     assert file_status(db, file_id) == (TextStatus.DONE, OcrStatus.DONE)
@@ -293,6 +296,7 @@ def test_every_file_read_again(client: TestClient, db: Session, worker: App) -> 
     assert run_jobs(worker) == {
         "queue_pending_files succeeded": 1,
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
     }
     assert file_status(db, file_id) == (TextStatus.DONE, None)
@@ -336,6 +340,7 @@ def test_open_access_copies_and_published_versions(
         "queue_open_access_sweep succeeded": 1,
         "fetch_open_access succeeded": 1,
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
         "find_item_references succeeded": 1,
     }
@@ -356,6 +361,7 @@ def test_open_access_copies_and_published_versions(
         "find_published_versions succeeded": 1,
         "fetch_open_access succeeded": 1,
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
     }
     detail = ada.get(f"/api/items/{paper['id']}").json()
@@ -533,7 +539,9 @@ def test_starting_the_worker(
 
     monkeypatch.setattr(jobs, "run_workers", run_workers)
     jobs.run_worker(settings)
-    assert seen == [{"text": 3, "ml": 1, "ocr": 1, "import": 1, "backup": 1}]
+    assert seen == [
+        {"text": 3, "ml": 1, "ocr": 1, "layout": 3, "import": 1, "backup": 1}
+    ]
     context = jobs._worker_context()
     assert context.settings is settings
     context.http.close()
@@ -553,6 +561,7 @@ def test_jobs_of_a_stopped_worker_run_again(
     assert run_jobs(worker) == {
         "tidy succeeded": 1,
         "extract_text succeeded": 1,
+        "page_layout succeeded": 1,
         "embed_file succeeded": 1,
         "find_item_references succeeded": 1,
     }

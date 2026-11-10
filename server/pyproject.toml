@@ -23,6 +23,7 @@ dependencies = [
     "httpx2>=2.16.0",
     "markdownify>=1.2.3",
     "mcp>=2.3.0,<3",
+    "numpy>=2.3",
     "pgvector>=0.5.1",
     "procrastinate>=3.10,<3.11",  # schema frozen in src/paperus/migrations/
     "prometheus-client>=0.26.0",

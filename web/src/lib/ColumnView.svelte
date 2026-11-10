@@ -11,11 +11,10 @@
 	import AnnotationLayer from '#lib/annotations/AnnotationLayer.svelte';
 	import type { FileAnnotations } from '#lib/annotations/annotations.svelte.ts';
 	import type { Box, Viewport } from '#lib/annotations/geometry.ts';
-	import type { Piece } from '#lib/columns.ts';
-	import type { PageLayouts } from '#lib/pageLayouts.svelte.ts';
+	import type { PageLayouts, Piece } from '#lib/pageLayouts.svelte.ts';
 
 	/** Fluent mode: a two-column paper's pages cut into pieces in reading
-	 * order (see ``columns.ts``), one column across the screen, the columns
+	 * order (``paperus.page_layout`` on the server), one column across the screen, the columns
 	 * running on into each other. Each piece is a window onto its page
 	 * drawn whole at the piece's scale, so selecting, marking and the
 	 * annotations work as on the page. */
