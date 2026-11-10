@@ -30,8 +30,9 @@
   write in Obsidian? Deep links `[[paper:doi]]`?
 - **Word plugin**: when? LaTeX/Overleaf (BibTeX URL) and Markdown (CSL-JSON)
   first.
-- **Tablet reading and offline**: web reader with touch/stylus support;
-  desktop app (Tauri) later.
+- **Apps and offline**: one Tauri app around the website, connected to a
+  server or with a library on the computer; offline sync later, see
+  [apps.md](apps.md). Signing and updates still open.
 - **Who maintains the service** after the pilot: the group, the library or
   the computing centre?
 - **Funding** if it grows: hosted version, support, grants.

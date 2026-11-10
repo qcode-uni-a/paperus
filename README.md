@@ -78,6 +78,7 @@ stores, load it from the release's zips: see
 | [Search](docs/search.md) | Chunking, embeddings, hybrid search, deduplication across versions, pgvector |
 | [Permissions](docs/permissions.md) | Who may do what with papers, tags, collections and groups |
 | [AI integration](docs/ai.md) | MCP tools, permissions, the AI inbox, skill draft |
+| [Apps](docs/apps.md) | Planned: one app for computers and phones, a library on one's computer, offline sync |
 | [Operations](docs/operations.md) | Hosting at the university, data protection, lessons from similar projects |
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |
 | [Pilot](docs/pilot.md) | Pilot plan and questions for testers |
