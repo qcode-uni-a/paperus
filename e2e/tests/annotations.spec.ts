@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { uploadPaper } from './helpers.ts';
+import { scrollPhone, uploadPaper } from './helpers.ts';
 
 /** Select the words of a page's text layer that contain ``text``. */
 async function select(page: Page, text: string) {
@@ -148,47 +148,50 @@ test('words on the page without words are discarded', async ({ page }) => {
 test.describe('on a phone', () => {
 	test.use({ viewport: { width: 390, height: 800 }, isMobile: true, hasTouch: true });
 
-	test('the tools are behind a round button', async ({ page }) => {
+	test('the tools are behind a round button', async ({ page, browserName }) => {
 		await uploadPaper(page, 'Phone annotated');
 		await expect(page.locator('#page-1 .textLayer span').first()).toBeVisible({ timeout: 20_000 });
 		const button = page.getByRole('button', { name: 'Annotate' });
 		await expect(button).toBeVisible();
 		// At the screen's bottom right, also once the page is scrolled.
-		await page.mouse.wheel(0, 1500);
+		await scrollPhone(page, 1500);
 		await expect
 			.poll(async () => {
 				const box = (await button.boundingBox())!;
 				return box.y > 800 - 120 && box.x > 390 - 120;
 			})
 			.toBe(true);
-		// Zoomed in by pinching too, at its usual size, whichever way one scrolls.
-		const cdp = await page.context().newCDPSession(page);
-		await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
-		for (const step of [600, -300]) {
-			await page.mouse.wheel(0, step);
-			await expect
-				.poll(() =>
-					page.evaluate(() => {
-						const seen = window.visualViewport!;
-						const box = document.querySelector('.fab')!.getBoundingClientRect();
-						return [
-							Math.round((box.x - seen.offsetLeft) * seen.scale),
-							Math.round((box.y - seen.offsetTop) * seen.scale),
-							Math.round(box.width * seen.scale)
-						];
-					})
-				)
-				.toEqual([390 - 16 - 56, 800 - 16 - 56, 56]);
+		// Zoomed in by pinching too, at its usual size, whichever way one
+		// scrolls (pinched through Chromium's DevTools; WebKit has none).
+		if (browserName === 'chromium') {
+			const cdp = await page.context().newCDPSession(page);
+			await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
+			for (const step of [600, -300]) {
+				await page.mouse.wheel(0, step);
+				await expect
+					.poll(() =>
+						page.evaluate(() => {
+							const seen = window.visualViewport!;
+							const box = document.querySelector('.fab')!.getBoundingClientRect();
+							return [
+								Math.round((box.x - seen.offsetLeft) * seen.scale),
+								Math.round((box.y - seen.offsetTop) * seen.scale),
+								Math.round(box.width * seen.scale)
+							];
+						})
+					)
+					.toEqual([390 - 16 - 56, 800 - 16 - 56, 56]);
+			}
+			// The page on screen drawn again that much sharper.
+			const canvasWidth = () =>
+				page.evaluate(() => document.querySelector<HTMLCanvasElement>('#page-1 canvas')!.width);
+			const usual = await page.evaluate(
+				() => document.querySelector<HTMLElement>('#page-1 canvas')!.offsetWidth * devicePixelRatio
+			);
+			await page.mouse.wheel(0, -2000);
+			await expect.poll(canvasWidth).toBeGreaterThanOrEqual(Math.floor(usual * 2) - 1);
+			await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
 		}
-		// The page on screen drawn again that much sharper.
-		const canvasWidth = () =>
-			page.evaluate(() => document.querySelector<HTMLCanvasElement>('#page-1 canvas')!.width);
-		const usual = await page.evaluate(
-			() => document.querySelector<HTMLElement>('#page-1 canvas')!.offsetWidth * devicePixelRatio
-		);
-		await page.mouse.wheel(0, -2000);
-		await expect.poll(canvasWidth).toBeGreaterThanOrEqual(Math.floor(usual * 2) - 1);
-		await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
 		await button.click();
 		await expect(page.getByRole('button', { name: 'Pen', exact: true }).last()).toBeVisible();
 		const widths = await page.evaluate(() => ({

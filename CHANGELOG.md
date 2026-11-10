@@ -37,6 +37,13 @@
     Physics, J. Chem. Phys.);
   - a narrow gap between columns (6 points), a rule however thick it is
     drawn, a figure's labels under it.
+- **Safari**: the end-to-end tests run in WebKit too (Safari's engine,
+  and the apps' to come), which found: Enter in a field with suggestions
+  (a tag, a person to add) only closed the suggestions, so it took a
+  second Enter; in a private window no PDF was kept for opening again.
+  And in every browser, the page count beside the PDF could stay on the
+  page one came from after following a link and going Back; it now
+  counts the page across the window's middle.
 
 ## 0.0.19 (2026-11-09)
 

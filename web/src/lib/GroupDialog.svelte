@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import { changeGroup, createGroup, errorMessage, findUsers } from '#lib/api/client.ts';
 	import type { GroupOut, UserBrief } from '#lib/api/generated/types.gen.ts';
 
@@ -119,7 +120,12 @@
 		{#if topLevel}
 			<label>
 				First admin <span class="optional">(you, if left empty)</span>
-				<input bind:value={adminName} list="group-admins" autocomplete="off" />
+				<input
+					bind:value={adminName}
+					list="group-admins"
+					autocomplete="off"
+					{@attach enterSubmits}
+				/>
 				<datalist id="group-admins">
 					{#each people as person (person.id)}<option value={person.username}></option>{/each}
 				</datalist>

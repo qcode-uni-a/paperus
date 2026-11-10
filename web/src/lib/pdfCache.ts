@@ -63,11 +63,11 @@ export async function cachedPdf(
 		const kept = transaction.objectStore('kept');
 		const entry = (await read(kept.get(fileId))) as Kept | undefined;
 		if (!entry || entry.sha256 !== sha256 || entry.user !== user) return null;
-		const blob = (await read(transaction.objectStore('pdfs').get(fileId))) as Blob | undefined;
-		if (!blob) return null;
+		const bytes = await read(transaction.objectStore('pdfs').get(fileId));
+		if (!(bytes instanceof ArrayBuffer)) return null;
 		kept.put({ ...entry, used: Date.now() });
 		await finished(transaction);
-		return new Uint8Array(await blob.arrayBuffer());
+		return new Uint8Array(bytes);
 	} catch {
 		return null;
 	}
@@ -107,7 +107,8 @@ export async function keepPdf(
 			}
 		});
 		kept.put({ fileId, sha256, user, size: data.byteLength, used: Date.now() });
-		pdfs.put(new Blob([data as Uint8Array<ArrayBuffer>], { type: 'application/pdf' }), fileId);
+		// The bytes, not a Blob: Safari's private windows refuse Blobs here.
+		pdfs.put(data.slice().buffer, fileId);
 		await finished(transaction);
 	} catch {
 		// Full, or storage refused: shown, just not kept.

@@ -6,6 +6,7 @@
 		"build-web": "npm --prefix ../web run build",
 		"test": "npm run build-web && playwright test",
 		"test:quick": "playwright test",
+		"test:webkit": "npm run build-web && bash scripts/webkit.sh",
 		"check": "tsc -p .",
 		"report": "playwright show-report"
 	},

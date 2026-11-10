@@ -18,7 +18,10 @@ test('export the library and download it', async ({ page }) => {
 	await expect(download).toBeVisible({ timeout: 30_000 });
 	const [file] = await Promise.all([page.waitForEvent('download'), download.click()]);
 	expect(file.suggestedFilename()).toMatch(/^paperus-export-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/);
-	const zip = await readFile((await file.path()) ?? '');
+	// Saved (its path is only known where the browser runs).
+	const saved = test.info().outputPath('export.zip');
+	await file.saveAs(saved);
+	const zip = await readFile(saved);
 	// A zip whose first entry is the database.
 	expect(zip.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
 	const firstName = zip.subarray(30, 30 + zip.readUInt16LE(26)).toString();

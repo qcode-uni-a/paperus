@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import { resolve } from '$app/paths';
 	import { addItems, addTag, errorMessage, removeItem, removeTag } from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
@@ -133,6 +134,7 @@
 				<input
 					bind:value={tagInput}
 					list="tag-suggestions"
+					{@attach enterSubmits}
 					placeholder="New tag"
 					aria-label="Add a tag"
 					autofocus

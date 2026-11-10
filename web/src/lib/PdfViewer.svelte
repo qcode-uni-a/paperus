@@ -577,11 +577,14 @@
 				},
 				{ rootMargin: '800px 0px' }
 			);
+			// The page across the window's middle (also a page zoomed taller
+			// than the window; and never one on its way out, whose report
+			// can come after the next one's).
 			const visible = new IntersectionObserver(
 				([entry]) => {
 					if (entry.isIntersecting) current = number;
 				},
-				{ threshold: 0.5 }
+				{ rootMargin: '-50% 0px -50% 0px' }
 			);
 			const seen = new IntersectionObserver(([entry]) => {
 				onScreen = entry.isIntersecting;

@@ -56,3 +56,16 @@ export async function itemAction(page: Page, action: string | RegExp): Promise<v
 	await page.getByRole('button', { name: 'Item actions' }).click();
 	await page.getByRole('menuitem', { name: action }).click();
 }
+
+/** Scrolls a phone's page by ``dy`` with the wheel; in WebKit, which has no
+ * wheel on phones, as a finger does: a touch, then the page scrolled. */
+export async function scrollPhone(page: Page, dy: number): Promise<void> {
+	if (page.context().browser()?.browserType().name() !== 'webkit') {
+		await page.mouse.wheel(0, dy);
+		return;
+	}
+	await page.evaluate((dy) => {
+		window.dispatchEvent(new TouchEvent('touchstart'));
+		window.scrollBy(0, dy);
+	}, dy);
+}

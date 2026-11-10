@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import Avatar from '#lib/Avatar.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -245,6 +246,7 @@
 					<input
 						bind:value={newPerson}
 						list="group-people"
+						{@attach enterSubmits}
 						placeholder="Username"
 						aria-label="Person to add"
 						autocomplete="off"

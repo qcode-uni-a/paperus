@@ -94,8 +94,15 @@ jobs:
       - run: npm run build
 
   e2e:
-    name: End-to-end (Playwright)
+    name: End-to-end (Playwright, ${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # WebKit: Safari's engine, and the apps' on macOS, iOS and Linux.
+        browser: [chromium, webkit]
+    env:
+      PAPERUS_E2E_BROWSER: ${{ matrix.browser }}
     services:
       postgres:
         image: pgvector/pgvector:pg18
@@ -124,7 +131,7 @@ jobs:
         working-directory: web
       - run: npm ci
         working-directory: e2e
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: e2e
       - run: npm run check
         working-directory: e2e
@@ -134,7 +141,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.browser }}
           path: |
             e2e/playwright-report/
             e2e/test-results/

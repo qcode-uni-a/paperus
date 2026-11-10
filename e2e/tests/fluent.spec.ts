@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { makeLayoutPdf, type Placed } from '../fixtures/pdf.ts';
-import { uploadPaper } from './helpers.ts';
+import { scrollPhone, uploadPaper } from './helpers.ts';
 
 const LINES = 30;
 
@@ -55,7 +55,7 @@ test.describe('fluent mode on a phone', () => {
 
 		// Drawn as one scrolls through: in reading order, column after column.
 		for (let i = 0; i < 12; i++) {
-			await page.mouse.wheel(0, 800);
+			await scrollPhone(page, 800);
 			await page.waitForTimeout(150);
 		}
 		await expect.poll(() => words(page), { timeout: 20_000 }).toContain('Right 2.29');

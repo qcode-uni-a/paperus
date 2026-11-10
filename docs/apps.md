@@ -2,8 +2,7 @@
 
 paperus as an app on computers and phones: connected to a server, or with
 a library of its own on the computer, and later with papers kept offline
-and synced. Planned, nothing built yet; the steps are issues (#30, #39,
-#40).
+and synced. Planned; the steps (under Order) are issues (#30, #39, #40).
 
 ## One app, two kinds of library
 
@@ -131,7 +130,8 @@ its base.
 
 Each step usable on its own:
 
-1. **WebKit in the e2e tests** (Safari's engine; also phones' Safari).
+1. **WebKit in the e2e tests** (Safari's engine; also phones' Safari):
+   done, every test in both engines in CI (`e2e/README.md`).
 2. **The app on computers, connected to a server**: login in the system
    browser, "Open with", notifications; installers on each GitHub release.
 3. **A library on this computer**, in the same app (#39).

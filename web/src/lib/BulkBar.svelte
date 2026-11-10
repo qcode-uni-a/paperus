@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import { bulk, errorMessage, type Item } from '#lib/api/client.ts';
 	import type { BulkIn, BulkOut } from '#lib/api/generated/types.gen.ts';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
@@ -250,6 +251,7 @@
 					id="{id}-tag-name"
 					bind:value={tagName}
 					list="{id}-tag-names"
+					{@attach enterSubmits}
 					autocomplete="off"
 					maxlength="200"
 					placeholder="Tag"

@@ -56,6 +56,12 @@ test('edit the title and the tags', async ({ page }) => {
 	}
 	await page.getByRole('button', { name: `Remove tag ${tag}-2` }).click();
 	await expect(page.getByRole('link', { name: `${tag}-2`, exact: true })).toBeHidden();
+	// One Enter adds a tag also while suggestions show (the removed one is
+	// one now): Safari's suggestions took that Enter for themselves.
+	await page.getByRole('button', { name: 'Add a tag' }).click();
+	await page.getByRole('combobox', { name: 'Add a tag' }).fill(`${tag}-3`);
+	await page.getByRole('combobox', { name: 'Add a tag' }).press('Enter');
+	await expect(page.getByRole('link', { name: `${tag}-3`, exact: true })).toBeVisible();
 
 	// Both stay after a reload; the library filters by the tag.
 	await page.reload();

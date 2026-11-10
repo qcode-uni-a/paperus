@@ -1,6 +1,6 @@
 # End-to-end tests
 
-A real browser (Playwright, Chromium) against a real paperus: the API
+A real browser (Playwright: Chromium, or WebKit) against a real paperus: the API
 serving the built website, the worker, and a fresh database `paperus_e2e`
 on the compose Postgres. No ML service: search falls back to keywords, as
 it does when the ML service is down.
@@ -13,6 +13,22 @@ npx playwright install chromium      # once (in CI: --with-deps chromium)
 npm test                             # builds web/build, then runs the tests
 npm run test:quick                   # without building the website again
 ```
+
+WebKit is Safari's engine, and the apps' on macOS, iOS and Linux
+([apps.md](../docs/apps.md)); CI runs every test in both. One engine per
+run (they share the database), chosen by `PAPERUS_E2E_BROWSER`
+(`chromium`, the default, or `webkit`):
+
+```sh
+npx playwright install webkit        # once, on Ubuntu or Debian
+PAPERUS_E2E_BROWSER=webkit npm test
+npm run test:webkit                  # elsewhere: WebKit in Playwright's container (Docker)
+```
+
+`test:webkit` starts the browser in Playwright's image of the same version
+and the tests here against it; arguments after `--` go to `playwright test`.
+A test that needs one engine (pinching through Chromium's DevTools) checks
+`browserName`.
 
 `scripts/serve.sh`, started by Playwright, drops and creates `paperus_e2e`
 (it refuses other names), migrates it, and starts the worker and the API on

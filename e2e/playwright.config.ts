@@ -6,6 +6,15 @@ import { ADMIN_STATE } from './tests/helpers.ts';
 
 const port = Number(process.env.PAPERUS_E2E_PORT ?? 8100);
 const baseURL = `http://127.0.0.1:${port}`;
+// One browser engine per run: Chromium, or WebKit (Safari's, and the apps'
+// on macOS, iOS and Linux). Both share one database, so not at once.
+const browser = process.env.PAPERUS_E2E_BROWSER ?? 'chromium';
+const engines: Record<string, (typeof devices)[string]> = {
+	chromium: devices['Desktop Chrome'],
+	webkit: devices['Desktop Safari']
+};
+const device = engines[browser];
+if (!device) throw new Error(`PAPERUS_E2E_BROWSER: chromium or webkit, not ${browser}`);
 
 export default defineConfig({
 	testDir: 'tests',
@@ -23,20 +32,20 @@ export default defineConfig({
 	},
 	projects: [
 		// The first run: creates the administrator, whose login the others use.
-		{ name: 'setup', testMatch: /setup\.ts$/ },
+		{ name: 'setup', testMatch: /setup\.ts$/, use: device },
 		{
-			name: 'chromium',
+			name: browser,
 			dependencies: ['setup'],
 			testIgnore: [/setup\.ts$/, /sharing\.spec\.ts$/],
-			use: { ...devices['Desktop Chrome'], storageState: ADMIN_STATE }
+			use: { ...device, storageState: ADMIN_STATE }
 		},
 		// Last: once the administrator is in a group, dialogs ask whose
 		// things to use, which the tests above don't expect.
 		{
 			name: 'sharing',
-			dependencies: ['chromium'],
+			dependencies: [browser],
 			testMatch: /sharing\.spec\.ts$/,
-			use: { ...devices['Desktop Chrome'], storageState: ADMIN_STATE }
+			use: { ...device, storageState: ADMIN_STATE }
 		}
 	],
 	webServer: {
