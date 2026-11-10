@@ -76,7 +76,7 @@ cargo fmt && cargo clippy --all-targets && cargo test
 Unit tests in the Rust files (`cargo test`). `tests/run.sh` runs the
 app's journeys (`tests/journeys.mjs`): the app itself, driven through
 tauri-driver (WebDriver; `cargo install tauri-driver`, and WebKitWebDriver:
-Ubuntu `webkit2gtk-driver`, Arch's comes with `webkit2gtk-4.1`), against
+Ubuntu `webkitgtk-webdriver`, Arch's comes with `webkit2gtk-4.1`), against
 the e2e tests' paperus (as `e2e/scripts/serve.sh` starts it; needs
 `web/build` and the compose Postgres). Connecting to a library, the
 website kept out of the app, logging in in the browser (whose part goes
