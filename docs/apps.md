@@ -134,6 +134,9 @@ Each step usable on its own:
    done, every test in both engines in CI (`e2e/README.md`).
 2. **The app on computers, connected to a server**: login in the system
    browser, "Open with", notifications; installers on each GitHub release.
+   Begun (`app/`): the libraries listed and added, a library's website in
+   the app's window (logging in there, as on the website), other sites'
+   links in the system's browser, downloads.
 3. **A library on this computer**, in the same app (#39).
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (above), then the offline

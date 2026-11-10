@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>paperus</title>
+		<link rel="stylesheet" href="start.css" />
+		<script type="module" src="start.js"></script>
+	</head>
+	<body>
+		<main>
+			<header>
+				<img src="logo.svg" alt="" width="56" height="56" />
+				<h1>paperus</h1>
+			</header>
+
+			<section id="known" hidden>
+				<h2>Your libraries</h2>
+				<ul id="libraries"></ul>
+			</section>
+
+			<section>
+				<h2 id="add-heading">Connect to a paperus server</h2>
+				<p class="hint">
+					Your group's or your university's: the address you open it at in the browser.
+				</p>
+				<form id="add">
+					<input
+						id="address"
+						name="address"
+						type="text"
+						inputmode="url"
+						autocomplete="url"
+						autocapitalize="off"
+						spellcheck="false"
+						placeholder="paperus.example.org"
+						aria-labelledby="add-heading"
+						required
+					/>
+					<button type="submit">Connect</button>
+				</form>
+				<p id="error" class="error" role="alert" hidden></p>
+			</section>
+		</main>
+	</body>
+</html>

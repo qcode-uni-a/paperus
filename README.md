@@ -78,7 +78,7 @@ stores, load it from the release's zips: see
 | [Search](docs/search.md) | Chunking, embeddings, hybrid search, deduplication across versions, pgvector |
 | [Permissions](docs/permissions.md) | Who may do what with papers, tags, collections and groups |
 | [AI integration](docs/ai.md) | MCP tools, permissions, the AI inbox, skill draft |
-| [Apps](docs/apps.md) | Planned: one app for computers and phones, a library on one's computer, offline sync |
+| [Apps](docs/apps.md) | One app for computers and phones (begun), a library on one's computer, offline sync |
 | [Operations](docs/operations.md) | Hosting at the university, data protection, lessons from similar projects |
 | [Decisions](docs/decisions.md) | Decisions made so far and open questions |
 | [Pilot](docs/pilot.md) | Pilot plan and questions for testers |
@@ -115,6 +115,8 @@ with `npm run dev -- --host 0.0.0.0`, then open `http://<this PC's IP>:5173`.
 
 `npm run build` writes the website to `web/build`, which `paperus serve`
 serves on its own port as well. Checks: `uv run pytest`, `uvx pre-commit run --all-files`.
+
+The app for computers (Tauri, Rust) is in `app/` ([app/README.md](app/README.md)).
 
 ## Licence
 

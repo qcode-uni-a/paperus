@@ -16,6 +16,7 @@ close them from commits with "Fixes #n".
   has been applied; the dev database holds test data, so never reset it
   without asking.
 - Frontend and browser extension in TypeScript.
+- The app (`app/`): Tauri 2, Rust; `cargo fmt`, `cargo clippy -- -D warnings`.
 - Tests: server and ML service keep line coverage above 95% (CI checks with
   `pytest --cov`); browser journeys in `e2e/` (Playwright, `npm test` there);
   fluent mode's page layouts on layout twins (`server/tests/twins/`, in

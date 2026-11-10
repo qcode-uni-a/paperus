@@ -37,6 +37,10 @@
     Physics, J. Chem. Phys.);
   - a narrow gap between columns (6 points), a rule however thick it is
     drawn, a figure's labels under it.
+- **An app for computers, begun** (`app/`, not released yet): a paperus
+  server's website in a window of its own, the libraries one connects to
+  listed (checked to be a paperus), the one opened last opened again;
+  other sites' links in the system's browser, downloads in Downloads.
 - **Safari**: the end-to-end tests run in WebKit too (Safari's engine,
   and the apps' to come), which found: Enter in a field with suggestions
   (a tag, a person to add) only closed the suggestions, so it took a
