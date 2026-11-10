@@ -1,0 +1,104 @@
+// The app's journeys (app/README.md, Tests): the app itself, driven
+// through tauri-driver (WebDriver), against the e2e tests' paperus. The
+// browser's side of logging in goes over HTTP here (its page is tested in
+// e2e/tests/app-login.spec.ts). Run by run.sh.
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+
+const [APP, OPENED, PDF] = process.argv.slice(2);
+const DRIVER = 'http://127.0.0.1:4444';
+const LIBRARY = `http://127.0.0.1:${process.env.PAPERUS_E2E_PORT ?? 8100}`;
+const ADMIN = { username: 'admin', password: 'e2e-admin-password' };
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+async function webdriver(method, path, body) {
+	const response = await fetch(DRIVER + path, {
+		method,
+		headers: { 'Content-Type': 'application/json' },
+		body: body && JSON.stringify(body)
+	});
+	const { value } = await response.json();
+	if (value?.error) throw new Error(`${path}: ${value.error}: ${value.message}`);
+	return value;
+}
+
+/** Until ``check`` gives something (at most ``seconds``). */
+async function until(check, seconds = 20) {
+	for (let i = 0; i < seconds * 4; i++) {
+		const found = await check();
+		if (found) return found;
+		await sleep(250);
+	}
+	throw new Error(`waited ${seconds} s for ${check}`);
+}
+
+const { sessionId } = await webdriver('POST', '/session', {
+	capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } }
+});
+/** ``script`` in the app's window; it ends by calling ``done(value)``. */
+const inApp = (script) =>
+	webdriver('POST', `/session/${sessionId}/execute/async`, {
+		script: `const done = arguments[arguments.length - 1]; ${script}`,
+		args: []
+	});
+const shown = () => webdriver('GET', `/session/${sessionId}/url`);
+const invoke = (command, args) =>
+	inApp(`window.__TAURI__.core.invoke('${command}', ${JSON.stringify(args)})
+		.then((value) => done({ value }), (error) => done({ refused: String(error) }))`);
+
+try {
+	// The app's own page; connecting to a library, checked first.
+	await until(async () => (await shown()).startsWith('tauri:'));
+	const nowhere = await invoke('add_library', { address: 'http://127.0.0.1:9' });
+	assert.match(nowhere.refused, /could not be reached/);
+	const added = await invoke('add_library', { address: LIBRARY });
+	assert.deepEqual(added.value, { url: LIBRARY, name: '127.0.0.1' });
+	invoke('open_library', { url: LIBRARY }).catch(() => {});
+	await until(async () => (await shown()).startsWith(`${LIBRARY}/login`));
+	console.log('ok: connected, at the login page');
+
+	// The website knows it is in the app, and may not call it.
+	assert.equal((await inApp(`done('paperusApp' in window)`)), true);
+	const refused = await invoke('libraries', {});
+	assert.match(refused.refused, /not allowed/);
+	console.log('ok: the website cannot call the app');
+
+	// Logging in in the browser: the login page's OIDC link asks the app.
+	await inApp(`location.href = 'paperus-app:login?next=%2Fsettings'; done()`);
+	const opened = await until(() => existsSync(OPENED) && readFileSync(OPENED, 'utf8').trim());
+	const login = new URL(opened.split('\n').pop());
+	assert.equal(login.pathname, '/app-login');
+	// The browser, logged in there, confirms (as the page does).
+	const browser = await fetch(`${LIBRARY}/api/auth/login`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(ADMIN)
+	});
+	const cookie = browser.headers.get('set-cookie').split(';')[0];
+	const asked = Object.fromEntries(login.searchParams);
+	const confirmed = await fetch(`${LIBRARY}/api/oauth/app-login`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', Cookie: cookie },
+		body: JSON.stringify({ ...asked, allow: true })
+	});
+	const { redirect } = await confirmed.json();
+	// Back to the app's loopback address, which answers with a page.
+	const back = await fetch(redirect);
+	assert.match(await back.text(), /logged in to the paperus app/);
+	await until(async () => (await shown()) === `${LIBRARY}/settings`);
+	const me = await inApp(`fetch('/api/auth/me').then((r) => r.json()).then((me) => done(me.username))`);
+	assert.equal(me, ADMIN.username);
+	// The website's own cookie, out of its scripts' reach.
+	assert.equal(await inApp(`done(document.cookie.includes('paperus_session'))`), false);
+	console.log('ok: logged in in the browser');
+
+	// "Open with": a second start with a PDF hands it to this one.
+	const second = spawn(APP, [PDF], { stdio: 'ignore' });
+	assert.equal(await new Promise((done) => second.on('exit', done)), 0);
+	await until(async () => /\/items\/[0-9a-f-]+$/.test(await shown()));
+	console.log('ok: a PDF opened with the app is added');
+} finally {
+	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
+}

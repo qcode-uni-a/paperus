@@ -70,3 +70,16 @@ npm run icons        # the icons again, from web/static/favicon.svg
 cd src-tauri
 cargo fmt && cargo clippy --all-targets && cargo test
 ```
+
+## Tests
+
+Unit tests in the Rust files (`cargo test`). `tests/run.sh` runs the
+app's journeys (`tests/journeys.mjs`): the app itself, driven through
+tauri-driver (WebDriver; `cargo install tauri-driver`, and WebKitWebDriver:
+Ubuntu `webkit2gtk-driver`, Arch's comes with `webkit2gtk-4.1`), against
+the e2e tests' paperus (as `e2e/scripts/serve.sh` starts it; needs
+`web/build` and the compose Postgres). Connecting to a library, the
+website kept out of the app, logging in in the browser (whose part goes
+over HTTP; its page is in `e2e/tests/app-login.spec.ts`), "Open with". On
+its own display (xvfb-run, else GTK's Broadway) and session bus; the
+browser it opens is a stand-in that writes the address down. CI runs it.
