@@ -2,7 +2,7 @@
 # The app's journeys (journeys.mjs): the e2e tests' paperus (a fresh
 # database paperus_e2e; needs web/build and Postgres, see e2e/README.md),
 # the app (a debug build), tauri-driver and WebKitWebDriver, on a display
-# of their own (xvfb-run, else GTK's Broadway). The app's settings, data
+# of their own (Xvfb, else GTK's Broadway). The app's settings, data
 # and the browser it opens are stand-ins in a temporary folder.
 set -euo pipefail
 # A session bus of its own (the app's single-instance check uses it).
@@ -41,14 +41,17 @@ export WEBKIT_DISABLE_COMPOSITING_MODE=1
 printf '%%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%%%EOF\n' >"$STATE/opened-with.pdf"
 
 driver=(tauri-driver --native-driver "$(command -v WebKitWebDriver)")
-if command -v xvfb-run >/dev/null; then
-  xvfb-run -a "${driver[@]}" >"$STATE/driver.log" 2>&1 &
+# One display for all (the app started a second time too).
+if command -v Xvfb >/dev/null; then
+  Xvfb :97 -screen 0 1280x900x24 >/dev/null 2>&1 &
+  export DISPLAY=:97 GDK_BACKEND=x11
 else
   broadwayd :7 >/dev/null 2>&1 &
-  pids+=($!)
   export GDK_BACKEND=broadway BROADWAY_DISPLAY=:7
-  "${driver[@]}" >"$STATE/driver.log" 2>&1 &
 fi
+pids+=($!)
+sleep 1
+"${driver[@]}" >"$STATE/driver.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 30); do curl -sf http://127.0.0.1:4444/status >/dev/null && break; sleep 1; done
 
