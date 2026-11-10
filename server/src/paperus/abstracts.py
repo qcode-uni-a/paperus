@@ -11,6 +11,7 @@ import re
 
 from paperus.library import preferred_version
 from paperus.models import Item
+from paperus.text import mend_hyphens
 
 # Shorter is a heading or a stray line; longer has run into the paper.
 MIN_LENGTH = 200
@@ -66,7 +67,7 @@ def from_pages(pages: list[str]) -> str | None:
     end = _END.search(rest, MIN_LENGTH // 2)
     found = rest[: end.start() if end else MAX_LENGTH + 1]
     # Lines joined again; words broken at the line's end mended.
-    found = re.sub(r"-\n(?=[a-z])", "", found)
+    found = mend_hyphens(found)
     found = " ".join(found.split())
     if not MIN_LENGTH <= len(found) <= MAX_LENGTH:
         return None

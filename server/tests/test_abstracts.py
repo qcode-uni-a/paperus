@@ -40,9 +40,11 @@ def test_the_paragraph_after_the_heading() -> None:
     assert found is not None
     assert found.startswith("line 0 of") and "INTRODUCTION" not in found
     # On the heading's line; up to the keywords; words broken at a line end.
-    inline = f"ABSTRACT—{body}\nwith a hyph-\nenated word\nKeywords: spins"
+    # (PDFium reads LaTeX's hyphen at a line end as U+0002.)
+    broken = "with a hyph-\nenated word, co\u0002\nherent"
+    inline = f"ABSTRACT—{body}\n{broken}\nKeywords: spins"
     found = abstracts.from_pages(["Title", inline])
-    assert found is not None and found.endswith("with a hyphenated word")
+    assert found is not None and found.endswith("with a hyphenated word, coherent")
     assert abstracts.from_pages(["No heading at all\n" + body]) is None
     assert abstracts.from_pages(["Abstract\nToo short.\nIntroduction"]) is None
 

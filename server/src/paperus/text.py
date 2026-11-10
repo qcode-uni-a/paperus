@@ -18,6 +18,16 @@ MAX_WORDS = 350
 LONGEST_WORD = 200
 
 _HYPHENATED = re.compile(r"(\w)-\n(?=[a-z])")
+# How PDFium reads a word hyphenated at a line's end (LaTeX's, among
+# others): its hyphen as U+0002; and soft hyphens.
+_HYPHEN_MARKS = re.compile(r"[\u0002\u00ad]\n?")
+
+
+def mend_hyphens(text: str) -> str:
+    """Words broken at a line's end joined again (lines end in ``\\n``)."""
+    return _HYPHENATED.sub(r"\1", _HYPHEN_MARKS.sub("", text))
+
+
 _BLANK_LINES = re.compile(r"\n\s*\n")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[\"'(\[A-Z0-9])")
 
@@ -71,7 +81,7 @@ def html_text(html: bytes) -> str:
 
 def _paragraphs(text: str) -> list[str]:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = _HYPHENATED.sub(r"\1", text)
+    text = mend_hyphens(text)
     # Words longer than any real word (embedded images, minified code) only
     # bloat a passage (Postgres indexes at most 1 MB of text per passage).
     paragraphs = (

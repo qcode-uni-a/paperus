@@ -49,6 +49,9 @@ def test_endless_sentences_are_cut() -> None:
 def test_cleanup() -> None:
     [chunk] = chunk_text("Hydro-\nlogy of   rivers\r\nand lakes")
     assert chunk.text == "Hydrology of rivers and lakes"
+    # As PDFium reads a LaTeX PDF's hyphenation; and a soft hyphen.
+    [chunk] = chunk_text("a co\u0002\r\nherent state, den\u00adsities")
+    assert chunk.text == "a coherent state, densities"
 
 
 def test_chunk_pages_keeps_page_numbers() -> None:
