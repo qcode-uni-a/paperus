@@ -25,7 +25,7 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           status=0
-          for file in server/pyproject.toml ml/pyproject.toml; do
+          for file in server/pyproject.toml ml/pyproject.toml app/src-tauri/Cargo.toml; do
             found=$(grep -m1 '^version = ' "$file" | cut -d'"' -f2)
             [ "$found" = "$version" ] || { echo "::error file=$file::version $found, tag $version"; status=1; }
           done
