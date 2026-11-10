@@ -1,6 +1,7 @@
 // The homepage's few scripts: the latest release's version and installers
 // (from GitHub's API; without it, the links go to the releases page), and
-// the first screen's sequence.
+// the animations. Without scripts, or with less motion wished for, every
+// picture shows its last frame.
 
 const REPO = 'qcode-uni-a/paperus';
 
@@ -61,29 +62,194 @@ async function release() {
 	}
 }
 
-const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+const motion = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
-async function play() {
+// A scene's clock: it only runs while the scene is on screen, the tab is
+// shown, and nobody pressed its pause button.
+function clock(scene) {
+	const state = { visible: false, paused: false };
+	new IntersectionObserver(([entry]) => (state.visible = entry.isIntersecting), {
+		threshold: 0.3
+	}).observe(scene);
+	const button = scene.querySelector('.pause');
+	const label = button?.querySelector('.visually-hidden');
+	if (button && label) {
+		button.hidden = false;
+		button.addEventListener('click', () => {
+			state.paused = !state.paused;
+			button.setAttribute('aria-pressed', String(state.paused));
+			label.textContent = state.paused ? 'Play the example' : 'Pause the example';
+			scene.classList.toggle('paused', state.paused);
+		});
+	}
+	return async (ms) => {
+		for (let left = ms; left > 0;) {
+			await sleep(40);
+			if (state.visible && !state.paused && !document.hidden) left -= 40;
+		}
+	};
+}
+
+// Wraps each word in a span, numbered, so they can appear one by one.
+function words(element) {
+	let i = 0;
+	for (const node of [...element.childNodes]) {
+		if (node.nodeType === Node.TEXT_NODE) {
+			const pieces = node.textContent.split(/(\s+)/);
+			const spans = pieces.map((piece) => {
+				if (!piece.trim()) return document.createTextNode(piece);
+				const span = document.createElement('span');
+				span.className = 'w';
+				span.style.setProperty('--i', String(i++));
+				span.textContent = piece;
+				return span;
+			});
+			node.replaceWith(...spans);
+		} else if (node instanceof HTMLElement) {
+			node.classList.add('w');
+			node.style.setProperty('--i', String(i++ + 2));
+		}
+	}
+}
+
+// The first screen: a question typed, the library searched, the passage
+// found and marked, the answer with its citation; then again.
+async function hero() {
 	const demo = document.querySelector('.demo');
 	const typed = demo?.querySelector('[data-typed]');
-	if (!demo || !typed || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-	const text = typed.textContent;
+	const tool = demo?.querySelector('[data-tool]');
+	const answer = demo?.querySelector('[data-words]');
+	if (!demo || !typed || !tool || !answer) return;
+	const question = typed.textContent;
+	const ghost = document.createElement('span');
+	ghost.className = 'ghost';
+	ghost.setAttribute('aria-hidden', 'true');
+	ghost.textContent = question;
+	typed.closest('.ask')?.prepend(ghost);
+	words(answer);
+	const wait = clock(demo);
+	const steps = ['searching', 'found', 'marked', 'answered', 'leaving'];
+
 	typed.textContent = '';
 	demo.classList.add('play');
 	await wait(700);
-	for (const letter of text) {
-		typed.textContent += letter;
-		await wait(letter === ' ' ? 70 : 38);
+	for (;;) {
+		for (const letter of question) {
+			typed.textContent += letter;
+			await wait(letter === ' ' ? 80 : 42);
+		}
+		await wait(500);
+		tool.textContent = 'Searching your library by meaning';
+		demo.classList.add('searching');
+		await wait(1300);
+		tool.textContent = 'Searched your library by meaning';
+		demo.classList.add('found');
+		await wait(800);
+		demo.classList.add('marked');
+		await wait(2600);
+		demo.classList.add('answered');
+		await wait(8000);
+		demo.classList.add('leaving');
+		await wait(800);
+		typed.textContent = '';
+		demo.classList.remove(...steps);
+		await wait(700);
 	}
-	await wait(450);
-	demo.classList.add('searched');
-	await wait(650);
-	demo.classList.add('found');
-	await wait(350);
-	demo.classList.add('marked');
-	await wait(1500);
-	demo.classList.add('answered');
+}
+
+// The round trip: the assistant asks, paperus searches and checks, the
+// cited passage comes back. Each time with another assistant.
+async function relay() {
+	const scene = document.querySelector('.relay');
+	const name = scene?.querySelector('[data-name]');
+	if (!scene || !name) return;
+	const wait = clock(scene);
+	const names = ['Claude', 'ChatGPT', 'a local model'];
+	const steps = ['asked', 'sent', 's1', 's2', 's3', 'returned', 'answered', 'leaving'];
+	const step = async (name, ms) => {
+		scene.classList.add(name);
+		await wait(ms);
+	};
+
+	name.textContent = names[0];
+	scene.classList.add('play');
+	for (let round = 0; ; round++) {
+		await wait(600);
+		await step('asked', 900);
+		await step('sent', 1500);
+		await step('s1', 550);
+		await step('s2', 550);
+		await step('s3', 700);
+		await step('returned', 1500);
+		await step('answered', 4200);
+		await step('leaving', 600);
+		scene.classList.remove(...steps);
+		scene.classList.add('switching');
+		await wait(300);
+		name.textContent = names[(round + 1) % names.length];
+		scene.classList.remove('switching');
+	}
+}
+
+// The screenshot straightens as it comes up the screen.
+function tilt() {
+	const window_ = document.querySelector('[data-tilt]');
+	if (!window_) return;
+	let queued = false;
+	const update = () => {
+		queued = false;
+		const top = window_.getBoundingClientRect().top;
+		const height = innerHeight;
+		const p = Math.min(1, Math.max(0, (height - top) / (height * 0.75)));
+		window_.style.setProperty('--p', p.toFixed(3));
+	};
+	const queue = () => {
+		if (!queued) requestAnimationFrame(update);
+		queued = true;
+	};
+	addEventListener('scroll', queue, { passive: true });
+	addEventListener('resize', queue);
+	update();
+}
+
+// The four small pictures: played from the start each time they come into
+// view, and again on pointing at them.
+function pictures() {
+	const replay = (idea) => {
+		for (const animation of idea.getAnimations({ subtree: true })) {
+			animation.currentTime = 0;
+			animation.play();
+		}
+	};
+	const observer = new IntersectionObserver(
+		(entries) => {
+			for (const { target, isIntersecting } of entries) {
+				if (isIntersecting) replay(target);
+				else
+					for (const animation of target.getAnimations({ subtree: true })) {
+						animation.pause();
+						animation.currentTime = 0;
+					}
+			}
+		},
+		{ threshold: 0.6 }
+	);
+	for (const idea of document.querySelectorAll('[data-play]')) {
+		observer.observe(idea);
+		idea.addEventListener('pointerenter', () => {
+			const done = idea
+				.getAnimations({ subtree: true })
+				.every((animation) => animation.playState === 'finished');
+			if (done) replay(idea);
+		});
+	}
 }
 
 release();
-play();
+if (motion) {
+	hero();
+	relay();
+	tilt();
+	pictures();
+}

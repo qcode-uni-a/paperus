@@ -1,6 +1,9 @@
 /* paperus.github.io: ink and highlighter, as the website (web/src/app.css).
    Royal-blue ink, cool paper, and the highlighter as the one loud thing:
-   the stroke over the passage in the first screen. */
+   the stroke over the passage in the first screen.
+
+   Every animation runs only with scripts (html.js) and without a wish for
+   less motion; the styles outside those blocks are the final frames. */
 
 @font-face {
 	font-family: 'Literata';
@@ -41,11 +44,15 @@
 	--shadow: 0 1px 2px rgb(27 36 64 / 0.08), 0 24px 60px -12px rgb(27 36 64 / 0.28);
 	--code: #1b2440;
 	--on-code: #e6e9f2;
+	--band: #1b2440;
 
 	--serif: 'Literata', Georgia, serif;
 	--sans: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+	--mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 	--width: 1180px;
 	--gutter: clamp(16px, 4vw, 40px);
+	--ease: cubic-bezier(0.65, 0, 0.25, 1);
+	--spring: cubic-bezier(0.25, 1.35, 0.4, 1);
 	color-scheme: light;
 }
 
@@ -64,6 +71,7 @@
 		--highlighter: #f5d547;
 		--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 60px -12px rgb(0 0 0 / 0.6);
 		--code: #0c1020;
+		--band: #0c1020;
 		color-scheme: dark;
 	}
 }
@@ -81,6 +89,7 @@
 	--highlighter: #f5d547;
 	--shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 60px -12px rgb(0 0 0 / 0.6);
 	--code: #0c1020;
+	--band: #0c1020;
 	color-scheme: dark;
 }
 
@@ -135,6 +144,18 @@ h3 {
 }
 p {
 	margin: 0;
+}
+code {
+	font-family: var(--mono);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
 
 /* The sheets' corners, turned, may reach past a phone's edge. */
@@ -192,7 +213,7 @@ main > section,
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	align-items: center;
 	gap: clamp(40px, 6vw, 88px);
-	padding-block: clamp(40px, 8vw, 104px) clamp(64px, 10vw, 136px);
+	padding-block: clamp(32px, 7vw, 88px) clamp(64px, 10vw, 128px);
 }
 
 .status {
@@ -225,13 +246,13 @@ h1 {
 
 .lede {
 	margin-top: 28px;
-	max-width: 33em;
-	font-size: clamp(1.1rem, 1rem + 0.4vw, 1.28rem);
-	line-height: 1.55;
+	max-width: 24em;
+	font-size: clamp(1.15rem, 1rem + 0.5vw, 1.4rem);
+	line-height: 1.45;
 	color: var(--muted);
 }
 .byline {
-	margin-top: 18px;
+	margin-top: 16px;
 	font-family: var(--serif);
 	font-style: italic;
 	font-size: 1.15rem;
@@ -244,6 +265,13 @@ h1 {
 	gap: 12px;
 	margin-top: 36px;
 }
+.demo-note {
+	margin-top: 14px;
+	max-width: 30em;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
 .button {
 	display: inline-flex;
 	align-items: center;
@@ -282,6 +310,9 @@ h1 {
 /* The assistant answering from the library: three sheets, as in the logo. */
 
 .demo {
+	--tilt-blue: -5.5deg;
+	--tilt-yellow: 4.5deg;
+	--fan: 1.5deg;
 	position: relative;
 	margin: 0;
 	padding: 18px;
@@ -294,14 +325,17 @@ h1 {
 	inset: 40px 36px 28px;
 	border-radius: 22px;
 	transform-origin: 50% 100%;
+	transition:
+		rotate 0.9s var(--spring),
+		translate 0.9s var(--spring);
 }
 .sheet.blue {
 	background: var(--sheet-blue);
-	transform: rotate(-5.5deg);
+	rotate: var(--tilt-blue);
 }
 .sheet.yellow {
 	background: var(--sheet-yellow);
-	transform: rotate(4.5deg);
+	rotate: var(--tilt-yellow);
 }
 .sheet.front {
 	position: relative;
@@ -314,13 +348,20 @@ h1 {
 }
 
 .ask {
+	display: grid;
 	justify-self: end;
-	max-width: 88%;
+	max-width: calc(100% - 48px);
 	padding: 10px 16px;
 	border-radius: 18px 18px 4px 18px;
 	background: var(--field);
 	font-size: 0.98rem;
-	min-height: 1.6em;
+}
+/* The question, typed over a hidden copy of itself, so nothing moves. */
+.ask > * {
+	grid-area: 1 / 1;
+}
+.ask .ghost {
+	visibility: hidden;
 }
 .caret {
 	display: inline-block;
@@ -428,41 +469,54 @@ mark {
 	white-space: nowrap;
 }
 
-/* The sequence, once the script starts it (without it, all is shown). */
-.demo.play .ask .caret {
-	opacity: 1;
-	animation: blink 0.9s steps(1) infinite;
+/* Pausing the example: two bars, or a triangle once paused. */
+.pause {
+	position: absolute;
+	top: 22px;
+	left: 22px;
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border: 1.5px solid var(--rule);
+	border-radius: 50%;
+	background: var(--surface);
+	color: var(--muted);
+	cursor: pointer;
 }
-.demo.play .tool,
-.demo.play .page,
-.demo.play .answer {
-	opacity: 0;
-	transform: translateY(6px);
-	transition:
-		opacity 0.5s ease,
-		transform 0.5s ease;
+.pause[hidden] {
+	display: none;
 }
-.demo.play mark {
-	background-size: 0% 100%;
-	transition: background-size 1.3s cubic-bezier(0.6, 0.1, 0.3, 1);
+.pause:hover {
+	border-color: var(--royal);
+	color: var(--royal);
 }
-.demo.searched .tool,
-.demo.found .page,
-.demo.answered .answer {
-	opacity: 1;
-	transform: none;
+.pause::before {
+	content: '';
+	width: 10px;
+	height: 11px;
+	border-inline: 3px solid currentColor;
 }
-.demo.searched .ask .caret {
-	opacity: 0;
-	animation: none;
+.pause[aria-pressed='true']::before {
+	width: 0;
+	height: 0;
+	margin-left: 3px;
+	border: 6px solid transparent;
+	border-left: 10px solid currentColor;
+	border-right: 0;
 }
-.demo.marked mark {
-	background-size: 100% 100%;
+.relay .pause {
+	top: 18px;
+	left: auto;
+	right: 18px;
+	border-color: #3a4470;
+	background: #1b2440;
+	color: #b8bfd3;
 }
-@keyframes blink {
-	50% {
-		opacity: 0;
-	}
+.relay .pause:hover {
+	border-color: #ffe45c;
+	color: #ffe45c;
 }
 
 /* Sections. */
@@ -474,7 +528,7 @@ mark {
 	font-weight: 560;
 }
 
-/* AI first: a band of ink across the page. */
+/* AI first: a band of ink across the page, and the round trip on it. */
 
 .ai {
 	position: relative;
@@ -482,20 +536,15 @@ mark {
 	color: #e6e9f2;
 	isolation: isolate;
 }
+.ai :focus-visible {
+	outline-color: #ffe45c;
+}
 .ai::before {
 	content: '';
 	position: absolute;
 	inset: 0 calc(50% - 50vw);
 	z-index: -1;
-	background: #1b2440;
-}
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme='light']) .ai::before {
-		background: #0c1020;
-	}
-}
-:root[data-theme='dark'] .ai::before {
-	background: #0c1020;
+	background: var(--band);
 }
 .ai-head {
 	display: grid;
@@ -505,57 +554,207 @@ mark {
 }
 .ai .intro {
 	color: #b8bfd3;
-	font-size: 1.15rem;
-	max-width: 34em;
+	font-size: 1.2rem;
+	max-width: 26em;
 }
 
-.split {
+.relay {
+	position: relative;
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-	margin-top: clamp(40px, 6vw, 72px);
-	border-radius: 22px;
-	overflow: hidden;
-	background: #2b3350;
-	gap: 1px;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+	align-items: center;
+	margin: clamp(40px, 6vw, 72px) 0 0;
 }
-.side {
-	padding: clamp(24px, 4vw, 44px);
-	background: #222b4b;
-}
-.side.mine {
-	background: #263066;
-}
-.side h3 {
-	font-size: 1.4rem;
-	letter-spacing: -0.01em;
-}
-.side.mine h3 {
-	color: #ffe45c;
-}
-.side ul {
-	margin: 22px 0 0;
-	padding: 0;
-	list-style: none;
+.node {
+	position: relative;
 	display: grid;
 	gap: 14px;
+	padding: clamp(20px, 2.4vw, 28px);
+	border-radius: 22px;
+	background: #222b4b;
+	box-shadow: 0 0 0 1px #2f3a63;
+	transition: box-shadow 0.5s ease;
 }
-.side li {
+.node.you {
+	background: #263066;
+}
+.node.you .who {
+	padding-right: 40px;
+}
+.who {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	font-family: var(--serif);
+	font-size: 1.25rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+.who img {
+	flex: none;
+}
+.name {
+	padding: 1px 10px;
+	border-radius: 999px;
+	background: rgb(255 228 92 / 0.14);
+	color: #ffe45c;
+	font-family: var(--sans);
+	font-size: 0.85rem;
+	font-weight: 600;
+	letter-spacing: 0;
+	transition: opacity 0.3s ease;
+}
+.bubble {
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+.bubble.q {
+	justify-self: end;
+	max-width: 92%;
+	padding: 9px 14px;
+	border-radius: 16px 16px 4px 16px;
+	background: rgb(255 255 255 / 0.1);
+}
+.bubble.a {
+	color: #e6e9f2;
+}
+.relay .cite {
+	background: rgb(154 172 255 / 0.18);
+	color: #c9d3ff;
+}
+.caption {
+	color: #b8bfd3;
+	font-size: 0.9rem;
+}
+
+.steps {
+	display: grid;
+	gap: 12px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.steps li {
 	position: relative;
-	padding-left: 26px;
+	padding-left: 24px;
 	color: #d3d8e6;
+	font-size: 0.97rem;
+	line-height: 1.4;
+	transition:
+		color 0.35s ease,
+		opacity 0.35s ease;
 }
-.side li::before {
+.steps li::before {
 	content: '';
 	position: absolute;
 	left: 0;
-	top: 0.62em;
-	width: 12px;
-	height: 2px;
-	border-radius: 2px;
+	top: 0.32em;
+	width: 11px;
+	height: 11px;
+	border-radius: 50%;
 	background: #9aacff;
+	transition:
+		background-color 0.35s ease,
+		box-shadow 0.35s ease,
+		scale 0.35s var(--spring);
 }
-.side.mine li::before {
-	background: #ffe45c;
+
+/* Between them, two tracks: the question goes, the passage comes back. */
+.wire {
+	display: grid;
+	grid-template-rows: auto auto;
+	gap: 22px;
+	padding-inline: 14px;
+}
+.track {
+	position: relative;
+	height: 82px;
+	container-type: inline-size;
+}
+.track::before {
+	content: '';
+	position: absolute;
+	inset: 50% 6px auto;
+	border-top: 2px dashed rgb(154 172 255 / 0.4);
+}
+.track::after {
+	content: '';
+	position: absolute;
+	top: calc(50% - 5px);
+	width: 10px;
+	height: 10px;
+	border-top: 2px solid #9aacff;
+	border-right: 2px solid #9aacff;
+}
+.track.out::after {
+	right: 4px;
+	rotate: 45deg;
+}
+.track.back::after {
+	left: 4px;
+	rotate: -135deg;
+	border-color: #ffe45c;
+}
+.track.back::before {
+	border-color: rgb(255 228 92 / 0.4);
+}
+.packet {
+	position: absolute;
+	z-index: 1;
+	top: 50%;
+	left: 0;
+	transform: translate(calc(50cqw - 50%), -50%);
+	box-shadow: 0 10px 24px -8px rgb(0 0 0 / 0.5);
+}
+.out .packet {
+	padding: 6px 13px;
+	border-radius: 999px;
+	background: #9aacff;
+	color: #10173a;
+	font-size: 0.86rem;
+	font-weight: 600;
+	white-space: nowrap;
+}
+.back .packet {
+	width: min(240px, 84cqw);
+	padding: 9px 12px;
+	border-radius: 10px;
+	background: #fcfcfd;
+	color: #1b2440;
+	font-family: var(--serif);
+	font-size: 0.84rem;
+	line-height: 1.5;
+}
+.back .packet mark {
+	color: #1b2440;
+	background-image: linear-gradient(#ffe45c, #ffe45c);
+}
+
+.promises {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px clamp(24px, 5vw, 64px);
+	margin: clamp(40px, 5vw, 56px) 0 0;
+	padding: 0;
+	list-style: none;
+	font-family: var(--serif);
+	font-size: clamp(1.1rem, 1rem + 0.4vw, 1.3rem);
+}
+.promises li {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+.promises svg {
+	flex: none;
+	width: 26px;
+	height: 26px;
+	fill: none;
+	stroke: #ffe45c;
+	stroke-width: 1.8;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 /* The library. */
@@ -570,28 +769,284 @@ mark {
 	border: 1px solid var(--rule);
 	box-shadow: var(--shadow);
 	background: var(--desk);
+	transform-origin: 50% 0;
 }
+
 .ideas {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: clamp(24px, 3vw, 40px);
-	margin-top: clamp(40px, 6vw, 64px);
+	gap: clamp(28px, 3vw, 40px);
+	margin-top: clamp(48px, 7vw, 88px);
 }
 .idea h3 {
+	margin-top: 20px;
 	font-size: 1.28rem;
 	line-height: 1.25;
 	letter-spacing: -0.01em;
 }
 .idea p {
-	margin-top: 10px;
+	margin-top: 6px;
 	color: var(--muted);
 	font-size: 1rem;
+	line-height: 1.5;
+}
+
+/* The four small pictures. Each one's plain style is its last frame. */
+.art {
+	position: relative;
+	display: grid;
+	place-items: center;
+	align-content: center;
+	gap: 8px;
+	height: 172px;
+	border-radius: 20px;
+	background: var(--field);
+	overflow: hidden;
+}
+.art i,
+.art b {
+	display: block;
+	border-radius: 3px;
+}
+
+/* A lab, with groups inside, behind one login. */
+.groups .lab {
+	position: relative;
+	display: flex;
+	gap: 10px;
+	width: 76%;
+	height: 116px;
+	padding: 22px 12px 12px;
+	border: 2px solid var(--royal);
+	border-radius: 18px;
+}
+.groups .badge {
+	position: absolute;
+	top: -12px;
+	left: 14px;
+	padding: 1px 9px;
+	border-radius: 999px;
+	background: var(--highlighter);
+	color: #1b2440;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+.groups .team {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	border: 1.5px dashed color-mix(in srgb, var(--royal) 50%, transparent);
+	border-radius: 12px;
+}
+.groups .t2 {
+	flex: 0.75;
+}
+.groups .team i {
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--royal);
+}
+.groups .team i:nth-child(2) {
+	background: var(--highlighter);
+}
+.groups .team i:nth-child(3) {
+	background: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+
+/* A question in plain words, and what it finds. */
+.find .field,
+.find .hit {
+	width: 84%;
+	border-radius: 10px;
+	background: var(--surface);
+	box-shadow: 0 1px 2px rgb(27 36 64 / 0.08);
+}
+.find .field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 12px;
+	border-radius: 999px;
+	font-size: 0.76rem;
+	white-space: nowrap;
+	overflow: hidden;
+}
+.find .field svg {
+	flex: none;
+	width: 13px;
+	height: 13px;
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 2.4;
+	stroke-linecap: round;
+}
+.find .query {
+	overflow: hidden;
+	text-overflow: clip;
+}
+.find .hit {
+	display: grid;
+	gap: 5px;
+	padding: 9px 12px;
+}
+.find .hit b {
+	width: 58%;
+	height: 6px;
+	background: var(--royal);
+	opacity: 0.75;
+}
+.find .hit i {
+	height: 5px;
+	background: var(--rule);
+}
+.find .hit i.mark {
+	width: 80%;
+	background: var(--highlighter);
+	transform-origin: 0 50%;
+}
+.find .hit i.short {
+	width: 55%;
+}
+.find .h2 {
+	opacity: 0.6;
+}
+
+/* A two-column page that turns into a phone. */
+.reflow .device {
+	position: relative;
+	width: 80px;
+	height: 148px;
+	border: 3px solid var(--ink);
+	border-radius: 16px;
+	background: var(--surface);
+}
+.reflow .col {
+	position: absolute;
+	left: 9px;
+	width: calc(100% - 18px);
+	display: grid;
+	gap: 5px;
+}
+.reflow .col.a {
+	top: 12px;
+}
+.reflow .col.b {
+	top: 68px;
+}
+.reflow .col i {
+	height: 5px;
+	background: var(--rule);
+}
+.reflow .col i.short {
+	width: 60%;
+}
+.reflow .col i.mark {
+	background: var(--highlighter);
+}
+.reflow .figure {
+	aspect-ratio: 4 / 3;
+	border-radius: 4px;
+	background:
+		linear-gradient(to top right, transparent 46%, var(--royal) 47% 53%, transparent 54%) center /
+			70% 60% no-repeat,
+		color-mix(in srgb, var(--royal) 14%, var(--surface));
+}
+
+/* A preprint's card turns over: published. */
+.publish {
+	perspective: 700px;
+}
+.publish .card {
+	position: relative;
+	width: 64%;
+	height: 118px;
+	transform-style: preserve-3d;
+	transform: rotateY(180deg);
+}
+.publish .face {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	align-content: start;
+	gap: 7px;
+	padding: 14px;
+	border-radius: 12px;
+	background: var(--surface);
+	box-shadow: 0 1px 2px rgb(27 36 64 / 0.08);
+	backface-visibility: hidden;
+}
+.publish .face i {
+	height: 6px;
+	background: var(--rule);
+}
+.publish .face i.short {
+	width: 60%;
+}
+.publish .pub {
+	transform: rotateY(180deg);
+	box-shadow: inset 0 0 0 2px var(--royal);
+}
+.publish .tag {
+	justify-self: start;
+	margin-bottom: 4px;
+	padding: 1px 9px;
+	border-radius: 999px;
+	background: var(--rule);
+	color: var(--muted);
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+.publish .pub .tag {
+	background: var(--royal);
+	color: var(--on-royal);
+}
+.publish .tick {
+	position: absolute;
+	right: 12px;
+	bottom: 12px;
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: var(--highlighter);
+}
+.publish .tick::after {
+	content: '';
+	position: absolute;
+	left: 9px;
+	top: 6px;
+	width: 6px;
+	height: 11px;
+	border-right: 2.5px solid #1b2440;
+	border-bottom: 2.5px solid #1b2440;
+	rotate: 45deg;
 }
 
 /* Getting it. */
 
 .get {
 	padding-block: clamp(80px, 11vw, 152px) clamp(56px, 8vw, 96px);
+}
+.get-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	justify-content: space-between;
+	gap: 20px 40px;
+}
+.try {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.try span {
+	max-width: 21em;
+	color: var(--muted);
+	font-size: 0.9rem;
+	line-height: 1.45;
 }
 .ways {
 	display: grid;
@@ -603,7 +1058,7 @@ mark {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
-	gap: 16px;
+	gap: 14px;
 	padding-top: 22px;
 	border-top: 3px solid var(--ink);
 	scroll-margin-top: 24px;
@@ -616,7 +1071,8 @@ mark {
 	color: var(--muted);
 }
 .way .note {
-	font-size: 0.9rem;
+	font-size: 0.88rem;
+	line-height: 1.5;
 }
 .way .button {
 	margin-top: 4px;
@@ -633,9 +1089,6 @@ pre {
 	font-size: 0.8rem;
 	line-height: 1.75;
 	overflow-x: auto;
-}
-code {
-	font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
 }
 .comment {
 	color: #8d96b3;
@@ -709,16 +1162,79 @@ code {
 		max-width: 680px;
 	}
 }
+
+/* The round trip stands up: assistant above, library below. */
+@media (max-width: 760px) {
+	.relay {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.wire {
+		grid-template-rows: none;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 12px;
+		padding: 0;
+	}
+	.track {
+		height: 176px;
+		container-type: size;
+	}
+	.track::before {
+		inset: 6px auto 6px 50%;
+		border-top: 0;
+		border-left: 2px dashed rgb(154 172 255 / 0.4);
+	}
+	.track.back::before {
+		border-color: rgb(255 228 92 / 0.4);
+	}
+	.track::after {
+		top: auto;
+		left: calc(50% - 4px);
+		right: auto;
+	}
+	.track.out::after {
+		bottom: 6px;
+		rotate: 135deg;
+	}
+	.track.back::after {
+		top: 6px;
+		left: calc(50% - 4px);
+		rotate: -45deg;
+	}
+	.packet {
+		top: 0;
+		left: 50%;
+		transform: translate(-50%, calc(50cqh - 50%));
+	}
+	.out .packet {
+		max-width: 96cqw;
+		font-size: 0.76rem;
+		white-space: normal;
+		text-align: center;
+		border-radius: 12px;
+	}
+	.back .packet {
+		width: 96cqw;
+		font-size: 0.8rem;
+	}
+}
+
 @media (max-width: 640px) {
-	.top nav a:not(.github):not([href='#get']) {
+	.top nav a:not([href='#get']) {
 		display: none;
 	}
-	.split,
 	.ideas {
 		grid-template-columns: minmax(0, 1fr);
 	}
+	.art {
+		height: 160px;
+	}
 	.demo {
 		padding: 10px 6px;
+	}
+	.demo {
+		--tilt-blue: -2.5deg;
+		--tilt-yellow: 2deg;
+		--fan: 1.2deg;
 	}
 	.sheet.back {
 		inset: 26px 18px 30px;
@@ -726,19 +1242,424 @@ code {
 	.sheet.front {
 		padding: 16px;
 	}
+	.pause {
+		top: 16px;
+		left: 16px;
+	}
 	.page {
 		padding: 16px;
+	}
+	.try {
+		flex-wrap: wrap;
+	}
+}
+
+/* Motion. Only here do things start from somewhere else. */
+
+@media (prefers-reduced-motion: no-preference) {
+	/* The first screen arrives: the pitch rises, the sheets fan out. */
+	.js .pitch > * {
+		animation: rise 0.8s var(--ease) both;
+	}
+	.js .pitch > :nth-child(2) {
+		animation-delay: 0.06s;
+	}
+	.js .pitch > :nth-child(3) {
+		animation-delay: 0.14s;
+	}
+	.js .pitch > :nth-child(4) {
+		animation-delay: 0.2s;
+	}
+	.js .pitch > :nth-child(n + 5) {
+		animation-delay: 0.26s;
+	}
+	.js .demo {
+		animation: rise 0.9s var(--ease) 0.1s both;
+	}
+	.js .demo .sheet.back {
+		animation: fan 1.2s var(--spring) 0.35s backwards;
+	}
+
+	/* The example, step by step (main.js sets the steps). */
+	.js .demo.play .caret {
+		opacity: 1;
+		animation: blink 0.9s steps(1) infinite;
+	}
+	.js .demo.play .typing,
+	.js .demo.play .tool,
+	.js .demo.play .page,
+	.js .demo.play .answer {
+		transition:
+			opacity 0.6s ease,
+			transform 0.7s var(--ease);
+	}
+	.js .demo.play .tool {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	.js .demo.play .page {
+		opacity: 0.16;
+		filter: blur(7px);
+		transform: translateY(18px) scale(0.98);
+		transform-origin: 50% 0;
+		transition:
+			opacity 0.6s ease,
+			filter 0.9s ease,
+			transform 0.7s var(--ease);
+	}
+	/* While searching, the page is already there, out of focus. */
+	.js .demo.searching .page {
+		opacity: 0.45;
+		transform: translateY(8px) scale(0.99);
+	}
+	.js .demo.play mark {
+		-webkit-box-decoration-break: slice;
+		box-decoration-break: slice;
+		background-size: 0% 100%;
+		transition: background-size 2.4s cubic-bezier(0.45, 0.1, 0.55, 0.95);
+	}
+	.js .demo.play .answer .w {
+		opacity: 0;
+		transition: opacity 0.4s ease;
+	}
+	.js .demo.searching .tool,
+	.js .demo.found .page {
+		opacity: 1;
+		filter: none;
+		transform: none;
+	}
+	.js .demo.searching:not(.found) .tool svg {
+		animation: look 1s ease-in-out infinite;
+	}
+	.js .demo.searching .caret {
+		opacity: 0;
+		animation: none;
+	}
+	.js .demo.found .sheet.blue {
+		rotate: calc(var(--tilt-blue) - var(--fan));
+		translate: -6px 0;
+	}
+	.js .demo.found .sheet.yellow {
+		rotate: calc(var(--tilt-yellow) + var(--fan));
+		translate: 6px 0;
+	}
+	.js .demo.answered .sheet.blue {
+		rotate: var(--tilt-blue);
+		translate: 0;
+	}
+	.js .demo.answered .sheet.yellow {
+		rotate: var(--tilt-yellow);
+		translate: 0;
+	}
+	.js .demo.marked mark {
+		background-size: 100% 100%;
+	}
+	.js .demo.answered .answer .w {
+		opacity: 1;
+		transition-delay: calc(var(--i) * 55ms);
+	}
+	.js .demo.leaving .typing,
+	.js .demo.leaving .tool,
+	.js .demo.leaving .answer {
+		opacity: 0;
+		transform: none;
+	}
+	.js .demo.leaving .page {
+		opacity: 0.16;
+		filter: blur(7px);
+	}
+	.js .demo.paused *,
+	.js .relay.paused * {
+		animation-play-state: paused !important;
+	}
+
+	/* The round trip, step by step. */
+	.js .relay.play .bubble,
+	.js .relay.play .name {
+		transition:
+			opacity 0.5s ease,
+			transform 0.6s var(--ease);
+	}
+	.js .relay.play .bubble {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	.js .relay.play .packet {
+		opacity: 0;
+	}
+	.js .relay.play .steps li {
+		opacity: 0.5;
+	}
+	.js .relay.asked .bubble.q,
+	.js .relay.answered .bubble.a {
+		opacity: 1;
+		transform: none;
+	}
+	.js .relay.sent .out .packet {
+		animation: go 1.5s var(--ease) both;
+	}
+	.js .relay.returned .back .packet {
+		animation: come 1.5s var(--ease) both;
+	}
+	.js .relay.s1 .node.lib,
+	.js .relay.returned .node.you {
+		box-shadow:
+			0 0 0 1px #2f3a63,
+			0 0 0 6px rgb(255 228 92 / 0.12);
+	}
+	.js .relay.s3 .node.lib {
+		box-shadow: 0 0 0 1px #2f3a63;
+	}
+	.js .relay.s1 .steps li:nth-child(1),
+	.js .relay.s2 .steps li:nth-child(2),
+	.js .relay.s3 .steps li:nth-child(3) {
+		opacity: 1;
+		color: #fff;
+	}
+	.js .relay.s1 .steps li:nth-child(1)::before,
+	.js .relay.s2 .steps li:nth-child(2)::before,
+	.js .relay.s3 .steps li:nth-child(3)::before {
+		background: #ffe45c;
+		box-shadow: 0 0 0 4px rgb(255 228 92 / 0.2);
+		scale: 1.15;
+	}
+	.js .relay.leaving .bubble {
+		opacity: 0;
+		transform: none;
+	}
+	.js .relay.switching .name {
+		opacity: 0;
+	}
+
+	/* The screenshot leans back, and straightens as it comes up. */
+	.js .window {
+		transform: perspective(1800px) rotateX(calc((1 - var(--p, 1)) * 14deg))
+			scale(calc(0.93 + var(--p, 1) * 0.07));
+		will-change: transform;
+	}
+
+	/* The four pictures play once each time they come into view. */
+	.js [data-play] .art * {
+		animation-play-state: paused;
+	}
+	.js .groups .lab {
+		animation: pop 0.7s var(--spring) both;
+	}
+	.js .groups .team {
+		animation: pop 0.6s var(--spring) 0.35s both;
+	}
+	.js .groups .t2 {
+		animation-delay: 0.5s;
+	}
+	.js .groups .team i {
+		animation: pop 0.5s var(--spring) 0.75s both;
+	}
+	.js .groups .team i:nth-child(2) {
+		animation-delay: 0.85s;
+	}
+	.js .groups .team i:nth-child(3) {
+		animation-delay: 0.95s;
+	}
+	.js .groups .t2 i:nth-child(1) {
+		animation-delay: 1.05s;
+	}
+	.js .groups .t2 i:nth-child(2) {
+		animation-delay: 1.15s;
+	}
+	.js .groups .badge {
+		animation: drop 0.6s var(--spring) 1.4s both;
+	}
+
+	.js .find .query {
+		animation: type 1.6s steps(32) 0.3s both;
+	}
+	.js .find .hit {
+		animation: rise 0.6s var(--ease) 2s both;
+	}
+	.js .find .h2 {
+		animation-name: rise-dim;
+		animation-delay: 2.15s;
+	}
+	.js .find .hit i.mark {
+		animation: sweep 0.9s var(--ease) 2.5s both;
+	}
+
+	.js .reflow .device {
+		animation: to-phone 2.6s var(--ease) 0.4s both;
+	}
+	.js .reflow .col.a {
+		animation: col-a 2.6s var(--ease) 0.4s both;
+	}
+	.js .reflow .col.b {
+		animation: col-b 2.6s var(--ease) 0.4s both;
+	}
+
+	.js .publish .card {
+		animation: flip 2.4s var(--ease) 0.3s both;
+	}
+	.js .publish .tick {
+		animation: pop 0.5s var(--spring) 2.4s both;
+	}
+}
+
+@keyframes rise {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+	}
+}
+@keyframes rise-dim {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+	}
+	to {
+		opacity: 0.6;
+	}
+}
+@keyframes fan {
+	from {
+		rotate: 0deg;
+	}
+}
+@keyframes blink {
+	50% {
+		opacity: 0;
+	}
+}
+@keyframes look {
+	0%,
+	100% {
+		transform: translate(0, 0);
+	}
+	25% {
+		transform: translate(2px, -1px);
+	}
+	50% {
+		transform: translate(0, -2px);
+	}
+	75% {
+		transform: translate(-2px, -1px);
+	}
+}
+@keyframes go {
+	0% {
+		opacity: 0;
+		transform: translate(0, -50%);
+	}
+	15%,
+	85% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translate(calc(100cqw - 100%), -50%);
+	}
+}
+@keyframes come {
+	0% {
+		opacity: 0;
+		transform: translate(calc(100cqw - 100%), -50%);
+	}
+	15%,
+	85% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translate(0, -50%);
+	}
+}
+@keyframes pop {
+	from {
+		opacity: 0;
+		scale: 0.6;
+	}
+}
+@keyframes drop {
+	from {
+		opacity: 0;
+		translate: 0 -14px;
+	}
+}
+@keyframes type {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+	to {
+		clip-path: inset(0 0 0 0);
+	}
+}
+@keyframes sweep {
+	from {
+		transform: scaleX(0);
+	}
+}
+@keyframes to-phone {
+	0%,
+	22% {
+		width: 132px;
+		border-width: 1px;
+		border-color: var(--rule);
+		border-radius: 4px;
+	}
+}
+@keyframes col-a {
+	0%,
+	22% {
+		left: 10px;
+		width: calc(50% - 15px);
+	}
+}
+@keyframes col-b {
+	0%,
+	22% {
+		top: 12px;
+		left: calc(50% + 5px);
+		width: calc(50% - 15px);
+	}
+}
+@keyframes flip {
+	0%,
+	30% {
+		transform: rotateY(0deg);
+	}
+}
+
+/* Upright tracks on a phone: the packets go down and come up. */
+@media (max-width: 760px) {
+	@keyframes go {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, 0);
+		}
+		15%,
+		85% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, calc(100cqh - 100%));
+		}
+	}
+	@keyframes come {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, calc(100cqh - 100%));
+		}
+		15%,
+		85% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, 0);
+		}
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
-	}
-	*,
-	*::before,
-	*::after {
-		transition: none !important;
-		animation: none !important;
 	}
 }

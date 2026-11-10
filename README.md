@@ -5,23 +5,37 @@
   </picture>
 </h1>
 
-*Papers, for us.* A self-hosted research library for groups: think Zotero, but
-with group sharing, search by meaning and integration with whatever AI
-assistant you already use.
+*Papers, for us.* A research library for groups, on your own server, read
+with the AI assistant you already use. Made by scientists, for scientists.
 
-> Status: early version (0.0.20) for a pilot. It works, with private papers
-> and nested groups, but the data format may still change. See the
+**[Homepage](https://qcode-uni-a.github.io/paperus/)** and
+**[demo](https://qcode-uni-a.github.io/paperus/demo/)** (a recorded library to
+look around in: uploads, changes and search by meaning don't work there).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/screenshots/library-dark.png">
+  <img src="site/screenshots/library.png" alt="paperus in the browser: a group's library with papers, tags and collections">
+</picture>
+
+> Status: beta (0.0.20), in a pilot. It works, with private papers and
+> nested groups, but the data format may still change. See the
 > [changelog](CHANGELOG.md) for what is there and what is missing.
 
 ## The idea
 
+- **AI first, on your terms**: no built-in chatbot and no AI vendor. Any
+  assistant (Claude, ChatGPT, a self-hosted or local model) connects through
+  an MCP server, sees only what the user may see, cites the exact passage
+  and asks before it changes anything. paperus finds, checks and keeps
+  track; the assistant does the thinking.
 - **One library for the group**, on your own server with your organisation's
-  login (OIDC), plus private space for each member.
+  login (OIDC), groups inside groups, plus private space for each member.
 - **Search by meaning** across the full text of every paper, note and
   annotation, computed on the server with a small open model.
-- **Bring your own AI**: no built-in chatbot and no AI vendor. Any assistant
-  (Claude, ChatGPT, a self-hosted or local model) connects through an MCP
-  server, sees only what the user may see, and cites the exact passage.
+- **PDFs that fit your phone**: fluent mode turns two columns into one,
+  figures whole, highlights and notes as on the page.
+- **Preprints that get published**: the published version is found by
+  itself, and cited from then on.
 - **Sources first**: papers, lecture notes, meeting notes and their versions,
   with notes and annotations attached to them. Not a general notes app.
 - **No lock-in**: full export of files, BibTeX/CSL-JSON, Markdown notes and
@@ -64,9 +78,10 @@ or pull `release` again, then `docker compose up -d`.
 
 **Browser extension** (Chrome, Firefox): one click saves the paper you are
 reading, with its PDF, or the PDF you have open; right-click it to save to
-another owner; on arXiv, a button next to each paper. Until it is in the
-stores, load it from the release's zips: see
-[extension/README.md](extension/README.md).
+another owner; on arXiv, a button next to each paper. For Firefox on
+[addons.mozilla.org](https://addons.mozilla.org/firefox/addon/paperus/); for
+Chrome and Edge, until it is in their store, load it from the release's zips:
+see [extension/README.md](extension/README.md).
 
 ## Documents
 
@@ -116,7 +131,10 @@ with `npm run dev -- --host 0.0.0.0`, then open `http://<this PC's IP>:5173`.
 `npm run build` writes the website to `web/build`, which `paperus serve`
 serves on its own port as well. Checks: `uv run pytest`, `uvx pre-commit run --all-files`.
 
-The app for computers (Tauri, Rust) is in `app/` ([app/README.md](app/README.md)).
+The app for computers (Tauri, Rust) is in `app/` ([app/README.md](app/README.md));
+its installers for Linux, Windows and macOS are on each
+[release](https://github.com/qcode-uni-a/paperus/releases). The homepage is in
+`site/`, its demo in `e2e/demo/` ([README](e2e/demo/README.md)).
 
 ## Licence
 

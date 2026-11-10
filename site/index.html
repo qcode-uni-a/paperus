@@ -6,12 +6,12 @@
 		<title>paperus: papers, for us</title>
 		<meta
 			name="description"
-			content="A research library built for working with AI: your group's papers on your own server, and the assistant you already use reading them with you. Made by scientists, for scientists."
+			content="Your group's research library on your own server, read with the AI assistant you already use. Made by scientists, for scientists."
 		/>
 		<meta property="og:title" content="paperus: papers, for us" />
 		<meta
 			property="og:description"
-			content="A research library built for working with AI. Made by scientists, for scientists."
+			content="Your group's research library, read with the AI assistant you already use. Made by scientists, for scientists."
 		/>
 		<meta property="og:image" content="screenshots/library.png" />
 		<link rel="icon" href="paperus-mark.svg" type="image/svg+xml" />
@@ -23,6 +23,10 @@
 			crossorigin
 		/>
 		<link rel="stylesheet" href="style.css" />
+		<!-- With scripts, the animations start from their first frame; without, all is shown. -->
+		<script>
+			document.documentElement.classList.add('js');
+		</script>
 		<script src="main.js" defer></script>
 	</head>
 	<body>
@@ -47,15 +51,17 @@
 					</p>
 					<h1>Papers, for&nbsp;us.</h1>
 					<p class="lede">
-						A research library built for working with AI. Your group's papers on your own server,
-						and the assistant you already use reading them with you: it finds the passage, cites the
-						page, and sees only what you may see.
+						Your group's research library on your own server, read with the AI assistant you already
+						use.
 					</p>
 					<p class="byline">Made by scientists, for scientists.</p>
 					<div class="actions">
-						<a class="button primary" href="#server">Install on your server</a>
-						<a class="button" href="#ai">How it works with AI</a>
+						<a class="button primary" href="demo/">Try the demo</a>
+						<a class="button" href="#server">Install on your server</a>
 					</div>
+					<p class="demo-note">
+						The demo is a recorded library: uploads and search by meaning don't work there.
+					</p>
 				</div>
 
 				<figure
@@ -66,15 +72,17 @@
 					<div class="sheet back yellow" aria-hidden="true"></div>
 					<div class="sheet front">
 						<p class="ask">
-							<span class="typed" data-typed>What is light made of? Look in our library.</span
-							><span class="caret" aria-hidden="true"></span>
+							<span class="typing"
+								><span data-typed>What is light made of? Look in our library.</span
+								><span class="caret" aria-hidden="true"></span
+							></span>
 						</p>
-						<p class="tool" aria-hidden="true">
-							<svg viewBox="0 0 24 24">
+						<p class="tool">
+							<svg viewBox="0 0 24 24" aria-hidden="true">
 								<circle cx="10.5" cy="10.5" r="6.5" />
 								<path d="m15.5 15.5 5 5" />
 							</svg>
-							Searched your library by meaning
+							<span data-tool>Searched your library by meaning</span>
 						</p>
 						<article class="page">
 							<p class="journal">Philosophical Transactions of the Royal Society, 1865</p>
@@ -91,11 +99,14 @@
 							</p>
 							<div class="lines" aria-hidden="true"><i></i><i class="short"></i></div>
 						</article>
-						<p class="answer">
+						<p class="answer" data-words>
 							An electromagnetic wave, Maxwell concludes: the speed he calculates for such waves is
-							almost exactly the speed of light.
+							almost exactly that of light.
 							<span class="cite">Maxwell 1865, part VI</span>
 						</p>
+						<button class="pause" type="button" aria-pressed="false" hidden>
+							<span class="visually-hidden">Pause the example</span>
+						</button>
 					</div>
 				</figure>
 			</section>
@@ -104,35 +115,83 @@
 				<div class="ai-head">
 					<h2 class="section-title">AI first, on your&nbsp;terms</h2>
 					<p class="intro">
-						paperus has no chatbot of its own and calls no AI company. It does what a library
-						should: find, check, keep track. The thinking happens in the assistant you choose, and
-						it can only ever reach what you can.
+						No chatbot inside, no AI company called. paperus finds, checks and keeps track; the
+						assistant you choose does the thinking.
 					</p>
 				</div>
 
-				<div class="split">
-					<div class="side">
-						<h3>paperus, on your server</h3>
-						<ul>
-							<li>Reads every PDF, page by page, and remembers where each passage is</li>
-							<li>Searches by meaning, with a small open model that runs right there</li>
-							<li>Decides who may see what, and logs every change an assistant makes</li>
+				<figure
+					class="relay"
+					aria-label="Your assistant asks paperus, and paperus sends back the passage, cited"
+				>
+					<div class="node you">
+						<p class="who">
+							Your assistant
+							<span class="name" data-name>Claude, ChatGPT or a local model</span>
+						</p>
+						<p class="bubble q">What is light made of? Look in our library.</p>
+						<p class="bubble a">
+							An electromagnetic wave, Maxwell concludes.
+							<span class="cite">Maxwell 1865, part VI</span>
+						</p>
+						<p class="caption">Thinks with you. Connects over MCP, with 40+ tools.</p>
+						<button class="pause" type="button" aria-pressed="false" hidden>
+							<span class="visually-hidden">Pause the example</span>
+						</button>
+					</div>
+
+					<div class="wire" aria-hidden="true">
+						<div class="track out">
+							<span class="packet"><code>search("what is light")</code></span>
+						</div>
+						<div class="track back">
+							<span class="packet">
+								<mark>…light itself … is an electromagnetic disturbance…</mark>
+							</span>
+						</div>
+					</div>
+
+					<div class="node lib">
+						<p class="who">
+							<img src="paperus-mark.svg" alt="" width="22" height="22" />
+							paperus, on your server
+						</p>
+						<ul class="steps">
+							<li>Reads every PDF, page by page</li>
+							<li>Searches by meaning, with a small open model</li>
+							<li>Sends only what you may see</li>
+							<li>Logs every change an assistant makes</li>
 						</ul>
 					</div>
-					<div class="side mine">
-						<h3>Your assistant, your choice</h3>
-						<ul>
-							<li>Reasons, compares, summarises and helps you write</li>
-							<li>Claude, ChatGPT, Cursor, or a model you run yourself</li>
-							<li>Asks you before it changes anything in the library</li>
-						</ul>
-					</div>
-				</div>
+				</figure>
+
+				<ul class="promises">
+					<li>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M7 7h4v4c0 3-1.5 5-4 6M15 7h4v4c0 3-1.5 5-4 6" />
+						</svg>
+						Cites the exact passage
+					</li>
+					<li>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+							<path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+						</svg>
+						Sees only what you may see
+					</li>
+					<li>
+						<svg viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M12 20a8 8 0 1 0-8-8c0 1.6.5 3.1 1.3 4.4L4 20l3.6-1.3A8 8 0 0 0 12 20Z" />
+							<path d="M10 9.6a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.6M12 15.3v.1" />
+						</svg>
+						Asks before it changes anything
+					</li>
+				</ul>
 			</section>
 
 			<section id="library" class="library">
 				<h2 class="section-title">Made for research groups</h2>
-				<figure class="window">
+				<figure class="window" data-tilt>
 					<picture>
 						<source srcset="screenshots/library-dark.png" media="(prefers-color-scheme: dark)" />
 						<img
@@ -144,49 +203,81 @@
 						/>
 					</picture>
 				</figure>
+
 				<div class="ideas">
-					<div class="idea">
+					<div class="idea" data-play>
+						<div class="art groups" aria-hidden="true">
+							<div class="lab">
+								<span class="badge">OIDC</span>
+								<div class="team t1"><i></i><i></i><i></i></div>
+								<div class="team t2"><i></i><i></i></div>
+							</div>
+						</div>
 						<h3>Your server, your group</h3>
-						<p>
-							One library for the lab, groups inside groups, and private space for each member.
-							Everyone logs in with your organisation's OIDC login. No storage limits, no
-							subscription, and the papers never leave your hands.
-						</p>
+						<p>OIDC login, groups inside groups, no storage limits.</p>
 					</div>
-					<div class="idea">
+
+					<div class="idea" data-play>
+						<div class="art find" aria-hidden="true">
+							<div class="field">
+								<svg viewBox="0 0 24 24">
+									<circle cx="10.5" cy="10.5" r="6.5" />
+									<path d="m15.5 15.5 5 5" />
+								</svg>
+								<span class="query">that paper where light is a wave</span>
+							</div>
+							<div class="hit h1"><b></b><i></i><i class="mark"></i></div>
+							<div class="hit h2"><b></b><i></i><i class="short"></i></div>
+						</div>
 						<h3>Search in your own words</h3>
-						<p>
-							Describe what you remember and find the passage, across the full text of every paper,
-							note and annotation, by meaning as well as by keyword.
-						</p>
+						<p>The full text of every paper, by meaning or by keyword.</p>
 					</div>
-					<div class="idea">
+
+					<div class="idea" data-play>
+						<div class="art reflow" aria-hidden="true">
+							<div class="device">
+								<div class="col a">
+									<i></i><i></i><i class="mark"></i><i></i><i class="short"></i>
+								</div>
+								<div class="col b"><b class="figure"></b><i></i><i class="short"></i></div>
+							</div>
+						</div>
 						<h3>PDFs that fit your phone</h3>
-						<p>
-							A paper's two columns become one, running down the screen without margins. Figures
-							stay whole, and highlights and notes work as on the page. No pinching, no scrolling
-							sideways.
-						</p>
+						<p>Two columns become one. Figures stay whole, highlights work.</p>
 					</div>
-					<div class="idea">
+
+					<div class="idea" data-play>
+						<div class="art publish" aria-hidden="true">
+							<div class="card">
+								<div class="face pre">
+									<span class="tag">Preprint</span>
+									<i></i><i></i><i class="short"></i>
+								</div>
+								<div class="face pub">
+									<span class="tag">Published</span>
+									<i></i><i></i><i class="short"></i>
+									<span class="tick"></span>
+								</div>
+							</div>
+						</div>
 						<h3>Preprints that get published</h3>
-						<p>
-							When a preprint in your library appears in a journal, paperus finds the published
-							version by itself, tells you, and cites that one from then on.
-						</p>
+						<p>paperus finds the journal version by itself.</p>
 					</div>
 				</div>
 			</section>
 
 			<section id="get" class="get">
-				<h2 class="section-title">Get paperus</h2>
+				<div class="get-head">
+					<h2 class="section-title">Get paperus</h2>
+					<p class="try">
+						<a class="button" href="demo/">Try the demo first</a>
+						<span>A recorded library: uploads and search by meaning don't work there.</span>
+					</p>
+				</div>
 				<div class="ways">
 					<div class="way" id="server">
 						<h3>On your server</h3>
-						<p>
-							One Linux machine with Docker and about 4&nbsp;GB of memory. Put an HTTPS proxy in
-							front, and the first person to open it sets it up.
-						</p>
+						<p>One Linux machine with Docker and about 4&nbsp;GB of memory.</p>
 						<pre><code><span class="comment"># compose.yaml and its settings</span>
 curl -LO https://raw.githubusercontent.com/qcode-uni-a/paperus/main/deploy/compose.yaml
 curl -Lo .env https://raw.githubusercontent.com/qcode-uni-a/paperus/main/deploy/example.env
@@ -199,10 +290,7 @@ docker compose up -d</code></pre>
 
 					<div class="way" id="computer">
 						<h3>On your computer</h3>
-						<p>
-							The app opens your libraries in a window of their own, adds PDFs you open with it, and
-							tells you when someone shares a paper.
-						</p>
+						<p>Your libraries in a window of their own.</p>
 						<a
 							class="button primary"
 							href="https://github.com/qcode-uni-a/paperus/releases/latest"
@@ -211,19 +299,19 @@ docker compose up -d</code></pre>
 						>
 						<ul class="files" data-files></ul>
 						<p class="note">
-							Not signed yet: Windows asks once whether to run it (More info, then Run anyway), and
-							on a Mac you open it the first time with a right click, then Open.
+							Not signed yet: on Windows choose More info, then Run anyway; on a Mac, right-click,
+							then Open.
 						</p>
 					</div>
 
 					<div class="way" id="browser">
 						<h3>In your browser</h3>
-						<p>Save the paper you are reading, with its PDF, to your library or to a group's.</p>
+						<p>Save the paper you are reading, with its PDF.</p>
 						<a class="button" href="https://addons.mozilla.org/firefox/addon/paperus/"
 							>Add to Firefox</a
 						>
 						<p class="note">
-							For Chrome and Edge, until it is in their store:
+							Chrome and Edge:
 							<a href="https://github.com/qcode-uni-a/paperus/blob/main/extension/README.md"
 								>load it from the release</a
 							>.
@@ -237,8 +325,8 @@ docker compose up -d</code></pre>
 			<div class="sign">
 				<img src="paperus-mark.svg" alt="" width="28" height="28" />
 				<p>
-					paperus is open source, under the Apache 2.0 licence. It is in beta: it works, and the
-					data format may still change.
+					Open source, under the Apache 2.0 licence. In beta: it works, and the data format may
+					still change.
 				</p>
 			</div>
 			<nav aria-label="More">
