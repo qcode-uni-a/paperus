@@ -7,11 +7,15 @@ import { PAPERS, seed } from './seed.ts';
 /** Records the demo (README.md here): the website, as Mira, goes through
  * every page it can reach, on a computer and on a phone, and each answer
  * from the API is kept for the demo's service worker; and a search for
- * every word in the library, so that searching works there for single
- * words (by words, as here without the ML service). */
+ * the library's words (titles, the lecture notes, the scans' frequent ones
+ * from words.py), so that searching works there for single words (by
+ * words, as here without the ML service). */
 
 const OUT = process.env.PAPERUS_DEMO_OUT ?? '../site/demo/recording';
 const PDFS = process.env.PAPERUS_DEMO_PDFS;
+const PAPERS_FOLDER = process.env.PAPERUS_DEMO_PAPERS;
+/** The scans' words worth searching for (words.py). */
+const WORDS = process.env.PAPERUS_DEMO_WORDS;
 /** What the recorded answers show as the server's address. */
 const SHOWN = 'https://paperus.example.org';
 /** The answer headers the website reads. */
@@ -127,13 +131,15 @@ function words(ids: Record<string, string>): string[] {
 			: ''
 	].join(' ');
 	const found = text.toLowerCase().match(/\p{L}{3,}/gu) ?? [];
-	return [...new Set(found)];
+	const scans: string[] = WORDS ? JSON.parse(readFileSync(WORDS, 'utf8')) : [];
+	return [...new Set([...found, ...scans])];
 }
 
 test('record the demo', async ({ page, browser, baseURL }) => {
 	test.setTimeout(20 * 60_000);
 	const { page: mira, ids } = await seed(page, browser, {
 		pdfs: PDFS,
+		papers: PAPERS_FOLDER,
 		options: { viewport: { width: 1440, height: 900 } }
 	});
 	const recording = new Recording(new URL(baseURL ?? '').origin);

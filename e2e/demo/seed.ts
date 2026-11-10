@@ -4,8 +4,9 @@ import { makePdf } from '../fixtures/pdf.ts';
 import { LOGGED_OUT } from '../tests/helpers.ts';
 
 /** The demo library (README.md here), also in the homepage's screenshots: a
- * physics group's papers that everyone knows, details only (each with a
- * one-page PDF of our own that says so), and lecture notes written for it
+ * physics group's papers that everyone knows: public-domain scans
+ * (papers.json, downloaded by fetch.ts), others as details only (each with a
+ * one-page PDF of our own that says so); and lecture notes written for it
  * (oscillator.tex, typeset by pdfs.sh). Made by Mira Kessler, a member of
  * the Theory group, who is not an administrator. */
 
@@ -20,20 +21,6 @@ type Paper = readonly [
 ];
 
 export const PAPERS: readonly Paper[] = [
-	[
-		'A Dynamical Theory of the Electromagnetic Field',
-		[['Maxwell', 'J. Clerk']],
-		1865,
-		'Philosophical Transactions of the Royal Society of London',
-		['electromagnetism', 'classic']
-	],
-	[
-		'Ueber das Gesetz der Energieverteilung im Normalspectrum',
-		[['Planck', 'Max']],
-		1901,
-		'Annalen der Physik',
-		['quantum', 'classic']
-	],
 	[
 		'Zur Elektrodynamik bewegter Körper',
 		[['Einstein', 'Albert']],
@@ -114,18 +101,19 @@ export const PAPERS: readonly Paper[] = [
 		1982,
 		'International Journal of Theoretical Physics',
 		['quantum computing']
-	],
-	[
-		'Quantum computation with quantum dots',
-		[
-			['Loss', 'Daniel'],
-			['DiVincenzo', 'David P.']
-		],
-		1998,
-		'Physical Review A',
-		['quantum computing', 'spin qubits']
 	]
 ];
+
+/** The scans with their full text (papers.json), by title. */
+type Scan = { file: string; commons: string; metadata: { title: string }; tags: string[] };
+const SCANS: Scan[] = JSON.parse(readFileSync(new URL('papers.json', import.meta.url), 'utf8'));
+export const SCAN_TITLES = SCANS.map((scan) => scan.metadata.title);
+const [MAXWELL, PLANCK, DISSERTATION, SPECIFIC_HEAT] = SCAN_TITLES;
+const title = (start: string) => PAPERS.find(([title]) => title.startsWith(start))![0];
+export const EPR = title('Can quantum-mechanical');
+const BELL = title('On the Einstein Podolsky Rosen');
+const HEISENBERG = title('Über quantentheoretische');
+const FEYNMAN = title('Simulating physics');
 
 const COLOURS: Record<string, string> = {
 	quantum: 'blue',
@@ -134,7 +122,7 @@ const COLOURS: Record<string, string> = {
 	electromagnetism: 'teal',
 	relativity: 'violet',
 	'quantum computing': 'emerald',
-	'spin qubits': 'rose',
+	'statistical physics': 'rose',
 	symmetry: 'orange',
 	information: 'sky',
 	teaching: 'lime'
@@ -145,11 +133,15 @@ export type Seeded = { page: Page; ids: Record<string, string>; notes: string };
 /** Makes the library with the administrator's ``admin`` page (a fresh
  * paperus) and returns a page logged in as Mira, in a context with
  * ``options``; ``pdfs``: the folder with pdfs.sh's output (without it, no
- * lecture notes). */
+ * lecture notes); ``papers``: fetch.ts's (without it, no scans). */
 export async function seed(
 	admin: Page,
 	browser: Browser,
-	{ pdfs, options = {} }: { pdfs?: string; options?: BrowserContextOptions } = {}
+	{
+		pdfs,
+		papers,
+		options = {}
+	}: { pdfs?: string; papers?: string; options?: BrowserContextOptions } = {}
 ): Promise<Seeded> {
 	const user = await admin.request.post('/api/admin/users', {
 		data: { username: MIRA.username, password: MIRA.password }
@@ -217,6 +209,13 @@ export async function seed(
 			tags
 		);
 	}
+	for (const scan of papers ? SCANS : []) {
+		ids[scan.metadata.title] = await add(
+			scan.metadata,
+			readFileSync(`${papers}/${scan.file}`),
+			scan.tags
+		);
+	}
 	const lecture = 'The quantum harmonic oscillator';
 	if (pdfs) {
 		ids[lecture] = await add(
@@ -241,9 +240,9 @@ export async function seed(
 		});
 		await page.request.put(`/api/collections/${made.id}/pin`);
 	};
-	await collection('Foundations seminar', [PAPERS[9][0], PAPERS[11][0], PAPERS[6][0]]);
-	await collection('Thesis, chapter 2', [PAPERS[12][0], PAPERS[13][0], lecture]);
-	for (const title of [PAPERS[0][0], PAPERS[11][0], lecture]) {
+	await collection('Foundations seminar', [EPR, BELL, HEISENBERG]);
+	await collection('Thesis, chapter 2', [PLANCK, SPECIFIC_HEAT, FEYNMAN, lecture]);
+	for (const title of [MAXWELL, BELL, DISSERTATION, lecture]) {
 		if (ids[title]) await page.request.put(`/api/items/${ids[title]}/favourite`);
 	}
 
@@ -262,10 +261,30 @@ export async function seed(
 				'',
 				'Next time: the loophole-free tests, and what they rule out.'
 			].join('\n'),
-			items: [{ item_id: ids[PAPERS[9][0]] }, { item_id: ids[PAPERS[11][0]] }]
+			items: [{ item_id: ids[EPR] }, { item_id: ids[BELL] }]
 		}
 	});
 	expect(note.status()).toBe(201);
+	if (papers) {
+		// Where the scans come from, on each one's page.
+		const sources = await page.request.post('/api/notes', {
+			data: {
+				library_id: group.library_id,
+				text: [
+					'# Where these scans come from',
+					'',
+					'Public domain, from Wikimedia Commons:',
+					'',
+					...SCANS.map(
+						(scan) =>
+							`- ${scan.metadata.title}: https://commons.wikimedia.org/wiki/${encodeURI(scan.commons.replaceAll(' ', '_'))}`
+					)
+				].join('\n'),
+				items: SCANS.map((scan) => ({ item_id: ids[scan.metadata.title] }))
+			}
+		});
+		expect(sources.status()).toBe(201);
+	}
 
 	// Ready once the PDFs are read (nothing missing) and their details looked
 	// up (the list says so while that runs).
@@ -278,7 +297,7 @@ export async function seed(
 		.poll(
 			async () => {
 				await page.goto('/');
-				await expect(page.getByRole('link', { name: PAPERS[0][0] })).toBeVisible();
+				await expect(page.getByRole('link', { name: EPR })).toBeVisible();
 				return page.getByText('Looking up details').count();
 			},
 			{ timeout: 90_000, intervals: [2_000] }

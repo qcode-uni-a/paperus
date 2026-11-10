@@ -25,9 +25,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The demo's public-domain scans (e2e/demo/papers.json): downloaded from
+  # Wikimedia Commons only when the list changes, else from the cache. Never
+  # checked in.
+  papers:
+    name: Demo papers
+    if: vars.PUBLISH_SITE == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - uses: actions/cache@v6
+        with:
+          path: e2e/demo/papers
+          key: demo-papers-${{ hashFiles('e2e/demo/papers.json') }}
+      # Checks each one's licence and checksum; keeps the cached ones.
+      - run: node e2e/demo/fetch.ts e2e/demo/papers
+      - uses: actions/upload-artifact@v7
+        with:
+          name: demo-papers
+          path: e2e/demo/papers/
+          retention-days: 1
+
   build:
     name: Homepage and demo
-    if: vars.PUBLISH_SITE == 'true'
+    needs: papers
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -64,6 +88,10 @@ jobs:
         working-directory: e2e
       - run: npx playwright install --with-deps chromium
         working-directory: e2e
+      - uses: actions/download-artifact@v7
+        with:
+          name: demo-papers
+          path: e2e/demo/papers
       # Builds the website twice, starts paperus and records the demo into
       # site/demo/.
       - run: npm run demo

@@ -3,3 +3,5 @@ test-results/
 playwright-report/
 server-logs/
 .auth/
+# The demo's papers, downloaded by demo/fetch.ts (never checked in).
+demo/papers/

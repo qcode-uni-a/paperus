@@ -9,8 +9,13 @@ BASE=${PAPERUS_DEMO_BASE:-/paperus/demo}
 SITE=${PAPERUS_DEMO_SITE:-$ROOT/site}
 PDFS=$(mktemp -d -t paperus-demo.XXXXXX)
 trap 'rm -rf "$PDFS"' EXIT
+# The public-domain scans: downloaded once, kept there (CI caches the folder).
+PAPERS=${PAPERUS_DEMO_PAPERS:-$ROOT/e2e/demo/papers}
+PAPERS=$(mkdir -p "$PAPERS" && cd "$PAPERS" && pwd)
 
 bash "$ROOT/e2e/demo/pdfs.sh" "$PDFS"
+node "$ROOT/e2e/demo/fetch.ts" "$PAPERS"
+uv --directory "$ROOT/server" run python "$ROOT/e2e/demo/words.py" "$PDFS/words.json" "$PAPERS"/*.pdf
 # The website the recording's server serves, and the demo's own.
 npm --prefix "$ROOT/web" run build
 rm -rf "$SITE/demo"
@@ -21,5 +26,6 @@ cp "$ROOT/web/demo/service-worker.js" "$SITE/demo/demo-service-worker.js"
 cp "$SITE/demo/200.html" "$SITE/demo/index.html"
 cp "$SITE/demo/200.html" "$SITE/404.html"
 cd "$ROOT/e2e"
-PAPERUS_DEMO_PDFS=$PDFS PAPERUS_DEMO_OUT=$SITE/demo/recording npx playwright test -c demo.config.ts
+PAPERUS_DEMO_PDFS=$PDFS PAPERUS_DEMO_PAPERS=$PAPERS PAPERUS_DEMO_WORDS=$PDFS/words.json \
+  PAPERUS_DEMO_OUT=$SITE/demo/recording npx playwright test -c demo.config.ts
 du -sh "$SITE/demo/recording"

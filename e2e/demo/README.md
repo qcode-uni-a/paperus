@@ -31,9 +31,18 @@ as `paperus/`, then open `/paperus/demo/`.
 
 Only what may be published:
 
+- **Classic papers with their full text**: public-domain scans from
+  Wikimedia Commons (`papers.json`: Maxwell 1865, Planck 1901, Einstein's
+  dissertation of 1905 and his 1907 paper on specific heat), with the text
+  layer the scans carry. Not checked in: `fetch.ts` downloads them when the
+  demo is recorded (the homepage's workflow caches them), and checks each
+  file first: Commons still marks it public domain, and its SHA-1 is the
+  one listed. A note in the library names each one's source. `words.py`
+  picks their words worth searching for (four letters or more, in two
+  passages at least).
 - **Classic papers, details only**: titles, authors, years and journals of
-  well-known papers (Maxwell, Planck, Einstein, Bohr, Noether, Dirac,
-  Shannon, Bell, Feynman and others), bibliographic facts as in any
+  well-known papers (Einstein, Rutherford, Bohr, Noether, Heisenberg,
+  Dirac, Shannon, Bell, Feynman), bibliographic facts as in any
   reference list. Not their text or their PDFs: each has a one-page PDF
   made here (`fixtures/pdf.ts`) that says so.
 - **Written for the demo**, under paperus' licence (Apache-2.0): the

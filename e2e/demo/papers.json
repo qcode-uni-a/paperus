@@ -1,0 +1,97 @@
+[
+	{
+		"file": "maxwell-1865.pdf",
+		"commons": "File:A Dynamical Theory of the Electromagnetic Field (IA jstor-108892).pdf",
+		"sha1": "73a4a02aea812f6ca34db0c41819743e2157b56e",
+		"metadata": {
+			"type": "article-journal",
+			"title": "A Dynamical Theory of the Electromagnetic Field",
+			"author": [
+				{
+					"family": "Maxwell",
+					"given": "J. Clerk"
+				}
+			],
+			"issued": {
+				"date-parts": [[1865]]
+			},
+			"container-title": "Philosophical Transactions of the Royal Society of London",
+			"volume": "155",
+			"page": "459-512",
+			"DOI": "10.1098/rstl.1865.0008"
+		},
+		"tags": ["electromagnetism", "classic"]
+	},
+	{
+		"file": "planck-1901.pdf",
+		"commons": "File:Gesetz der Energieverteilung im Normalspectrum.pdf",
+		"sha1": "51610b6a217bedc9946e36ea01289fd52485e748",
+		"metadata": {
+			"type": "article-journal",
+			"title": "Ueber das Gesetz der Energieverteilung im Normalspectrum",
+			"author": [
+				{
+					"family": "Planck",
+					"given": "Max"
+				}
+			],
+			"issued": {
+				"date-parts": [[1901]]
+			},
+			"container-title": "Annalen der Physik",
+			"volume": "309",
+			"issue": "3",
+			"page": "553-563",
+			"DOI": "10.1002/andp.19013090310",
+			"language": "de"
+		},
+		"tags": ["quantum", "classic"]
+	},
+	{
+		"file": "einstein-1905-dissertation.pdf",
+		"commons": "File:Einstein Dissertation eth-30378-01.pdf",
+		"sha1": "176d25c8850c0b93bd598b37f4e06a0f97836f5b",
+		"metadata": {
+			"type": "thesis",
+			"title": "Eine neue Bestimmung der Moleküldimensionen",
+			"author": [
+				{
+					"family": "Einstein",
+					"given": "Albert"
+				}
+			],
+			"issued": {
+				"date-parts": [[1905]]
+			},
+			"publisher": "Universität Zürich",
+			"genre": "Dissertation",
+			"language": "de"
+		},
+		"tags": ["statistical physics"]
+	},
+	{
+		"file": "einstein-1907-specific-heat.pdf",
+		"commons": "File:Einstein1906.pdf",
+		"sha1": "31898b175de8362767d6bae3fc52d4e07c018462",
+		"metadata": {
+			"type": "article-journal",
+			"title": "Die Plancksche Theorie der Strahlung und die Theorie der spezifischen Wärme",
+			"author": [
+				{
+					"family": "Einstein",
+					"given": "Albert"
+				}
+			],
+			"issued": {
+				"date-parts": [[1907]]
+			},
+			"container-title": "Annalen der Physik",
+			"volume": "327",
+			"issue": "1",
+			"page": "180-190",
+			"DOI": "10.1002/andp.19063270110",
+			"language": "de"
+		},
+		"tags": ["quantum", "statistical physics"]
+	}
+]
