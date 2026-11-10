@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.21 (2026-11-11)
 
 - **Scans are drawn**: PDFs whose pages are images in JBIG2 or JPEG 2000
   (most black-and-white scans, the Internet Archive's among them) stayed
