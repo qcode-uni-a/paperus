@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
+	import { pdfFiles } from '#lib/pdfjs.ts';
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 	GlobalWorkerOptions.workerSrc = workerUrl;
@@ -17,7 +18,7 @@
 		if (!target) return;
 		failed = false;
 		loading = true;
-		const task = getDocument({ url, withCredentials: true });
+		const task = getDocument({ ...pdfFiles(), url, withCredentials: true });
 		let cancelled = false;
 		task.promise
 			.then(async (pdf) => {

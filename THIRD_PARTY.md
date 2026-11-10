@@ -8,6 +8,7 @@ come from others and keep their own licences.
 | Component | Where | Licence |
 | --- | --- | --- |
 | [PDF.js](https://mozilla.github.io/pdf.js/) (pdfjs-dist) | Website: the PDF reader | Apache-2.0, [text](licenses/PDF.js-Apache-2.0.txt) |
+| PDF.js's own files, shipped with it (`web/static/pdfjs/`, copied by `web/scripts/pdfjs-assets.js`): JBIG2 decoder (from PDFium), OpenJPEG, qcms; the Foxit standard fonts; Adobe's character maps; a colour profile | Website: drawing scans and PDFs without embedded fonts | BSD-3-Clause, BSD-2-Clause, MIT, BSD-3-Clause, BSD-3-Clause, CC0-1.0, as given in each folder's `LICENSE*` files, which are shipped with them |
 | [marked](https://marked.js.org/) | Website: showing Markdown notes | MIT, [text](licenses/marked-MIT.txt) |
 | [DOMPurify](https://github.com/cure53/DOMPurify) | Website: cleaning the HTML of shown notes | Apache-2.0 (or MPL-2.0), [text](licenses/DOMPurify-Apache-2.0.txt) |
 | [KaTeX](https://katex.org/) with its fonts, and [marked-katex-extension](https://github.com/UziTech/marked-katex-extension) | Website: formulas in Markdown notes | MIT, texts: [KaTeX](licenses/KaTeX-MIT.txt), [extension](licenses/marked-katex-extension-MIT.txt) |

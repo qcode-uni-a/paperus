@@ -17,6 +17,7 @@
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import PdfContents from '#lib/PdfContents.svelte';
 	import { cachedPdf, keepPdf } from '#lib/pdfCache.ts';
+	import { pdfFiles } from '#lib/pdfjs.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import { contents, type Section } from '#lib/pdfContents.ts';
 	import { addLinks, type Place as LinkPlace } from '#lib/pdfLinks.ts';
@@ -253,7 +254,7 @@
 			const data = kept ? await cachedPdf(...kept) : null;
 			if (cancelled) return;
 			downloaded = !data;
-			task = getDocument(data ? { data } : { url, withCredentials: true });
+			task = getDocument({ ...pdfFiles(), ...(data ? { data } : { url, withCredentials: true }) });
 			return task.promise;
 		})()
 			.then(async (doc) => {

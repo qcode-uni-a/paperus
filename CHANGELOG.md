@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- **Scans are drawn**: PDFs whose pages are images in JBIG2 or JPEG 2000
+  (most black-and-white scans, the Internet Archive's among them) stayed
+  blank in the reader. The website now ships PDF.js's decoders, standard
+  fonts, character maps and colour profile (`web/static/pdfjs/`, copied
+  from pdfjs-dist at each build, not checked in).
+- **Search finds words split at a line's end**: PDFium reads such a hyphen
+  (LaTeX's, and many publishers') as a control character, which stayed in
+  passages and abstracts ("co\u0002herent" showed as a box, and a search
+  for "coherent" missed it). For PDFs read from now on.
+- **Passages nothing uses are removed every night** (with their vectors),
+  also when the trash is not emptied by itself: those of edited notes and
+  of files read again piled up.
+- **A homepage** on GitHub Pages (qcode-uni-a.github.io/paperus, `site/`),
+  with **a demo**: the website with a recorded library, answered by a
+  service worker (`e2e/demo/`): classic papers, four of them public-domain
+  scans with their full text (downloaded and cached in CI, never checked
+  in), lecture notes written for it, a group. Uploads, changes and search
+  by meaning don't work there; search finds single words.
+
 ## 0.0.20 (2026-11-10)
 
 - **Notifications**, under a bell in the header: papers others add to

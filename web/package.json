@@ -8,6 +8,8 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"scripts": {
+		"predev": "node scripts/pdfjs-assets.js",
+		"prebuild": "node scripts/pdfjs-assets.js",
 		"dev": "vite dev",
 		"build": "vite build",
 		"preview": "vite preview",

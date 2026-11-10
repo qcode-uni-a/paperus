@@ -7,6 +7,8 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
+# pdf.js's files, copied by scripts/pdfjs-assets.js
+/static/pdfjs
 
 # OS
 .DS_Store
