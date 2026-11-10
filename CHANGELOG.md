@@ -33,6 +33,8 @@
     (no longer its top first, twice as large);
   - double-spaced pages (supplementary information): a paragraph one
     piece, not each line;
+  - tables: their halves no longer read as two columns (Molecular
+    Physics, J. Chem. Phys.);
   - a narrow gap between columns (6 points), a rule however thick it is
     drawn, a figure's labels under it.
 

@@ -26,7 +26,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 2
+VERSION = 3
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -39,6 +39,8 @@ GUTTER = 6
 # Rows reaching into the gap between columns leave at least this much of it
 # blank, else they are across it.
 NARROW_GAP = 4
+# Blank space between a table's columns, down all its rows, at least.
+TABLE_GAP = 6
 # How far a line's ink reaches beyond its middle part (points).
 LINE_REACH = 5
 # Blank space between blocks of the page, each with its own columns.
@@ -740,6 +742,25 @@ def lay_out(
                 and not display(gutter_right + 1, x1, band)
             )
 
+        def cells(a: int, b: int, band: _Band) -> bool:
+            """A table's columns on a side: blank space down the band's
+            whole height, in the side's middle (a list's gap after its
+            numbers is at its edge; a column of text crosses any)."""
+            inked = area(a, b, band.y0, band.y1).any(axis=0)
+            across = b - a + 1
+            return any(
+                e - s + 1 >= TABLE_GAP and s >= across * 0.2 and e <= across * 0.8
+                for s, e in runs(~inked)
+            )
+
+        # A table's two halves are no columns: across the page.
+        for band in bands:
+            if (
+                not band.wide
+                and cells(x0, gutter_left - 1, band)
+                and cells(gutter_right + 1, x1, band)
+            ):
+                band.wide = True
         in_columns = any(full(band) for band in bands)
         for band in bands:
             if band.wide or full(band):
