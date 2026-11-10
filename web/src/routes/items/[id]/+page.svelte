@@ -372,12 +372,6 @@
 					title="Papers by {writtenName(author)} in the library">{writtenName(author)}</a
 				>{/each}
 		</p>
-		{#if item.abstract}
-			<details class="abstract">
-				<summary>Abstract</summary>
-				{#each item.abstract.split('\n\n') as paragraph, i (i)}<p>{paragraph}</p>{/each}
-			</details>
-		{/if}
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
@@ -394,9 +388,14 @@
 
 		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
-		{#if !item.deleted_at}<ItemNotes item={item.id} /><SimilarPapers
-				item={item.id}
-			/><PaperReferences item={item.id} />{/if}
+		{#if !item.deleted_at}<ItemNotes item={item.id} />{/if}
+		{#if item.abstract}
+			<details class="abstract">
+				<summary>Abstract</summary>
+				{#each item.abstract.split('\n\n') as paragraph, i (i)}<p>{paragraph}</p>{/each}
+			</details>
+		{/if}
+		{#if !item.deleted_at}<SimilarPapers item={item.id} /><PaperReferences item={item.id} />{/if}
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
 			<MergeDialog bind:this={mergeDialog} {item} />
@@ -599,7 +598,7 @@
 <style>
 	.abstract {
 		max-width: 75ch;
-		margin: 4px 0 0;
+		margin: 10px 0 0;
 	}
 	.abstract summary {
 		color: var(--muted);
