@@ -5,6 +5,14 @@
   </picture>
 </h1>
 
+[![CI](https://github.com/qcode-uni-a/paperus/actions/workflows/ci.yml/badge.svg)](https://github.com/qcode-uni-a/paperus/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/qcode-uni-a/paperus?label=release)](https://github.com/qcode-uni-a/paperus/releases/latest)
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/paperus?label=PyPI)](https://pypi.org/project/paperus/)
+[![npm](https://img.shields.io/npm/v/paperus?label=npm)](https://www.npmjs.com/package/paperus)
+[![Firefox add-on](https://img.shields.io/amo/v/paperus?label=Firefox%20add-on)](https://addons.mozilla.org/firefox/addon/paperus/)
+[![Demo](https://img.shields.io/badge/demo-try%20it-ffe45c)](https://qcode-uni-a.github.io/paperus/demo/)
+
 *Papers, for us.* A research library for groups, on your own server, read
 with the AI assistant you already use. Made by scientists, for scientists.
 
