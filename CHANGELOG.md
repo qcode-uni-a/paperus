@@ -43,7 +43,9 @@
   other sites' links in the system's browser, downloads in Downloads. The
   OIDC login opens the system's browser, where one confirms on the new page
   `/app-login` (`/api/oauth/app-login`), and the app trades the one-time
-  code it gets back for a session (`/api/oauth/app-session`).
+  code it gets back for a session (`/api/oauth/app-session`). Installers
+  for Linux, Windows and macOS (not signed yet) come with releases once
+  `PUBLISH_APP` is switched on.
 - **Safari**: the end-to-end tests run in WebKit too (Safari's engine,
   and the apps' to come), which found: Enter in a field with suggestions
   (a tag, a person to add) only closed the suggestions, so it took a

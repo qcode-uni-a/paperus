@@ -2,7 +2,9 @@
 name = "paperus-app"
 version = "0.0.19"
 description = "paperus as an app: a paperus server's website in a window of its own"
+authors = ["paperus contributors"]
 license = "Apache-2.0"
+repository = "https://github.com/qcode-uni-a/paperus"
 edition = "2024"
 publish = false
 

@@ -1,0 +1,62 @@
+name: App installers
+
+# The app's installers for Linux, Windows and macOS (app/README.md), as
+# workflow artifacts: run by hand to try them, and by release.yml (with
+# PUBLISH_APP), which attaches them to the GitHub release. Not signed yet
+# (docs/apps.md, Open).
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: App (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+            bundles: deb,rpm,appimage
+          - name: Windows
+            os: windows-latest
+            bundles: nsis,msi
+          # One for both Apple Silicon and Intel Macs.
+          - name: macOS
+            os: macos-latest
+            bundles: dmg
+            target: --target universal-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: ${{ matrix.name }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npx tauri build --bundles ${{ matrix.bundles }} ${{ matrix.target }}
+        working-directory: app
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            app/src-tauri/target/**/bundle/deb/*.deb
+            app/src-tauri/target/**/bundle/rpm/*.rpm
+            app/src-tauri/target/**/bundle/appimage/*.AppImage
+            app/src-tauri/target/**/bundle/nsis/*.exe
+            app/src-tauri/target/**/bundle/msi/*.msi
+            app/src-tauri/target/**/bundle/dmg/*.dmg

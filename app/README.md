@@ -34,7 +34,14 @@ and trades it with its PKCE verifier for a session
 cookie. A session like a browser's, not a connected app: logging out in the
 app ends it.
 
-Still to come: "Open with", notifications, installers.
+Still to come: "Open with", notifications.
+
+## Installers
+
+`.github/workflows/app.yml` builds them for Linux (deb, rpm, AppImage),
+Windows (setup .exe, msi) and macOS (one dmg for both kinds of Mac), by
+hand (Actions → App installers) or for a release
+([operations.md](../docs/operations.md), Releases). Not signed yet.
 
 ## Development
 

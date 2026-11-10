@@ -376,8 +376,8 @@ library's export needs about its size in free space there for that day.
 ## Releases
 
 Pushing a tag `vX.Y.Z` (matching the versions in `server/pyproject.toml`,
-`ml/pyproject.toml`, `web/package.json`, `client/package.json` and
-`extension/package.json`) runs `.github/workflows/release.yml`: the tests,
+`ml/pyproject.toml`, `app/src-tauri/Cargo.toml`, `web/package.json`,
+`client/package.json` and `extension/package.json`) runs `.github/workflows/release.yml`: the tests,
 then the container images on ghcr.io (tags `vX.Y.Z`, `X.Y.Z` and
 `release`), then a GitHub release with the notes from `CHANGELOG.md` and the
 browser extension's zips (for Chrome and Firefox).
@@ -417,6 +417,14 @@ Variables):
   previous release tag: the release builds both and compares what ships,
   apart from the version (`.github/scripts/extension-changed.sh`). The
   GitHub release always has the zips.
+- The app's installers (`app/`; Linux: deb, rpm, AppImage; Windows:
+  setup .exe and msi; macOS: one dmg for Apple Silicon and Intel), built by
+  `.github/workflows/app.yml` and attached to the GitHub release once
+  `PUBLISH_APP` = `true`. Not signed yet: Windows warns before the first
+  start (SmartScreen: More info → Run anyway), macOS opens it only with a
+  right click → Open (the app is signed ad hoc, not by a known developer);
+  Linux needs none. Actions → "App installers" → Run workflow builds them
+  without a release (as the run's artifacts), to try them.
 
 After the first release, make the two packages on ghcr.io public (package
 settings), so `docker compose pull` works without logging in.

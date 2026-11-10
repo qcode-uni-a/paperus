@@ -2,9 +2,10 @@ name: Release
 
 # For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
 # packages (PyPI), the TypeScript client (npm) and the browser extension
-# (Firefox, Chrome), then the GitHub release. Each of these only runs once
-# switched on with its repository variable (PUBLISH_PYPI, PUBLISH_NPM,
-# PUBLISH_FIREFOX, PUBLISH_CHROME; see docs/operations.md, "Releases").
+# (Firefox, Chrome), then the GitHub release, with the app's installers.
+# Each of these only runs once switched on with its repository variable
+# (PUBLISH_PYPI, PUBLISH_NPM, PUBLISH_FIREFOX, PUBLISH_CHROME, PUBLISH_APP;
+# see docs/operations.md, "Releases").
 on:
   push:
     tags: ["v*"]
@@ -228,14 +229,27 @@ jobs:
           PUBLISHER: ${{ vars.CHROME_PUBLISHER_ID }}
           ITEM: ${{ vars.CHROME_ITEM_ID }}
 
+  app:
+    needs: [ci, versions]
+    if: vars.PUBLISH_APP == 'true'
+    uses: ./.github/workflows/app.yml
+
   release:
     name: GitHub release
-    needs: [images]
+    needs: [images, app]
+    # Also without the app's installers (PUBLISH_APP off).
+    if: always() && needs.images.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.app.result)
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+      - if: needs.app.result == 'success'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: app-*
+          merge-multiple: true
+          path: app-installers
       - name: Notes from the changelog
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -257,5 +271,6 @@ jobs:
       - run: >
           gh release create "$GITHUB_REF_NAME" --title "paperus $GITHUB_REF_NAME"
           --notes-file notes.md extension/dist/paperus-*.zip
+          $(find app-installers -type f 2>/dev/null)
         env:
           GH_TOKEN: ${{ github.token }}
