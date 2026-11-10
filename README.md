@@ -36,6 +36,10 @@ look around in: uploads, changes and search by meaning don't work there).
   figures whole, highlights and notes as on the page.
 - **Preprints that get published**: the published version is found by
   itself, and cited from then on.
+- **Apps for Linux, Windows and macOS**: your libraries in a window of their
+  own, notifications, PDFs added with "Open with" (Linux, macOS); installers on each
+  [release](https://github.com/qcode-uni-a/paperus/releases). Android and iOS
+  are planned.
 - **Sources first**: papers, lecture notes, meeting notes and their versions,
   with notes and annotations attached to them. Not a general notes app.
 - **No lock-in**: full export of files, BibTeX/CSL-JSON, Markdown notes and
