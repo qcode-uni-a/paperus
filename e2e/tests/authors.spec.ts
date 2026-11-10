@@ -154,6 +154,8 @@ test('a smart collection of an author’s papers', async ({ page }) => {
 	await expect(dialog.getByLabel('Name')).toHaveValue(`${family}, Gloria`);
 	await expect(dialog.getByRole('button', { name: `Remove ${family}, Gloria` })).toBeVisible();
 	await dialog.getByRole('button', { name: 'Create collection' }).click();
+	// Made (the dialog closes then), before the list is read.
+	await expect(dialog).toBeHidden();
 	await page.goto('/collections');
 	await page
 		.getByRole('link', { name: `${family}, Gloria` })
