@@ -40,6 +40,8 @@ look around in: uploads, changes and search by meaning don't work there).
   with notes and annotations attached to them. Not a general notes app.
 - **No lock-in**: full export of files, BibTeX/CSL-JSON, Markdown notes and
   annotations at any time.
+- **Free and open source, forever**: Apache-2.0, no paid tier, no account
+  with us; your server, your data.
 
 ## Installation
 
