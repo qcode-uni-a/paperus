@@ -140,7 +140,7 @@ Each step usable on its own:
    the app's window, other sites' links in the system's browser,
    downloads; the OIDC login in the system's browser (passwords inside the
    window, as on the website); "Open with" for PDFs (Linux, macOS);
-   installers (`.github/workflows/app.yml`).
+   notifications; installers (`.github/workflows/app.yml`).
 3. **A library on this computer**, in the same app (#39).
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (above), then the offline

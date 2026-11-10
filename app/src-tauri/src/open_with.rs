@@ -17,9 +17,6 @@ use tauri::{AppHandle, Manager, Url, WebviewWindow};
 
 use crate::{MAIN, libraries};
 
-/// The website's login cookie (`server/src/paperus/api/deps.py`).
-const SESSION_COOKIE: &str = "paperus_session";
-
 #[derive(Deserialize)]
 struct Uploaded {
     item_id: String,
@@ -90,13 +87,8 @@ fn add(app: &AppHandle, window: &WebviewWindow, files: &[PathBuf]) -> Result<(),
     let library = libraries::of(app, &shown)
         .and_then(|library| Url::parse(&library.url).ok())
         .ok_or("Open a library first, then the file again.")?;
-    let session = window
-        .cookies_for_url(library.clone())
-        .map_err(|error| error.to_string())?
-        .into_iter()
-        .find(|cookie| cookie.name() == SESSION_COOKIE)
-        .map(|cookie| cookie.value().to_owned())
-        .ok_or("Log in first, then open the file again.")?;
+    let session =
+        libraries::session(window, &library).ok_or("Log in first, then open the file again.")?;
     let mut last = None;
     for file in files {
         last = Some(upload(&library, &session, file)?);
@@ -118,7 +110,10 @@ fn upload(library: &Url, session: &str, file: &Path) -> Result<String, String> {
     let (content_type, body) = multipart(&name, &bytes);
     let mut response = libraries::agent()
         .post(format!("{}/api/uploads", libraries::key(library)))
-        .header("Cookie", &format!("{SESSION_COOKIE}={session}"))
+        .header(
+            "Cookie",
+            &format!("{}={session}", libraries::SESSION_COOKIE),
+        )
         .header("Content-Type", &content_type)
         .send(&body[..])
         .map_err(|error| format!("{name} could not be added: {error}."))?;

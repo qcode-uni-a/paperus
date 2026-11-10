@@ -4,7 +4,7 @@
 use std::{fs, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
 use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -81,6 +81,20 @@ pub fn of(app: &AppHandle, url: &Url) -> Option<Library> {
         .libraries
         .into_iter()
         .find(|library| Url::parse(&library.url).is_ok_and(|own| own.origin() == origin))
+}
+
+/// The website's login cookie (`server/src/paperus/api/deps.py`).
+pub const SESSION_COOKIE: &str = "paperus_session";
+
+/// The window's login to the library (its cookie), if logged in. Not on
+/// the main thread: reading cookies waits for it.
+pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
+    window
+        .cookies_for_url(library.clone())
+        .ok()?
+        .into_iter()
+        .find(|cookie| cookie.name() == SESSION_COOKIE)
+        .map(|cookie| cookie.value().to_owned())
 }
 
 /// For talking to libraries. Certificates are checked as the system does

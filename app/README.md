@@ -25,6 +25,9 @@ What the app does around the website:
   PDFs, never made the program that opens them (on macOS an "alternate"
   one; Windows' installer would make it the default, so not there yet).
 - Files dropped on the window go to the website (its drop zone).
+- The bell's notifications as the system's (`notices.rs`): asked for every
+  minute with the window's login; those that come while the app runs, and
+  not while its window is in front.
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 
@@ -41,7 +44,8 @@ and trades it with its PKCE verifier for a session
 cookie. A session like a browser's, not a connected app: logging out in the
 app ends it.
 
-Still to come: "Open with" on Windows, notifications.
+Still to come: "Open with" on Windows; a click on a notification
+opening its paper.
 
 ## Installers
 

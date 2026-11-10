@@ -27,8 +27,6 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::libraries;
 
-/// The website's login cookie (`server/src/paperus/api/deps.py`).
-const SESSION_COOKIE: &str = "paperus_session";
 /// How long the browser has to come back.
 const WAIT: Duration = Duration::from_secs(10 * 60);
 
@@ -234,7 +232,7 @@ fn parse(line: &str, state: &str) -> Option<Option<String>> {
 
 /// The session as the website's own login cookie for the library.
 fn cookie(library: &Url, session: Session) -> Cookie<'static> {
-    Cookie::build((SESSION_COOKIE, session.token))
+    Cookie::build((libraries::SESSION_COOKIE, session.token))
         .domain(library.host_str().unwrap_or_default().to_owned())
         .path("/")
         .http_only(true)

@@ -5,6 +5,7 @@
 
 mod libraries;
 mod login;
+mod notices;
 mod open_with;
 
 use std::{
@@ -214,6 +215,7 @@ pub fn run() {
             open_with::open(app, open_with::files_in(&arguments));
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .menu(menu)
         .on_menu_event(|app, event| {
             let Some(window) = focused(app) else { return };
@@ -243,6 +245,7 @@ pub fn run() {
                 .and_then(|last| Url::parse(&last).ok())
                 .map_or(WebviewUrl::App("index.html".into()), WebviewUrl::External);
             window(app.handle(), MAIN, url)?;
+            notices::start(app.handle().clone());
             let arguments: Vec<String> = std::env::args().collect();
             open_with::open(app.handle(), open_with::files_in(&arguments));
             Ok(())
