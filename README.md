@@ -53,21 +53,10 @@ look around in: uploads, changes and search by meaning don't work there).
   with notes and annotations attached to them. Not a general notes app.
 - **No lock-in**: full export of files, BibTeX/CSL-JSON, Markdown notes and
   annotations at any time.
-- **And the everyday things**, briefly:
-  - import a library with its files (BibTeX, RIS, CSL-JSON, RDF); export
-    all of it, or citations as BibTeX and CSL-JSON
-  - OCR for scanned PDFs and images
-  - tags with colours, collections, smart collections from rules,
-    favourites, an archive, a trash with undo
-  - annotations (highlights, comments, the pen) and Markdown notes linked
-    to papers and pages
-  - duplicates found and merged; missing PDFs fetched from open-access
-    copies
-  - authors as people, with their ORCID iD; reference lists, "cited by"
-    and similar papers
-  - the browser extension, and reading on where you stopped, on any device
-  - nightly backups, restored on a new server in a few clicks; logs and
-    monitoring (Prometheus) for administrators
+- **And the rest**: import, export, OCR, tags, collections, smart collections,
+  annotations, notes, duplicates, open-access PDFs, authors with ORCID,
+  references and cited-by, similar papers, browser extension, backups,
+  monitoring.
 - **Free and open source, forever**: Apache-2.0, no paid tier, no account
   with us; your server, your data.
 
