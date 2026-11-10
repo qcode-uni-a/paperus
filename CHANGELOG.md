@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.20 (2026-11-10)
 
 - **Notifications**, under a bell in the header: papers others add to
   one of your groups (uploaded, by DOI, with the extension, imported or
