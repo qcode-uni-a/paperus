@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { mdiFormatListBulleted } from '@mdi/js';
 	import Icon from '#lib/Icon.svelte';
-	import { createNote, errorMessage } from '#lib/api/client.ts';
+	import { apiHref, createNote, errorMessage } from '#lib/api/client.ts';
 	import {
 		COLORS,
 		KIND_NAMES,
@@ -191,7 +191,7 @@
 				{#if store.list.length}
 					<a
 						class="download"
-						href="/api/files/{store.fileId}/annotated"
+						href={apiHref(`/api/files/${store.fileId}/annotated`)}
 						download
 						title="The PDF with these annotations written in, for any PDF reader"
 						>Download with annotations</a

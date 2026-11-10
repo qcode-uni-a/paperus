@@ -3,7 +3,7 @@ import base from './playwright.config.ts';
 import { ADMIN_STATE } from './tests/helpers.ts';
 
 /** The homepage's screenshots (site/screenshots/), from a fresh paperus
- * with a few classic papers: `npm run screenshots`. */
+ * with the demo's library (demo/seed.ts): `npm run screenshots`. */
 
 export default defineConfig({
 	...base,

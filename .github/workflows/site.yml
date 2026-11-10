@@ -1,13 +1,20 @@
 name: Homepage
 
-# The homepage (site/) on GitHub Pages, at qcode-uni-a.github.io/paperus:
-# published when site/ changes on main, once PUBLISH_SITE = true (and Pages
-# is set to "GitHub Actions" in the repository's settings). Its screenshots
-# are taken by hand: `npm run screenshots` in e2e/.
+# The homepage (site/) on GitHub Pages, at qcode-uni-a.github.io/paperus,
+# with the demo (e2e/demo/README.md) recorded afresh: published when either
+# changes on main, once PUBLISH_SITE = true (and Pages is set to "GitHub
+# Actions" in the repository's settings). The homepage's screenshots are
+# taken by hand: `npm run screenshots` in e2e/.
 on:
   push:
     branches: [main]
-    paths: [site/**, .github/workflows/site.yml]
+    paths:
+      - site/**
+      - web/src/**
+      - web/demo/**
+      - e2e/demo/**
+      - e2e/scripts/demo.sh
+      - .github/workflows/site.yml
   workflow_dispatch:
 
 permissions:
@@ -18,9 +25,65 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    name: Homepage and demo
+    if: vars.PUBLISH_SITE == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: paperus
+          POSTGRES_PASSWORD: paperus
+          POSTGRES_DB: paperus
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U paperus"
+          --health-interval 2s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving major tag; pin an exact version
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
+      # For the demo's lecture notes (e2e/demo/pdfs.sh).
+      - run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          texlive-latex-base texlive-latex-recommended texlive-fonts-recommended
+          texlive-pictures lmodern
+      - run: uv sync --frozen
+        working-directory: server
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      # Builds the website twice, starts paperus and records the demo into
+      # site/demo/.
+      - run: npm run demo
+        working-directory: e2e
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: demo-logs
+          path: |
+            e2e/test-results/
+            e2e/server-logs/
+          retention-days: 7
+
   publish:
     name: Publish the homepage
-    if: vars.PUBLISH_SITE == 'true'
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -29,10 +92,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
       - id: deployment
         uses: actions/deploy-pages@v4

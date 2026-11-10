@@ -14,6 +14,8 @@
 	import UploadTray from '#lib/UploadTray.svelte';
 	import Toasts from '#lib/Toasts.svelte';
 	import UserMenu from '#lib/UserMenu.svelte';
+	import DemoBanner from '#lib/DemoBanner.svelte';
+	import { DEMO } from '#lib/demo.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -50,6 +52,7 @@
 	<title>paperus</title>
 </svelte:head>
 
+{#if DEMO}<DemoBanner />{/if}
 {#if onLoginPage}
 	<main class="login">{@render children()}</main>
 {:else}

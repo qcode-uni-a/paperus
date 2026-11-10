@@ -27,6 +27,13 @@ export type {
 // Same origin as the website; the schema names no server.
 client.setConfig({ baseUrl: '', credentials: 'same-origin' });
 
+/** A link into the API (a file to open or download), below the website's
+ * own path: none at a paperus server, the demo's on GitHub Pages
+ * (#lib/demo.ts), where its service worker answers it. */
+export function apiHref(path: `/api/${string}`): string {
+	return resolve('/').replace(/\/$/, '') + path;
+}
+
 // Back to the login page when the session has ended.
 client.interceptors.response.use(async (response) => {
 	const login = resolve('/login');

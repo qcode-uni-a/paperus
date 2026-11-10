@@ -4,12 +4,13 @@
 	import { resolve } from '$app/paths';
 	import {
 		addVersion,
-		errorMessage,
-		listItems,
+		apiHref,
 		downloadAgain,
+		errorMessage,
+		type Item,
+		listItems,
 		readFileAgain,
-		unreadableFiles,
-		type Item
+		unreadableFiles
 	} from '#lib/api/client.ts';
 	import type { UnreadableFile } from '#lib/api/generated/types.gen.ts';
 	import { readingProblem } from '#lib/format.ts';
@@ -119,7 +120,9 @@
 						{#if problems[file.file_id]}<small class="error">{problems[file.file_id]}</small>{/if}
 					</div>
 					<div class="actions">
-						<a href="/api/files/{file.file_id}/content" target="_blank" rel="noopener">Open file</a>
+						<a href={apiHref(`/api/files/${file.file_id}/content`)} target="_blank" rel="noopener"
+							>Open file</a
+						>
 						{#if file.writable && !retried[file.file_id]}
 							{#if file.can_download}
 								<button

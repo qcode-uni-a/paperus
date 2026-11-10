@@ -7,17 +7,20 @@
 	import { page } from '$app/state';
 	import {
 		addVersion,
+		apiHref,
 		archiveItem,
+		downloadAgain,
 		errorMessage,
 		etagOf,
 		FILE_ROLES,
+		type FileRole,
 		getItem,
 		getReading,
+		type ItemDetail,
 		markViewed,
-		downloadAgain,
 		passageText,
-		readFileAgain,
 		pinVersion,
+		readFileAgain,
 		restoreFile,
 		restoreItem,
 		setOverrides,
@@ -27,8 +30,6 @@
 		unarchiveItem,
 		uploadToVersion,
 		VERSION_KINDS,
-		type FileRole,
-		type ItemDetail,
 		type VersionKind
 	} from '#lib/api/client.ts';
 	import type { Reading } from '#lib/api/generated/types.gen.ts';
@@ -481,7 +482,7 @@
 					<ul class="files">
 						{#each version.files as file (file.id)}
 							<li class="row" class:deleted={file.deleted_at}>
-								<a href="/api/files/{file.id}/content" target="_blank" rel="noreferrer"
+								<a href={apiHref(`/api/files/${file.id}/content`)} target="_blank" rel="noreferrer"
 									>{file.filename}</a
 								>
 								<span class="badge">{file.role}</span>
@@ -577,19 +578,23 @@
 			<figcaption class="muted">
 				A web page saved with the paper ({webFile.filename}), shown without its scripts and without
 				loading anything from the web, so parts may be missing.
-				<a href="/api/files/{webFile.id}/content" target="_blank" rel="noreferrer">Open it alone</a>
+				<a href={apiHref(`/api/files/${webFile.id}/content`)} target="_blank" rel="noreferrer"
+					>Open it alone</a
+				>
 			</figcaption>
 		</figure>
 	{:else if imageFile}
 		<figure class="image">
 			{#if SHOWN_IMAGES.includes(imageFile.media_type)}
-				<a href="/api/files/{imageFile.id}/content" target="_blank" rel="noreferrer"
+				<a href={apiHref(`/api/files/${imageFile.id}/content`)} target="_blank" rel="noreferrer"
 					><img src="/api/files/{imageFile.id}/content" alt={plainTitle(item.title)} /></a
 				>
 			{:else}
 				<p class="muted">
 					Browsers cannot show this image ({imageFile.filename}).
-					<a href="/api/files/{imageFile.id}/content" target="_blank" rel="noreferrer">Open it</a>
+					<a href={apiHref(`/api/files/${imageFile.id}/content`)} target="_blank" rel="noreferrer"
+						>Open it</a
+					>
 				</p>
 			{/if}
 		</figure>

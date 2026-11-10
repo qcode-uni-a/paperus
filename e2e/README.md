@@ -77,4 +77,5 @@ parallel on one server without stepping on each other.
 
 `npm run screenshots` (`screenshots.config.ts`, `screenshots/`) takes the
 homepage's pictures instead (`site/screenshots/`, see docs/operations.md),
+and `npm run demo` records the homepage's demo (`demo/README.md`), both
 against the same fresh server.

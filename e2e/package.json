@@ -9,7 +9,8 @@
 		"test:webkit": "npm run build-web && bash scripts/webkit.sh",
 		"check": "tsc -p .",
 		"report": "playwright show-report",
-		"screenshots": "npm run build-web && playwright test -c screenshots.config.ts"
+		"screenshots": "bash scripts/screenshots.sh",
+		"demo": "bash scripts/demo.sh"
 	},
 	"devDependencies": {
 		"@playwright/test": "1.64.1",

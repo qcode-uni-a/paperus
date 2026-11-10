@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import {
+		apiHref,
 		deleteExport,
 		errorMessage,
 		estimateExport,
@@ -277,7 +278,9 @@
 					<ul class="parts">
 						{#each record.parts as part (part.part)}
 							<li>
-								<a href="/api/exports/{record.id}/parts/{part.part}" download={part.name}
+								<a
+									href={apiHref(`/api/exports/${record.id}/parts/${part.part}`)}
+									download={part.name}
 									>Download{record.parts.length > 1 ? ` part ${part.part}` : ''}</a
 								>
 								<small>{part.name}, {fileSize(part.size)}</small>

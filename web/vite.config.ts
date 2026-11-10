@@ -2,6 +2,12 @@ import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+// The build's settings for the demo (scripts/demo.sh in e2e/); Node's
+// process, without its types here.
+const env =
+	(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
+const demoBase = env.PAPERUS_WEB_BASE as `/${string}` | undefined;
+
 export default defineConfig({
 	plugins: [
 		sveltekit({
@@ -12,7 +18,16 @@ export default defineConfig({
 			},
 			// A static single-page app, served by the paperus server (see
 			// server/src/paperus/web.py); 200.html is the entry for every route.
-			adapter: adapter({ fallback: '200.html', precompress: true })
+			// The demo (web/demo/) builds it once more, below the homepage's
+			// path, into a folder of its own.
+			adapter: adapter({
+				pages: env.PAPERUS_WEB_OUT ?? 'build',
+				fallback: '200.html',
+				precompress: !env.PAPERUS_WEB_OUT
+			}),
+			// Absolute asset paths there: GitHub Pages serves the entry as 404.html
+			// at any depth.
+			paths: demoBase ? { base: demoBase, relative: false } : undefined
 		})
 	],
 	server: {

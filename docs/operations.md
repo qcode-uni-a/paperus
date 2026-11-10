@@ -431,12 +431,14 @@ settings), so `docker compose pull` works without logging in.
 
 **The homepage** (`site/`, plain HTML and CSS) goes to GitHub Pages
 (qcode-uni-a.github.io/paperus) by `.github/workflows/site.yml` when
-`site/` changes on main, once `PUBLISH_SITE` = `true` and Settings →
-Pages → Source is "GitHub Actions". It needs no change for a release: it
-asks GitHub's API for the latest one's version and installers. Its
-screenshots come from a fresh paperus with classic papers: `npm run
-screenshots` in `e2e/` (`e2e/screenshots/`) writes them into
-`site/screenshots/`; take them again when the library page changes.
+`site/`, the website or the demo change on main, once `PUBLISH_SITE` =
+`true` and Settings → Pages → Source is "GitHub Actions". It needs no
+change for a release: it asks GitHub's API for the latest one's version
+and installers. The workflow records the demo afresh each time
+(`/paperus/demo/`, see `e2e/demo/README.md`). The screenshots come from a
+fresh paperus with the demo's library: `npm run screenshots` in `e2e/`
+writes them into `site/screenshots/`; take them again when the library
+page changes.
 
 ## Database maintenance
 

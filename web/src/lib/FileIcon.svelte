@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { apiHref } from '#lib/api/client.ts';
 	import {
 		mdiFileDocumentOutline,
 		mdiFileImageOutline,
@@ -35,7 +36,7 @@
 	<a
 		class="file"
 		class:pdf={file.media_type === 'application/pdf'}
-		href="/api/files/{file.id}/content"
+		href={apiHref(`/api/files/${file.id}/content`)}
 		target="_blank"
 		rel="noopener"
 		{title}
