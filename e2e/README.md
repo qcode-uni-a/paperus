@@ -74,3 +74,7 @@ something already listens on its port.
 
 Each test makes its own papers with words of its own, so tests run in
 parallel on one server without stepping on each other.
+
+`npm run screenshots` (`screenshots.config.ts`, `screenshots/`) takes the
+homepage's pictures instead (`site/screenshots/`, see docs/operations.md),
+against the same fresh server.

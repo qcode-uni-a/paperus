@@ -1,0 +1,38 @@
+name: Homepage
+
+# The homepage (site/) on GitHub Pages, at qcode-uni-a.github.io/paperus:
+# published when site/ changes on main, once PUBLISH_SITE = true (and Pages
+# is set to "GitHub Actions" in the repository's settings). Its screenshots
+# are taken by hand: `npm run screenshots` in e2e/.
+on:
+  push:
+    branches: [main]
+    paths: [site/**, .github/workflows/site.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the homepage
+    if: vars.PUBLISH_SITE == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

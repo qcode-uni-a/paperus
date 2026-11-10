@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="paperus">
+  <title>paperus</title>
+  <defs>
+    <linearGradient id="m-front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EEF1FB"/>
+    </linearGradient>
+    <linearGradient id="m-blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5468D4"/><stop offset="1" stop-color="#2338A8"/>
+    </linearGradient>
+    <linearGradient id="m-yellow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE45C"/><stop offset="1" stop-color="#F2C230"/>
+    </linearGradient>
+    <filter id="m-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="1.2" stdDeviation="1.4" flood-color="#1B2440" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <g transform="rotate(-23 32 58)" filter="url(#m-shadow)"><path d="M22 12h15l8 8v26a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V15a3 3 0 0 1 3-3Z" fill="url(#m-blue)"/><path d="M37 12v6.5a1.5 1.5 0 0 0 1.5 1.5h6.5Z" fill="#1A2B85"/></g>
+  <g transform="rotate(23 32 58)" filter="url(#m-shadow)"><path d="M22 12h15l8 8v26a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V15a3 3 0 0 1 3-3Z" fill="url(#m-yellow)"/><path d="M37 12v6.5a1.5 1.5 0 0 0 1.5 1.5h6.5Z" fill="#D9A91E"/></g>
+  <g transform="rotate(0 32 58)" filter="url(#m-shadow)"><path d="M22 12h15l8 8v26a3 3 0 0 1-3 3H22a3 3 0 0 1-3-3V15a3 3 0 0 1 3-3Z" fill="url(#m-front)"/><path d="M37 12v6.5a1.5 1.5 0 0 0 1.5 1.5h6.5Z" fill="#C9D1F2"/></g>
+  <path d="M22.5 31.6 L42 30.9 L41.6 36.8 L22 37.4Z" fill="#FFE45C"/>
+  <path d="M24.5 27h11M24.5 34.2h15M24.5 41.4h9" stroke="#2338A8" stroke-width="2.2" stroke-linecap="round"/>
+</svg>
