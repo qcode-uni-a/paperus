@@ -5,6 +5,7 @@
 
 mod libraries;
 mod login;
+mod open_with;
 
 use std::{
     path::{Path, PathBuf},
@@ -15,7 +16,7 @@ use libraries::Library;
 use tauri::{
     AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
-    webview::{DownloadEvent, NewWindowResponse},
+    webview::{DownloadEvent, NewWindowResponse, PageLoadEvent},
 };
 use tauri_plugin_opener::OpenerExt;
 
@@ -125,6 +126,13 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
             }
             NewWindowResponse::Deny
         })
+        // Files dropped on the window are the website's (its drop zone).
+        .disable_drag_drop_handler()
+        .on_page_load(|window, payload| {
+            if window.label() == MAIN && payload.event() == PageLoadEvent::Finished {
+                open_with::loaded(window.app_handle());
+            }
+        })
         .on_document_title_changed(|window, title| {
             let _ = window.set_title(if title.is_empty() { "paperus" } else { &title });
         })
@@ -197,6 +205,14 @@ fn focused(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn run() {
     tauri::Builder::default()
+        // One app: opening it again (or a file with it) goes to this one.
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            if let Some(main) = app.get_webview_window(MAIN) {
+                let _ = main.unminimize();
+                let _ = main.set_focus();
+            }
+            open_with::open(app, open_with::files_in(&arguments));
+        }))
         .plugin(tauri_plugin_opener::init())
         .menu(menu)
         .on_menu_event(|app, event| {
@@ -227,8 +243,21 @@ pub fn run() {
                 .and_then(|last| Url::parse(&last).ok())
                 .map_or(WebviewUrl::App("index.html".into()), WebviewUrl::External);
             window(app.handle(), MAIN, url)?;
+            let arguments: Vec<String> = std::env::args().collect();
+            open_with::open(app.handle(), open_with::files_in(&arguments));
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("paperus failed to start");
+        .build(tauri::generate_context!())
+        .expect("paperus failed to start")
+        .run(|_app, _event| {
+            // macOS hands files over as an event, not as arguments.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = _event {
+                let files = urls
+                    .iter()
+                    .filter_map(|url| url.to_file_path().ok())
+                    .collect();
+                open_with::open(_app, files);
+            }
+        });
 }

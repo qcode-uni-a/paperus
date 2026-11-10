@@ -18,6 +18,13 @@ What the app does around the website:
   links that ask for a new tab open in another window of the app (the
   login carries over).
 - Downloads go into the Downloads folder.
+- "Open with → paperus" for PDFs (`open_with.rs`; Linux and macOS for now):
+  each file is added to the library shown, with the window's login, as the
+  website's upload does, and its paper shown. Opening the app again (or a
+  file with it) goes to the one already open. paperus is only offered for
+  PDFs, never made the program that opens them (on macOS an "alternate"
+  one; Windows' installer would make it the default, so not there yet).
+- Files dropped on the window go to the website (its drop zone).
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 
@@ -34,7 +41,7 @@ and trades it with its PKCE verifier for a session
 cookie. A session like a browser's, not a connected app: logging out in the
 app ends it.
 
-Still to come: "Open with", notifications.
+Still to come: "Open with" on Windows, notifications.
 
 ## Installers
 
