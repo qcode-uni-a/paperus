@@ -17,7 +17,7 @@ from paperus.backup import due
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
 from paperus.jobs import WorkerContext, job_limits, run_workers
-from paperus.models import Item, LoginSession, SystemSetting
+from paperus.models import Chunk, Embedding, Item, LoginSession, SystemSetting
 from paperus.storage import BlobStore
 from paperus.system import SystemConfig, load_config, save_config
 from tests.people import Person
@@ -173,6 +173,27 @@ def test_trash_emptied_at_the_night_hour(
     jobs.empty_old_trash(_at(3))
     db.expire_all()
     assert db.scalar(select(Item.id)) is None
+
+
+def test_unused_passages_removed_at_night_without_emptying_the_trash(
+    db: Session, settings: Settings, worker: None
+) -> None:
+    # A passage no file, note or paper uses any more (e.g. a note's before it
+    # was edited), and its vector.
+    db.add(Chunk(sha256=b"\x01" * 32, text="Gone with the edit"))
+    db.flush()
+    db.add(Embedding(chunk_sha256=b"\x01" * 32, model="m", embedding=[0.0] * 4))
+    config = load_config(db, settings)
+    config.night_hour = 3
+    save_config(db, config)
+    db.commit()
+
+    jobs.empty_old_trash(_at(2))
+    assert db.scalar(select(Chunk.sha256)) is not None
+    jobs.empty_old_trash(_at(3))
+    db.expire_all()
+    assert db.scalar(select(Chunk.sha256)) is None
+    assert db.scalar(select(Embedding.chunk_sha256)) is None
 
 
 def test_integrity_on_its_schedule(

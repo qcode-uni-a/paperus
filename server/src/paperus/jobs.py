@@ -717,16 +717,20 @@ def queue_ml_configuration(app: App) -> None:
 def empty_old_trash(timestamp: int) -> None:
     """At half past the night hour (Administration → Settings → Job
     settings), or when asked (``timestamp`` 0): delete for good what has been
-    in the trash longer than the days set; nothing if none are set."""
+    in the trash longer than the days set. Without days set, only what
+    nothing uses any more: passages left by edited notes and files read
+    again (with their vectors), contents no file has."""
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
-        if config.trash_days is None:
-            return
         if (
             timestamp
             and datetime.fromtimestamp(timestamp, UTC).hour != config.night_hour
         ):
+            return
+        if config.trash_days is None:
+            contents, size = trash.collect_garbage(db, context.blobs)
+            log.info("removed what nothing uses: %d contents, %d bytes", contents, size)
             return
         done = trash.empty(
             db,
