@@ -493,6 +493,11 @@ of the papers they chose (see `extension/PRIVACY.md`).
   Server → Open-access copies on. Copies behind a login come through the
   person's own browser (the extension), only on their click.
 - Meeting notes: participants-only by default, retention setting.
+- Browsers keep the last 30 PDFs a person opened (at most 300 MB,
+  `web/src/lib/pdfCache.ts`), so they open again without a download; one
+  person's at a time, deleted on logging out. On a shared computer, log
+  out. Other files are only kept by the browser's cache, which asks the
+  server each time (`Cache-Control: private, no-cache`).
 
 ## Self-hosting principles
 

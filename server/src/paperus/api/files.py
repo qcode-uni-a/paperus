@@ -327,6 +327,13 @@ def download_file(
         safety["Content-Security-Policy"] = WEB_PAGE_POLICY
     elif file.media_type != PDF:
         safety["Content-Security-Policy"] = "sandbox"
+    # Browsers keep a copy but ask each time (so a file out of reach, or
+    # with its content replaced, is never shown from their cache); the
+    # content's hash says whether theirs is still it.
+    etag = f'"{file.blob_sha256.hex()}"'
+    safety |= {"ETag": etag, "Cache-Control": "private, no-cache"}
+    if etag in request.headers.get("If-None-Match", "").split(", "):
+        return Response(status_code=304, headers=safety)
     if isinstance(blobs, FilesystemStore):
         # Supports range requests, which PDF.js uses for large files.
         return FileResponse(

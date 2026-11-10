@@ -138,6 +138,23 @@ def test_files_need_login(client: TestClient) -> None:
     assert client.get(f"/api/files/{unknown}/content").status_code == 401
 
 
+def test_browsers_keep_files_but_ask_first(logged_in: TestClient, item_id: str) -> None:
+    file = upload(logged_in, item_id)
+    url = f"/api/files/{file['id']}/content"
+    response = logged_in.get(url)
+    assert response.headers["etag"] == f'"{file["sha256"]}"'
+    assert response.headers["cache-control"] == "private, no-cache"
+
+    again = logged_in.get(url, headers={"If-None-Match": response.headers["etag"]})
+    assert again.status_code == 304
+    assert again.content == b""
+    assert again.headers["etag"] == response.headers["etag"]
+    # Another copy (the content replaced): sent whole.
+    other = logged_in.get(url, headers={"If-None-Match": '"0123"'})
+    assert other.status_code == 200
+    assert other.content == PDF_BYTES
+
+
 def test_uploaded_html_cannot_run_scripts(logged_in: TestClient, item_id: str) -> None:
     page = b"<script>fetch('/api/items')</script>"
     file = upload(logged_in, item_id, page, "notes.html", "text/html")

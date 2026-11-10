@@ -10,6 +10,11 @@
   (all). A new migration (`0006`) adds the table `notifications`. On a
   phone the bell takes the theme button's place (the theme is in
   Settings).
+- **PDFs open again without a download**: the browser keeps the last 30
+  opened (at most 300 MB), deleted on logging out. Files sent by the server carry their content's hash, so the
+  browser's own cache asks before using a copy (never a replaced or no
+  longer reachable one).
+- A paper's abstract sits with the folded sections, above similar papers.
 
 ## 0.0.19 (2026-11-09)
 

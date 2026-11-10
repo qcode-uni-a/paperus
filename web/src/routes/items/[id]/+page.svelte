@@ -547,6 +547,7 @@
 				<PdfViewer
 					url="/api/files/{pdfFile.id}/content"
 					fileId={pdfFile.id}
+					sha256={pdfFile.sha256}
 					itemId={item.id}
 					title={plainTitle(item.title)}
 					startPage={resume?.page ?? startPage}

@@ -1,4 +1,5 @@
 import { logout as apiLogout, me, type User } from '#lib/api/client.ts';
+import { forgetPdfs } from '#lib/pdfCache.ts';
 
 /** The logged-in user, loaded once by the layout. */
 export const session = $state<{ user: User | null; checked: boolean }>({
@@ -14,5 +15,6 @@ export async function loadUser(): Promise<void> {
 
 export async function logout(): Promise<void> {
 	await apiLogout();
+	await forgetPdfs();
 	session.user = null;
 }

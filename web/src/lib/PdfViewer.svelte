@@ -10,11 +10,14 @@
 		getDocument,
 		GlobalWorkerOptions,
 		TextLayer,
+		type PDFDocumentLoadingTask,
 		type PDFDocumentProxy,
 		type RenderTask
 	} from 'pdfjs-dist';
 	import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 	import PdfContents from '#lib/PdfContents.svelte';
+	import { cachedPdf, keepPdf } from '#lib/pdfCache.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import { contents, type Section } from '#lib/pdfContents.ts';
 	import { addLinks, type Place as LinkPlace } from '#lib/pdfLinks.ts';
 	import AnnotationLayer from '#lib/annotations/AnnotationLayer.svelte';
@@ -34,6 +37,7 @@
 		onplace,
 		highlight = null,
 		fileId = null,
+		sha256 = null,
 		itemId = null,
 		title = ''
 	}: {
@@ -50,6 +54,9 @@
 		highlight?: { page: number; text: string } | null;
 		/** With these, the file's annotations are shown and made. */
 		fileId?: string | null;
+		/** The file's content: with ``fileId``, kept in the browser to show
+		 * it again without downloading it (``pdfCache``). */
+		sha256?: string | null;
 		itemId?: string | null;
 		/** The paper's (for a note gathered from the annotations). */
 		title?: string;
@@ -220,11 +227,27 @@
 	const pages = $derived(pdf ? Array.from({ length: pdf.numPages }, (_, i) => i + 1) : []);
 
 	$effect(() => {
-		const task = getDocument({ url, withCredentials: true });
+		const user = session.user?.id;
+		const kept = fileId && sha256 && user ? ([fileId, sha256, user] as const) : null;
+		let task: PDFDocumentLoadingTask | null = null;
 		let cancelled = false;
+		let downloaded = false;
 		error = '';
-		task.promise
+		(async () => {
+			const data = kept ? await cachedPdf(...kept) : null;
+			if (cancelled) return;
+			downloaded = !data;
+			task = getDocument(data ? { data } : { url, withCredentials: true });
+			return task.promise;
+		})()
 			.then(async (doc) => {
+				if (!doc) return;
+				// Downloaded: kept for next time, once all of it is here.
+				if (kept && downloaded)
+					doc.getData().then(
+						(bytes) => keepPdf(...kept, bytes),
+						() => {}
+					);
 				const viewport = (await doc.getPage(1)).getViewport({ scale: 1 });
 				if (cancelled) return;
 				firstPage = { width: viewport.width, height: viewport.height };
@@ -253,7 +276,7 @@
 			pdf = null;
 			sections = [];
 			viewports = {};
-			task.destroy();
+			task?.destroy();
 		};
 	});
 
