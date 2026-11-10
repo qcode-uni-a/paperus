@@ -57,9 +57,11 @@ replace.
 - **Login in the system browser**, not inside the app (some identity
   providers refuse logins in embedded browsers). The server's OAuth login
   with PKCE (`api/oauth.py`, made for MCP clients) does most of it: the app
-  opens the browser, gets a code back on a loopback address (computers) or
-  an app link (phones), and trades it once for a session. The app is listed
-  under connected apps and can be disconnected there.
+  opens the browser (`/app-login`, where the person confirms), gets a code
+  back on a loopback address (computers) or an app link (phones), and
+  trades it once for a session (`/api/oauth/app-session`; the code has no
+  scopes, so it gives no tokens). A session like a browser's: logging out
+  in the app ends it (built: `app/src-tauri/src/login.rs`).
 - **Adding from outside**: "Open with → paperus" for PDFs and other files;
   on phones "Share → paperus" from the browser, the extension's job there.
 - **Notifications** from the bell as system notifications, and `paperus://`
@@ -135,8 +137,9 @@ Each step usable on its own:
 2. **The app on computers, connected to a server**: login in the system
    browser, "Open with", notifications; installers on each GitHub release.
    Begun (`app/`): the libraries listed and added, a library's website in
-   the app's window (logging in there, as on the website), other sites'
-   links in the system's browser, downloads.
+   the app's window, other sites' links in the system's browser,
+   downloads; the OIDC login in the system's browser (passwords inside the
+   window, as on the website).
 3. **A library on this computer**, in the same app (#39).
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (above), then the offline

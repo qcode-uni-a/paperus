@@ -10,10 +10,11 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from paperus.models import OAuthCode, OAuthGrant
+from paperus import oauth
+from paperus.models import OAuthCode, OAuthGrant, User
 from tests.people import Person
 from tests.test_mcp import Assistant, ToolFailed
 
@@ -425,3 +426,137 @@ def test_revoking_with_the_access_token(client: TestClient, db: Session) -> None
     assert ada.get("/api/me/connected-apps").json() == []
     with pytest.raises(ToolFailed, match="invalid, expired or revoked"):
         Assistant(client, issued["access_token"]).call("list_documents")
+
+
+APP = "http://127.0.0.1/done"
+"""The paperus app registers its loopback address without a port."""
+
+
+def app_code(
+    person: Person, client_id: str, challenge: str, *, allow: bool = True
+) -> dict[str, list[str]]:
+    """The person logs the app in (or not); what the app gets back."""
+    request = {
+        "client_id": client_id,
+        "redirect_uri": "http://127.0.0.1:53124/done",
+        "code_challenge": challenge,
+        "state": "s1",
+    }
+    shown = person.post("/api/oauth/app-login/check", json=request)
+    assert shown.status_code == 200, shown.text
+    assert shown.json() == {"client_name": "Claude", "username": "ada"}
+    response = person.post("/api/oauth/app-login", json={**request, "allow": allow})
+    assert response.status_code == 200, response.text
+    target = urlsplit(response.json()["redirect"])
+    assert (target.netloc, target.path) == ("127.0.0.1:53124", "/done")
+    query = parse_qs(target.query)
+    assert query["state"] == ["s1"]
+    return query
+
+
+def app_session(client: TestClient, client_id: str, code: str, verifier: str) -> Any:  # noqa: ANN401 (JSON)
+    return client.post(
+        "/api/oauth/app-session",
+        json={
+            "client_id": client_id,
+            "code": code,
+            "redirect_uri": "http://127.0.0.1:53124/done",
+            "code_verifier": verifier,
+        },
+    )
+
+
+def test_logging_in_the_app(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    client_id = register(client, APP)
+    verifier, challenge = pkce()
+
+    # Logged in on the website only (the person's login cookie gone).
+    client.cookies.clear()
+    request = {"client_id": client_id, "redirect_uri": APP, "code_challenge": challenge}
+    assert client.post("/api/oauth/app-login/check", json=request).status_code == 401
+
+    code = app_code(ada, client_id, challenge)["code"][0]
+    response = app_session(client, client_id, code, verifier)
+    assert response.status_code == 200, response.text
+    assert response.headers["Cache-Control"] == "no-store"
+    session = response.json()
+    assert session["max_age"] == 30 * 24 * 3600
+    # The website's own login, as the app sets it as the cookie.
+    me = client.get(
+        "/api/auth/me", headers={"Cookie": f"paperus_session={session['token']}"}
+    )
+    assert me.json()["username"] == "ada"
+    # A session, not a connected app; and the code is used up.
+    assert ada.get("/api/me/connected-apps").json() == []
+    again = app_session(client, client_id, code, verifier)
+    assert again.json()["error"] == "invalid_grant"
+
+    # Refused: no code then.
+    assert "code" not in app_code(ada, client_id, challenge, allow=False)
+    assert app_code(ada, client_id, challenge, allow=False)["error"] == [
+        "access_denied"
+    ]
+
+
+def test_app_logins_that_go_wrong(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    client_id = register(client, APP)
+    verifier, challenge = pkce()
+
+    # The app's code gives no tokens, and a wrong verifier no session.
+    code = app_code(ada, client_id, challenge)["code"][0]
+    tokens = exchange(
+        client,
+        grant_type="authorization_code",
+        client_id=client_id,
+        code=code,
+        redirect_uri="http://127.0.0.1:53124/done",
+        code_verifier=verifier,
+    )
+    assert tokens.status_code == 400
+    assert "paperus app" in tokens.json()["error_description"]
+    code = app_code(ada, client_id, challenge)["code"][0]
+    wrong = app_session(client, client_id, code, pkce()[0])
+    assert wrong.status_code == 400
+    unknown = app_session(client, "nobody", code, verifier)
+    assert unknown.status_code == 401
+
+    # An assistant's code (for tokens) logs no one in.
+    assistant = register(client)
+    code = consent(ada, assistant, challenge)["code"][0]
+    response = client.post(
+        "/api/oauth/app-session",
+        json={
+            "client_id": assistant,
+            "code": code,
+            "redirect_uri": REDIRECT,
+            "code_verifier": verifier,
+        },
+    )
+    assert response.json()["error_description"] == (
+        "This code is for tokens, not a login."
+    )
+
+    # Only to an app on this computer.
+    request = {
+        "client_id": assistant,
+        "redirect_uri": REDIRECT,
+        "code_challenge": challenge,
+    }
+    refused = ada.post("/api/oauth/app-login/check", json=request)
+    assert refused.status_code == 400
+    assert "paperus app" in refused.json()["detail"]
+    asked = oauth.check_request(
+        db,
+        client_id=assistant,
+        redirect_uri=REDIRECT,
+        response_type="code",
+        code_challenge=challenge,
+        code_challenge_method="S256",
+        scope=None,
+    )
+    user = db.scalar(select(User).where(User.username == "ada"))
+    assert user is not None
+    with pytest.raises(oauth.OAuthError):
+        oauth.create_app_code(db, asked, user, challenge)

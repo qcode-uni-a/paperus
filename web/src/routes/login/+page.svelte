@@ -32,7 +32,15 @@
 		// Only paths on this site, never another origin.
 		return wanted?.startsWith('/') && !wanted.startsWith('//') ? wanted : '/';
 	});
-	const oidcHref = $derived(`/api/auth/oidc/start?next=${encodeURIComponent(next)}`);
+	/** In the paperus app (it says so: app/src-tauri/src/lib.rs): the OIDC
+	 * login in the system's browser, which providers allow (some refuse a
+	 * window inside an app), and where one may be logged in already. */
+	const inApp = typeof window !== 'undefined' && 'paperusApp' in window;
+	const oidcHref = $derived(
+		inApp
+			? `paperus-app:login?next=${encodeURIComponent(next)}`
+			: `/api/auth/oidc/start?next=${encodeURIComponent(next)}`
+	);
 	const passwordForm = $derived(!methods || methods.password || showPassword);
 
 	// A server without users yet starts with the setup.
@@ -76,6 +84,7 @@
 	{#if methods?.oidc_label}
 		<!-- A full page load: the server sends the browser on to the identity provider. -->
 		<a class="oidc" href={oidcHref} data-sveltekit-reload>{methods.oidc_label}</a>
+		{#if inApp}<p class="in-browser">Opens your browser to log in.</p>{/if}
 		{#if passwordForm}<p class="or"><span>or with a password</span></p>{/if}
 	{/if}
 	{#if passwordForm}
@@ -150,6 +159,12 @@
 	}
 	.oidc:hover {
 		filter: brightness(1.08);
+	}
+	.in-browser {
+		margin: 8px 0 0;
+		color: var(--muted);
+		font-size: var(--step--1);
+		text-align: center;
 	}
 	.oidc:focus-visible {
 		outline: 2px solid var(--royal);

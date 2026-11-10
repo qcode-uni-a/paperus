@@ -40,7 +40,10 @@
 - **An app for computers, begun** (`app/`, not released yet): a paperus
   server's website in a window of its own, the libraries one connects to
   listed (checked to be a paperus), the one opened last opened again;
-  other sites' links in the system's browser, downloads in Downloads.
+  other sites' links in the system's browser, downloads in Downloads. The
+  OIDC login opens the system's browser, where one confirms on the new page
+  `/app-login` (`/api/oauth/app-login`), and the app trades the one-time
+  code it gets back for a session (`/api/oauth/app-session`).
 - **Safari**: the end-to-end tests run in WebKit too (Safari's engine,
   and the apps' to come), which found: Enter in a field with suggestions
   (a tag, a person to add) only closed the suggestions, so it took a

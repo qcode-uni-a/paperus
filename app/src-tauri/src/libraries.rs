@@ -74,12 +74,19 @@ pub fn key(url: &Url) -> String {
     url.as_str().trim_end_matches('/').to_owned()
 }
 
-/// Whether a paperus answers there: its public list of login methods is
-/// one only paperus gives. Certificates are checked as the system does
+/// The library a page belongs to (by origin), if any.
+pub fn of(app: &AppHandle, url: &Url) -> Option<Library> {
+    let origin = url.origin();
+    load(app)
+        .libraries
+        .into_iter()
+        .find(|library| Url::parse(&library.url).is_ok_and(|own| own.origin() == origin))
+}
+
+/// For talking to libraries. Certificates are checked as the system does
 /// (so also a university's own authority, as its browsers trust it).
-pub fn check(url: &Url) -> Result<(), String> {
-    let host = url.host_str().unwrap_or_default();
-    let agent: ureq::Agent = ureq::Agent::config_builder()
+pub fn agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
         .http_status_as_error(false)
         .tls_config(
@@ -88,7 +95,14 @@ pub fn check(url: &Url) -> Result<(), String> {
                 .build(),
         )
         .build()
-        .into();
+        .into()
+}
+
+/// Whether a paperus answers there: its public list of login methods is
+/// one only paperus gives.
+pub fn check(url: &Url) -> Result<(), String> {
+    let host = url.host_str().unwrap_or_default();
+    let agent = agent();
     let mut response = agent
         .get(format!("{}/api/auth/methods", key(url)))
         .header("Accept", "application/json")

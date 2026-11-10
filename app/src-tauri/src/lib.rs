@@ -4,6 +4,7 @@
 //! access to the app (no capability names it).
 
 mod libraries;
+mod login;
 
 use std::{
     path::{Path, PathBuf},
@@ -77,29 +78,37 @@ fn open_library(app: AppHandle, url: String) -> Result<(), String> {
     window.navigate(to).map_err(|error| error.to_string())
 }
 
-/// The library shown in a window (its origin), if any.
-fn library_of(app: &AppHandle, url: &Url) -> Option<Library> {
-    let origin = url.origin();
-    libraries::load(app)
-        .libraries
-        .into_iter()
-        .find(|library| Url::parse(&library.url).is_ok_and(|own| own.origin() == origin))
-}
-
 /// A window for the app's page or a library, with what the app does
 /// around the website: other sites' links in the system's browser, the
 /// library's own in another window, downloads into Downloads.
 fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<WebviewWindow> {
     let opener = app.clone();
     let windows = app.clone();
+    let own = label.to_owned();
     WebviewWindowBuilder::new(app, label, url)
         .title("paperus")
+        // The website knows it is in the app (its login page offers the
+        // browser's then: web/src/routes/login).
+        .initialization_script("window.paperusApp = {};")
         .inner_size(1280.0, 860.0)
         .min_inner_size(420.0, 520.0)
         .on_navigation(move |url| match url.scheme() {
             // The page, a library, its login (its OIDC provider's pages).
             "http" | "https" | "tauri" => true,
             "about" | "blob" | "data" => true,
+            // The website asking the app: log in in the system's browser.
+            "paperus-app" => {
+                if url.path() == "login" {
+                    let next = url
+                        .query_pairs()
+                        .find(|(key, _)| key == "next")
+                        .map(|(_, path)| path.into_owned())
+                        .filter(|path| path.starts_with('/') && !path.starts_with("//"))
+                        .unwrap_or_else(|| "/".into());
+                    login::start(opener.clone(), own.clone(), next);
+                }
+                false
+            }
             // mailto: and the like: the system's programs.
             _ => {
                 let _ = opener.opener().open_url(url.as_str(), None::<&str>);
@@ -107,7 +116,7 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
             }
         })
         .on_new_window(move |url, _features| {
-            if library_of(&windows, &url).is_some() {
+            if libraries::of(&windows, &url).is_some() {
                 static OPENED: AtomicUsize = AtomicUsize::new(0);
                 let label = format!("library-{}", OPENED.fetch_add(1, Ordering::Relaxed));
                 let _ = window(&windows, &label, WebviewUrl::External(url));

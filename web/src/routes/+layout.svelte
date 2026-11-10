@@ -23,7 +23,8 @@
 	const onLoginPage = $derived(
 		page.url.pathname === resolve('/login') ||
 			page.url.pathname === resolve('/setup') ||
-			page.url.pathname === resolve('/oauth/authorize')
+			page.url.pathname === resolve('/oauth/authorize') ||
+			page.url.pathname === resolve('/app-login')
 	);
 
 	$effect(() => {

@@ -222,10 +222,10 @@ def _issue(db: Session, grant: OAuthGrant, user: User) -> Issued:
     return Issued(raw, refresh, int(ACCESS_LIFETIME.total_seconds()), grant.scopes)
 
 
-def exchange_code(
+def _take_code(
     db: Session, *, client_id: str, code: str, redirect_uri: str, verifier: str
-) -> Issued:
-    """Tokens for a code (once; ``OAuthError`` otherwise)."""
+) -> tuple[OAuthClient, OAuthCode, User]:
+    """The code used up (once; ``OAuthError`` otherwise)."""
     client = find_client(db, client_id)
     if client is None:
         raise OAuthError("invalid_client", "Unknown client_id.")
@@ -245,6 +245,18 @@ def exchange_code(
     user = db.get(User, found.user_id)
     if user is None or user.deactivated_at is not None:
         raise OAuthError("invalid_grant", "The account is not active.")
+    return client, found, user
+
+
+def exchange_code(
+    db: Session, *, client_id: str, code: str, redirect_uri: str, verifier: str
+) -> Issued:
+    """Tokens for a code (once; ``OAuthError`` otherwise)."""
+    client, found, user = _take_code(
+        db, client_id=client_id, code=code, redirect_uri=redirect_uri, verifier=verifier
+    )
+    if not found.scopes:
+        raise OAuthError("invalid_grant", "This code logs in the paperus app only.")
     grant = OAuthGrant(
         client_id=client.id,
         user_id=user.id,
@@ -256,6 +268,34 @@ def exchange_code(
     db.add(grant)
     db.flush()
     return _issue(db, grant, user)
+
+
+def is_app_redirect(uri: str) -> bool:
+    """Back to an app on this computer (a loopback address, as the paperus
+    app listens on): the only place an app login's code may go."""
+    parts = urlsplit(uri)
+    return parts.scheme == "http" and parts.hostname in LOOPBACK
+
+
+def create_app_code(db: Session, asked: Asked, user: User, code_challenge: str) -> str:
+    """A one-time code that logs the person in to the paperus app on this
+    computer: no scopes, so traded for a session (``app_login``), never
+    for tokens."""
+    if not is_app_redirect(asked.redirect_uri):
+        raise OAuthError("invalid_request", "Only the paperus app logs in this way.")
+    return create_code(db, asked, user, [], code_challenge)
+
+
+def app_login(
+    db: Session, *, client_id: str, code: str, redirect_uri: str, verifier: str
+) -> User:
+    """Who an app login's code (once, with its PKCE verifier) logs in."""
+    _, found, user = _take_code(
+        db, client_id=client_id, code=code, redirect_uri=redirect_uri, verifier=verifier
+    )
+    if found.scopes:
+        raise OAuthError("invalid_grant", "This code is for tokens, not a login.")
+    return user
 
 
 def refresh(db: Session, *, client_id: str, refresh_token: str) -> Issued:

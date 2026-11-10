@@ -349,6 +349,8 @@ ROUTES = {
     ("DELETE", "/api/me/connected-apps/{grant_id}"): None,
     ("POST", "/api/oauth/consent"): None,
     ("POST", "/api/oauth/consent/check"): None,
+    ("POST", "/api/oauth/app-login"): None,
+    ("POST", "/api/oauth/app-login/check"): None,
     ("DELETE", "/api/me/tokens/{token_id}"): None,
     ("GET", "/api/notes"): "papers.read",
     ("POST", "/api/notes"): "notes.write",

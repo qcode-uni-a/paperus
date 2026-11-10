@@ -8074,6 +8074,90 @@
         }
       }
     },
+    "/api/oauth/app-login/check": {
+      "post": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "Check App Login",
+        "description": "The app asking, to show the person (only logged in, never with a\ntoken).",
+        "operationId": "check_app_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppLoginInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oauth/app-login": {
+      "post": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "App Login",
+        "description": "The person logs the app in as themselves (or not): the app gets a\none-time code for a session.",
+        "operationId": "app_login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Redirect"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/me/connected-apps": {
       "get": {
         "tags": [
@@ -8544,6 +8628,98 @@
           "other_id"
         ],
         "title": "Apart"
+      },
+      "AppLogin": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri"
+          },
+          "code_challenge": {
+            "type": "string",
+            "title": "Code Challenge"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "allow": {
+            "type": "boolean",
+            "title": "Allow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_id",
+          "redirect_uri",
+          "code_challenge",
+          "allow"
+        ],
+        "title": "AppLogin"
+      },
+      "AppLoginInfo": {
+        "properties": {
+          "client_name": {
+            "type": "string",
+            "title": "Client Name"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_name",
+          "username"
+        ],
+        "title": "AppLoginInfo"
+      },
+      "AppLoginRequest": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "title": "Redirect Uri"
+          },
+          "code_challenge": {
+            "type": "string",
+            "title": "Code Challenge"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "client_id",
+          "redirect_uri",
+          "code_challenge"
+        ],
+        "title": "AppLoginRequest",
+        "description": "The paperus app's request to log in (the page's address)."
       },
       "Archive": {
         "properties": {

@@ -21,8 +21,20 @@ What the app does around the website:
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 
-Log in inside the window, as on the website. Still to come: logging in
-in the system's browser, "Open with", notifications, installers.
+Logging in: with a password inside the window, as on the website; with
+the OIDC login in the system's browser (`login.rs`), where identity
+providers allow it (some refuse a window inside an app) and one may be
+logged in already. The website knows it is in the app
+(`window.paperusApp`, set by the app) and its OIDC button then asks the app
+(`paperus-app:login`): the app registers as an OAuth client of the library,
+opens `/app-login` in the browser, where the person confirms, gets a
+one-time code back on a loopback address (`http://127.0.0.1:<port>/done`),
+and trades it with its PKCE verifier for a session
+(`/api/oauth/app-session`), which it sets as the website's own login
+cookie. A session like a browser's, not a connected app: logging out in the
+app ends it.
+
+Still to come: "Open with", notifications, installers.
 
 ## Development
 

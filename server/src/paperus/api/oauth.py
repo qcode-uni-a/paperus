@@ -1,11 +1,13 @@
 """OAuth for connected apps (see ``paperus.oauth``): the metadata apps
 discover, registration, the person's consent (shown by the website at
-``/oauth/authorize``), tokens, and the person's list of connected apps."""
+``/oauth/authorize``), tokens, and the person's list of connected apps.
+And the paperus app's login in the system's browser (``/app-login``), which
+ends in a session rather than tokens."""
 
 import base64
 import binascii
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlsplit
 
@@ -14,7 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete
 
-from paperus import oauth
+from paperus import auth, oauth
 from paperus.api.auth import public_base
 from paperus.api.deps import DB, SessionUser
 from paperus.models import OAuthGrant
@@ -187,6 +189,102 @@ def give_consent(
         params["error"] = "access_denied"
     separator = "&" if urlsplit(asked.redirect_uri).query else "?"
     return Redirect(redirect=f"{asked.redirect_uri}{separator}{urlencode(params)}")
+
+
+class AppLoginRequest(BaseModel):
+    """The paperus app's request to log in (the page's address)."""
+
+    client_id: str
+    redirect_uri: str
+    """The app's loopback address."""
+    code_challenge: str
+    state: str | None = None
+
+
+class AppLoginInfo(BaseModel):
+    client_name: str
+    username: str
+
+
+def _app_checked(db: DB, body: AppLoginRequest) -> oauth.Asked:
+    asked = _checked(
+        db,
+        ConsentRequest(
+            client_id=body.client_id,
+            redirect_uri=body.redirect_uri,
+            code_challenge=body.code_challenge,
+            code_challenge_method="S256",
+        ),
+    )
+    if not oauth.is_app_redirect(asked.redirect_uri):
+        raise HTTPException(400, "Only the paperus app on this computer logs in here.")
+    return asked
+
+
+@router.post("/api/oauth/app-login/check")
+def check_app_login(body: AppLoginRequest, db: DB, user: SessionUser) -> AppLoginInfo:
+    """The app asking, to show the person (only logged in, never with a
+    token)."""
+    asked = _app_checked(db, body)
+    return AppLoginInfo(client_name=asked.client.name, username=user.username)
+
+
+class AppLogin(AppLoginRequest):
+    allow: bool
+
+
+@router.post("/api/oauth/app-login")
+def app_login(request: Request, body: AppLogin, db: DB, user: SessionUser) -> Redirect:
+    """The person logs the app in as themselves (or not): the app gets a
+    one-time code for a session."""
+    asked = _app_checked(db, body)
+    params = {"state": body.state} if body.state is not None else {}
+    params["iss"] = _base(request, db)
+    if body.allow:
+        params["code"] = oauth.create_app_code(db, asked, user, body.code_challenge)
+        db.commit()
+    else:
+        params["error"] = "access_denied"
+    return Redirect(redirect=f"{asked.redirect_uri}?{urlencode(params)}")
+
+
+class AppSessionRequest(BaseModel):
+    client_id: str
+    code: str
+    redirect_uri: str
+    code_verifier: str
+
+
+class AppSession(BaseModel):
+    token: str
+    """The session: the app sets it as the website's login cookie."""
+    max_age: int
+    """How long it lasts, in seconds."""
+
+
+@router.post("/api/oauth/app-session", include_in_schema=False)
+def app_session(request: Request, body: AppSessionRequest, db: DB) -> JSONResponse:
+    """A session for the app's one-time code and its PKCE verifier, as a
+    login on the website would start."""
+    try:
+        user = oauth.app_login(
+            db,
+            client_id=body.client_id,
+            code=body.code,
+            redirect_uri=body.redirect_uri,
+            verifier=body.code_verifier,
+        )
+    except oauth.OAuthError as error:
+        # A used code stays gone.
+        db.commit()
+        return _error(error, 401 if error.error == "invalid_client" else 400)
+    days = load_config(db, request.app.state.settings).session_days
+    token = auth.start_session(db, user, timedelta(days=days))
+    db.commit()
+    return JSONResponse(
+        AppSession(token=token, max_age=days * 24 * 3600).model_dump(),
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
 
 
 def _basic_client(authorization: str | None) -> str | None:

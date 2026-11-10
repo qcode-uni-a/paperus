@@ -62,6 +62,9 @@ something already listens on its port.
   expiry; set back to the browser's at the end.
 - `oauth`: an app registers, the consent page, the code traded for a token,
   disconnecting; an unknown app refused.
+- `app-login`: the paperus app's login in the browser: confirmed on
+  `/app-login`, the code on the app's loopback address traded for a session;
+  cancelled; refused for an address not on this computer.
 - `phone`: on a phone-sized screen (and a tablet held upright), pages have no
   sideways scroll; the menu
   drawer; a long chapter name keeps the PDF toolbar on one line and wraps in

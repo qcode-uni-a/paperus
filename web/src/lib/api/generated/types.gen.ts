@@ -200,6 +200,70 @@ export type Apart = {
 };
 
 /**
+ * AppLogin
+ */
+export type AppLogin = {
+    /**
+     * Client Id
+     */
+    client_id: string;
+    /**
+     * Redirect Uri
+     */
+    redirect_uri: string;
+    /**
+     * Code Challenge
+     */
+    code_challenge: string;
+    /**
+     * State
+     */
+    state?: string | null;
+    /**
+     * Allow
+     */
+    allow: boolean;
+};
+
+/**
+ * AppLoginInfo
+ */
+export type AppLoginInfo = {
+    /**
+     * Client Name
+     */
+    client_name: string;
+    /**
+     * Username
+     */
+    username: string;
+};
+
+/**
+ * AppLoginRequest
+ *
+ * The paperus app's request to log in (the page's address).
+ */
+export type AppLoginRequest = {
+    /**
+     * Client Id
+     */
+    client_id: string;
+    /**
+     * Redirect Uri
+     */
+    redirect_uri: string;
+    /**
+     * Code Challenge
+     */
+    code_challenge: string;
+    /**
+     * State
+     */
+    state?: string | null;
+};
+
+/**
  * Archive
  */
 export type Archive = {
@@ -9851,6 +9915,56 @@ export type GiveConsentResponses = {
 };
 
 export type GiveConsentResponse = GiveConsentResponses[keyof GiveConsentResponses];
+
+export type CheckAppLoginData = {
+    body: AppLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/oauth/app-login/check';
+};
+
+export type CheckAppLoginErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CheckAppLoginError = CheckAppLoginErrors[keyof CheckAppLoginErrors];
+
+export type CheckAppLoginResponses = {
+    /**
+     * Successful Response
+     */
+    200: AppLoginInfo;
+};
+
+export type CheckAppLoginResponse = CheckAppLoginResponses[keyof CheckAppLoginResponses];
+
+export type AppLoginData = {
+    body: AppLogin;
+    path?: never;
+    query?: never;
+    url: '/api/oauth/app-login';
+};
+
+export type AppLoginErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AppLoginError = AppLoginErrors[keyof AppLoginErrors];
+
+export type AppLoginResponses = {
+    /**
+     * Successful Response
+     */
+    200: Redirect;
+};
+
+export type AppLoginResponse = AppLoginResponses[keyof AppLoginResponses];
 
 export type ConnectedAppsData = {
     body?: never;
