@@ -43,7 +43,10 @@ the page's lower left (`rects` [x1, y1, x2, y2], or `paths` [x, y, …] with a
   Tested on layout twins of real papers' pages (`server/tests/twins/`:
   their measured layout with filler words and coloured figures, no
   content); a page fluent mode gets wrong becomes a twin with
-  `measure.py` (see there), looked over with `review.py`.
+  `measure.py` (see there), looked over with `review.py`. Such pages are
+  found with `sweep.py`: the library's own PDFs, pages where the pieces
+  read many lines against the PDF's text order (often the PDF's order is
+  the odd one: look before believing).
 - The list (the toolbar's list button): all annotations by page, found by
   their words, comments, tags or author, filtered by colour or to one's own;
   a click goes to one. "Add note from all" gathers them into a note on the
