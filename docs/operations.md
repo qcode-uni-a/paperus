@@ -14,9 +14,9 @@ Before the computing centre hosts it, run paperus on an always-on machine of
 the group at the university, reachable only through the university VPN.
 
 - Same `docker compose up` as later: a test of the self-hosting setup.
-- Login: username and password, accounts created by an admin. Keep auth
-  behind one layer so university login (OIDC/SAML) can replace it later
-  without migrating users (link existing accounts by email).
+- Login: username and password, accounts created by an admin; the OIDC
+  login can be added later without migrating anyone (see
+  [OIDC login](#oidc-login)).
 - AI: only clients on the user's own machine (Claude Code, Claude Desktop,
   Cursor, local models) through the stdio bridge/CLI with a personal API
   token. Hosted connectors (Claude.ai, ChatGPT) cannot reach a VPN-only
@@ -41,22 +41,63 @@ Ask the computing centre for:
   ChatGPT) need the server reachable from the internet over HTTPS: clarify
   early with IT security.
 - **DNS name and TLS certificate** (ACME from the university or Let's Encrypt).
-- **University login (OIDC)**: registration with the identity provider as an
-  OpenID Connect client (confidential, authorization code flow with PKCE;
-  scopes `openid profile email`). Give them the redirect address shown in
-  Administration → Settings → Authentication
-  (`https://<host>/api/auth/oidc/callback`); enter the issuer, client ID and
-  secret there (or the secret as `PAPERUS_OIDC_CLIENT_SECRET`). The client
-  authenticates with `client_secret_post`. SAML-only providers need a bridge
-  (Keycloak, SATOSA). Group membership from the directory later.
-- **Administrators keep a password**: with password login off, only
-  administrators may still use one, their way in if the identity provider
-  fails. Link their accounts to the OIDC login (on first setup, or
-  "Link my account" under Authentication).
+- **OIDC login**: a client registration with the identity provider (see
+  [OIDC login](#oidc-login)).
 
 Agree in writing who patches the OS and who updates the application. Automate
 updates (container images + script or Ansible), set up backups and test a
 restore.
+
+## OIDC login
+
+People log in with the organisation's accounts (an OpenID Connect provider:
+Keycloak, Microsoft Entra ID, Google, a university's; SAML-only providers
+need a bridge such as Keycloak or SATOSA).
+
+1. **The address first**: open paperus at its public address (the proxy's,
+   with HTTPS) and check it under Administration → Settings → Server
+   ("Public address"): the redirect address is made from it.
+2. **Register a client** with the provider: confidential, authorization code
+   flow with PKCE, scopes `openid profile email`, authenticating with
+   `client_secret_post`, and the redirect address shown in Administration →
+   Settings → Authentication (`https://<host>/api/auth/oidc/callback`).
+3. **Enter** the issuer, client ID and secret there (or the secret as
+   `OIDC_CLIENT_SECRET` in `.env`).
+4. **Administrators link their own login** before others log in: logged in
+   with their password, "Link my account" under Authentication. An
+   administrator's account is never matched by its name.
+
+**Whose account**: a login used before goes to its account; otherwise to the
+account of the same username (the claim chosen there, `preferred_username`
+by default), which it is then linked to. Without one, a new account is made
+(and joins the groups chosen for new people) unless "Create accounts" is
+off: then only people an administrator added first can log in, by the same
+username. Turn it off when the provider holds more people than should use
+paperus.
+
+**Administrators keep a password**: with password login off, only
+administrators may still use one, their way in if the provider fails.
+
+## Outgoing connections
+
+The server and the ML service reach out over HTTPS (see
+[Outside services](#outside-services)). Behind
+an HTTP proxy, give it to both in a `compose.override.yaml` next to
+`compose.yaml`:
+
+```yaml
+services:
+  server: &proxy
+    environment:
+      HTTPS_PROXY: http://proxy.example.org:3128
+      NO_PROXY: localhost,db,ml
+  worker: *proxy
+  ml:
+    environment:
+      HTTPS_PROXY: http://proxy.example.org:3128
+```
+
+(The override's `environment` adds to the one in `compose.yaml`.)
 
 ## Reverse proxy
 
@@ -482,6 +523,18 @@ without end:
 Search by meaning has no vector index yet (exact search; fine at pilot size,
 see issue #37).
 
+## Updating
+
+1. A backup first (Administration → Backups), with the files if they are
+   not backed up otherwise.
+2. `docker compose pull && docker compose up -d`: the images of
+   `PAPERUS_VERSION` (`release`: the latest; or a version such as `v0.0.23`
+   to update by hand, changed in `.env` first). The server brings the
+   database up to date as it starts; there is no way back to an older
+   version but a backup.
+3. The changelog says when `compose.yaml` or `example.env` changed: then
+   take the release's and carry over what you changed.
+
 ## Checks and updates
 
 - **CI** (`.github/workflows/ci.yml`) on every push and pull request: the
@@ -516,7 +569,7 @@ these services ask; nothing about people or their notes is sent.
 | Unpaywall: `api.unpaywall.org` | A DOI | Open copies, only with a contact email | No contact email |
 | Publishers, repositories | A PDF address OpenAlex or Unpaywall gave | Downloading an open copy | as above |
 | Hugging Face | A model name | The ML service's first use of a model | Model cache filled once |
-| The OIDC provider | The login | OIDC login | Server → OIDC |
+| The OIDC provider | The login | OIDC login | Settings → Authentication |
 
 The browser extension talks only to the person's paperus and, on their
 click, to the page they are on or (Manage → Missing) the publishers' pages

@@ -67,8 +67,10 @@ look around in: uploads, changes and search by meaning don't work there).
 
 ## Installation
 
-Needs a Linux machine with Docker and about 4 GB of RAM (the model for search
-by meaning takes 2–3 GB).
+Needs a Linux machine (x86-64) with Docker Engine and its Compose plugin
+(`docker compose`), about 4 GB of RAM (the model for search by meaning takes
+2–3 GB), and HTTPS out to the internet (the model, metadata services; behind
+a proxy, see [operations](docs/operations.md#outgoing-connections)).
 
 1. Download [`deploy/compose.yaml`](deploy/compose.yaml) and
    [`deploy/example.env`](deploy/example.env) into a new folder; rename
@@ -82,13 +84,20 @@ by meaning takes 2–3 GB).
    ```
 3. Put a reverse proxy with HTTPS in front of port 8000, on a (sub)domain of its
    own; examples for Caddy and nginx are in
-   [operations](docs/operations.md#reverse-proxy).
+   [operations](docs/operations.md#reverse-proxy). The port is open to this
+   machine only; with the proxy on another one, set `PAPERUS_PORT=8000`.
+   Folders on a network share must belong to uid 1000 there (the
+   containers' user).
 4. Start: `docker compose up -d`. The first start downloads the model (about
    2.3 GB).
-5. Open paperus in the browser: create the administrator account, or restore
-   a backup found in the backup folder (for moving to a new server). The
-   library page then lists the first steps: backups, adding people, the
-   browser extension, connecting an AI assistant.
+5. Open paperus at its address (the proxy's) in the browser: create the
+   administrator account, or restore a backup found in the backup folder
+   (for moving to a new server). Check the address under Administration →
+   Settings → Server ("Public address"). The library page then lists the
+   first steps: backups, adding people, the browser extension, connecting
+   an AI assistant.
+6. Optional: people log in with your organisation's accounts (OIDC
+   login), see [operations](docs/operations.md#oidc-login).
 
 Just trying it out, without HTTPS? Open `http://localhost:8000` on the same
 machine; from another computer on the network, set `COOKIE_SECURE=false` in
@@ -97,8 +106,10 @@ machine; from another computer on the network, set `COOKIE_SECURE=false` in
 Backups of the database run every night from the start; add the files (the
 PDFs), or change when, under Administration → Backups. They go into
 `BACKUP_LOCATION` on another disk; restoring is described in
-[operations](docs/operations.md#backups). To update, change `PAPERUS_VERSION`
-or pull `release` again, then `docker compose up -d`.
+[operations](docs/operations.md#backups). To update (see
+[operations](docs/operations.md#updating)):
+`docker compose pull && docker compose up -d`; the database is brought up
+to date as the server starts.
 
 **Browser extension** (Chrome, Firefox): one click saves the paper you are
 reading, with its PDF, or the PDF you have open; right-click it to save to

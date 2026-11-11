@@ -7,10 +7,12 @@
 set -e
 
 if [ "$(id -u)" = 0 ]; then
-    for folder in "$PAPERUS_STORAGE_PATH" "$PAPERUS_BACKUP_PATH"; do
+    for folder in "$PAPERUS_STORAGE_PATH" "$PAPERUS_BACKUP_PATH" "$PAPERUS_COPY_PATH"; do
         mkdir -p "$folder"
         if [ "$(stat -c %U "$folder")" != paperus ]; then
-            chown -R paperus:paperus "$folder"
+            # A network share may refuse (root squashed): said, not fatal.
+            chown -R paperus:paperus "$folder" 2>/dev/null \
+                || echo "start: $folder could not be given to the paperus user; give it to uid 1000 where it is" >&2
         fi
     done
     HOME=/home/paperus exec setpriv --reuid=paperus --regid=paperus --init-groups "$0" "$@"

@@ -17,6 +17,21 @@
   entry points to is added as if uploaded, joins the paper whose DOI it
   carries once read, and otherwise stays a paper of its own. The
   instructions for Mendeley and EndNote say how.
+- **The app keeps papers offline where you choose**: its start page shows
+  the folder and moves them to another (another disk), or back.
+- **OIDC login can no longer claim an administrator's account by its
+  name** (the first one is often "admin", a name anyone at the identity
+  provider may have): administrators link their login themselves, under
+  Settings.
+- **Installing, read as a stranger would**: the port is open to the
+  machine itself by default (`PAPERUS_PORT=127.0.0.1:8000`; Docker's ports
+  pass by firewalls); `OIDC_CLIENT_SECRET` in `.env` now reaches the
+  containers; the library-copy folder is handed to the containers' user
+  too, and a network share refusing that no longer stops the start. The
+  README names what is needed (x86-64, Docker's Compose plugin, HTTPS out)
+  and the public address; operations has sections on the OIDC login
+  (whose account a login gets, "Create accounts"), outgoing connections
+  through a proxy, and updating (`docker compose pull` first).
 
 ## 0.0.23 (2026-11-11)
 

@@ -12,6 +12,11 @@ x-paperus-env: &paperus-env
   PAPERUS_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
   PAPERUS_COOKIE_SECURE: ${COOKIE_SECURE:-true}
   PAPERUS_TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7}
+  # The OIDC client's secret, if not entered under Administration →
+  # Settings → Authentication (docs/operations.md, "OIDC login").
+  PAPERUS_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  # Other PAPERUS_* settings (docs/operations.md) go here too: .env alone
+  # does not reach the containers.
   # Prometheus metrics (see docs/operations.md, Monitoring):
   # PAPERUS_METRICS_PORT: 9464
 
