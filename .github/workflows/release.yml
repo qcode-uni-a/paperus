@@ -2,7 +2,8 @@ name: Release
 
 # For a tag "v1.2.3": test, then publish container images (ghcr.io), Python
 # packages (PyPI), the TypeScript client (npm) and the browser extension
-# (Firefox, Chrome), then the GitHub release, with the app's installers.
+# (Firefox, Chrome), then the GitHub release, with the app's installers
+# and the parts of its library on this computer.
 # Each of these only runs once switched on with its repository variable
 # (PUBLISH_PYPI, PUBLISH_NPM, PUBLISH_FIREFOX, PUBLISH_CHROME, PUBLISH_APP;
 # see docs/operations.md, "Releases").
@@ -234,11 +235,21 @@ jobs:
     if: vars.PUBLISH_APP == 'true'
     uses: ./.github/workflows/app.yml
 
+  # The parts of the app's library on this computer, which the app
+  # downloads from this release (docs/apps.md).
+  local:
+    needs: [ci, versions]
+    if: vars.PUBLISH_APP == 'true'
+    uses: ./.github/workflows/local.yml
+
   release:
     name: GitHub release
-    needs: [images, app]
+    needs: [images, app, local]
     # Also without the app's installers (PUBLISH_APP off).
-    if: always() && needs.images.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.app.result)
+    if: >-
+      always() && needs.images.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.app.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.local.result)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -248,6 +259,12 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           pattern: app-*
+          merge-multiple: true
+          path: app-installers
+      - if: needs.local.result == 'success'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: local-*
           merge-multiple: true
           path: app-installers
       - name: Notes from the changelog
