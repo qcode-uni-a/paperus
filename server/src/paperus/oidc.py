@@ -211,8 +211,9 @@ def user_for(
     db: Session, claims: dict[str, Any], config: SystemConfig
 ) -> tuple[User, bool]:
     """The account for these claims: the one linked before, else the one of
-    the same username (then linked), else a new one if allowed; and whether
-    it was linked just now."""
+    the same username (then linked; not an administrator's, they link it
+    themselves), else a new one if allowed; and whether it was linked just
+    now."""
     subject = f"{claims['iss']} {claims['sub']}"
     user = db.scalar(select(User).where(User.oidc_subject == subject))
     linked = user is None
@@ -225,6 +226,13 @@ def user_for(
         user = db.scalar(select(User).where(User.username == username))
         if user is not None and user.oidc_subject is not None:
             raise LoginFailed(f"the account {username} belongs to another login")
+        if user is not None and user.is_admin:
+            # Never taken over by name (the first administrator is often
+            # "admin", a name anyone at the provider may have).
+            raise LoginFailed(
+                f"the account {username} is an administrator's: log in with its "
+                "password and link the OIDC login under Settings"
+            )
         if user is None:
             if not config.oidc_create_accounts:
                 raise LoginFailed(

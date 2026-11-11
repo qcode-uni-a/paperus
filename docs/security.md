@@ -33,7 +33,8 @@ may see and change what is described in [permissions.md](permissions.md).
   the ID token's issuer, audience, expiry and nonce are checked (it comes
   straight from the provider's token endpoint over https, where OIDC lets
   its signature go unchecked); the provider's discovery must use https and
-  name itself; accounts are matched or made as configured.
+  name itself; accounts are matched (by username, never an
+  administrator's: they link their login themselves) or made as configured.
 - **Apps** (`test_oauth.py`): the app's login in the system's browser
   (PKCE, a one-time code to a loopback address only); assistants'
   connections (OAuth with registration rules, consent, revoking).

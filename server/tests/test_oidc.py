@@ -522,6 +522,10 @@ def test_accounts_for_claims(db: Session) -> None:
     ben.oidc_subject = f"{ISSUER} u-0"
     with pytest.raises(oidc.LoginFailed, match="belongs to another login"):
         oidc.user_for(db, {**claims, "preferred_username": "ben"}, config)
+    # An administrator's account is not taken over by its name.
+    create_user(db, "admin", "password1").is_admin = True
+    with pytest.raises(oidc.LoginFailed, match="an administrator's"):
+        oidc.user_for(db, {**claims, "preferred_username": "admin"}, config)
     # The login linked to a deactivated account.
     ben.deactivated_at = datetime.now(UTC)
     with pytest.raises(oidc.LoginFailed, match="deactivated"):
