@@ -99,3 +99,40 @@ def test_files_say_when_the_folder_is_away(
     claim_storage(db, blobs)
     (tmp_path / "share" / storage.MARKER).write_text("us\n")
     assert ada.get(f"/api/files/{file_id}/content").status_code == 404
+
+
+def test_opened_files_are_kept_for_when_the_folder_is_away(tmp_path: Path) -> None:
+    share, cache = tmp_path / "share", tmp_path / "cache"
+    blobs = FilesystemStore(share, tmp_path / "incoming", cache, cache_bytes=10)
+    storage.claim_if_new(blobs, "us", has_contents=False)
+    first = blobs.put([b"first"], max_size=1 << 20).sha256
+    second = blobs.put([b"second"], max_size=1 << 20).sha256
+    # Opened: read from the cache, kept there.
+    assert blobs.path_to_read(first).is_relative_to(cache)
+    assert blobs.path_to_read(first).read_bytes() == b"first"
+    # The share away: still opens from the cache.
+    (share / storage.MARKER).unlink()
+    assert blobs.path_to_read(first).read_bytes() == b"first"
+    # Never opened before: not there (the API says "not reachable").
+    assert not blobs.path_to_read(second).is_relative_to(cache)
+    # Over size, the file opened longest ago goes.
+    (share / storage.MARKER).write_text("us\n")
+    blobs.path_to_read(second)
+    assert not (cache / storage.blob_name(first)).exists()
+    assert (cache / storage.blob_name(second)).exists()
+    # Waiting in the incoming folder: read there, not cached.
+    (share / storage.MARKER).unlink()
+    waiting = blobs.put([b"waiting"], max_size=1 << 20).sha256
+    assert blobs.path_to_read(waiting).is_relative_to(tmp_path / "incoming")
+    # Without a cache: as before.
+    plain = FilesystemStore(share)
+    assert plain.path_to_read(first) == plain.path(first)
+    # A cache that cannot be written: read from the folder all the same.
+    (share / storage.MARKER).write_text("us\n")
+    locked = tmp_path / "locked"
+    locked.mkdir(mode=0o500)
+    try:
+        unwritable = FilesystemStore(share, tmp_path / "incoming", locked / "cache")
+        assert unwritable.path_to_read(first) == unwritable.path(first)
+    finally:
+        locked.chmod(0o700)

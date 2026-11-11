@@ -111,9 +111,17 @@ class FilesystemStore(BlobStore):
     network share not mounted: its marker missing, ``MARKER``), readable
     meanwhile, and move over when it is back (``move_incoming``)."""
 
-    def __init__(self, root: Path, incoming: Path | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        incoming: Path | None = None,
+        cache: Path | None = None,
+        cache_bytes: int = 2 * 1024**3,
+    ) -> None:
         self.root = root
         self.incoming = incoming
+        self.cache = cache
+        self.cache_bytes = cache_bytes
         super().__init__((incoming or root) / "tmp")
 
     def reachable(self) -> bool:
@@ -128,6 +136,47 @@ class FilesystemStore(BlobStore):
             if waiting.exists():
                 return waiting
         return main
+
+    def path_to_read(self, sha256: bytes) -> Path:
+        """The file to open for reading (a person opening it): with a cache,
+        kept there too, so it opens while the folder is out of reach;
+        from there if it is."""
+        found = self.path(sha256)
+        waiting = self.incoming is not None and found.is_relative_to(self.incoming)
+        if self.cache is None or waiting:
+            return found
+        cached = self.cache / blob_name(sha256)
+        try:
+            if self.reachable() and found.exists():
+                if not cached.exists():
+                    cached.parent.mkdir(parents=True, exist_ok=True)
+                    partial = cached.with_name(cached.name + ".partial")
+                    shutil.copyfile(found, partial)
+                    partial.replace(cached)
+                    self._trim_cache()
+                os.utime(cached)
+                return cached
+            if cached.exists():
+                os.utime(cached)
+                return cached
+        except OSError:
+            pass
+        return found
+
+    def _trim_cache(self) -> None:
+        """The files opened longest ago out, while the cache is over size."""
+        assert self.cache is not None
+        files = sorted(
+            (path.stat().st_mtime, path.stat().st_size, path)
+            for path in self.cache.glob("*/*/*")
+            if path.is_file() and not path.name.endswith(".partial")
+        )
+        total = sum(size for _, size, _ in files)
+        for _, size, path in files:
+            if total <= self.cache_bytes:
+                break
+            path.unlink(missing_ok=True)
+            total -= size
 
     def _commit(self, tmp: Path, sha256: bytes) -> None:
         if self.exists(sha256):
@@ -309,7 +358,12 @@ def make_blob_store(settings: Settings) -> BlobStore:
         return S3Store(
             client, settings.s3_bucket, settings.s3_prefix, settings.temp_path
         )
-    return FilesystemStore(settings.storage_path, settings.incoming_path)
+    return FilesystemStore(
+        settings.storage_path,
+        settings.incoming_path,
+        settings.cache_path,
+        settings.cache_bytes,
+    )
 
 
 __all__ = [

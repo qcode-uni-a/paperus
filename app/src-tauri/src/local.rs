@@ -365,6 +365,8 @@ pub fn start(app: &AppHandle) -> Result<(Url, String), String> {
             // New files wait here while the PDFs' folder (a network share,
             // say) is out of reach.
             .env("PAPERUS_INCOMING_PATH", data.join("incoming"))
+            // The PDFs opened last, kept here: they open while it is away.
+            .env("PAPERUS_CACHE_PATH", data.join("cache"))
             .env("PAPERUS_BACKUP_PATH", data.join("backups"))
             .env("PAPERUS_COPY_PATH", data.join("library-copy"))
             .env("PAPERUS_WEB_PATH", bundle.join("web"))

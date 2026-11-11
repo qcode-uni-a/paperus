@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     """A local folder for new files while ``storage_path`` (a network share,
     say) is out of reach: they wait there, readable, and move over when it
     is back. Off unless set (the app's library on this computer sets it)."""
+    cache_path: Path | None = None
+    """A local folder keeping the files last opened from ``storage_path``
+    (a network share, say), so they open while it is out of reach too. Off
+    unless set."""
+    cache_bytes: int = 2 * 1024**3
+    """At most this much in ``cache_path``; the files opened longest ago go
+    first."""
     backup_path: Path = Path("data/backups")
     """Where backups go: best another disk or a network share."""
     export_path: Path | None = None

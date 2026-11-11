@@ -25,6 +25,10 @@
   the folder answers "not reachable" (503) meanwhile, not an error. The
   folder counts as there when its marker is (an empty mount point is no
   folder of ours).
+- **PDFs opened last stay readable while their folder is away** (#28;
+  with `PAPERUS_CACHE_PATH`, a local folder, at most `PAPERUS_CACHE_BYTES`,
+  2 GB): opening a file keeps it there too; the ones opened longest ago go
+  first. The library on this computer uses it.
 - **The library on this computer keeps its PDFs where you choose** (#28):
   "Keep them elsewhere…" on the app's page moves them to a folder picked
   in the system's dialog (a network share, another disk), checked, and

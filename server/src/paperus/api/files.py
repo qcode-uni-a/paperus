@@ -336,7 +336,8 @@ def download_file(
     if etag in request.headers.get("If-None-Match", "").split(", "):
         return Response(status_code=304, headers=safety)
     if isinstance(blobs, FilesystemStore):
-        if not blobs.path(file.blob_sha256).exists():
+        path = blobs.path_to_read(file.blob_sha256)
+        if not path.exists():
             if not blobs.reachable():
                 raise HTTPException(
                     503,
@@ -346,7 +347,7 @@ def download_file(
             raise HTTPException(404, "the file's contents are missing")
         # Supports range requests, which PDF.js uses for large files.
         return FileResponse(
-            blobs.path(file.blob_sha256),
+            path,
             media_type=file.media_type,
             filename=file.filename,
             content_disposition_type="inline",
