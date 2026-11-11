@@ -31,6 +31,10 @@ What the app does around the website:
 - The bell's notifications as the system's (`notices.rs`): asked for every
   minute with the window's login; those that come while the app runs, and
   not while its window is in front.
+- A copy of the open server library for offline use (`offline.rs`, begun):
+  in SQLite in the app's data folder, brought up to date every minute
+  from `/api/changes` with the window's login ([apps.md](../docs/apps.md),
+  "Offline and sync"). Not yet read offline.
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 

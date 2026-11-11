@@ -29,3 +29,4 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
 tar = "0.4"
 flate2 = "1"
+rusqlite = { version = "0.42", features = ["bundled"] }

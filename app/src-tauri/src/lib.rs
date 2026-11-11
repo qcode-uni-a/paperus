@@ -7,6 +7,7 @@ mod libraries;
 mod local;
 mod login;
 mod notices;
+mod offline;
 mod open_with;
 
 use std::{
@@ -319,6 +320,7 @@ pub fn run() {
                 });
             }
             notices::start(app.handle().clone());
+            offline::start(app.handle().clone());
             let arguments: Vec<String> = std::env::args().collect();
             open_with::open(app.handle(), open_with::files_in(&arguments));
             Ok(())
