@@ -17,6 +17,11 @@
   entry points to is added as if uploaded, joins the paper whose DOI it
   carries once read, and otherwise stays a paper of its own. The
   instructions for Mendeley and EndNote say how.
+- **Fluent mode: an equation across both columns between REVTeX's rules**
+  (Physical Review and other REVTeX papers: a rule closing the left
+  column, one opening the right) is read between the columns above and
+  below it, not inside them. Found by checking the library's papers
+  against their PDFs' own text order.
 - **The app keeps papers offline where you choose**: its start page shows
   the folder and moves them to another (another disk), or back.
 - **OIDC login can no longer claim an administrator's account by its

@@ -26,7 +26,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 3
+VERSION = 4
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -58,6 +58,13 @@ THIRD_COLUMN_SIDE = 0.55
 # Points of blank space inside a line of text at most (word spaces of a
 # justified line; an equation's parts stand further apart).
 LINE_GAP = 24
+# REVTeX's wide equations: a rule closing the left column, a tick up at its
+# end by the gap, and one opening the right column below, a tick down at
+# its start; each across this share of its column at least, ending this
+# close to the gap (points).
+WIDE_RULE = 0.85
+WIDE_RULE_GAP = 4
+WIDE_TICK = 3
 # A rule over the columns' gap ending them: at least this share of the
 # width long.
 RULE_ACROSS = 0.2
@@ -590,6 +597,64 @@ def lay_out(
                 return True
         return False
 
+    def side_rule(y: int, a: int, b: int, closing: bool) -> bool:
+        """Row ``y`` holds a rule across most of the side ``a``-``b`` with
+        a tick at the gap: up at its right end (``closing``, the left side),
+        else down at its left end."""
+        for s, e in runs(ink[y], a, b):
+            if e - s + 1 < (b - a + 1) * WIDE_RULE:
+                continue
+            if closing and b - e <= WIDE_RULE_GAP:
+                beside, end = ink[max(0, y - WIDE_TICK) : y], e
+            elif not closing and s - a <= WIDE_RULE_GAP:
+                beside, end = ink[y + 1 : y + WIDE_TICK + 1], s
+            else:
+                continue
+            # The tick, and nothing else along the rule (a table's double
+            # rule is no tick).
+            tick = beside[:, max(0, end - 1) : end + 2].any(axis=1)
+            along = beside[:, s + 3 : e - 2].any()
+            return bool(tick.all()) and not along
+        return False
+
+    def wide_spans(
+        y0: int, y1: int, gutter: tuple[int, int], x0: int, x1: int
+    ) -> list[tuple[int, int]]:
+        """Rows set across the page between REVTeX's rules (``WIDE_RULE``):
+        from a closing rule to the opening one below it, else to ``y1``
+        (the equation goes on over the page). (An opening rule alone is
+        not enough to go by.)"""
+        gutter_left, gutter_right = gutter
+        # The gap's middle blank (a rule may reach into its edge).
+        inset = max(0, (gutter_right - gutter_left + 1 - 3) // 4)
+
+        def gap_blank(y: int) -> bool:
+            return not ink[y, gutter_left + inset : gutter_right - inset + 1].any()
+
+        closing = [
+            y
+            for y in range(y0, y1 + 1)
+            if side_rule(y, x0, gutter_left, True) and gap_blank(y)
+        ]
+        opening = [
+            y
+            for y in range(y0, y1 + 1)
+            if side_rule(y, gutter_right, x1, False) and gap_blank(y)
+        ]
+        spans: list[tuple[int, int]] = []
+        top = None
+        for row, closes in sorted(
+            [(y, True) for y in closing] + [(y, False) for y in opening]
+        ):
+            if closes and top is None:
+                top = row
+            elif not closes and top is not None:
+                spans.append((top, row))
+                top = None
+        if top is not None:
+            spans.append((top, y1))
+        return spans
+
     def bands_of(
         y0: int,
         y1: int,
@@ -647,6 +712,8 @@ def lay_out(
                 continue
             if not any(rule_at(y0 + i) for i in range(a, b + 1)):
                 crosses[a : b + 1] = [False] * (b - a + 1)
+        for top, bottom in wide_spans(y0, y1, gutter, x0, x1):
+            crosses[top - y0 : bottom - y0 + 1] = [True] * (bottom - top + 1)
         last_row = len(crosses) - 1
         for a, b in runs(crosses):
             i = a - 1

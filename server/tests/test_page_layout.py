@@ -99,3 +99,42 @@ def test_a_third_column_beside_the_title_is_one_piece() -> None:
     assert third[0]["y"] < 60
     assert third[0]["y"] + third[0]["height"] > 430
     assert pieces.index(third[0]) == len(pieces) - 2  # before the figure
+
+
+def test_an_equation_between_revtex_rules_is_across() -> None:
+    """REVTeX's wide equation: a rule closes the left column (a tick up by
+    the gap), the equation runs across, a rule opens the right column (a
+    tick down); the matrix leaves the gap blank. Read: both columns above,
+    the equation, both columns below."""
+    ink = np.zeros((792, 612), dtype=bool)
+
+    def column(x0: int, x1: int, y0: int, y1: int) -> None:
+        for y in range(y0, y1, 11):
+            ink[y : y + 7, x0:x1] = (np.arange(x0, x1) % 4 != 0)[None, :]
+
+    column(50, 297, 60, 410)
+    column(314, 561, 60, 410)
+    ink[422, 51:297] = True  # closing rule
+    ink[418:422, 296] = True  # its tick
+    for y in range(428, 488, 14):  # the matrix's rows, either side
+        ink[y : y + 8, 90:280] = (np.arange(90, 280) % 7 != 0)[None, :]
+        ink[y : y + 8, 330:520] = (np.arange(330, 520) % 7 != 0)[None, :]
+    ink[494, 314:561] = True  # opening rule
+    ink[495:499, 314] = True  # its tick
+    column(50, 297, 506, 740)
+    column(314, 561, 506, 740)
+    columns, pieces = lay_out(ink)
+    assert columns
+    found = [(p["x"] < 300, p["y"] // 100, p["wide"]) for p in pieces]
+    assert found == [
+        (True, 0, False),
+        (False, 0, False),
+        (True, 4, True),
+        (True, 5, False),
+        (False, 5, False),
+    ]
+    # A table's double rule over a column is no such rule.
+    ink[418:422, 296] = False
+    ink[420, 51:297] = True
+    _, pieces = lay_out(ink)
+    assert not any(p["wide"] for p in pieces)
