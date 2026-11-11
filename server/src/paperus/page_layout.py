@@ -26,7 +26,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 4
+VERSION = 5
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -61,9 +61,10 @@ LINE_GAP = 24
 # REVTeX's wide equations: a rule closing the left column, a tick up at its
 # end by the gap, and one opening the right column below, a tick down at
 # its start; each across this share of its column at least, ending this
-# close to the gap (points).
+# close to the gap found (points: as wide as a gap between columns, as the
+# equation may narrow the gap found).
 WIDE_RULE = 0.85
-WIDE_RULE_GAP = 4
+WIDE_RULE_GAP = 16
 WIDE_TICK = 3
 # A rule over the columns' gap ending them: at least this share of the
 # width long.
@@ -622,8 +623,8 @@ def lay_out(
     ) -> list[tuple[int, int]]:
         """Rows set across the page between REVTeX's rules (``WIDE_RULE``):
         from a closing rule to the opening one below it, else to ``y1``
-        (the equation goes on over the page). (An opening rule alone is
-        not enough to go by.)"""
+        (the equation goes on over the page); from ``y0`` to an opening
+        rule without a closing one above (it came from the page before)."""
         gutter_left, gutter_right = gutter
         # The gap's middle blank (a rule may reach into its edge).
         inset = max(0, (gutter_right - gutter_left + 1 - 3) // 4)
@@ -642,7 +643,7 @@ def lay_out(
             if side_rule(y, gutter_right, x1, False) and gap_blank(y)
         ]
         spans: list[tuple[int, int]] = []
-        top = None
+        top = y0 if opening and (not closing or opening[0] < closing[0]) else None
         for row, closes in sorted(
             [(y, True) for y in closing] + [(y, False) for y in opening]
         ):

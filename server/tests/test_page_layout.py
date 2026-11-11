@@ -133,8 +133,20 @@ def test_an_equation_between_revtex_rules_is_across() -> None:
         (True, 5, False),
         (False, 5, False),
     ]
-    # A table's double rule over a column is no such rule.
+    # Begun on the page before: across from the top to the opening rule.
+    ink[418:423, 51:297] = False
+    _, pieces = lay_out(ink)
+    found = [(p["x"] < 300, p["y"] // 100, p["wide"]) for p in pieces]
+    assert found == [
+        (True, 0, True),
+        (True, 4, True),
+        (True, 5, False),
+        (False, 5, False),
+    ]
+    # Tables' double rules over a column are no such rules.
     ink[418:422, 296] = False
     ink[420, 51:297] = True
+    ink[495:499, 314] = False
+    ink[496, 314:561] = True
     _, pieces = lay_out(ink)
     assert not any(p["wide"] for p in pieces)
