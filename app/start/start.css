@@ -157,7 +157,8 @@ input {
 	background: var(--surface);
 }
 
-button[type='submit'] {
+button[type='submit'],
+#make-local {
 	padding: 0.5rem 1rem;
 	border: 0;
 	border-radius: 6px;
@@ -167,7 +168,8 @@ button[type='submit'] {
 	cursor: pointer;
 }
 
-button[type='submit']:hover {
+button[type='submit']:hover,
+#make-local:hover {
 	background: var(--royal-hover);
 }
 
@@ -179,6 +181,14 @@ button:disabled {
 :focus-visible {
 	outline: 2px solid var(--focus);
 	outline-offset: 2px;
+}
+
+.progress {
+	margin: 1.5rem 0 0;
+	padding: 0.75rem 1rem;
+	border-radius: 8px;
+	background: var(--surface);
+	border: 1px solid var(--rule);
 }
 
 .error {

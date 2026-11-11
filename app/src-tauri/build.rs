@@ -5,6 +5,8 @@ fn main() {
             "add_library",
             "forget_library",
             "open_library",
+            "make_local_library",
+            "local_progress",
         ]),
     ))
     .expect("failed to build the app");

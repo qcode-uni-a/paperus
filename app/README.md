@@ -8,7 +8,10 @@ engine (WebKitGTK on Linux, WebKit on macOS, WebView2 on Windows).
   connecting to another. Plain HTML and JavaScript, no build.
 - `src-tauri/`: the app. `libraries.rs` keeps the libraries (in the app's
   config folder, `libraries.json`) and checks that an address is a paperus
-  (its public `/api/auth/methods`); `lib.rs` makes the windows.
+  (its public `/api/auth/methods`); `lib.rs` makes the windows; `local.rs`
+  runs the library on this computer (below).
+- `local/`: the library on this computer's parts: `build.sh` builds them
+  for a platform, `smoke.sh` starts them once.
 
 What the app does around the website:
 
@@ -44,8 +47,32 @@ and trades it with its PKCE verifier for a session
 cookie. A session like a browser's, not a connected app: logging out in the
 app ends it.
 
+## A library on this computer
+
+For one person, without a server (`local.rs`, [apps.md](../docs/apps.md)):
+"Make a library on this computer" on the app's page. Its parts come as one
+file per platform from the release, `paperus-local-<version>-<target>.tar.gz`
+(built by `local/build.sh` in `.github/workflows/local.yml`: a standalone
+Python with the server and its locked dependencies, PostgreSQL with
+pgvector built against it, the website), downloaded once per version and
+checked against its SHA-256 (`.sha256` beside it). The first start makes a
+database (`initdb`, a random password) and the library's only person (`me`,
+a random password); both are kept in `secrets.json` with the data, in the
+app's data folder (`library/`: the database, files, backups, logs). Each
+start runs PostgreSQL, `paperus serve` and `paperus worker`, all on
+127.0.0.1 only, migrates the schema, logs the window in and opens it; the
+app stops them when it ends, and the server and worker end with it however
+it ends (`--stop-with-stdin`: their input is a pipe from the app). A
+PostgreSQL left running by a crash is used again. No ML service yet: search
+finds words.
+
+`PAPERUS_LOCAL_BUNDLE`: a bundle's folder or .tar.gz to use instead of the
+release's (development, tests).
+
 Still to come: "Open with" on Windows; a click on a notification
-opening its paper.
+opening its paper; search by meaning in the library on this computer (the
+ML service in the bundle, its model downloaded on first use); Intel Macs'
+bundle.
 
 ## Installers
 
@@ -83,3 +110,10 @@ website kept out of the app, logging in in the browser (whose part goes
 over HTTP; its page is in `e2e/tests/app-login.spec.ts`), "Open with". On
 its own display (Xvfb, else GTK's Broadway) and session bus; the
 browser it opens is a stand-in that writes the address down. CI runs it.
+
+`tests/local.sh <bundle>` (`tests/local.mjs`): the library on this
+computer with a built bundle: made from the app's page, logged in, opened
+again by itself after the app was killed (its PostgreSQL used again), no
+server or worker left afterwards. `.github/workflows/local.yml` runs it
+after building the Linux bundle, whose `local/smoke.sh` has started it
+once already.

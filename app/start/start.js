@@ -6,6 +6,10 @@ const known = document.getElementById('known');
 const form = document.getElementById('add');
 const address = document.getElementById('address');
 const error = document.getElementById('error');
+const local = document.getElementById('local');
+const makeLocal = document.getElementById('make-local');
+const localError = document.getElementById('local-error');
+const localProgress = document.getElementById('local-progress');
 
 function showError(message) {
 	error.textContent = message;
@@ -20,9 +24,31 @@ async function open(url) {
 	}
 }
 
+// What the library on this computer is doing while it gets ready (also
+// when the app opens it by itself at its start).
+setInterval(async () => {
+	const text = await invoke('local_progress');
+	localProgress.textContent = text;
+	localProgress.hidden = !text;
+}, 400);
+
+makeLocal.addEventListener('click', async () => {
+	makeLocal.disabled = true;
+	localError.hidden = true;
+	try {
+		await invoke('make_local_library');
+	} catch (message) {
+		localError.textContent = String(message);
+		localError.hidden = false;
+	} finally {
+		makeLocal.disabled = false;
+	}
+});
+
 async function show() {
 	const libraries = await invoke('libraries');
 	known.hidden = libraries.length === 0;
+	local.hidden = libraries.some((library) => library.local);
 	list.replaceChildren(
 		...libraries.map((library) => {
 			const item = document.createElement('li');
@@ -34,7 +60,7 @@ async function show() {
 			name.textContent = library.name;
 			const where = document.createElement('span');
 			where.className = 'where';
-			where.textContent = library.url;
+			where.textContent = library.local ? 'On this computer' : library.url;
 			button.append(name, where);
 			button.addEventListener('click', () => open(library.url));
 			const forget = document.createElement('button');
@@ -46,7 +72,9 @@ async function show() {
 				await invoke('forget_library', { url: library.url });
 				await show();
 			});
-			item.append(button, forget);
+			// The one on this computer stays: removing it from the list would
+			// not remove its papers.
+			item.append(...(library.local ? [button] : [button, forget]));
 			return item;
 		})
 	);

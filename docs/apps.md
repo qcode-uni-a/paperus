@@ -141,7 +141,12 @@ Each step usable on its own:
    downloads; the OIDC login in the system's browser (passwords inside the
    window, as on the website); "Open with" for PDFs (Linux, macOS);
    notifications; installers (`.github/workflows/app.yml`).
-3. **A library on this computer**, in the same app (#39).
+3. **A library on this computer**, in the same app (#39). Begun: its parts
+   built per platform in CI (`app/local/`, `.github/workflows/local.yml`:
+   Linux, macOS on Apple silicon, Windows), made and started by the app
+   (`app/src-tauri/src/local.rs`, see `app/README.md`), tested end to end
+   on Linux. Not yet: search by meaning there (the ML service), attaching
+   the parts to releases, Intel Macs.
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (above), then the offline
    layer, kept papers, the queue.

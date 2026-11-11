@@ -48,7 +48,7 @@ pub fn start(app: AppHandle, label: String, next: String) {
         let outcome = log_in(&app, &library);
         match outcome {
             Ok(Some(session)) => {
-                let set = window.set_cookie(cookie(&library, session));
+                let set = window.set_cookie(cookie(&library, session.token, session.max_age));
                 let target = library.join(&next).unwrap_or(library);
                 if set.is_ok() {
                     let _ = window.navigate(target);
@@ -148,7 +148,7 @@ fn answer<T: serde::de::DeserializeOwned>(
 }
 
 /// ``bytes`` random bytes, as URL-safe text.
-fn random(bytes: usize) -> String {
+pub fn random(bytes: usize) -> String {
     let mut buffer = vec![0; bytes];
     getrandom::fill(&mut buffer).expect("the system's randomness");
     URL_SAFE_NO_PAD.encode(buffer)
@@ -230,15 +230,15 @@ fn parse(line: &str, state: &str) -> Option<Option<String>> {
     Some(value("code"))
 }
 
-/// The session as the website's own login cookie for the library.
-fn cookie(library: &Url, session: Session) -> Cookie<'static> {
-    Cookie::build((libraries::SESSION_COOKIE, session.token))
+/// A session as the website's own login cookie for the library.
+pub fn cookie(library: &Url, token: String, max_age: i64) -> Cookie<'static> {
+    Cookie::build((libraries::SESSION_COOKIE, token))
         .domain(library.host_str().unwrap_or_default().to_owned())
         .path("/")
         .http_only(true)
         .secure(library.scheme() == "https")
         .same_site(SameSite::Lax)
-        .max_age(time::Duration::seconds(session.max_age))
+        .max_age(time::Duration::seconds(max_age))
         .build()
 }
 
@@ -267,11 +267,7 @@ mod tests {
     #[test]
     fn the_cookie_is_the_websites_own() {
         let library = Url::parse("https://paperus.example.org/").unwrap();
-        let session = Session {
-            token: "t".into(),
-            max_age: 60,
-        };
-        let cookie = cookie(&library, session);
+        let cookie = cookie(&library, "t".into(), 60);
         assert_eq!(cookie.name(), "paperus_session");
         assert_eq!(cookie.domain(), Some("paperus.example.org"));
         assert_eq!(cookie.secure(), Some(true));

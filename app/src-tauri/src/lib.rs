@@ -4,6 +4,7 @@
 //! access to the app (no capability names it).
 
 mod libraries;
+mod local;
 mod login;
 mod notices;
 mod open_with;
@@ -48,6 +49,7 @@ async fn add_library(app: AppHandle, address: String) -> Result<Library, String>
     let library = Library {
         url: libraries::key(&url),
         name: url.host_str().unwrap_or_default().to_owned(),
+        local: false,
     };
     let mut saved = libraries::load(&app);
     if !saved.libraries.contains(&library) {
@@ -68,16 +70,67 @@ fn forget_library(app: AppHandle, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_library(app: AppHandle, url: String) -> Result<(), String> {
+async fn open_library(app: AppHandle, url: String) -> Result<(), String> {
     let mut saved = libraries::load(&app);
-    if !saved.libraries.iter().any(|library| library.url == url) {
-        return Err("No such library.".into());
+    let library = saved
+        .libraries
+        .iter()
+        .find(|library| library.url == url)
+        .cloned()
+        .ok_or("No such library.")?;
+    if library.local {
+        return open_local(app).await;
     }
     saved.last = Some(url.clone());
     libraries::save(&app, &saved)?;
     let window = app.get_webview_window(MAIN).ok_or("The window is gone.")?;
     let to = Url::parse(&url).map_err(|error| error.to_string())?;
     window.navigate(to).map_err(|error| error.to_string())
+}
+
+/// Makes the library on this computer (its parts downloaded, a database
+/// made) and opens it.
+#[tauri::command]
+async fn make_local_library(app: AppHandle) -> Result<(), String> {
+    open_local(app).await
+}
+
+/// What the library on this computer is doing while it gets ready.
+#[tauri::command]
+fn local_progress() -> String {
+    local::PROGRESS
+        .lock()
+        .map(|text| text.clone())
+        .unwrap_or_default()
+}
+
+/// Starts the library on this computer if needed, logs the window in and
+/// opens it; kept in the list (its address follows its port).
+async fn open_local(app: AppHandle) -> Result<(), String> {
+    let started = app.clone();
+    let (url, password) = tauri::async_runtime::spawn_blocking(move || local::start(&started))
+        .await
+        .map_err(|error| error.to_string())??;
+    let login = url.clone();
+    let (token, max_age) =
+        tauri::async_runtime::spawn_blocking(move || local::log_in(&login, &password))
+            .await
+            .map_err(|error| error.to_string())??;
+    let mut saved = libraries::load(&app);
+    saved.libraries.retain(|library| !library.local);
+    let library = Library {
+        url: libraries::key(&url),
+        name: "This computer".into(),
+        local: true,
+    };
+    saved.last = Some(library.url.clone());
+    saved.libraries.insert(0, library);
+    libraries::save(&app, &saved)?;
+    let window = app.get_webview_window(MAIN).ok_or("The window is gone.")?;
+    window
+        .set_cookie(login::cookie(&url, token, max_age))
+        .map_err(|error| error.to_string())?;
+    window.navigate(url).map_err(|error| error.to_string())
 }
 
 /// A window for the app's page or a library, with what the app does
@@ -234,17 +287,37 @@ pub fn run() {
             libraries,
             add_library,
             forget_library,
-            open_library
+            open_library,
+            make_local_library,
+            local_progress
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());
-            // The library open last, else the app's page.
-            let url = saved
+            // The library open last, else the app's page; the one on this
+            // computer from the app's page, which shows it starting.
+            let last = saved
                 .last
-                .filter(|last| saved.libraries.iter().any(|library| &library.url == last))
-                .and_then(|last| Url::parse(&last).ok())
-                .map_or(WebviewUrl::App("index.html".into()), WebviewUrl::External);
+                .as_ref()
+                .and_then(|last| saved.libraries.iter().find(|library| &library.url == last));
+            let url = match last {
+                Some(library) if !library.local => Url::parse(&library.url)
+                    .map_or(WebviewUrl::App("index.html".into()), WebviewUrl::External),
+                _ => WebviewUrl::App("index.html".into()),
+            };
             window(app.handle(), MAIN, url)?;
+            if last.is_some_and(|library| library.local) {
+                let opening = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(message) = open_local(opening.clone()).await
+                        && let Some(main) = opening.get_webview_window(MAIN)
+                    {
+                        let _ = main.eval(format!(
+                            "alert({})",
+                            serde_json::to_string(&message).unwrap_or_default()
+                        ));
+                    }
+                });
+            }
             notices::start(app.handle().clone());
             let arguments: Vec<String> = std::env::args().collect();
             open_with::open(app.handle(), open_with::files_in(&arguments));
@@ -253,6 +326,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("paperus failed to start")
         .run(|_app, _event| {
+            // The library on this computer ends with the app.
+            if let tauri::RunEvent::Exit = _event {
+                local::stop();
+            }
             // macOS hands files over as an event, not as arguments.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = _event {

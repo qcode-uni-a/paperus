@@ -14,6 +14,10 @@ pub struct Library {
     pub url: String,
     /// What the app calls it: its host, until servers name themselves.
     pub name: String,
+    /// The library on this computer (`local.rs`): started by the app, its
+    /// address changes when its port does.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub local: bool,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -102,6 +106,22 @@ pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
 pub fn agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(15)))
+        .http_status_as_error(false)
+        .tls_config(
+            ureq::tls::TlsConfig::builder()
+                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                .build(),
+        )
+        .build()
+        .into()
+}
+
+/// For downloading the library on this computer's parts: as long as it
+/// takes, but giving up on a connection that stays silent.
+pub fn agent_for_downloads() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_secs(30)))
+        .timeout_recv_body(Some(Duration::from_secs(60)))
         .http_status_as_error(false)
         .tls_config(
             ureq::tls::TlsConfig::builder()
