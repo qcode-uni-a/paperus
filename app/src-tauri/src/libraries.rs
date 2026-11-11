@@ -93,12 +93,24 @@ pub const SESSION_COOKIE: &str = "paperus_session";
 /// The window's login to the library (its cookie), if logged in. Not on
 /// the main thread: reading cookies waits for it.
 pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
+    let login = |cookies: Vec<tauri::webview::Cookie<'static>>| {
+        cookies
+            .into_iter()
+            .find(|cookie| {
+                cookie.name() == SESSION_COOKIE
+                    && cookie.domain().is_none_or(|domain| {
+                        Some(domain.trim_start_matches('.')) == library.host_str()
+                    })
+            })
+            .map(|cookie| cookie.value().to_owned())
+    };
+    // WebKitGTK leaves out cookies kept from before the app started; all of
+    // the window's have them.
     window
         .cookies_for_url(library.clone())
-        .ok()?
-        .into_iter()
-        .find(|cookie| cookie.name() == SESSION_COOKIE)
-        .map(|cookie| cookie.value().to_owned())
+        .ok()
+        .and_then(login)
+        .or_else(|| window.cookies().ok().and_then(login))
 }
 
 /// For talking to libraries. Certificates are checked as the system does

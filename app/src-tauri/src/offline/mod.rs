@@ -271,7 +271,8 @@ fn sync(
         return None;
     }
     let Some(token) = libraries::session(&window, &Url::parse(&url).ok()?) else {
-        eprintln!("offline: {url}: not logged in, not synced");
+        let cookies = window.cookies().map(|cookies| cookies.len()).unwrap_or(0);
+        eprintln!("offline: {url}: not logged in, not synced ({cookies} cookies)");
         return None;
     };
     let folder = folder(app, &url)?;
