@@ -47,6 +47,9 @@ Choose who new papers belong to.
 
 ## Develop
 
+Checking it on publishers' sites (articles, steps and a table to fill in):
+[`publisher-check/`](publisher-check/README.md).
+
 ```sh
 npm ci
 npm run check   # TypeScript
