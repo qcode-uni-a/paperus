@@ -31,3 +31,4 @@ tar = "0.4"
 flate2 = "1"
 rusqlite = { version = "0.42", features = ["bundled"] }
 keyring = { version = "4", features = ["apple-native-keyring-store"] }
+tauri-plugin-dialog = "2"

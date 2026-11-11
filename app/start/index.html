@@ -25,6 +25,17 @@
 
 			<p id="logging-out" class="progress" role="status" hidden></p>
 
+			<section id="pdfs" hidden>
+				<h2>The PDFs of the library on this computer</h2>
+				<p class="hint">
+					Kept in <span id="pdf-folder" class="path"></span>. Another folder, such as a network share
+					or another disk, keeps the library small here; while it is out of reach, new files wait on
+					this computer.
+				</p>
+				<button id="choose-pdfs" type="button">Keep them elsewhere…</button>
+				<p id="pdfs-error" class="error" role="alert" hidden></p>
+			</section>
+
 			<section id="unsaved" hidden>
 				<h2>Changes made offline that could not be saved</h2>
 				<p class="hint">

@@ -13,6 +13,8 @@
 		"allow-unsaved-changes",
 		"allow-dismiss-unsaved",
 		"allow-logins-in-file",
-		"allow-logging-out"
+		"allow-logging-out",
+		"allow-local-pdf-folder",
+		"allow-choose-pdf-folder"
 	]
 }

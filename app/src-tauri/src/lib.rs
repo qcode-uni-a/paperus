@@ -149,6 +149,39 @@ fn logins_in_file(app: AppHandle) -> bool {
     libraries::logins_in_file(&app)
 }
 
+/// Where the PDFs of the library on this computer are kept, if there is one.
+#[tauri::command]
+fn local_pdf_folder(app: AppHandle) -> Option<String> {
+    local::current_pdf_folder(&app).map(|folder| folder.display().to_string())
+}
+
+/// Keep the PDFs of the library on this computer in a folder chosen in the
+/// system's dialog (a network share, another disk): moved over, the library
+/// started again. False if none was chosen.
+#[tauri::command]
+async fn choose_pdf_folder(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let asking = app.clone();
+    let chosen = tauri::async_runtime::spawn_blocking(move || {
+        asking
+            .dialog()
+            .file()
+            .set_title("Where to keep the PDFs")
+            .blocking_pick_folder()
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    let Some(folder) = chosen.and_then(|path| path.into_path().ok()) else {
+        return Ok(false);
+    };
+    let moving = app.clone();
+    tauri::async_runtime::spawn_blocking(move || local::move_pdf_folder(&moving, &folder))
+        .await
+        .map_err(|error| error.to_string())??;
+    open_local(app).await?;
+    Ok(true)
+}
+
 /// Libraries logged out offline, whose login ends when they are back.
 #[tauri::command]
 fn logging_out(app: AppHandle) -> Vec<offline::LoggingOut> {
@@ -364,6 +397,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol(offline::SCHEME, offline::serve)
         .menu(menu)
         .on_menu_event(|app, event| {
@@ -389,7 +423,9 @@ pub fn run() {
             unsaved_changes,
             dismiss_unsaved,
             logins_in_file,
-            logging_out
+            logging_out,
+            local_pdf_folder,
+            choose_pdf_folder
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());

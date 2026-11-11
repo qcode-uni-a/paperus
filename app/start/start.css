@@ -213,6 +213,12 @@ button:disabled {
 	user-select: text;
 }
 
+.path {
+	font-family: ui-monospace, monospace;
+	font-size: 0.9em;
+	overflow-wrap: anywhere;
+}
+
 .progress {
 	margin: 1.5rem 0 0;
 	padding: 0.75rem 1rem;

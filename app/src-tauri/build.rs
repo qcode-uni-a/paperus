@@ -11,6 +11,8 @@ fn main() {
             "dismiss_unsaved",
             "logins_in_file",
             "logging_out",
+            "local_pdf_folder",
+            "choose_pdf_folder",
         ]),
     ))
     .expect("failed to build the app");

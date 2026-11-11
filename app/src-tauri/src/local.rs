@@ -47,6 +47,9 @@ struct Secrets {
     password: String,
     database_port: u16,
     port: u16,
+    /// Where the PDFs are kept, if not with the rest (`pdf_folder`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pdf_folder: Option<PathBuf>,
 }
 
 fn progress(text: &str) {
@@ -246,6 +249,7 @@ fn secrets(data: &Path) -> Result<(Secrets, bool), String> {
         password: crate::login::random(24),
         database_port: free_port(0),
         port: free_port(0),
+        pdf_folder: None,
     };
     save_secrets(data, &secrets)?;
     Ok((secrets, true))
@@ -357,7 +361,10 @@ pub fn start(app: &AppHandle) -> Result<(Url, String), String> {
                     secrets.database_password
                 ),
             )
-            .env("PAPERUS_STORAGE_PATH", data.join("files"))
+            .env("PAPERUS_STORAGE_PATH", pdf_folder(&data, &secrets))
+            // New files wait here while the PDFs' folder (a network share,
+            // say) is out of reach.
+            .env("PAPERUS_INCOMING_PATH", data.join("incoming"))
             .env("PAPERUS_BACKUP_PATH", data.join("backups"))
             .env("PAPERUS_COPY_PATH", data.join("library-copy"))
             .env("PAPERUS_WEB_PATH", bundle.join("web"))
@@ -468,6 +475,80 @@ fn session_of(header: &str) -> Option<(String, i64)> {
     Some((value.to_owned(), max_age))
 }
 
+/// Where the library's PDFs are kept: a folder chosen (a network share,
+/// another disk), else beside its database.
+fn pdf_folder(data: &Path, secrets: &Secrets) -> PathBuf {
+    secrets
+        .pdf_folder
+        .clone()
+        .unwrap_or_else(|| data.join("files"))
+}
+
+/// Where the PDFs of the library on this computer are, if there is one.
+pub fn current_pdf_folder(app: &AppHandle) -> Option<PathBuf> {
+    let data = data_folder(app).ok()?;
+    let bytes = fs::read(data.join("secrets.json")).ok()?;
+    let secrets: Secrets = serde_json::from_slice(&bytes).ok()?;
+    Some(pdf_folder(&data, &secrets))
+}
+
+/// The marker naming the library a folder of stored files belongs to
+/// (`server/src/paperus/storage.py`).
+const MARKER: &str = ".paperus-library";
+
+/// Keep the PDFs in ``to`` from now on: the library stopped, what is in
+/// the old folder copied over, checked, and removed there. Refused for a
+/// folder another library owns. Start the library again afterwards.
+pub fn move_pdf_folder(app: &AppHandle, to: &Path) -> Result<(), String> {
+    let data = data_folder(app)?;
+    let (mut secrets, _) = secrets(&data)?;
+    let from = pdf_folder(&data, &secrets);
+    if from == to {
+        return Ok(());
+    }
+    let ours = fs::read_to_string(from.join(MARKER)).ok();
+    if let Ok(theirs) = fs::read_to_string(to.join(MARKER))
+        && Some(&theirs) != ours.as_ref()
+    {
+        return Err("That folder holds another library's files.".into());
+    }
+    progress("Moving the PDFs");
+    stop();
+    copy_tree(&from, &from, to)?;
+    secrets.pdf_folder = (to != data.join("files")).then(|| to.to_path_buf());
+    save_secrets(&data, &secrets)?;
+    // Only once all is over and the setting saved.
+    let _ = fs::remove_dir_all(&from);
+    progress("");
+    Ok(())
+}
+
+/// Copy everything under ``folder`` (inside ``root``) to the same place
+/// under ``to``, each file checked by its size.
+fn copy_tree(root: &Path, folder: &Path, to: &Path) -> Result<(), String> {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            copy_tree(root, &path, to)?;
+            continue;
+        }
+        let relative = path.strip_prefix(root).map_err(|error| error.to_string())?;
+        let target = to.join(relative);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        let copied = fs::copy(&path, &target).map_err(|error| error.to_string())?;
+        let size = entry.metadata().map(|meta| meta.len()).unwrap_or(copied);
+        if copied != size {
+            return Err(format!("{} was not copied whole.", relative.display()));
+        }
+    }
+    Ok(())
+}
+
 /// Ends the library's processes (when the app ends).
 pub fn stop() {
     let Some(mut running) = RUNNING.lock().expect("running").take() else {
@@ -488,6 +569,22 @@ pub fn stop() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_pdfs_copied_whole() {
+        let root = std::env::temp_dir().join(format!("paperus-move-{}", std::process::id()));
+        let (from, to) = (root.join("from"), root.join("to"));
+        fs::create_dir_all(from.join("blobs/ab/cd")).unwrap();
+        fs::write(from.join("blobs/ab/cd/abcd"), "a PDF").unwrap();
+        fs::write(from.join(MARKER), "us\n").unwrap();
+        copy_tree(&from, &from, &to).unwrap();
+        assert_eq!(
+            fs::read_to_string(to.join("blobs/ab/cd/abcd")).unwrap(),
+            "a PDF"
+        );
+        assert_eq!(fs::read_to_string(to.join(MARKER)).unwrap(), "us\n");
+        fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn the_login_cookie_is_read_from_its_header() {

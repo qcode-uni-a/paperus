@@ -25,6 +25,11 @@
   the folder answers "not reachable" (503) meanwhile, not an error. The
   folder counts as there when its marker is (an empty mount point is no
   folder of ours).
+- **The library on this computer keeps its PDFs where you choose** (#28):
+  "Keep them elsewhere…" on the app's page moves them to a folder picked
+  in the system's dialog (a network share, another disk), checked, and
+  starts the library again; a folder another library owns is refused. New
+  files wait on the computer while that folder is out of reach.
 - **Installers tested** (#45): each release installs the `.deb`, the
   `.msi`, the setup `.exe` and the `.dmg` as people do, starts the app from
   there and removes it again.

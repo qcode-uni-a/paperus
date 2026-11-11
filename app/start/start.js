@@ -151,6 +151,29 @@ invoke('logging_out').then((libraries) => {
 		)
 		.join(' ');
 });
+// Where the PDFs of the library on this computer are kept, and moving them.
+const pdfs = document.getElementById('pdfs');
+const choosePdfs = document.getElementById('choose-pdfs');
+const pdfsError = document.getElementById('pdfs-error');
+async function showPdfFolder() {
+	const folder = await invoke('local_pdf_folder');
+	pdfs.hidden = !folder;
+	document.getElementById('pdf-folder').textContent = folder ?? '';
+}
+choosePdfs.addEventListener('click', async () => {
+	choosePdfs.disabled = true;
+	pdfsError.hidden = true;
+	try {
+		await invoke('choose_pdf_folder');
+	} catch (message) {
+		pdfsError.textContent = String(message);
+		pdfsError.hidden = false;
+	} finally {
+		choosePdfs.disabled = false;
+		await showPdfFolder();
+	}
+});
+showPdfFolder();
 // Where logins are kept, if not in the system's keyring.
 invoke('logins_in_file').then((inFile) => {
 	document.getElementById('logins-in-file').hidden = !inFile;
