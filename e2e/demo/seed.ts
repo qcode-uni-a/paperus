@@ -154,6 +154,10 @@ export async function seed(
 	).json();
 
 	const context = await browser.newContext({ ...options, storageState: LOGGED_OUT });
+	// The live stream (/api/changes/live) stays open, so the network would
+	// never be idle (the recording and the screenshots wait for that); the
+	// demo has none (live.svelte.ts).
+	await context.route('**/api/changes/live', (route) => route.abort());
 	const page = await context.newPage();
 	const login = await page.request.post('/api/auth/login', {
 		data: { username: MIRA.username, password: MIRA.password }
