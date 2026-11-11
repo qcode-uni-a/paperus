@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.22 (2026-11-11)
 
 - **A library on this computer, without a server** (the app, #39): made
   from the app's start page, for one person. The first time, the app
@@ -9,8 +9,9 @@
   their SHA-256), makes a database with a random password and the only
   account, and opens the library logged in. The server and the worker stop
   with the app, also when it crashes. The parts are built for Linux
-  (glibc 2.36 or later), macOS (Apple silicon) and Windows, and attached
-  to each release (`app/local/`, `local.yml`).
+  (from 2023 on: glibc 2.36 or later, such as Debian 12 or Ubuntu 23.04;
+  older systems use the app with a server), macOS (Apple silicon) and
+  Windows, and attached to each release (`app/local/`, `local.yml`).
 - **Libraries offline in the app**: while a server library is open, the
   app keeps a copy of what one sees there (papers' details, notes, tags,
   collections, annotations, where one stopped reading; whole, with their
@@ -51,6 +52,10 @@
   and collections take an optional `If-Match` with their `change` (now in
   the answers): 412 if they changed since, so a device's queued edit
   overwrites nothing.
+- **The readable copy follows the library within minutes** (Administration
+  → Settings → Storage template): uploads, details found or edited,
+  papers filed are written within five minutes; the whole copy is still
+  checked every night.
 - **Exports tell you when each zip is ready**: after clicking Export a
   message says it is being prepared and you can leave the page. Each zip
   can be downloaded as soon as it is written (not only when all are), and
