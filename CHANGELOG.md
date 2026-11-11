@@ -25,11 +25,11 @@
   around the website; the author dialog closes at once. If the extension
   does not answer for three minutes, the panel says so instead of standing
   at "0 of …".
-- **The extension's log**: its settings show what it did, newest first
-  (the page read, each fetch and its answer, where a PDF link led, each
-  paper of Manage → Missing), to copy and pass on; kept in the browser.
-  With "Detailed log" on, every step also goes to the paperus's log
-  (Administration → Logs), not only what went wrong.
+- **The extension's steps in Administration → Logs**: each step of a save
+  and of Manage → Missing (the page read, each fetch and its answer, where
+  a PDF link led), not only what went wrong. Its settings show them too,
+  newest first, to copy. **Download** on the log page saves the entries
+  shown (with the filters) as a text file.
 - **Manage → Authors: "Same person"** next to "Compare…" and "Different
   people", for pairs that are obviously one person: merged at once (the
   record with an ORCID iD stays, else the one with more papers).

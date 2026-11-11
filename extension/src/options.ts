@@ -33,11 +33,7 @@ const asText = (entry: Entry): string =>
 	].join('\n');
 
 async function showLog(): Promise<void> {
-	const { log = [], detailedLog = false } = (await chrome.storage.local.get([
-		'log',
-		'detailedLog'
-	])) as { log?: Entry[]; detailedLog?: boolean };
-	$<HTMLInputElement>('detailed').checked = detailedLog;
+	const { log = [] } = (await chrome.storage.local.get('log')) as { log?: Entry[] };
 	const list = $('log');
 	list.replaceChildren(
 		...log
@@ -73,9 +69,6 @@ async function showLog(): Promise<void> {
 		list.append(empty);
 	}
 }
-$('detailed').addEventListener('change', async (event) => {
-	await chrome.storage.local.set({ detailedLog: (event.target as HTMLInputElement).checked });
-});
 $('copy-log').addEventListener('click', async () => {
 	const { log = [] } = (await chrome.storage.local.get('log')) as { log?: Entry[] };
 	await navigator.clipboard.writeText(

@@ -49,6 +49,35 @@
 		more = data?.more ?? false;
 	}
 
+	/** Every entry the filters show (two weeks are kept), as a text file:
+	 * one entry a line, its details indented below it. */
+	let downloading = $state(false);
+	async function download() {
+		downloading = true;
+		const all: LogEntryOut[] = [];
+		let before: number | undefined;
+		for (;;) {
+			const { data } = await readLogs({ query: { ...query(before), limit: 500 } });
+			all.push(...(data?.entries ?? []));
+			if (!data?.more || !data.entries.length) break;
+			before = data.entries.at(-1)!.id;
+		}
+		const lines = all.map((entry) =>
+			[
+				`${entry.at} ${entry.level.toUpperCase()} ${entry.source}` +
+					`${entry.username ? ` (${entry.username})` : ''} ${entry.logger}: ${entry.message}`,
+				...Object.entries(entry.context ?? {}).map(([key, value]) => `    ${key}: ${value}`)
+			].join('\n')
+		);
+		const file = new Blob([lines.join('\n') + '\n'], { type: 'text/plain' });
+		const link = document.createElement('a');
+		link.href = URL.createObjectURL(file);
+		link.download = `paperus-log-${new Date().toISOString().slice(0, 16).replace(':', '-')}.txt`;
+		link.click();
+		URL.revokeObjectURL(link.href);
+		downloading = false;
+	}
+
 	async function older() {
 		const { data } = await readLogs({ query: query(entries.at(-1)?.id) });
 		entries = [...entries, ...(data?.entries ?? [])];
@@ -79,8 +108,8 @@
 <h1>Logs</h1>
 <p class="muted">
 	What the server, the worker and people’s browser extensions report, for the last two weeks. How
-	much the server and worker write is set under Settings → Logging; the extensions send their
-	warnings and errors.
+	much the server and worker write is set under Settings → Logging; the extensions send each step of
+	a save (the page, each fetch and its answer) and what went wrong.
 </p>
 
 <div class="filters">
@@ -102,6 +131,13 @@
 			bind:value={words}
 			placeholder="e.g. a paper’s title or DOI"
 		/></label
+	>
+	<button
+		class="download"
+		onclick={download}
+		disabled={downloading}
+		title="All entries these filters show, as a text file"
+		>{downloading ? 'Downloading…' : 'Download'}</button
 	>
 </div>
 
@@ -214,6 +250,9 @@
 		font-size: var(--step--1);
 		color: var(--royal);
 		cursor: pointer;
+	}
+	.download {
+		align-self: end;
 	}
 	.context {
 		display: flex;

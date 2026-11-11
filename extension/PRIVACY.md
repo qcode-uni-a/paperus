@@ -22,9 +22,8 @@ What it sends to your paperus, and when:
   could not get, an error): what happened, with the page's address and
   the extension's version, for the administrators of your paperus
   (Administration → Logs). Papers saved without trouble are not reported.
-- **With "Detailed log" on** (in its settings; off unless you switch it
-  on): every step of a save too (the page's address and details, each
-  address it fetched from and the answer), to your paperus's log, for
+- **The steps of a save** (the page's address and details, each address
+  it fetched from and the answer), to your paperus's log too, for
   finding out what goes wrong.
 
 On your paperus' own pages, a small script tells paperus that the

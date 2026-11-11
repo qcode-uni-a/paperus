@@ -1,10 +1,11 @@
-/** What the extension did, to find out why something failed:
+/** What the extension did, to find out why something failed: every step
+ * (``trace``) and every problem (``logIssue``)
  *
- * - every step (``trace``) and every problem (``logIssue``) kept in the
- *   browser, the last few hundred, for the settings page's log (to copy);
- * - problems also sent to paperus, where its administrators read them
- *   (Administration → Logs): which publisher refused a PDF, and why; with
- *   "Detailed log" on in the settings, every step too.
+ * - sent to paperus, where its administrators read them (Administration →
+ *   Logs): the page read, each fetch and its answer, which publisher
+ *   refused a PDF, and why;
+ * - kept in the browser too, the last few hundred, for the settings page
+ *   (to copy).
  *
  * Sent in small batches; an older paperus without the log, or none
  * connected, lets them go. */
@@ -48,17 +49,11 @@ export function logIssue(
   queue(level, message, context);
 }
 
-/** A step on the way (the page read, a fetch and its answer, a tab):
- * kept; sent only with "Detailed log" on. */
+/** A step on the way (the page read, a fetch and its answer, a tab). */
 export function trace(message: string, context?: Context): void {
   console.info("paperus:", message, context ?? "");
   keep("info", message, context);
-  void chrome.storage.local
-    .get("detailedLog")
-    .then(({ detailedLog }) => {
-      if (detailedLog) queue("info", message, context);
-    })
-    .catch(() => undefined);
+  queue("info", message, context);
 }
 
 function clean(context?: Context): Api.ExtensionReport["context"] {
