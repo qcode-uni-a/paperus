@@ -135,6 +135,13 @@ fn local_progress() -> String {
         .unwrap_or_default()
 }
 
+/// Whether logins are kept in the app's file, there being no system store
+/// of logins (Keychain, Credential Manager, GNOME Keyring, KWallet).
+#[tauri::command]
+fn logins_in_file(app: AppHandle) -> bool {
+    libraries::logins_in_file(&app)
+}
+
 /// Changes made offline that libraries refused (changed or gone meanwhile).
 #[tauri::command]
 fn unsaved_changes(app: AppHandle) -> Vec<offline::Unsaved> {
@@ -367,7 +374,8 @@ pub fn run() {
             make_local_library,
             local_progress,
             unsaved_changes,
-            dismiss_unsaved
+            dismiss_unsaved,
+            logins_in_file
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());

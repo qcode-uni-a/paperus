@@ -1,7 +1,16 @@
 //! The libraries the app knows (paperus servers), kept in the app's config
 //! folder, and the check that an address is one.
 
-use std::{fs, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    path::PathBuf,
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, WebviewWindow};
@@ -92,8 +101,8 @@ pub const SESSION_COOKIE: &str = "paperus_session";
 
 /// The window's login to the library (its cookie), if logged in. Not on
 /// the main thread: reading cookies waits for it. Kept by the app too
-/// (`sessions.json`, the person's alone): WebKitGTK's cookie functions do
-/// not see cookies kept from an earlier run, though the window uses them.
+/// (`remember_session`): WebKitGTK's cookie functions do not see cookies
+/// kept from an earlier run, though the window uses them.
 pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
     let login = |cookies: Vec<tauri::webview::Cookie<'static>>| {
         cookies
@@ -112,40 +121,39 @@ pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
             remember_session(app, library, Some(&token));
             Some(token)
         }
-        None => sessions(app).remove(&key(library)),
+        None => kept_session(app, library),
     }
 }
 
+/// Logins kept, as last read or written (the system's store is asked once).
+static SESSIONS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+/// Whether a login had to go into the file: no system store to keep it.
+static IN_FILE: AtomicBool = AtomicBool::new(false);
+
+/// Where logins are kept without a system store: the person's alone.
 fn sessions_file(app: &AppHandle) -> Option<PathBuf> {
     Some(app.path().app_data_dir().ok()?.join("sessions.json"))
 }
 
-fn sessions(app: &AppHandle) -> std::collections::HashMap<String, String> {
+fn file_sessions(app: &AppHandle) -> HashMap<String, String> {
     sessions_file(app)
         .and_then(|path| fs::read(path).ok())
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or_default()
 }
 
-/// Keep the app's login to a library (``None``: forget it, as when the
-/// library no longer takes it).
-pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
-    let mut kept = sessions(app);
-    let before = kept.get(&key(library)).cloned();
-    match token {
-        Some(token) => kept.insert(key(library), token.to_owned()),
-        None => kept.remove(&key(library)),
-    };
-    if kept.get(&key(library)) == before.as_ref() {
-        return;
-    }
+fn save_file_sessions(app: &AppHandle, kept: &HashMap<String, String>) {
     let Some(path) = sessions_file(app) else {
         return;
     };
+    if kept.is_empty() {
+        let _ = fs::remove_file(&path);
+        return;
+    }
     if let Some(folder) = path.parent() {
         let _ = fs::create_dir_all(folder);
     }
-    if let Ok(bytes) = serde_json::to_vec(&kept) {
+    if let Ok(bytes) = serde_json::to_vec(kept) {
         let _ = fs::write(&path, bytes);
         // Only for the person themselves.
         #[cfg(unix)]
@@ -154,6 +162,86 @@ pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
             let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
         }
     }
+}
+
+/// The system's store of logins (Keychain, Windows' Credential Manager,
+/// the Secret Service: GNOME Keyring, KWallet), one entry per library.
+fn system_entry(library: &Url) -> Option<keyring::Entry> {
+    keyring::Entry::new("paperus", &key(library)).ok()
+}
+
+/// The app's login to a library, kept from before: in the system's store,
+/// else in the file.
+fn kept_session(app: &AppHandle, library: &Url) -> Option<String> {
+    let mut sessions = SESSIONS.lock().ok()?;
+    let known = sessions.get_or_insert_with(HashMap::new);
+    if let Some(token) = known.get(&key(library)) {
+        return Some(token.clone());
+    }
+    let in_system = system_entry(library).and_then(|entry| entry.get_password().ok());
+    let token = in_system
+        .clone()
+        .or_else(|| file_sessions(app).remove(&key(library)));
+    eprintln!(
+        "login to {}: {}",
+        key(library),
+        match (&in_system, &token) {
+            (Some(_), _) => "kept in the system's store",
+            (None, Some(_)) => "kept in the file",
+            (None, None) => "none kept",
+        }
+    );
+    let token = token?;
+    known.insert(key(library), token.clone());
+    Some(token)
+}
+
+/// Keep the app's login to a library (``None``: forget it, as when the
+/// library no longer takes it): in the system's store where there is one,
+/// else in a file of the person's alone.
+pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
+    let Ok(mut sessions) = SESSIONS.lock() else {
+        return;
+    };
+    let known = sessions.get_or_insert_with(HashMap::new);
+    if known.get(&key(library)).map(String::as_str) == token {
+        return;
+    }
+    let mut in_file = file_sessions(app);
+    match token {
+        Some(token) => {
+            known.insert(key(library), token.to_owned());
+            let kept = system_entry(library).is_some_and(|entry| entry.set_password(token).is_ok());
+            eprintln!(
+                "login to {}: kept in {}",
+                key(library),
+                if kept {
+                    "the system's store"
+                } else {
+                    "the file"
+                }
+            );
+            if kept {
+                in_file.remove(&key(library));
+            } else {
+                IN_FILE.store(true, Ordering::Relaxed);
+                in_file.insert(key(library), token.to_owned());
+            }
+        }
+        None => {
+            known.remove(&key(library));
+            if let Some(entry) = system_entry(library) {
+                let _ = entry.delete_credential();
+            }
+            in_file.remove(&key(library));
+        }
+    }
+    save_file_sessions(app, &in_file);
+}
+
+/// Whether logins are kept in the app's file, there being no system store.
+pub fn logins_in_file(app: &AppHandle) -> bool {
+    IN_FILE.load(Ordering::Relaxed) || !file_sessions(app).is_empty()
 }
 
 /// For talking to libraries. Certificates are checked as the system does

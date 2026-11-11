@@ -11,6 +11,7 @@
 		"allow-make-local-library",
 		"allow-local-progress",
 		"allow-unsaved-changes",
-		"allow-dismiss-unsaved"
+		"allow-dismiss-unsaved",
+		"allow-logins-in-file"
 	]
 }

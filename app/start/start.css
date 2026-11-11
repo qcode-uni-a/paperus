@@ -76,6 +76,11 @@ section + section {
 	color: var(--muted);
 }
 
+.hint.below {
+	margin: 0.75rem 0 0;
+	font-size: 0.9em;
+}
+
 ul {
 	margin: 0;
 	padding: 0;

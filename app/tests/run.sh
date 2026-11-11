@@ -58,4 +58,4 @@ for _ in $(seq 30); do curl -sf http://127.0.0.1:4444/status >/dev/null && break
 node "$ROOT/app/tests/journeys.mjs" "$APP" "$STATE/opened.txt" "$STATE/opened-with.pdf" \
   "$STATE/data/io.github.qcode-uni-a.paperus" ||
   { tail -n 30 "$STATE/driver.log" "$STATE/server-logs/"*.log >&2
-    grep "offline:" "$STATE/driver.log" >&2 || true; exit 1; }
+    grep -E "offline:|login to" "$STATE/driver.log" >&2 || true; exit 1; }

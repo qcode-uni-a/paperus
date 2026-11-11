@@ -152,6 +152,12 @@ try {
 		);
 	};
 	await until(copy, 60);
+	// Synced to the end: the page is told the paper is kept whole.
+	await until(async () => {
+		await inApp(`location.reload(); done()`);
+		await sleep(2000);
+		return inApp(`done((window.paperusApp.kept?.available ?? []).includes('${paper}'))`);
+	}, 90);
 	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
 	// The network goes; the app, started again, opens the copy.
 	await cut(proxy);

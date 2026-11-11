@@ -9,6 +9,7 @@ fn main() {
             "local_progress",
             "unsaved_changes",
             "dismiss_unsaved",
+            "logins_in_file",
         ]),
     ))
     .expect("failed to build the app");

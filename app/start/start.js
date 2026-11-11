@@ -139,3 +139,7 @@ form.addEventListener('submit', async (event) => {
 
 show();
 showUnsaved();
+// Where logins are kept, if not in the system's keyring.
+invoke('logins_in_file').then((inFile) => {
+	document.getElementById('logins-in-file').hidden = !inFile;
+});
