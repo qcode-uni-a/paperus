@@ -60,3 +60,88 @@ jobs:
             app/src-tauri/target/**/bundle/nsis/*.exe
             app/src-tauri/target/**/bundle/msi/*.msi
             app/src-tauri/target/**/bundle/dmg/*.dmg
+
+  # The installers installed as people do, the app started from where they
+  # put it (still running after a while: it found its web view and opened
+  # its window), then removed again (#45).
+  install:
+    name: Install and start (${{ matrix.name }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: app-${{ matrix.name }}
+          path: installers
+      - if: runner.os == 'Linux'
+        name: The .deb, with what it needs from the system
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb dbus-x11 "$(find installers -name '*.deb' | head -1 | xargs realpath)"
+          app=$(dpkg -L paperus | grep -E '^/usr/bin/' | head -1)
+          echo "installed: $app"
+          export XDG_CONFIG_HOME=$RUNNER_TEMP/config XDG_DATA_HOME=$RUNNER_TEMP/data
+          dbus-run-session -- xvfb-run -a "$app" >app.log 2>&1 &
+          sleep 20
+          pgrep -f "$app" >/dev/null || { cat app.log; echo "the app did not stay up"; exit 1; }
+          pkill -f "$app"
+          sudo apt-get remove -y paperus
+          test ! -e "$app"
+      - if: runner.os == 'Windows'
+        name: The .msi and the setup .exe, silently
+        shell: pwsh
+        run: |
+          function Start-And-Check($exe) {
+            Write-Output "installed: $exe"
+            $app = Start-Process -FilePath $exe -PassThru
+            Start-Sleep -Seconds 20
+            if ($app.HasExited) { throw "the app did not stay up (exit code $($app.ExitCode))" }
+            Stop-Process -Id $app.Id -Force
+          }
+          # The .msi: for all users, under Program Files.
+          $msi = (Get-ChildItem installers -Recurse -Filter *.msi | Select-Object -First 1).FullName
+          Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /l*v msi.log" -Wait
+          $exe = Get-ChildItem "$env:ProgramFiles" -Recurse -Filter paperus*.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
+          if (-not $exe) { Get-Content msi.log -Tail 40; throw "the .msi installed no paperus" }
+          Start-And-Check $exe.FullName
+          Start-Process msiexec -ArgumentList "/x `"$msi`" /qn" -Wait
+          if (Test-Path $exe.FullName) { throw "the .msi left the app behind" }
+          # The setup .exe (NSIS): for this user, under AppData.
+          $setup = (Get-ChildItem installers -Recurse -Filter *-setup.exe | Select-Object -First 1).FullName
+          Start-Process $setup -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA" -Recurse -Filter paperus*.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
+          if (-not $exe) { throw "the setup .exe installed no paperus" }
+          Start-And-Check $exe.FullName
+          $uninstall = Get-ChildItem $exe.DirectoryName -Filter uninstall.exe | Select-Object -First 1
+          Start-Process $uninstall.FullName -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path $exe.FullName) { throw "the setup's uninstaller left the app behind" }
+      - if: runner.os == 'macOS'
+        name: The .dmg, into Applications
+        run: |
+          dmg=$(find installers -name '*.dmg' | head -1)
+          volume=$(hdiutil attach -nobrowse "$dmg" | grep -o '/Volumes/.*' | head -1)
+          cp -R "$volume"/*.app /Applications/
+          hdiutil detach "$volume"
+          bundle=$(ls -d /Applications/paperus*.app | head -1)
+          # Not signed yet: as when one chooses Open in Finder the first time.
+          xattr -dr com.apple.quarantine "$bundle"
+          app=$(ls "$bundle"/Contents/MacOS/* | head -1)
+          echo "installed: $app"
+          "$app" >app.log 2>&1 &
+          sleep 20
+          pgrep -f "$app" >/dev/null || { cat app.log; echo "the app did not stay up"; exit 1; }
+          pkill -f "$app"
+          rm -rf "$bundle"
