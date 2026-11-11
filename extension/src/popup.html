@@ -8,6 +8,21 @@
 	</head>
 	<body>
 		<main>
+			<div id="flow" class="flow" data-stage="reading" aria-hidden="true">
+				<span class="node"><img id="site-icon" alt="" /><small id="site-name">the page</small></span>
+				<span class="track"></span>
+				<span class="node">
+					<svg viewBox="0 0 24 24" class="you"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></svg>
+					<small>you</small>
+				</span>
+				<span class="track"></span>
+				<span class="node"><img src="icons/icon-32.png" alt="" /><small>paperus</small></span>
+				<svg viewBox="0 0 24 28" class="pdf">
+					<path d="M3 1h12l6 6v20H3z" />
+					<path d="M15 1v6h6" />
+					<text x="12" y="21" text-anchor="middle">PDF</text>
+				</svg>
+			</div>
 			<p id="state" class="state" role="status">Reading the page…</p>
 			<p id="title" class="title" hidden></p>
 			<p id="detail" class="muted small" hidden></p>

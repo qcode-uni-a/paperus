@@ -27,6 +27,27 @@ $('settings').addEventListener('click', async (event) => {
 	window.close();
 });
 
+/** A site by its own name (sciencedirect, nature, wiley), short enough to
+ * stand under its icon: the address's name before its ending (before
+ * ".co.uk" and the like, too). */
+function siteName(host: string): string {
+	const parts = host.split('.');
+	let name = parts.at(-2) ?? host;
+	if (parts.length > 2 && /^(co|ac|com|org|edu|gov|net)$/.test(name)) name = parts.at(-3)!;
+	return name;
+}
+
+/** Where the PDF is in the little picture. */
+type Stage = 'reading' | 'fetching' | 'saving' | 'done' | 'no-pdf' | 'failed';
+function stage(name: Stage): void {
+	$('flow').dataset.stage = name;
+}
+const STAGES: Record<string, Stage> = {
+	'Reading the page…': 'reading',
+	'Fetching the PDF…': 'fetching',
+	'Saving to paperus…': 'saving'
+};
+
 function state(text: string, outcome?: 'ok' | 'warning' | 'error'): void {
 	const shown = $('state');
 	shown.textContent = text;
@@ -36,6 +57,7 @@ function state(text: string, outcome?: 'ok' | 'warning' | 'error'): void {
 /** The result's sentence split: what happened (first), then the rest. */
 function show(result: Result, owners: Owner[]): void {
 	if (!result.ok) {
+		stage('failed');
 		state('Not saved', 'error');
 		$('detail').textContent = result.text;
 		$('detail').hidden = false;
@@ -45,6 +67,7 @@ function show(result: Result, owners: Owner[]): void {
 		return;
 	}
 	const known = /^Already in paperus|in paperus already/.test(result.text);
+	stage(result.warning ? 'no-pdf' : 'done');
 	state(
 		known ? 'Already in paperus' : result.warning ? 'Saved, without its PDF' : 'Saved',
 		result.warning ? 'warning' : 'ok'
@@ -86,6 +109,7 @@ function show(result: Result, owners: Owner[]): void {
 
 async function save(tabId: number, owners: Owner[]): Promise<void> {
 	state('Reading the page…');
+	stage('reading');
 	const result = (await chrome.runtime.sendMessage({ type: 'popupSave', tabId })) as Result;
 	show(result, owners);
 }
@@ -110,8 +134,20 @@ async function save(tabId: number, owners: Owner[]): Promise<void> {
 		return;
 	}
 	chrome.runtime.onMessage.addListener((message) => {
-		if (message?.type === 'saveStep' && message.tabId === tab.id) state(message.text);
+		if (message?.type === 'saveStep' && message.tabId === tab.id) {
+			state(message.text);
+			if (STAGES[message.text]) stage(STAGES[message.text]);
+		}
 	});
+	// The page's site: its icon and name.
+	const icon = $<HTMLImageElement>('site-icon');
+	if (tab.favIconUrl) icon.src = tab.favIconUrl;
+	else icon.hidden = true;
+	try {
+		$('site-name').textContent = siteName(new URL(tab.url ?? '').hostname);
+	} catch {
+		// No address to show.
+	}
 	const { owners = [] } = (await chrome.storage.local.get('owners')) as { owners?: Owner[] };
 	$('allow').addEventListener('click', async () => {
 		if (!(await chrome.permissions.request(ALL_SITES).catch(() => false))) return;

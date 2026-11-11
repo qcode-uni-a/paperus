@@ -38,7 +38,8 @@
   "the page links no PDF"; a page that did not load (IEEE Xplore's
   "Unable to Load Page") is no longer saved as a paper of that title.
 - **The extension's popup**, as Zotero's: a click on the button opens a
-  small window under it that saves at once, shows each step, then the
+  small window under it that saves at once, shows each step (a PDF on its
+  way from the page's site, through you, to paperus), then the
   paper, its PDF or why not, and a link to it; a paper just added moves to
   another owner by choosing it there. Its settings show the version
   installed.
