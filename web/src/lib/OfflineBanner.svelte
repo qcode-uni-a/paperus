@@ -8,7 +8,7 @@
 {#if offline}
 	<p class="offline" role="note">
 		<strong>Offline:</strong> your library as last synced. Changes and search by meaning wait for
-		the connection. <a href="paperus-app://online">Go online</a>
+		the connection. <a href="paperus-app:online">Go online</a>
 	</p>
 {/if}
 

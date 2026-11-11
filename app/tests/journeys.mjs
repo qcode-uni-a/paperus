@@ -134,7 +134,7 @@ try {
 	const paper = (await shown()).split('/').pop();
 	const title = await until(() => inApp(`done(document.querySelector('h1')?.innerText)`));
 	// Marked "Keep offline" on this device: the app keeps it, and says so.
-	await inApp(`location.href = 'paperus-app://keep?kind=item&id=${paper}&on=true'; done()`);
+	await inApp(`location.href = 'paperus-app:keep?kind=item&id=${paper}&on=true'; done()`);
 	await until(() => inApp(`done((window.paperusApp.kept?.items ?? []).includes('${paper}'))`));
 	console.log('ok: kept offline on this device, the page told');
 	await sleep(1000);
@@ -201,7 +201,7 @@ try {
 	);
 	assert.deepEqual(listed, ['Written offline']);
 	proxy = await network();
-	await inApp(`location.href = 'paperus-app://online'; done()`);
+	await inApp(`location.href = 'paperus-app:online'; done()`);
 	await until(async () => (await shown()).startsWith(LIBRARY), 30);
 	const saved = async () => {
 		const found = await fetch(`${SERVER}/api/files/${file}/annotations`, {

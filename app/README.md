@@ -36,7 +36,7 @@ What the app does around the website:
   data folder, synced every minute and when a page loads (`/api/changes`,
   with the window's login), whole with their PDFs the papers opened last
   and those marked "Keep offline" (alone or by collection: the website asks
-  with `paperus-app://keep`, the app tells it `window.paperusApp.kept`), and
+  with `paperus-app:keep`, the app tells it `window.paperusApp.kept`), and
   the website itself (`site.rs`). Out of reach, the window opens the
   copy at `paperus-offline://`, where the app answers the website's calls
   (`answer.rs`) and queues its changes (`write.rs`), sent when the library

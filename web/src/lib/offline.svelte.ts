@@ -27,5 +27,5 @@ export function keep(kind: 'item' | 'collection', id: string, on: boolean) {
 	const key = kind === 'item' ? 'items' : 'collections';
 	const others = keeping[key].filter((kept) => kept !== id);
 	keeping[key] = on ? [...others, id] : others;
-	location.href = `paperus-app://keep?kind=${kind}&id=${id}&on=${on}`;
+	location.href = `paperus-app:keep?kind=${kind}&id=${id}&on=${on}`;
 }
