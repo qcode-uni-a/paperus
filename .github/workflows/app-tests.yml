@@ -1,0 +1,45 @@
+name: App tests (Windows)
+
+# The app's journeys on Windows (#45; app/tests/windows.sh): by hand, and
+# by release.yml. Not on every push: building the library's parts and the
+# app on Windows takes a while.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: App journeys (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving major tag; pin an exact version
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # nmake and cl for pgvector.
+      - uses: ilammy/msvc-dev-cmd@v1
+      # The server, PostgreSQL with pgvector and the website, as the app's
+      # library on this computer has them.
+      - run: bash app/local/build.sh x86_64-pc-windows-msvc local
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: windows-journeys
+      - run: cargo build --locked
+        working-directory: app/src-tauri
+      - run: cargo install tauri-driver --locked
+      # Edge's WebDriver matching the runner's WebView2.
+      - run: |
+          cargo install --git https://github.com/chippers/msedgedriver-tool
+          msedgedriver-tool
+      - run: bash app/tests/windows.sh local "$PWD/msedgedriver.exe"

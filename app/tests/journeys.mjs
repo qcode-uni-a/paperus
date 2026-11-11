@@ -9,6 +9,10 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 
 const [APP, OPENED, PDF, DATA] = process.argv.slice(2);
+// On Windows (windows.sh): logging in in the browser would open a real one,
+// so the window's own login form; the copy's address is http there.
+const WINDOWS = process.env.PAPERUS_APP_TESTS_SYSTEM === 'windows';
+const COPY = WINDOWS ? /^http:\/\/paperus-offline\.localhost\// : /^paperus-offline:\/\/localhost\//;
 const DRIVER = 'http://127.0.0.1:4444';
 const PORT = Number(process.env.PAPERUS_E2E_PORT ?? 8100);
 // The app reaches the library through a stand-in for the network, cut to
@@ -98,34 +102,45 @@ try {
 	assert.match(refused.refused, /not allowed/);
 	console.log('ok: the website cannot call the app');
 
-	// Logging in in the browser: the login page's OIDC link asks the app.
-	await inApp(`location.href = 'paperus-app:login?next=%2Fsettings'; done()`);
-	const opened = await until(() => existsSync(OPENED) && readFileSync(OPENED, 'utf8').trim());
-	const login = new URL(opened.split('\n').pop());
-	assert.equal(login.pathname, '/app-login');
-	// The browser, logged in there, confirms (as the page does).
+	// A login of the test's own, to look at the library from outside.
 	const browser = await fetch(`${LIBRARY}/api/auth/login`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(ADMIN)
 	});
 	const cookie = browser.headers.get('set-cookie').split(';')[0];
-	const asked = Object.fromEntries(login.searchParams);
-	const confirmed = await fetch(`${LIBRARY}/api/oauth/app-login`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Cookie: cookie },
-		body: JSON.stringify({ ...asked, allow: true })
-	});
-	const { redirect } = await confirmed.json();
-	// Back to the app's loopback address, which answers with a page.
-	const back = await fetch(redirect);
-	assert.match(await back.text(), /logged in to the paperus app/);
+	if (WINDOWS) {
+		// With the password, in the window (as its login form does).
+		const status = await inApp(
+			`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json'},` +
+				` body: ${JSON.stringify(JSON.stringify(ADMIN))}}).then((r) => done(r.status))`
+		);
+		assert.equal(status, 200);
+		await inApp(`location.href = '/settings'; done()`);
+	} else {
+		// In the browser: the login page's OIDC link asks the app.
+		await inApp(`location.href = 'paperus-app:login?next=%2Fsettings'; done()`);
+		const opened = await until(() => existsSync(OPENED) && readFileSync(OPENED, 'utf8').trim());
+		const login = new URL(opened.split('\n').pop());
+		assert.equal(login.pathname, '/app-login');
+		// The browser, logged in there, confirms (as the page does).
+		const asked = Object.fromEntries(login.searchParams);
+		const confirmed = await fetch(`${LIBRARY}/api/oauth/app-login`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', Cookie: cookie },
+			body: JSON.stringify({ ...asked, allow: true })
+		});
+		const { redirect } = await confirmed.json();
+		// Back to the app's loopback address, which answers with a page.
+		const back = await fetch(redirect);
+		assert.match(await back.text(), /logged in to the paperus app/);
+	}
 	await until(async () => (await shown()) === `${LIBRARY}/settings`);
 	const me = await inApp(`fetch('/api/auth/me').then((r) => r.json()).then((me) => done(me.username))`);
 	assert.equal(me, ADMIN.username);
 	// The website's own cookie, out of its scripts' reach.
 	assert.equal(await inApp(`done(document.cookie.includes('paperus_session'))`), false);
-	console.log('ok: logged in in the browser');
+	console.log(WINDOWS ? 'ok: logged in in the window' : 'ok: logged in in the browser');
 
 	// "Open with": a second start with a PDF hands it to this one.
 	const second = spawn(APP, [PDF], { stdio: 'ignore' });
@@ -169,7 +184,7 @@ try {
 	({ sessionId } = await webdriver('POST', '/session', {
 		capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } }
 	}));
-	await until(async () => /^paperus-offline:\/\/localhost\//.test(await shown()), 30);
+	await until(async () => COPY.test(await shown()), 30);
 	await until(async () => (await pageText()).includes('Offline:'), 30);
 	await until(async () => (await pageText()).includes(title), 30);
 	// The paper opened last is marked as available offline.
