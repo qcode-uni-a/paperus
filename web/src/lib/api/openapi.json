@@ -9519,7 +9519,7 @@
           },
           "annotations": {
             "items": {
-              "$ref": "#/components/schemas/AnnotationOut"
+              "$ref": "#/components/schemas/SyncedAnnotation"
             },
             "type": "array",
             "title": "Annotations"
@@ -15884,6 +15884,128 @@
           "papers"
         ],
         "title": "Suggestion"
+      },
+      "SyncedAnnotation": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AnnotationKind"
+          },
+          "page_index": {
+            "type": "integer",
+            "title": "Page Index"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "position": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Position"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "imported": {
+            "type": "boolean",
+            "title": "Imported"
+          },
+          "mine": {
+            "type": "boolean",
+            "title": "Mine"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
+          },
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "file_id",
+          "kind",
+          "page_index",
+          "page_label",
+          "position",
+          "color",
+          "text",
+          "comment",
+          "tags",
+          "imported",
+          "mine",
+          "author",
+          "created_at",
+          "changed_at",
+          "change",
+          "item_id"
+        ],
+        "title": "SyncedAnnotation"
       },
       "SystemConfig": {
         "properties": {

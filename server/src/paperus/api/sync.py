@@ -39,6 +39,11 @@ class View(BaseModel):
     reading: Reading | None
 
 
+class SyncedAnnotation(AnnotationOut):
+    item_id: uuid.UUID
+    """Its paper (a device drops it with the paper)."""
+
+
 class Removed(BaseModel):
     id: uuid.UUID
     kind: str
@@ -59,7 +64,7 @@ class Changes(BaseModel):
     notes: list[NoteDetail]
     tags: list[TagOut]
     collections: list[CollectionOut]
-    annotations: list[AnnotationOut]
+    annotations: list[SyncedAnnotation]
     """The person's own and those shared with them."""
     views: list[View]
 
@@ -105,8 +110,8 @@ def changes_since(
         AnnotationShare.user_id == Annotation.user_id,
         AnnotationShare.item_id == Item.id,
     )
-    annotations = db.scalars(
-        select(Annotation)
+    annotations = db.execute(
+        select(Annotation, Item.id)
         .join(File, File.id == Annotation.file_id)
         .join(Version, Version.id == File.version_id)
         .join(Item, Item.id == Version.item_id)
@@ -149,7 +154,12 @@ def changes_since(
         ],
         tags=tag_outs(db, access, Tag.library_id.in_(libraries) & (Tag.change > since)),
         collections=[collection_out(db, access, c) for c in collections],
-        annotations=[annotation_out(db, access, a, names) for a in annotations],
+        annotations=[
+            SyncedAnnotation(
+                **annotation_out(db, access, a, names).model_dump(), item_id=item_id
+            )
+            for a, item_id in annotations
+        ],
         views=[
             View(
                 item_id=view.item_id,

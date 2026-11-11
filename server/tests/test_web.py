@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -32,6 +33,20 @@ def test_serves_the_website(tmp_path: Path) -> None:
     assert client.get("/../pyproject.toml").text == "<html>app</html>"
     assert client.get("/api/unknown").status_code == 404
     assert client.get("/api/health").json() == {"status": "ok"}
+
+    # Its files, for the app's copy to run offline.
+    listed = client.get("/api/web-files").json()
+    assert listed["fallback"] == "200.html"
+    assert [f["path"] for f in listed["files"]] == [
+        "200.html",
+        "_app/immutable/app.js",
+        "robots.txt",
+    ]
+    assert listed["files"][0] == {
+        "path": "200.html",
+        "sha256": hashlib.sha256(b"<html>app</html>").hexdigest(),
+        "size": 16,
+    }
 
 
 def test_without_website(tmp_path: Path) -> None:

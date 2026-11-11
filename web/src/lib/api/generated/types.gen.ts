@@ -688,7 +688,7 @@ export type Changes = {
     /**
      * Annotations
      */
-    annotations: Array<AnnotationOut>;
+    annotations: Array<SyncedAnnotation>;
     /**
      * Views
      */
@@ -4260,6 +4260,79 @@ export type Suggestion = {
      * Papers
      */
     papers: number;
+};
+
+/**
+ * SyncedAnnotation
+ */
+export type SyncedAnnotation = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * File Id
+     */
+    file_id: string;
+    kind: AnnotationKind;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label: string | null;
+    /**
+     * Position
+     */
+    position: {
+        [key: string]: unknown;
+    };
+    /**
+     * Color
+     */
+    color: string;
+    /**
+     * Text
+     */
+    text: string | null;
+    /**
+     * Comment
+     */
+    comment: string | null;
+    /**
+     * Tags
+     */
+    tags: Array<string>;
+    /**
+     * Imported
+     */
+    imported: boolean;
+    /**
+     * Mine
+     */
+    mine: boolean;
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Item Id
+     */
+    item_id: string;
 };
 
 /**

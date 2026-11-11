@@ -90,6 +90,7 @@ def test_everything_since_and_what_is_gone(client: TestClient, db: Session) -> N
     later = changes(bob, since)
     assert ids(later["annotations"]) == [mark]
     assert later["annotations"][0]["mine"] is False
+    assert later["annotations"][0]["item_id"] == paper["id"]
     assert later["removed"] == [{"id": tag.json()["id"], "kind": "tag"}]
 
     # No longer shared: gone for Bob, changed for Ada (she keeps it).
