@@ -90,6 +90,12 @@ const browsers = {
 	}
 };
 
+// The notes for Mozilla's reviewers go with each upload; their API refuses
+// long ones (0.0.25's 3,830 characters: "Submission failed: 400").
+const notes = JSON.parse(readFileSync('amo-metadata.json', 'utf8')).version.approval_notes;
+if (notes.length > 2900)
+	throw new Error(`amo-metadata.json: approval_notes has ${notes.length} characters, at most 2900`);
+
 rmSync('dist', { recursive: true, force: true });
 for (const [name, manifest] of Object.entries(browsers)) {
 	const out = `dist/${name}`;
