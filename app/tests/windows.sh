@@ -46,6 +46,17 @@ curl -sf -X POST "$LIBRARY/api/setup/admin" -H 'Content-Type: application/json' 
 # A PDF to open with the app.
 printf '%%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%%%EOF\n' >"$STATE/opened-with.pdf"
 
+# The app on its own first: it starts and stays up (its output if not).
+"$APP" >"$STATE/app.log" 2>&1 &
+alone=$!
+sleep 15
+if kill -0 "$alone" 2>/dev/null; then
+  echo "the app stays up on its own"
+  kill "$alone"; sleep 2
+else
+  echo "the app ended on its own:" >&2; cat "$STATE/app.log" >&2
+fi
+
 tauri-driver --native-driver "$DRIVER" >"$STATE/driver.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 30); do curl -sf http://127.0.0.1:4444/status >/dev/null && break; sleep 1; done
