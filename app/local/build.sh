@@ -82,11 +82,12 @@ if [ "$TARGET" = x86_64-pc-windows-msvc ]; then
   (cd "$WORK/pgvector-$PGVECTOR" && PGROOT=$(cygpath -w "$OUT/postgres") nmake //NOLOGO //F Makefile.win \
     && PGROOT=$(cygpath -w "$OUT/postgres") nmake //NOLOGO //F Makefile.win install)
 else
-  # On macOS PostgreSQL names the SDK it was built with; this one's instead.
-  sysroot=()
-  if command -v xcrun >/dev/null; then sysroot=(PG_SYSROOT="$(xcrun --show-sdk-path)"); fi
-  make -C "$WORK/pgvector-$PGVECTOR" PG_CONFIG="$OUT/postgres/bin/pg_config" OPTFLAGS="" "${sysroot[@]}" >/dev/null
-  make -C "$WORK/pgvector-$PGVECTOR" PG_CONFIG="$OUT/postgres/bin/pg_config" OPTFLAGS="" "${sysroot[@]}" install >/dev/null
+  # PostgreSQL names the SDK and the clang it was built with (for JIT
+  # bitcode); this Mac's SDK instead, and no bitcode (JIT is optional).
+  options=(PG_CONFIG="$OUT/postgres/bin/pg_config" OPTFLAGS="" with_llvm=no)
+  if command -v xcrun >/dev/null; then options+=(PG_SYSROOT="$(xcrun --show-sdk-path)"); fi
+  make -C "$WORK/pgvector-$PGVECTOR" "${options[@]}" >/dev/null
+  make -C "$WORK/pgvector-$PGVECTOR" "${options[@]}" install >/dev/null
 fi
 # What only building needs.
 rm -rf "$OUT/postgres/include" "$OUT/postgres/lib/pgxs" "$OUT/postgres/doc" "$OUT/postgres/share/doc"
