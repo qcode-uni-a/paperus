@@ -6,6 +6,7 @@ progress. See docs/ingestion.md.
 """
 
 import re
+import tempfile
 import uuid
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import ExitStack
@@ -13,10 +14,11 @@ from datetime import datetime
 from typing import Annotated, Any, BinaryIO
 
 import httpx2
-from fastapi import APIRouter, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Request, Response, UploadFile
 from fastapi import File as FormFile
-from pydantic import BaseModel
-from sqlalchemy import select
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -326,6 +328,126 @@ def start_paperus_import(
         "names": names.model_dump(mode="json"),
     }
     record.library_id = access.own_library
+    record.status = ImportStatus.WAITING
+    db.commit()
+    queue_import(request.app.state.jobs, record.id, record.library_id)
+    return import_out(record)
+
+
+class FolderIn(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    """The folder's own name (shown in the list of imports)."""
+    library_id: uuid.UUID | None = None
+
+
+@router.post("/api/imports/folder", status_code=201)
+def start_folder_import(body: FolderIn, db: DB, access: CurrentAccess) -> ImportOut:
+    """Import a folder (a Zotero export with its files, too large to zip or
+    to upload at once), from the browser: begun here, then each file sent
+    on its own (``PUT …/files/{path}``), then ``finish``. Each request is
+    one file, so no limit on uploads in between (a reverse proxy's) stops
+    it, and an interrupted upload goes on where it was (``GET …/files``)."""
+    owner = access.target_library(body.library_id)
+    record = Import(
+        user_id=access.user.id,
+        library_id=owner,
+        filename=body.name,
+        status=ImportStatus.RECEIVING,
+    )
+    db.add(record)
+    db.commit()
+    return import_out(record)
+
+
+def _receiving(db: Session, access: Access, import_id: uuid.UUID) -> Import:
+    record = _own_import(db, access, import_id)
+    if record.status != ImportStatus.RECEIVING:
+        raise HTTPException(409, "this import is not receiving files")
+    return record
+
+
+def _folder_path(path: str) -> str:
+    """A path inside the folder, as uploaded ("files/12/a.pdf")."""
+    parts = path.replace("\\", "/").split("/")
+    if not path or any(part in ("", ".", "..") for part in parts) or len(path) > 255:
+        raise HTTPException(422, f"not a path inside the folder: {path!r}")
+    return "/".join(parts)
+
+
+@router.put("/api/imports/{import_id}/files/{path:path}", status_code=204)
+async def upload_folder_file(
+    import_id: uuid.UUID, path: str, request: Request, db: DB, access: CurrentAccess
+) -> Response:
+    """One file of a folder being imported, at its path in the folder (the
+    request's body); sent again, it takes the place of the first."""
+    record = _receiving(db, access, import_id)
+    name = _folder_path(path)
+    # Onto the disk as it comes (not into memory), then stored apart from
+    # the event loop (hashing a large file takes a while).
+    limit = request.app.state.settings.max_import_bytes
+    blobs: BlobStore = request.app.state.blobs
+    with tempfile.TemporaryFile(dir=blobs.temp_dir) as spool:
+        size = 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                raise HTTPException(413, "file too large")
+            spool.write(chunk)
+        spool.seek(0)
+        sha = await run_in_threadpool(_store, request, db, _chunks(spool))
+    found = next((part for part in record.parts if part.filename == name), None)
+    if found is not None:
+        old, found.blob_sha256 = found.blob_sha256, sha
+        db.commit()
+        if old is not None and old != sha:
+            _forget(request, db, [old])
+    else:
+        position = (
+            db.scalar(
+                select(func.max(ImportPart.position)).where(
+                    ImportPart.import_id == record.id
+                )
+            )
+            or 0
+        ) + 1
+        db.add(
+            ImportPart(
+                import_id=record.id, position=position, filename=name, blob_sha256=sha
+            )
+        )
+        db.commit()
+    return Response(status_code=204)
+
+
+class FolderFile(BaseModel):
+    path: str
+    size: int
+
+
+@router.get("/api/imports/{import_id}/files")
+def folder_files(
+    import_id: uuid.UUID, db: DB, access: CurrentAccess
+) -> list[FolderFile]:
+    """The files of a folder being imported that have arrived (to go on
+    with the others after an interruption)."""
+    record = _own_import(db, access, import_id)
+    rows = db.execute(
+        select(ImportPart.filename, Blob.size)
+        .join(Blob, Blob.sha256 == ImportPart.blob_sha256)
+        .where(ImportPart.import_id == record.id)
+        .order_by(ImportPart.position)
+    )
+    return [FolderFile(path=path, size=size or 0) for path, size in rows]
+
+
+@router.post("/api/imports/{import_id}/finish")
+def finish_folder_import(
+    import_id: uuid.UUID, request: Request, db: DB, access: CurrentAccess
+) -> ImportOut:
+    """All of the folder's files are there: import it, in the background."""
+    record = _receiving(db, access, import_id)
+    if not record.parts:
+        raise HTTPException(422, "no files arrived")
     record.status = ImportStatus.WAITING
     db.commit()
     queue_import(request.app.state.jobs, record.id, record.library_id)

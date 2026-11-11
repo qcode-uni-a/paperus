@@ -1109,6 +1109,9 @@ class ItemChunk(Base):
 
 
 class ImportStatus(StrEnum):
+    RECEIVING = "receiving"
+    """A folder being uploaded file by file (``api.imports``); its files are
+    the import's parts, by their path in the folder."""
     NEEDS_CHOICES = "needs_choices"
     """A paperus export: waiting for the person to choose where each of its
     owners goes (``Import.choices``)."""

@@ -7,12 +7,16 @@ whatever is still pending, so a job that failed to queue is not lost.
 import asyncio
 import contextlib
 import logging
+import os
+import shutil
 import signal
+import tempfile
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import httpx2
 from procrastinate import App, Blueprint, JobContext, PsycopgConnector, RetryStrategy
@@ -911,6 +915,27 @@ def queue_empty_trash(app: App) -> None:
     _queue(app, "empty_trash", "empty-trash", timestamp=0)
 
 
+@contextlib.contextmanager
+def uploaded_folder(blobs: BlobStore, record: Import) -> Generator[Path]:
+    """The folder uploaded file by file (``api.imports``), as it was: its
+    files at their paths, hard links to the stored ones where they can be
+    (no space), else copies; removed afterwards."""
+    folder = Path(tempfile.mkdtemp(dir=blobs.temp_dir)) / record.filename
+    try:
+        for part in (p for p in record.parts if p.blob_sha256 is not None):
+            assert part.blob_sha256 is not None
+            target = folder / part.filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with blobs.local_file(part.blob_sha256) as stored:
+                try:
+                    os.link(stored, target)
+                except OSError:
+                    shutil.copyfile(stored, target)
+        yield folder
+    finally:
+        shutil.rmtree(folder.parent, ignore_errors=True)
+
+
 @tasks.task(name="import_library", queue="import", pass_context=True)
 def import_library(job: JobContext, import_id: str) -> None:
     """Run an import someone uploaded (see ``paperus.importing``)."""
@@ -925,6 +950,19 @@ def import_library(job: JobContext, import_id: str) -> None:
         ):
             return
         if record.blob_sha256 is None:
+            if record.parts:
+                with uploaded_folder(context.blobs, record) as folder:
+                    run_import(
+                        db,
+                        context.blobs,
+                        record,
+                        path=folder,
+                        max_file_bytes=max_upload_bytes(db, context.settings),
+                        file_added=lambda file_id: queue_text_extraction(
+                            job.app, file_id
+                        ),
+                        http=context.http,
+                    )
             return
         with contextlib.ExitStack() as stack:
             path = stack.enter_context(context.blobs.local_file(record.blob_sha256))

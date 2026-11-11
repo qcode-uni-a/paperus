@@ -4,6 +4,7 @@
 	import type { ImportOut } from '#lib/api/generated/types.gen.ts';
 	import { ago } from '#lib/format.ts';
 	import ExportChoices from '#lib/ExportChoices.svelte';
+	import { importFolder } from '#lib/folderImport.ts';
 	import { watchImport } from '#lib/processing.svelte.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 	import {
@@ -18,17 +19,17 @@
 		{
 			name: 'Zotero',
 			steps:
-				'Right-click “My Library” (or a collection) → Export… → format “Zotero RDF”, tick “Export Notes” and “Export Files”. Zip the folder Zotero writes and choose the zip here. Collections, tags, notes and PDFs come along.'
+				'Right-click “My Library” (or a collection) → Export… → format “Zotero RDF”, tick “Export Notes” and “Export Files”. Then “Choose a folder” here and pick the folder Zotero wrote: no need to zip it, however large. Its files are sent one by one; if the upload breaks off, choose the same folder again and it goes on where it stopped. Collections, tags, notes and PDFs come along.'
 		},
 		{
 			name: 'JabRef',
 			steps:
-				'Choose your .bib file. With the PDFs: zip the .bib together with the folder of PDFs (keep the folders as they are). Groups become collections.'
+				'Choose your .bib file. With the PDFs: “Choose a folder” and pick the folder that holds the .bib and the PDFs (keep the folders as they are). Groups become collections.'
 		},
 		{
 			name: 'Mendeley',
 			steps:
-				'Select all references → Export → BibTeX (.bib) or RIS. Mendeley does not export collections; PDFs come along if you zip them with the export.'
+				'Select all references → Export → BibTeX (.bib) or RIS. Mendeley does not export collections; PDFs come along if you put the export and the PDFs in one folder and “Choose a folder”.'
 		},
 		{
 			name: 'EndNote, Citavi, others',
@@ -85,6 +86,30 @@
 		files = dropped;
 	}
 	let sending = $state<number | null>(null);
+	/** A folder on its way: files sent, of all. */
+	let folderSent = $state<{ files: number; of: number } | null>(null);
+
+	/** A whole folder, sent file by file (``#lib/folderImport.ts``). */
+	async function chooseFolder(event: Event & { currentTarget: HTMLInputElement }) {
+		const chosen = [...(event.currentTarget.files ?? [])];
+		event.currentTarget.value = '';
+		if (!chosen.length) return;
+		error = '';
+		sending = 0;
+		try {
+			const record = await importFolder(chosen, owner, (sent, total, files, of) => {
+				sending = total ? sent / total : 1;
+				folderSent = { files, of };
+			});
+			started(record);
+		} catch (failed) {
+			error = `${failed instanceof Error ? failed.message : failed}. Choose the same folder again to go on where it stopped.`;
+			load();
+		} finally {
+			sending = null;
+			folderSent = null;
+		}
+	}
 	let error = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -174,7 +199,7 @@
 			} else {
 				error =
 					request.status === 413
-						? 'The file is too large for an upload. An administrator can import it on the server with “paperus import”.'
+						? 'The file is too large for one upload. Unpack it and “Choose a folder” instead: its files are sent one by one.'
 						: request.status === 422
 							? ((request.response as { detail?: string })?.detail ?? 'This cannot be imported.')
 							: `The upload failed (${request.status}).`;
@@ -242,16 +267,30 @@
 				<span class="muted"
 					>{file
 						? `${(files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024).toFixed(1)} MB`
-						: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files; a LaTeX source (.tar.gz, .bbl) for its references; or a paperus export (all its zips). A folder: zip it first.'}</span
+						: 'Zotero RDF, BibTeX, RIS or CSL-JSON, alone or zipped with the files; a LaTeX source (.tar.gz, .bbl) for its references; or a paperus export (all its zips). A whole folder: “Choose a folder” below.'}</span
 				>
 			</label>
 			{#if dropProblem}<p class="error" role="alert">{dropProblem}</p>{/if}
 			{#if sending !== null}
 				<progress value={sending} max="1"></progress>
-				<span class="muted">Uploading… {Math.round(sending * 100)} %</span>
+				<span class="muted"
+					>Uploading… {Math.round(sending * 100)} %{folderSent
+						? ` (${folderSent.files} of ${folderSent.of} files)`
+						: ''}</span
+				>
 			{/if}
 			{#if error}<p class="error">{error}</p>{/if}
-			<div><button class="primary" disabled={!file || sending !== null}>Import</button></div>
+			<div class="buttons">
+				<button class="primary" disabled={!file || sending !== null}>Import</button>
+				<label class="button folder" class:disabled={sending !== null}>
+					Choose a folder…
+					<input type="file" webkitdirectory disabled={sending !== null} onchange={chooseFolder} />
+				</label>
+			</div>
+			<p class="muted hint">
+				A whole folder (a Zotero export with its files) needs no zip and no size limit: its files
+				are sent one by one, and an interrupted upload goes on where it stopped.
+			</p>
 		</form>
 
 		<form class="arxiv" onsubmit={startArxiv}>
@@ -297,6 +336,10 @@
 				</div>
 				{#if record.status === 'needs_choices' && record.choices}
 					<ExportChoices {record} onchange={load} onstart={started} />
+				{:else if record.status === 'receiving'}
+					<p class="muted">
+						Not all of its files arrived. Choose the same folder again to go on where it stopped.
+					</p>
 				{:else if record.status === 'waiting'}
 					<p class="muted">Waiting to start…</p>
 				{:else if record.status === 'running'}
@@ -405,6 +448,44 @@
 		inset: 0;
 		opacity: 0;
 		cursor: pointer;
+	}
+	.buttons {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		align-items: center;
+	}
+	/* A folder's dialog opens from a file input: hidden, in a button's looks. */
+	.folder {
+		position: relative;
+		display: inline-flex;
+		background: var(--surface);
+		border: 1px solid var(--rule);
+		border-radius: 999px;
+		padding: 7px 18px;
+		font-weight: 550;
+		cursor: pointer;
+	}
+	.folder:hover:not(.disabled) {
+		border-color: var(--faint);
+	}
+	.folder.disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+	.folder input {
+		position: absolute;
+		inset: 0;
+		opacity: 0;
+		cursor: inherit;
+	}
+	.folder:focus-within {
+		outline: 2px solid var(--focus, var(--royal));
+		outline-offset: 2px;
+	}
+	.hint {
+		margin: 6px 0 0;
+		font-size: var(--step--1);
 	}
 	.owner {
 		display: flex;

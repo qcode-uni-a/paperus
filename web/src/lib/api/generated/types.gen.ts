@@ -1513,6 +1513,34 @@ export type FileWanted = {
 };
 
 /**
+ * FolderFile
+ */
+export type FolderFile = {
+    /**
+     * Path
+     */
+    path: string;
+    /**
+     * Size
+     */
+    size: number;
+};
+
+/**
+ * FolderIn
+ */
+export type FolderIn = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Library Id
+     */
+    library_id?: string | null;
+};
+
+/**
  * GPUStep
  *
  * Whether the machine learning service could use the machine's GPU.
@@ -1863,7 +1891,7 @@ export type ImportOut = {
 /**
  * ImportStatus
  */
-export type ImportStatus = 'needs_choices' | 'waiting' | 'running' | 'done' | 'failed';
+export type ImportStatus = 'receiving' | 'needs_choices' | 'waiting' | 'running' | 'done' | 'failed';
 
 /**
  * Include
@@ -8142,6 +8170,127 @@ export type StartPaperusImportResponses = {
 };
 
 export type StartPaperusImportResponse = StartPaperusImportResponses[keyof StartPaperusImportResponses];
+
+export type StartFolderImportData = {
+    body: FolderIn;
+    path?: never;
+    query?: never;
+    url: '/api/imports/folder';
+};
+
+export type StartFolderImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type StartFolderImportError = StartFolderImportErrors[keyof StartFolderImportErrors];
+
+export type StartFolderImportResponses = {
+    /**
+     * Successful Response
+     */
+    201: ImportOut;
+};
+
+export type StartFolderImportResponse = StartFolderImportResponses[keyof StartFolderImportResponses];
+
+export type UploadFolderFileData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+        /**
+         * Path
+         */
+        path: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}/files/{path}';
+};
+
+export type UploadFolderFileErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UploadFolderFileError = UploadFolderFileErrors[keyof UploadFolderFileErrors];
+
+export type UploadFolderFileResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type UploadFolderFileResponse = UploadFolderFileResponses[keyof UploadFolderFileResponses];
+
+export type FolderFilesData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}/files';
+};
+
+export type FolderFilesErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FolderFilesError = FolderFilesErrors[keyof FolderFilesErrors];
+
+export type FolderFilesResponses = {
+    /**
+     * Response Folder Files
+     *
+     * Successful Response
+     */
+    200: Array<FolderFile>;
+};
+
+export type FolderFilesResponse = FolderFilesResponses[keyof FolderFilesResponses];
+
+export type FinishFolderImportData = {
+    body?: never;
+    path: {
+        /**
+         * Import Id
+         */
+        import_id: string;
+    };
+    query?: never;
+    url: '/api/imports/{import_id}/finish';
+};
+
+export type FinishFolderImportErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FinishFolderImportError = FinishFolderImportErrors[keyof FinishFolderImportErrors];
+
+export type FinishFolderImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportOut;
+};
+
+export type FinishFolderImportResponse = FinishFolderImportResponses[keyof FinishFolderImportResponses];
 
 export type DeleteImportData = {
     body?: never;

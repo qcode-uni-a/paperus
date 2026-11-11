@@ -70,7 +70,9 @@ Docker network. Put a reverse proxy with HTTPS in front of that port, on a
   machine and private networks (`PAPERUS_TRUSTED_PROXIES`, addresses or
   CIDR ranges); narrow it if the server port is reachable from elsewhere.
 - Uploads can be large (up to `PAPERUS_MAX_UPLOAD_BYTES`, 512 MB by
-  default): raise the proxy's body size limit and timeouts.
+  default): raise the proxy's body size limit and timeouts. Imports of a
+  whole folder (a large Zotero export) come file by file, so the limit
+  only needs to fit the largest single file.
 - Downloads use range requests (PDF.js loads large PDFs in parts); proxies
   pass them through by default.
 

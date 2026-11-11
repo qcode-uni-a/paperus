@@ -233,10 +233,15 @@ takes them all off. Importing an export again sorts the keywords an
 earlier import took as tags. (Stored as tags with the source
 "automatic".)
 
-- **How**: upload the file (or a zip with it and the files) in the browser
-  and choose the owner (oneself or a group); the import runs as a job with
-  a progress page. For very large libraries an administrator can run
-  `paperus import <file> --user <name>` on the server.
+- **How**: in the browser, choose the file (or a zip with it and the
+  files), or a whole folder (a Zotero export with its files: no zip, no
+  size limit), and the owner (oneself or a group); the import runs as a
+  job with a progress page. A folder is sent file by file
+  (`POST /api/imports/folder`, `PUT …/files/{path}`, `POST …/finish`): no
+  limit on uploads in between (a reverse proxy's) stops it, and choosing
+  the same folder again after an interruption sends only what has not
+  arrived. On the server, an administrator can also run
+  `paperus import <file or folder> --user <name>`.
 - **Each format is read into one common form** (CSL-JSON metadata,
   identifiers, tags, collection paths, notes as Markdown, files), so the
   rest of the import is the same for every format.

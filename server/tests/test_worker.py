@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx2
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
@@ -604,3 +605,77 @@ def test_waiting_files_move_when_the_folder_is_back(
     defer(worker, "move_incoming", timestamp=at(3))
     run_jobs(worker)
     assert shared.path(sha).is_relative_to(tmp_path / "share")
+
+
+ZOTERO = (Path(__file__).parent / "zotero_sample.rdf").read_bytes()
+
+
+def test_a_folder_uploaded_file_by_file(
+    client: TestClient, db: Session, worker: App, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Zotero export too large to zip, from the browser: one file per
+    request, interrupted and taken up again, then imported."""
+    ada = Person(client, db, "ada")
+    files = {
+        "Exported Items.rdf": ZOTERO,
+        "files/13/van Gogh - 2024 - Radar gaps.pdf": make_pdf([["Radar"]]),
+        "files/30/Note241029.pdf": make_pdf([["Scribbles"]]),
+        "files/31/2601.pdf": make_pdf([["Floquet"]]),
+    }
+    started = ada.post("/api/imports/folder", {"name": "Exported Items"}).json()
+    assert started["status"] == "receiving"
+    url = f"/api/imports/{started['id']}"
+
+    def send(path: str, content: bytes) -> int:
+        return client.put(
+            f"{url}/files/{path}", content=content, headers=ada.headers
+        ).status_code
+
+    assert ada.post(f"{url}/finish").status_code == 422  # nothing yet
+    names = list(files)
+    assert [send(path, files[path]) for path in names[:2]] == [204, 204]
+    # Interrupted: what arrived, then the rest; one sent again replaces it.
+    arrived = [f["path"] for f in ada.get(f"{url}/files").json()]
+    assert arrived == names[:2]
+    assert send(names[1], b"a first try") == 204
+    assert send(names[1], files[names[1]]) == 204
+    for path in names[2:]:
+        send(path, files[path])
+    assert len(ada.get(f"{url}/files").json()) == 4
+    # Out of the folder (written encoded: clients tidy plain dots away).
+    assert send("files/%2E%2E/%2E%2E/secret", b"x") == 422
+    assert send("files/%2E/a.pdf", b"x") == 422
+
+    # Too large for one file (the limit of imports).
+    app = client.app
+    assert isinstance(app, FastAPI)
+    limit = app.state.settings.max_import_bytes
+    app.state.settings.max_import_bytes = 10
+    try:
+        assert send("files/big.pdf", b"more than ten bytes") == 413
+    finally:
+        app.state.settings.max_import_bytes = limit
+
+    # Where the stored files cannot be linked (another disk): copied.
+    def other_disk(source: Path, target: Path) -> None:
+        raise OSError("another disk")
+
+    monkeypatch.setattr(jobs.os, "link", other_disk)
+
+    finished = ada.post(f"{url}/finish").json()
+    assert finished["status"] == "waiting"
+    assert send("late.pdf", b"x") == 409
+    assert run_jobs(worker)["import_library succeeded"] == 1
+    done = ada.get(url).json()
+    assert (done["status"], done["format"]) == ("done", "zotero-rdf")
+    assert (done["report"]["added"], done["report"]["files"]) == (5, 3)
+    assert done["report"]["missing_files"] == []
+
+    # Begun and given up: it can be removed, its files with it.
+    dropped = ada.post("/api/imports/folder", {"name": "Never mind"}).json()
+    client.put(
+        f"/api/imports/{dropped['id']}/files/a.pdf",
+        content=b"x",
+        headers=ada.headers,
+    )
+    assert ada.delete(f"/api/imports/{dropped['id']}").status_code == 204

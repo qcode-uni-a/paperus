@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Import a whole folder from the browser**: a Zotero export with its
+  files, however large, needs no zip any more. "Choose a folder…" on the
+  import page sends its files one by one (three at a time, with progress),
+  so no upload limit in between (a reverse proxy's 500 MB) stops it; if
+  the upload breaks off, choosing the same folder again goes on with what
+  has not arrived. The import page's instructions say so.
+
 ## 0.0.23 (2026-11-11)
 
 *Live updates, PDFs on a network share that wanders off, and a backup that actually came back.*

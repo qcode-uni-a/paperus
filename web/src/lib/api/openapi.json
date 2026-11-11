@@ -5020,6 +5020,186 @@
         }
       }
     },
+    "/api/imports/folder": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Start Folder Import",
+        "description": "Import a folder (a Zotero export with its files, too large to zip or\nto upload at once), from the browser: begun here, then each file sent\non its own (``PUT \u2026/files/{path}``), then ``finish``. Each request is\none file, so no limit on uploads in between (a reverse proxy's) stops\nit, and an interrupted upload goes on where it was (``GET \u2026/files``).",
+        "operationId": "start_folder_import",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}/files/{path}": {
+      "put": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Upload Folder File",
+        "description": "One file of a folder being imported, at its path in the folder (the\nrequest's body); sent again, it takes the place of the first.",
+        "operationId": "upload_folder_file",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}/files": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Folder Files",
+        "description": "The files of a folder being imported that have arrived (to go on\nwith the others after an interruption).",
+        "operationId": "folder_files",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FolderFile"
+                  },
+                  "title": "Response Folder Files"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imports/{import_id}/finish": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Finish Folder Import",
+        "description": "All of the folder's files are there: import it, in the background.",
+        "operationId": "finish_folder_import",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/imports/{import_id}": {
       "delete": {
         "tags": [
@@ -11025,6 +11205,51 @@
         ],
         "title": "FileWanted"
       },
+      "FolderFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "size"
+        ],
+        "title": "FolderFile"
+      },
+      "FolderIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "library_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FolderIn"
+      },
       "GPUStep": {
         "properties": {
           "done": {
@@ -11662,6 +11887,7 @@
       "ImportStatus": {
         "type": "string",
         "enum": [
+          "receiving",
           "needs_choices",
           "waiting",
           "running",
