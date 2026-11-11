@@ -23,6 +23,9 @@
   below it, not inside them; also where it began on the page before, or
   goes on to the next. Found by checking the library's papers against
   their PDFs' own text order.
+- **Fluent mode: an equation running on over a few lines is no columns**:
+  on a one-column page, its aligned terms left blank stripes that read as
+  two or three columns.
 - **The app keeps papers offline where you choose**: its start page shows
   the folder and moves them to another (another disk), or back.
 - **OIDC login can no longer claim an administrator's account by its

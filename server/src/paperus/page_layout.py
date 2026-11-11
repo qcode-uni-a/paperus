@@ -26,7 +26,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 5
+VERSION = 6
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -72,6 +72,11 @@ RULE_ACROSS = 0.2
 RULE_ACROSS_MOST = 0.8
 # A stretch of two columns is at least this tall (a few lines).
 MIN_COLUMNS = 36
+# Columns only in stretches of fewer lines than this on either side,
+# together less than this share of the part's height, are no columns (an
+# equation's lines, its terms aligned).
+FEW_COLUMNS_LINES = 6
+FEW_COLUMNS_SHARE = 0.25
 # A running header or footer: a block of a line or two (with a rule, a
 # small logo) at the page's top or bottom edge, set apart from the body.
 EDGE_BLOCK = 40
@@ -771,6 +776,15 @@ def lay_out(
                 lines.append(float(np.median(found[found > 0])))
             return bool(lines) and float(np.median(lines)) > large
 
+        def lines_on(a: int, b: int, band: _Band) -> int:
+            """Lines on a side: runs of rows with much ink (lines of dense
+            text touch; between them a row has little)."""
+            counts = area(a, b, band.y0, band.y1).sum(axis=1)
+            most = int(counts.max()) if counts.size else 0
+            if not most:
+                return 0
+            return sum(1 for s, e in runs(counts >= most * 0.3) if e - s >= 2)
+
         def two_lines(a: int, b: int, band: _Band) -> bool:
             """Lines of text (runs of rows with ink) on a side: two at
             least, not in large type."""
@@ -828,6 +842,23 @@ def lay_out(
                 and cells(x0, gutter_left - 1, band)
                 and cells(gutter_right + 1, x1, band)
             ):
+                band.wide = True
+        # Full columns only in a few lines, a little of the part (an
+        # equation running on over lines, its terms aligned): across.
+        full_bands = [band for band in bands if full(band)]
+        if full_bands and (
+            sum(band.y1 - band.y0 + 1 for band in full_bands)
+            < (y1 - y0 + 1) * FEW_COLUMNS_SHARE
+            and all(
+                max(
+                    lines_on(x0, gutter_left - 1, band),
+                    lines_on(gutter_right + 1, x1, band),
+                )
+                < FEW_COLUMNS_LINES
+                for band in full_bands
+            )
+        ):
+            for band in full_bands:
                 band.wide = True
         in_columns = any(full(band) for band in bands)
         for band in bands:

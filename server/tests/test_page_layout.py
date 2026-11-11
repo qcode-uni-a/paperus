@@ -150,3 +150,22 @@ def test_an_equation_between_revtex_rules_is_across() -> None:
     ink[496, 314:561] = True
     _, pieces = lay_out(ink)
     assert not any(p["wide"] for p in pieces)
+
+
+def test_an_equation_over_a_few_lines_is_no_columns() -> None:
+    """A one-column page's equation running on over five lines, its terms
+    aligned (gaps down all its lines): across, not in columns."""
+    ink = np.zeros((792, 612), dtype=bool)
+
+    def text(y0: int, y1: int) -> None:
+        for y in range(y0, y1, 14):
+            ink[y : y + 8, 70:540] = (np.arange(70, 540) % 4 != 0)[None, :]
+
+    text(60, 500)
+    for y in range(520, 620, 24):  # the equation's lines, in three parts
+        for x0, x1 in ((80, 250), (262, 400), (412, 540)):
+            ink[y : y + 16, x0:x1] = (np.arange(x0, x1) % 5 != 0)[None, :]
+    text(640, 740)
+    columns, pieces = lay_out(ink)
+    assert not columns
+    assert all(p["wide"] for p in pieces)
