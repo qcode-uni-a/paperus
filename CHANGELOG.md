@@ -2,6 +2,8 @@
 
 ## 0.0.23 (2026-11-11)
 
+*Live updates, PDFs on a network share that wanders off, and a backup that actually came back.*
+
 - **Live signals** (#46): `GET /api/changes/live` keeps a stream open
   (server-sent events) that says, within seconds, that the library changed
   (at most once every two seconds, and not what); clients then ask
