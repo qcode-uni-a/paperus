@@ -40,6 +40,8 @@
   heading showed without scrolling. How full the storage is stays under
   Administration → Server (with the library's share); `GET /api/storage`,
   which only the box used, is gone.
+- **The extension fetches the PDF while paperus adds the paper** (looking
+  its DOI up), not one after the other: a little quicker per save.
 - **The extension reads a page sooner**: it no longer waits until the
   page has loaded completely (in Firefox, with its trackers and figures:
   "Reading the page…" for long), only until its HTML is read; and it finds

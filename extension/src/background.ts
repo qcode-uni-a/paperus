@@ -365,26 +365,32 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
       pdf: pdfLink,
     });
   if (info.arxiv || page.isPdf || pdfLink) step(tab.id!, "Fetching the PDF…");
-  const pdf = info.arxiv
-    ? await arxivPdf(info.arxiv)
-    : page.isPdf || pdfLink
-      ? await orInTab(
-          await onwards(
-            await inPage(
-              tab.id!,
-              fetchPdf,
-              page.isPdf ? page.url : pdfLink!,
-              MAX_BYTES,
+  // Fetched while the paper is added (save): not waited for here.
+  const pdfComing = (async (): Promise<Pdf> =>
+    info.arxiv
+      ? await arxivPdf(info.arxiv)
+      : page.isPdf || pdfLink
+        ? await orInTab(
+            await onwards(
+              await inPage(
+                tab.id!,
+                fetchPdf,
+                page.isPdf ? page.url : pdfLink!,
+                MAX_BYTES,
+              ),
             ),
-          ),
-          pdfLink,
-        )
-      : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
-  trace("The PDF", { page: url, ...fetched(pdf) });
-  step(tab.id!, "Saving to paperus…");
+            pdfLink,
+          )
+        : {
+            error: robot ? EXPLAINED["robot-check"] : "The page links no PDF.",
+          })();
+  void pdfComing.then((pdf) => {
+    trace("The PDF", { page: url, ...fetched(pdf) });
+    step(tab.id!, "Saving to paperus…");
+  });
   return page.isPdf && !info.doi && !info.arxiv
-    ? saveFile(pdf, url, owner)
-    : save(info, pdf, owner);
+    ? saveFile(await pdfComing, url, owner)
+    : save(info, pdfComing, owner);
 }
 
 /** A PDF's fetch, for the log: its size, or what came back instead. */
@@ -548,7 +554,7 @@ async function itemLink(itemId: string): Promise<string> {
 /** The paper (found or added) and its PDF; what happened, in words. */
 async function save(
   page: Pick<PageInfo, "doi" | "arxiv" | "title" | "url"> & Partial<PageInfo>,
-  pdf: Pdf,
+  pdfComing: Pdf | Promise<Pdf>,
   owner?: Owner,
 ): Promise<Saved> {
   const target = owner ?? defaultOwner(await settings());
@@ -559,7 +565,12 @@ async function save(
       method: "POST",
       json,
     });
-  let added = doi ? await addItem({ doi, ...library }).catch(() => null) : null;
+  // The paper added (paperus looks its DOI up) while its PDF is fetched.
+  const [first, pdf] = await Promise.all([
+    doi ? addItem({ doi, ...library }).catch(() => null) : null,
+    pdfComing,
+  ]);
+  let added = first;
   if (!added || added.status >= 400) {
     // An open PDF whose DOI is unknown: paperus reads it instead.
     if (page.isPdf && !("error" in pdf)) return saveFile(pdf, page.url, owner);
