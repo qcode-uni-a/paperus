@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { live } from '#lib/live.svelte.ts';
 	import Title from '#lib/Title.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -157,6 +158,15 @@
 			await Promise.all([loadUpTo(count), searching]);
 		}
 	);
+
+	// Changed elsewhere (a colleague's paper, details found): the rows
+	// shown, again, in place.
+	$effect(() => {
+		if (!live.changes) return;
+		untrack(() => {
+			if (!refilling) void loadUpTo(items.length);
+		});
+	});
 
 	/** Load the next page when the end of the list comes near. */
 	function loadMoreNearby(node: HTMLElement) {

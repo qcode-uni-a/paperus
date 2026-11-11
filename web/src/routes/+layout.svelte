@@ -6,6 +6,7 @@
 	import OwnerHint from '#lib/OwnerHint.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadUser, session } from '#lib/session.svelte.ts';
+	import { listen } from '#lib/live.svelte.ts';
 	import SearchBar from '#lib/SearchBar.svelte';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import ThemeToggle from '#lib/ThemeToggle.svelte';
@@ -33,6 +34,10 @@
 
 	$effect(() => {
 		if (!session.checked && !onLoginPage) loadUser();
+	});
+	// Told at once when the library changes (#46), while logged in.
+	$effect(() => {
+		if (session.user) return listen();
 	});
 
 	$effect(() => menu.watch());

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { live } from '#lib/live.svelte.ts';
 	import { mdiBellOutline } from '@mdi/js';
 	import { resolve } from '$app/paths';
 	import { apiHref, listNotifications, markNotificationsRead } from '#lib/api/client.ts';
@@ -27,6 +28,10 @@
 		unread = data.unread;
 	}
 
+	// At once when the library changes (a paper added to a group, say).
+	$effect(() => {
+		if (live.changes) void load();
+	});
 	$effect(() => {
 		void load();
 		const timer = setInterval(() => !document.hidden && load(), 60_000);
