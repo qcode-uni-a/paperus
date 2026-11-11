@@ -16,8 +16,9 @@ export interface Signals {
 
 const ROBOT_CHECK =
 	/just a moment|attention required|verify (that )?you are (a )?human|are you a robot|not a robot|captcha|unusual traffic|checking (if the site connection is secure|your browser)|bot (protection|detection)|press (and|&) hold|security check/i;
+// Not "sign in" or "log in": every publisher's page has them in its header.
 const NO_ACCESS =
-	/sign in|log ?in|institutional (access|login)|access through your (institution|organization)|purchase (this )?(article|pdf)|buy (this )?article|rent this|subscribe|get access|access options|check access|shibboleth|openathens|seamless access/i;
+	/institutional (access|login)|access through your (institution|organization)|purchase (this )?(article|pdf)|buy (this )?article|rent this|get access|access options|check access|shibboleth|openathens|seamless access/i;
 
 const ERROR_PAGE =
 	/unable to load (the )?page|page not found|page (could not|cannot) be (found|loaded|displayed)|access denied|^\s*(400|403|404|500|502|503)\b|forbidden|internal server error|service (temporarily )?unavailable|bad gateway/i;

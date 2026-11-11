@@ -133,7 +133,7 @@ export async function fetchPdf(
 	maxBytes: number
 ): Promise<
 	| { base64: string; size: number }
-	| { error: string; status?: number; html?: string; next?: string }
+	| { error: string; status?: number; html?: string; next?: string; at?: string }
 > {
 	try {
 		let response: Response;
@@ -153,7 +153,9 @@ export async function fetchPdf(
 			const refresh =
 				html.match(/<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>]+)/i) ??
 				html.match(/<meta[^>]+content=["']?\s*\d+\s*;\s*url=([^"'>]+)["']?[^>]*http-equiv=["']?refresh/i) ??
-				html.match(/id=["']redirect-message["'][\s\S]{0,500}?href=["']([^"']+)/i);
+				html.match(/id=["']redirect-message["'][\s\S]{0,500}?href=["']([^"']+)/i) ??
+				html.match(/(?:window\.)?location(?:\.href)?\s*=\s*["']([^"']+\.pdf[^"']*)["']/i) ??
+				html.match(/location\.replace\(\s*["']([^"']+)["']\s*\)/i);
 			if (refresh) {
 				const next = new URL(refresh[1].replace(/&amp;/g, '&').trim(), response.url).href;
 				try {
@@ -177,7 +179,9 @@ export async function fetchPdf(
 					? 'The PDF link gave a web page, not a PDF.'
 					: `The PDF link answered ${response.status}.`,
 				status: response.status,
-				html
+				html,
+				// Where it ended up, to say what came back.
+				at: response.url
 			};
 		}
 		if (buffer.byteLength > maxBytes) return { error: 'The PDF is larger than paperus takes.' };

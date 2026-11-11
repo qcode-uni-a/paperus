@@ -11,6 +11,14 @@
   fetch** (AIP's: their PDF link redirects to a signed address on another
   site, Silverchair's): "NetworkError when attempting to fetch resource".
   The extension fetches those itself, with its access to websites.
+- **ScienceDirect's PDFs, again**: where its PDF link gives a web page
+  to the extension (the PDF at pdf.sciencedirectassets.com, reached by a
+  script), the extension opens the link in a tab out of sight, as a click
+  does, and fetches the PDF where the tab ends up. "No access: login or
+  payment" only on real signs (a password field, 401/403, "purchase", "get
+  access", …), not the "Sign in" in every page's header; when the PDF still
+  cannot be had, the message says what came back (the page's title and
+  site).
 - **The extension's popup**: a site at a numbered address (127.0.0.1)
   showed as "0"; a site without a favicon shows a globe.
 

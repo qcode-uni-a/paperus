@@ -35,7 +35,13 @@ const FIREFOX = chrome.runtime.getURL("").startsWith("moz-extension:");
 
 type Pdf =
   | { base64: string; size: number }
-  | { error: string; status?: number; html?: string; next?: string };
+  | {
+      error: string;
+      status?: number;
+      html?: string;
+      next?: string;
+      at?: string;
+    };
 /** Saved; with ``warning``, only in part: the paper without its PDF. */
 type Saved = {
   ok: true;
@@ -43,7 +49,12 @@ type Saved = {
   link: string;
   warning?: boolean;
   /** The paper, for the popup (moving one just added to another owner). */
-  item?: { id: string; libraryId: string | null; title: string; added: boolean };
+  item?: {
+    id: string;
+    libraryId: string | null;
+    title: string;
+    added: boolean;
+  };
 };
 
 /** What the popup shows while a tab is saved. */
@@ -318,13 +329,16 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
     : page.isPdf || page.pdfUrl
-      ? await onwards(
-          await inPage(
-            tab.id!,
-            fetchPdf,
-            page.isPdf ? page.url : page.pdfUrl!,
-            MAX_BYTES,
+      ? await orInTab(
+          await onwards(
+            await inPage(
+              tab.id!,
+              fetchPdf,
+              page.isPdf ? page.url : page.pdfUrl!,
+              MAX_BYTES,
+            ),
           ),
+          page.isPdf ? null : page.pdfUrl,
         )
       : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
   step(tab.id!, "Saving to paperus…");
@@ -590,7 +604,12 @@ async function saveFile(pdf: Pdf, url: string, owner?: Owner): Promise<Saved> {
     ok: true,
     text: `Saved to ${owner ? owner.name : "paperus"}: ${name}. paperus reads its details from the PDF.`,
     link: await itemLink(data.item_id),
-    item: { id: data.item_id, libraryId: target?.id ?? null, title: name, added: true },
+    item: {
+      id: data.item_id,
+      libraryId: target?.id ?? null,
+      title: name,
+      added: true,
+    },
   };
 }
 
@@ -863,10 +882,51 @@ function pdfProblem(pdf: {
   error: string;
   status?: number;
   html?: string;
+  at?: string;
 }): string {
   if (pdf.html === undefined) return pdf.error;
   const cause = causeOf(signalsOfHtml(pdf.html, pdf.status ?? 200));
-  return cause === "no-pdf" ? pdf.error : EXPLAINED[cause];
+  const said = cause === "no-pdf" ? pdf.error : EXPLAINED[cause];
+  // What came back, so the reason can be checked.
+  const title = signalsOfHtml(pdf.html, 200).title.replace(/\s+/g, " ").trim();
+  let from = "";
+  try {
+    from = pdf.at ? ` from ${new URL(pdf.at).host}` : "";
+  } catch {
+    // No address to name.
+  }
+  return title
+    ? `${said} (The PDF link gave “${title.slice(0, 80)}”${from}.)`
+    : said;
+}
+
+/** The PDF link opened in a tab of its own, out of sight, as a person's
+ * click opens it: the browser follows what sends it on (scripts, refreshes)
+ * to the PDF, whose address the extension then fetches; the tab closes.
+ * For links that give a web page to a fetch (ScienceDirect's, at times). */
+async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
+  const tab = await chrome.tabs.create({ url, active: false });
+  try {
+    await loaded(tab.id!);
+    const landed = (await chrome.tabs.get(tab.id!)).url ?? "";
+    if (!landed || landed === url || !/^https?:/.test(landed)) return failed;
+    if (!(await chrome.permissions.contains({ origins: [site(landed)] })))
+      return failed;
+    const pdf = await fetchPdf(landed, MAX_BYTES);
+    return "error" in pdf ? failed : pdf;
+  } catch {
+    return failed;
+  } finally {
+    await chrome.tabs.remove(tab.id!).catch(() => undefined);
+  }
+}
+
+/** A web page where the PDF should be, and no check for robots: try the
+ * link in a tab (``viaTab``). */
+async function orInTab(pdf: Pdf, url: string | null): Promise<Pdf> {
+  if (!url || !("error" in pdf) || pdf.html === undefined) return pdf;
+  if (isRobotCheck(signalsOfHtml(pdf.html, pdf.status ?? 200))) return pdf;
+  return viaTab(url, pdf);
 }
 
 /** One paper's PDF from its publisher's page: null once saved, else why
@@ -932,7 +992,10 @@ async function getOne(
     const page = await inPage(tabId, readPage);
     const pdfUrl = page.isPdf ? page.url : page.pdfUrl;
     if (!pdfUrl) return because(causeOf(await inPage(tabId, pageSignals)));
-    const pdf = await onwards(await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES));
+    const pdf = await orInTab(
+      await onwards(await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES)),
+      pdfUrl,
+    );
     if ("error" in pdf) {
       const cause =
         pdf.html === undefined
