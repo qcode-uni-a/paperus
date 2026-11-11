@@ -5,11 +5,13 @@ or other programs. paperus keeps its own storage by content (SHA-256); the
 copy is rebuilt from it every night and touches only files it wrote itself
 (listed in ``.paperus-copy.json``)."""
 
+import ctypes
 import json
 import os
 import re
 import shutil
 import string
+import sys
 import unicodedata
 import uuid
 from dataclasses import dataclass, field
@@ -27,6 +29,12 @@ from paperus.citations import citation_key_base, year_of
 from paperus.library import citation_csl, preferred_version
 from paperus.models import FileRole, Group, Item, Library, SystemSetting, User
 from paperus.storage import BlobStore, FilesystemStore
+
+if sys.platform != "win32":
+    import fcntl
+
+# Linux's ioctl for a copy-on-write clone of a whole file (Btrfs, XFS).
+FICLONE = 0x40049409
 
 # Short and sortable: Lovelace_NatPhys_1843, in a folder per owner.
 DEFAULT_TEMPLATE = "{owner}/{first_author}_{journal}_{year}"
@@ -223,6 +231,10 @@ def wanted(
 
 class CopyReport(BaseModel):
     at: datetime
+    cloned: int = 0
+    """Of the files written, how many as clones: no space, edits apart."""
+    linked: int = 0
+    """As hard links: no space, but an edit changes the stored file."""
     change: int | None = None
     """The library's change number it was made from (``paperus.changes``):
     a later one means the copy is behind."""
@@ -253,21 +265,46 @@ def _write_manifest(root: Path, manifest: _Manifest) -> None:
     tmp.replace(root / MANIFEST)
 
 
-def _place(blobs: BlobStore, sha256: bytes, target: Path, link: bool) -> None:
+def _clone(source: Path, target: Path) -> bool:
+    """``target`` as a copy-on-write clone of ``source`` (APFS on macOS,
+    Btrfs and XFS on Linux): it takes no space until one of them changes,
+    and an edit to one leaves the other alone. False where the file system
+    cannot (then a link or a copy)."""
+    try:
+        if sys.platform == "darwin":
+            libc = ctypes.CDLL(None, use_errno=True)
+            done = libc.clonefile(os.fsencode(source), os.fsencode(target), 0) == 0
+            return done
+        if sys.platform != "win32":
+            with source.open("rb") as original, target.open("wb") as clone:
+                fcntl.ioctl(clone.fileno(), FICLONE, original.fileno())
+            return True
+    except OSError:
+        target.unlink(missing_ok=True)
+    return False
+
+
+def _place(blobs: BlobStore, sha256: bytes, target: Path, link: bool) -> str:
+    """Write one file of the copy: ``cloned``, ``linked`` or ``copied``."""
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f".{target.name}.paperus-tmp")
     tmp.unlink(missing_ok=True)
-    if link and isinstance(blobs, FilesystemStore):
-        try:
-            os.link(blobs.path(sha256), tmp)
+    if isinstance(blobs, FilesystemStore):
+        if _clone(blobs.path(sha256), tmp):
             tmp.replace(target)
-            return
-        except OSError:
-            pass  # another disk: copy instead
+            return "cloned"
+        if link:
+            try:
+                os.link(blobs.path(sha256), tmp)
+                tmp.replace(target)
+                return "linked"
+            except OSError:
+                pass  # another disk: copy instead
     with tmp.open("wb") as out:
         for chunk in blobs.iter_bytes(sha256):
             out.write(chunk)
     tmp.replace(target)
+    return "copied"
 
 
 def _remove(root: Path, relative: str) -> None:
@@ -297,8 +334,10 @@ def sync(
             sha = entry.sha256.hex()
             target = root / entry.path
             if manifest.files.get(entry.path) != sha or not target.exists():
-                _place(blobs, entry.sha256, target, links)
+                how = _place(blobs, entry.sha256, target, links)
                 report.written += 1
+                report.cloned += int(how == "cloned")
+                report.linked += int(how == "linked")
             keep[entry.path] = sha
             report.bytes += entry.size
         for relative in set(manifest.files) - set(keep):

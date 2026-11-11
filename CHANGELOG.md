@@ -9,6 +9,10 @@
   (`LISTEN/NOTIFY`, one listener per server process). Behind nginx it
   needs no setting (the stream asks not to be buffered, and a comment
   every 20 seconds keeps it open).
+- **The readable copy takes no space where the disk can** (#28): files go
+  in as copy-on-write clones on APFS, Btrfs and XFS (edits in the copy
+  stay apart from the library's), else as hard links if chosen, else as
+  copies; the administration page says how many of each.
 - **Installers tested** (#45): each release installs the `.deb`, the
   `.msi`, the setup `.exe` and the `.dmg` as people do, starts the app from
   there and removes it again.

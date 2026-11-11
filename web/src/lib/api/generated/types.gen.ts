@@ -1072,6 +1072,14 @@ export type CopyReport = {
      */
     at: string;
     /**
+     * Cloned
+     */
+    cloned?: number;
+    /**
+     * Linked
+     */
+    linked?: number;
+    /**
      * Change
      */
     change?: number | null;

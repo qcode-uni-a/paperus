@@ -119,17 +119,58 @@ def test_sync_writes_renames_and_removes(
 
 
 def test_hard_links(
-    client: TestClient, db: Session, blobs: BlobStore, tmp_path: Path
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(blobs, FilesystemStore)
+    # Where clones can be made (Btrfs) they come first: not here.
+    monkeypatch.setattr(readable, "_clone", lambda source, target: False)
     ada = Person(client, db, "ada")
     paper = add(ada, {"title": "Linked"})
     upload(ada, paper, PDF)
     root = blobs.root.parent / "copy"
-    readable.sync(db, blobs, root, "{title}", links=True)
+    report = readable.sync(db, blobs, root, "{title}", links=True)
+    assert (report.linked, report.cloned) == (1, 0)
     copy = root / "Linked.pdf"
     stored = next((blobs.root / "blobs").glob("*/*/*"))
     assert os.stat(copy).st_ino == os.stat(stored).st_ino
+
+
+def test_clones_first(
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A copy-on-write clone where the file system makes one (here the
+    system's call stood in for: the test's disk may not)."""
+    ada = Person(client, db, "ada")
+    upload(ada, add(ada, {"title": "Cloned"}), PDF)
+
+    def clone(target: int, request: int, source: int) -> None:
+        assert request == readable.FICLONE
+        os.write(target, os.read(source, 1 << 20))
+
+    monkeypatch.setattr(readable.fcntl, "ioctl", clone)
+    report = readable.sync(db, blobs, tmp_path / "copy", "{title}", links=True)
+    assert (report.written, report.cloned, report.linked) == (1, 1, 0)
+    copy = tmp_path / "copy" / "Cloned.pdf"
+    assert copy.read_bytes() == PDF
+
+    # Refused (ext4, another disk): a copy, nothing half made left.
+    def refuse(target: int, request: int, source: int) -> None:
+        raise OSError(95, "Operation not supported")
+
+    monkeypatch.setattr(readable.fcntl, "ioctl", refuse)
+    copy.unlink()
+    report = readable.sync(db, blobs, tmp_path / "copy", "{title}", links=False)
+    assert (report.written, report.cloned, report.linked) == (1, 0, 0)
+    assert copy.read_bytes() == PDF
+    assert not list((tmp_path / "copy").glob(".*paperus-tmp"))
 
 
 def test_settings_and_preview(client: TestClient, db: Session) -> None:

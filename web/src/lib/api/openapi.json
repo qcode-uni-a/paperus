@@ -10241,6 +10241,16 @@
             "format": "date-time",
             "title": "At"
           },
+          "cloned": {
+            "type": "integer",
+            "title": "Cloned",
+            "default": 0
+          },
+          "linked": {
+            "type": "integer",
+            "title": "Linked",
+            "default": 0
+          },
           "change": {
             "anyOf": [
               {

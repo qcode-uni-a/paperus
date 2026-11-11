@@ -5,12 +5,25 @@
 	import SettingRow from '#lib/admin/SettingRow.svelte';
 	import Switch from '#lib/admin/Switch.svelte';
 	import { previewTemplate, readableCopy, runJob } from '#lib/api/client.ts';
-	import type { ReadableCopy } from '#lib/api/generated/types.gen.ts';
+	import type { CopyReport, ReadableCopy } from '#lib/api/generated/types.gen.ts';
 	import { localTime } from '#lib/dates.svelte.ts';
 	import { ago } from '#lib/format.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 
 	const DEFAULT = '{owner}/{first_author}_{journal}_{year}';
+
+	/** How the files written went in: clones and links take no space. */
+	function written(report: CopyReport): string {
+		const cloned = report.cloned ?? 0;
+		const linked = report.linked ?? 0;
+		const copied = (report.written ?? 0) - cloned - linked;
+		const how = [
+			cloned && `${cloned} cloned`,
+			linked && `${linked} linked`,
+			copied && `${copied} copied`
+		].filter(Boolean);
+		return `${report.written} written${how.length ? `: ${how.join(', ')}` : ''}`;
+	}
 	const config = $derived(admin.config);
 	let info = $state<ReadableCopy | null>(null);
 	let enabled = $state(false);
@@ -165,7 +178,7 @@
 	title="Hard links instead of copies"
 	description={info?.links_possible === false
 		? 'Only with files stored on a disk, not with S3.'
-		: 'Takes no extra space, if the copy is on the same disk as the files. But the copy’s files are the stored ones: never edit them there.'}
+		: 'Where the disk can, files are cloned anyway (APFS, Btrfs, XFS): no extra space, and edits in the copy stay apart. Elsewhere hard links take no extra space either, on the same disk as the files, but the copy’s files are then the stored ones: never edit them there.'}
 >
 	<Switch id="copy-links" label="Hard links instead of copies" bind:checked={links} />
 </SettingRow>
@@ -180,7 +193,7 @@
 				<strong>{(info.report.files ?? 0).toLocaleString()} files</strong>, {formatSize(
 					info.report.bytes
 				)}; updated {ago(info.report.at)}{info.report.written || info.report.removed
-					? ` (${info.report.written} written, ${info.report.removed} removed)`
+					? ` (${written(info.report)}, ${info.report.removed} removed)`
 					: ''}.
 			{:else}
 				Not written yet.
