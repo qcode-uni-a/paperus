@@ -234,4 +234,6 @@ try {
 	console.log('ok: annotated offline, saved when the library was back');
 } finally {
 	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
+	// The stand-in network would keep the test running.
+	await cut(proxy);
 }
