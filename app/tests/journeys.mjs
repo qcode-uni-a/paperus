@@ -44,7 +44,11 @@ async function webdriver(method, path, body) {
 	const response = await fetch(DRIVER + path, {
 		method,
 		headers: { 'Content-Type': 'application/json' },
-		body: body && JSON.stringify(body)
+		body: body && JSON.stringify(body),
+		// A call that hangs says which.
+		signal: AbortSignal.timeout(120_000)
+	}).catch((error) => {
+		throw new Error(`${method} ${path}: ${error.message}`);
 	});
 	const { value } = await response.json();
 	if (value?.error) throw new Error(`${path}: ${value.error}: ${value.message}`);

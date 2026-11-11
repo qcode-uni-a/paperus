@@ -219,6 +219,8 @@ jobs:
   app-e2e:
     name: App end-to-end (tauri-driver)
     runs-on: ubuntu-latest
+    # A step that hangs fails here, with its logs, not after hours.
+    timeout-minutes: 25
     services:
       postgres:
         image: pgvector/pgvector:pg18
