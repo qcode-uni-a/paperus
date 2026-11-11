@@ -42,7 +42,12 @@ export function idsInUrl(url: string): { doi: string | null; arxiv: string | nul
 
 /** The paper's details from the page: Highwire/Google Scholar tags
  * (citation_*) and Dublin Core (the address: see idsInUrl). */
-export function readPage(): PageInfo {
+export async function readPage(): Promise<PageInfo> {
+	// The page's HTML read (not its images and scripts loaded).
+	if (document.readyState === 'loading')
+		await new Promise((done) =>
+			document.addEventListener('DOMContentLoaded', () => done(undefined), { once: true })
+		);
 	/** Where to fetch the PDF from within the page: its citation_pdf_url,
 	 * over HTTPS on an HTTPS page (else the browser blocks it); if that is
 	 * another site (APS: link.aps.org, which the page may not fetch from),
@@ -204,7 +209,26 @@ export function pageSignals(): {
 } {
 	return {
 		title: document.title,
-		text: (document.body?.innerText ?? '').slice(0, 20000),
+		// Its words, without laying out the page (innerText would, slowly
+		// on a long article): text nodes outside scripts and styles, up to
+		// what is looked at.
+		text: (() => {
+			const parts: string[] = [];
+			let length = 0;
+			const walker = document.createTreeWalker(document.body ?? document.documentElement, NodeFilter.SHOW_TEXT, {
+				acceptNode: (node) =>
+					node.parentElement?.closest('script, style, noscript, template')
+						? NodeFilter.FILTER_REJECT
+						: NodeFilter.FILTER_ACCEPT
+			});
+			for (let node = walker.nextNode(); node && length < 20000; node = walker.nextNode()) {
+				const words = node.nodeValue?.trim();
+				if (!words) continue;
+				parts.push(words);
+				length += words.length + 1;
+			}
+			return parts.join(' ').slice(0, 20000);
+		})(),
 		captcha: !!document.querySelector(
 			'.g-recaptcha, .h-captcha, .cf-turnstile, #challenge-form, #challenge-running, ' +
 				'iframe[src*="captcha"], iframe[src*="challenges.cloudflare.com"], #px-captcha, ' +

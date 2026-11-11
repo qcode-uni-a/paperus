@@ -221,6 +221,10 @@ async function inPage<A extends unknown[], R>(
     target: { tabId },
     func,
     args,
+    // At once, not when the page is done loading (its trackers, figures,
+    // MathJax): what is read is in its head and body by then (readPage
+    // waits for those).
+    injectImmediately: true,
   });
   return result.result as Awaited<R>;
 }

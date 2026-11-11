@@ -40,6 +40,10 @@
   heading showed without scrolling. How full the storage is stays under
   Administration → Server (with the library's share); `GET /api/storage`,
   which only the box used, is gone.
+- **The extension reads a page sooner**: it no longer waits until the
+  page has loaded completely (in Firefox, with its trackers and figures:
+  "Reading the page…" for long), only until its HTML is read; and it finds
+  a page's words without laying the page out.
 - **The extension on Wiley**: its PDF links open Wiley's ePDF reader (a
   page with a sidebar), not the file; the extension takes the reader's
   download instead (`/doi/pdfdirect/…`), also when saving from the reader
