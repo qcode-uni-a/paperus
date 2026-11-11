@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from mcp.server.transport_security import TransportSecuritySettings
 from procrastinate import App
 
-from paperus import logbook, metrics, system, tokens
+from paperus import live, logbook, metrics, system, tokens
 from paperus.access import Forbidden, NotVisible
 from paperus.api import (
     admin,
@@ -97,6 +97,7 @@ def create_app(
                 )
             async with app.state.mcp.session_manager.run():
                 yield
+        await app.state.signals.close()
         http.close()
         ml.close()
         engine.dispose()
@@ -125,6 +126,7 @@ def create_app(
     app.state.settings = settings
     app.state.jobs = jobs
     app.state.ml = ml
+    app.state.signals = live.Signals(settings.database_url)
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(avatars.router)

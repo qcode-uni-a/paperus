@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Live signals** (#46): `GET /api/changes/live` keeps a stream open
+  (server-sent events) that says, within seconds, that the library changed
+  (at most once every two seconds, and not what); clients then ask
+  `/api/changes`. Postgres delivers the signal when a change commits
+  (`LISTEN/NOTIFY`, one listener per server process). Behind nginx it
+  needs no setting (the stream asks not to be buffered, and a comment
+  every 20 seconds keeps it open).
+- **Installers tested** (#45): each release installs the `.deb`, the
+  `.msi`, the setup `.exe` and the `.dmg` as people do, starts the app from
+  there and removes it again.
+
 ## 0.0.22 (2026-11-11)
 
 - **A library on this computer, without a server** (the app, #39): made

@@ -257,6 +257,7 @@ ROUTES = {
     ("PUT", "/api/items/{item_id}/authors/{position}"): "papers.write",
     # Includes what the person opened; apps sync logged in.
     ("GET", "/api/changes"): None,
+    ("GET", "/api/changes/live"): None,
     ("GET", "/api/citations"): "papers.read",
     ("GET", "/api/collections"): "papers.read",
     ("POST", "/api/collections"): "collections.write",

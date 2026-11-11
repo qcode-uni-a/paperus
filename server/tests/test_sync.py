@@ -1,15 +1,21 @@
 """Syncing: ``/api/changes`` (``paperus.api.sync``)."""
 
+import threading
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx2
+import pytest
+import uvicorn
 from fastapi.testclient import TestClient
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
 from paperus import changes as changes_module
-from paperus.models import Removal
+from paperus.api import sync
+from paperus.models import Removal, Tag
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n%%EOF\n"
@@ -207,3 +213,52 @@ def test_queued_edits_do_not_overwrite(client: TestClient, db: Session) -> None:
             url, json=queued, headers={**ada.headers, "If-Match": "yesterday"}
         )
         assert broken.status_code == 412
+
+
+def test_live_signals(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sync, "HEARTBEAT_SECONDS", 0.5)
+    monkeypatch.setattr(sync, "SIGNAL_SECONDS", 0.0)
+    ada = Person(client, db, "ada")
+    own = uuid.UUID(ada.add("Before")["library_id"])
+    # A real server: the test client reads a whole answer, and this one is
+    # endless.
+    server = uvicorn.Server(
+        uvicorn.Config(
+            client.app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"
+        )
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(100):
+        if server.started:
+            break
+        time.sleep(0.05)
+    port = server.servers[0].sockets[0].getsockname()[1]
+    live = f"http://127.0.0.1:{port}/api/changes/live"
+    try:
+        assert httpx2.get(live).status_code == 401
+        with httpx2.stream("GET", live, headers=ada.headers) as response:
+            assert response.headers["content-type"].startswith("text/event-stream")
+            assert response.headers["x-accel-buffering"] == "no"
+            lines = response.iter_lines()
+            assert next(lines) == ": live"
+
+            def until(wanted: str) -> None:
+                for _ in range(200):
+                    if next(lines) == wanted:
+                        return
+                raise AssertionError(f"no {wanted!r}")
+
+            # Listening (it signals once then: something may have changed).
+            until("event: change")
+            until(": still here")
+            # A change committed: a signal, with no word of what.
+            db.add(Tag(library_id=own, name="live"))
+            db.commit()
+            until("event: change")
+            assert next(lines) == "data:"
+    finally:
+        server.should_exit = True
+        thread.join(10)

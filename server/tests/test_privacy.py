@@ -107,7 +107,9 @@ def test_routes_show_nothing_private(
     routes = [
         (method.upper(), path)
         for path, operations in app.openapi()["paths"].items()
-        if path.startswith("/api")
+        # Not the live stream: endless, and it says only that something
+        # changed (tests/test_sync.py).
+        if path.startswith("/api") and path != "/api/changes/live"
         for method in operations
     ]
     query = {"q": SECRET, "doi": "10.5555/zebracorn", "query": SECRET}

@@ -8701,6 +8701,20 @@ export type ChangesSinceResponses = {
 
 export type ChangesSinceResponse = ChangesSinceResponses[keyof ChangesSinceResponses];
 
+export type LiveChangesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/changes/live';
+};
+
+export type LiveChangesResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ServerVersionData = {
     body?: never;
     path?: never;

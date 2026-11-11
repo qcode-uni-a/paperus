@@ -25,6 +25,7 @@ from sqlalchemy import delete, event, func, inspect, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, UOWTransaction
 
+from paperus import live
 from paperus.models import (
     Annotation,
     ChangeCounter,
@@ -59,16 +60,16 @@ def current_change(db: Session) -> int:
 
 def _next_change(db: Session) -> int:
     # On the connection, so it does not trigger another flush.
-    return (
-        db.connection()
-        .scalars(
-            update(ChangeCounter)
-            .where(ChangeCounter.name == COUNTER)
-            .values(value=ChangeCounter.value + 1)
-            .returning(ChangeCounter.value)
-        )
-        .one()
-    )
+    connection = db.connection()
+    number = connection.scalars(
+        update(ChangeCounter)
+        .where(ChangeCounter.name == COUNTER)
+        .values(value=ChangeCounter.value + 1)
+        .returning(ChangeCounter.value)
+    ).one()
+    # Live streams are woken when this transaction commits.
+    live.notify(connection)
+    return number
 
 
 def change_number(db: Session) -> int:

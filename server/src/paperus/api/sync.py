@@ -1,18 +1,21 @@
 """Syncing (docs/apps.md, "Offline and sync"): everything the person sees
 that changed since a change number, in one call, and what is gone."""
 
+import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import exists, or_, select
 
 from paperus import changes
 from paperus import notes as notes_module
 from paperus.api.annotations import AnnotationOut, annotation_out
-from paperus.api.deps import DB, CurrentAccess
+from paperus.api.deps import DB, CurrentAccess, current_user
 from paperus.api.items import ItemOut, Reading, item_out
 from paperus.api.notes import NoteDetail, note_out
 from paperus.api.organize import CollectionOut, TagOut, collection_out, tag_outs
@@ -31,6 +34,11 @@ from paperus.models import (
 )
 
 router = APIRouter(tags=["sync"])
+
+# A comment on a quiet stream this often keeps proxies from closing it.
+HEARTBEAT_SECONDS = 20.0
+# At most one signal this often, however busy the library.
+SIGNAL_SECONDS = 2.0
 
 
 class View(BaseModel):
@@ -188,4 +196,48 @@ def changes_since(
             for view in views
         ],
         favourites=list(favourites),
+    )
+
+
+@router.get(
+    "/api/changes/live",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {}}}},
+)
+async def live_changes(request: Request) -> StreamingResponse:
+    """Server-sent events: ``change`` whenever the library changed (at most
+    one every two seconds), with no word of what; then ask
+    ``/api/changes``. A comment every 20 seconds while quiet. Logged in
+    only, like ``/api/changes``."""
+
+    # The login checked with a session of its own, closed before streaming
+    # (the stream holds no connection of the pool).
+    def check() -> None:
+        with request.app.state.sessionmaker() as db:
+            current_user(request, db)
+
+    await asyncio.to_thread(check)
+    signals = request.app.state.signals
+
+    async def stream() -> AsyncIterator[str]:
+        woken = signals.subscribe()
+        try:
+            yield ": live\n\n"
+            while True:
+                try:
+                    await asyncio.wait_for(woken.wait(), HEARTBEAT_SECONDS)
+                except TimeoutError:
+                    yield ": still here\n\n"
+                    continue
+                woken.clear()
+                yield "event: change\ndata:\n\n"
+                await asyncio.sleep(SIGNAL_SECONDS)
+        finally:
+            signals.unsubscribe(woken)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        # Not kept by caches; not held back by nginx.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

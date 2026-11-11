@@ -5887,6 +5887,24 @@
         }
       }
     },
+    "/api/changes/live": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Live Changes",
+        "description": "Server-sent events: ``change`` whenever the library changed (at most\none every two seconds), with no word of what; then ask\n``/api/changes``. A comment every 20 seconds while quiet. Logged in\nonly, like ``/api/changes``.",
+        "operationId": "live_changes",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/event-stream": {}
+            }
+          }
+        }
+      }
+    },
     "/api/version": {
       "get": {
         "tags": [
