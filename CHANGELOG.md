@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.0.25 (2026-11-11)
+
+*The extension learned to read Wiley's mind, ScienceDirect's scripts and Google Scholar's links, and now leaves the room on its own.*
 
 - **Smaller updates of the images**: the release's version number no
   longer touches the layer with the Python dependencies (the ML service's
