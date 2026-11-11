@@ -1217,6 +1217,9 @@ export const storage = <ThrowOnError extends boolean = false>(options?: Options<
  * ``since`` (all of it with 0), in change order, and what is gone since;
  * ``library`` (repeatable) for only these libraries, e.g. one the person
  * may read since. Number first: what changes meanwhile comes next time.
+ *
+ * 410 if removals since then are no longer kept (a device offline for
+ * over a year): it sends what it changed, then syncs from 0.
  */
 export const changesSince = <ThrowOnError extends boolean = false>(options?: Options<ChangesSinceData, ThrowOnError>): RequestResult<ChangesSinceResponses, ChangesSinceErrors, ThrowOnError> => (options?.client ?? client).get<ChangesSinceResponses, ChangesSinceErrors, ThrowOnError>({ url: '/api/changes', ...options });
 

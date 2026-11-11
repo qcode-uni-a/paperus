@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from paperus import (
     auth,
     authors,
+    changes,
     integrity,
     item_references,
     layouts,
@@ -728,6 +729,8 @@ def empty_old_trash(timestamp: int) -> None:
             and datetime.fromtimestamp(timestamp, UTC).hour != config.night_hour
         ):
             return
+        forgotten = changes.forget_removals(db, datetime.now(UTC))
+        log.info("forgot %d removals older than a year (syncing)", forgotten)
         if config.trash_days is None:
             contents, size = trash.collect_garbage(db, context.blobs)
             log.info("removed what nothing uses: %d contents, %d bytes", contents, size)

@@ -113,7 +113,10 @@ every platform (and the installable website, as far as browsers allow).
   the number for next time, the libraries the person reads now (what a
   device keeps from others is out of reach: a group left; a new one is
   synced from 0 with `library=`), the removals, then the records as they
-  are now. A device applies the removals first, then the rest.
+  are now. A device applies the removals first, then the rest. Removals
+  are kept a year: a device offline for longer gets 410, sends its own
+  changes (they need no removals), tells the person it is getting the
+  library again, and syncs from 0.
 - **Pushing**: queued changes sent in order with `If-Match`, as now; on 412
   the conflict is shown, nothing overwritten. Changes as small operations
   that merge (add a tag, remove one from a collection, one annotation)

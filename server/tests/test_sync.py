@@ -1,12 +1,15 @@
 """Syncing: ``/api/changes`` (``paperus.api.sync``)."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
+from paperus import changes as changes_module
+from paperus.models import Removal
 from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n%%EOF\n"
@@ -134,3 +137,24 @@ def test_ids_made_on_a_device(client: TestClient, db: Session) -> None:
     # Only UUIDv7s, as the server makes them.
     old_style = ada.post("/api/tags", {"id": str(uuid.uuid4()), "name": "v4"})
     assert old_style.status_code == 422
+
+
+def test_offline_too_long(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    tag = ada.post("/api/tags", {"name": "old"}).json()["id"]
+    since = changes(ada)["change"]
+    ada.delete(f"/api/tags/{tag}")
+    later = changes(ada, since)
+    assert later["removed"] == [{"id": tag, "kind": "tag"}]
+
+    # A year on, the removal is forgotten: syncing from before it would miss
+    # it, so the device is told to sync anew (after sending its changes).
+    now = datetime.now(UTC)
+    assert changes_module.forget_removals(db, now) == 0
+    db.execute(update(Removal).values(removed_at=now - timedelta(days=366)))
+    assert changes_module.forget_removals(db, now) == 1
+    assert changes_module.forget_removals(db, now) == 0
+    response = ada.get("/api/changes", params={"since": str(since)})
+    assert response.status_code == 410
+    assert changes(ada, later["change"])["removed"] == []
+    assert ids(changes(ada)["tags"]) == []

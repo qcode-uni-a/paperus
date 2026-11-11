@@ -5809,7 +5809,7 @@
           "sync"
         ],
         "summary": "Changes Since",
-        "description": "Everything the person sees that changed after change number\n``since`` (all of it with 0), in change order, and what is gone since;\n``library`` (repeatable) for only these libraries, e.g. one the person\nmay read since. Number first: what changes meanwhile comes next time.",
+        "description": "Everything the person sees that changed after change number\n``since`` (all of it with 0), in change order, and what is gone since;\n``library`` (repeatable) for only these libraries, e.g. one the person\nmay read since. Number first: what changes meanwhile comes next time.\n\n410 if removals since then are no longer kept (a device offline for\nover a year): it sends what it changed, then syncs from 0.",
         "operationId": "changes_since",
         "parameters": [
           {

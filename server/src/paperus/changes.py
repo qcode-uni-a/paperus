@@ -18,10 +18,10 @@ now), and keeps what it may still see.
 
 import uuid
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from itertools import chain
 
-from sqlalchemy import event, inspect, select, update
+from sqlalchemy import delete, event, func, inspect, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, UOWTransaction
 
@@ -44,6 +44,10 @@ from paperus.models import (
 )
 
 COUNTER = "library"
+# Removals are kept this long; a device that last synced before syncs anew.
+KEEP_REMOVALS = timedelta(days=365)
+# The counter of the last change whose removals are no longer kept.
+FORGOTTEN = "removals forgotten"
 _INFO_KEY = "paperus_change"
 
 
@@ -73,6 +77,34 @@ def change_number(db: Session) -> int:
     if _INFO_KEY not in db.info:
         db.info[_INFO_KEY] = _next_change(db)
     return db.info[_INFO_KEY]
+
+
+def forgotten(db: Session) -> int:
+    """Syncing from before this change number misses removals."""
+    return (
+        db.scalar(select(ChangeCounter.value).where(ChangeCounter.name == FORGOTTEN))
+        or 0
+    )
+
+
+def forget_removals(db: Session, now: datetime) -> int:
+    """Delete removals older than ``KEEP_REMOVALS`` (nightly), remember up
+    to which change; how many. Commits."""
+    numbers = db.scalars(
+        delete(Removal)
+        .where(Removal.removed_at < now - KEEP_REMOVALS)
+        .returning(Removal.change)
+    ).all()
+    if numbers:
+        row = insert(ChangeCounter).values(name=FORGOTTEN, value=max(numbers))
+        db.execute(
+            row.on_conflict_do_update(
+                index_elements=[ChangeCounter.name],
+                set_={"value": func.greatest(ChangeCounter.value, row.excluded.value)},
+            )
+        )
+    db.commit()
+    return len(numbers)
 
 
 Stamped = Item | Tag | Collection | Note | Annotation | ItemView

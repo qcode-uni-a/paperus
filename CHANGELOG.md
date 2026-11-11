@@ -23,7 +23,8 @@
   is gone, and the libraries one reads now). New notes, tags, collections
   and annotations may bring their own ID (a UUIDv7 made on the device): a
   create sent again makes no second one. The client's `AnnotationIn` is
-  now `NewAnnotation`.
+  now `NewAnnotation`. Removals are kept a year (migration 0010); syncing
+  from before that answers 410, to sync anew.
 
 ## 0.0.21 (2026-11-11)
 

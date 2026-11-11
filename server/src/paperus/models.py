@@ -271,6 +271,10 @@ class Removal(Base):
     )
     """Where it was: who may read that library is told."""
     change: Mapped[int] = mapped_column(BigInteger, index=True)
+    removed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    """Kept a year (``changes.KEEP_REMOVALS``)."""
 
 
 class Trashable:

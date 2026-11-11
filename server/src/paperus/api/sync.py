@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import exists, or_, select
 
@@ -74,7 +74,14 @@ def changes_since(
     """Everything the person sees that changed after change number
     ``since`` (all of it with 0), in change order, and what is gone since;
     ``library`` (repeatable) for only these libraries, e.g. one the person
-    may read since. Number first: what changes meanwhile comes next time."""
+    may read since. Number first: what changes meanwhile comes next time.
+
+    410 if removals since then are no longer kept (a device offline for
+    over a year): it sends what it changed, then syncs from 0."""
+    if since and since < changes.forgotten(db):
+        raise HTTPException(
+            410, "offline too long: send this device's changes, then sync from 0"
+        )
     number = changes.current_change(db)
     libraries = access.readable
     if library is not None:
