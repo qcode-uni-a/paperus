@@ -48,6 +48,7 @@ pub fn start(app: AppHandle, label: String, next: String) {
         let outcome = log_in(&app, &library);
         match outcome {
             Ok(Some(session)) => {
+                libraries::remember_session(&app, &library, Some(&session.token));
                 let set = window.set_cookie(cookie(&library, session.token, session.max_age));
                 let target = library.join(&next).unwrap_or(library);
                 if set.is_ok() {

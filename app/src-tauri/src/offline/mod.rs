@@ -271,8 +271,7 @@ fn sync(
         return None;
     }
     let Some(token) = libraries::session(&window, &Url::parse(&url).ok()?) else {
-        let cookies = window.cookies().map(|cookies| cookies.len()).unwrap_or(0);
-        eprintln!("offline: {url}: not logged in, not synced ({cookies} cookies)");
+        eprintln!("offline: {url}: not logged in, not synced");
         return None;
     };
     let folder = folder(app, &url)?;
@@ -280,9 +279,13 @@ fn sync(
     let server = Server {
         url: &url,
         token: &token,
+        logged_out: Default::default(),
     };
     // What was changed offline first: what comes back then includes it.
     if !push(&server, &store) {
+        if server.logged_out.get() {
+            libraries::remember_session(app, &Url::parse(&url).ok()?, None);
+        }
         return None;
     }
     let set_aside = store.unsaved().len();
@@ -293,6 +296,10 @@ fn sync(
     let before = store.since();
     if let Err(error) = store::pull(&mut store, &url, &token) {
         eprintln!("offline: {url}: not synced: {error}");
+        // The login ended (logged out, or too old): not used again.
+        if error.ends_with(": 401") {
+            libraries::remember_session(app, &Url::parse(&url).ok()?, None);
+        }
         return None;
     }
     if store.since() != before || store.answer(ACCOUNT[0]).is_none() {
@@ -371,6 +378,10 @@ fn push(server: &Server, store: &Store) -> bool {
             404 => "It is no longer in the library.".to_owned(),
             403 => "You may no longer change it.".to_owned(),
             409 | 422 => format!("The library refused it: {detail}"),
+            401 => {
+                server.logged_out.set(true);
+                return false;
+            }
             _ => return false,
         };
         let _ = store.set_aside(&change, &why);
@@ -382,6 +393,8 @@ fn push(server: &Server, store: &Store) -> bool {
 struct Server<'a> {
     url: &'a str,
     token: &'a str,
+    /// The library answered 401: its login ended.
+    logged_out: std::cell::Cell<bool>,
 }
 
 impl Server<'_> {

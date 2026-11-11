@@ -91,7 +91,9 @@ pub fn of(app: &AppHandle, url: &Url) -> Option<Library> {
 pub const SESSION_COOKIE: &str = "paperus_session";
 
 /// The window's login to the library (its cookie), if logged in. Not on
-/// the main thread: reading cookies waits for it.
+/// the main thread: reading cookies waits for it. Kept by the app too
+/// (`sessions.json`, the person's alone): WebKitGTK's cookie functions do
+/// not see cookies kept from an earlier run, though the window uses them.
 pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
     let login = |cookies: Vec<tauri::webview::Cookie<'static>>| {
         cookies
@@ -104,13 +106,54 @@ pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
             })
             .map(|cookie| cookie.value().to_owned())
     };
-    // WebKitGTK leaves out cookies kept from before the app started; all of
-    // the window's have them.
-    window
-        .cookies_for_url(library.clone())
-        .ok()
-        .and_then(login)
-        .or_else(|| window.cookies().ok().and_then(login))
+    let app = window.app_handle();
+    match window.cookies_for_url(library.clone()).ok().and_then(login) {
+        Some(token) => {
+            remember_session(app, library, Some(&token));
+            Some(token)
+        }
+        None => sessions(app).remove(&key(library)),
+    }
+}
+
+fn sessions_file(app: &AppHandle) -> Option<PathBuf> {
+    Some(app.path().app_data_dir().ok()?.join("sessions.json"))
+}
+
+fn sessions(app: &AppHandle) -> std::collections::HashMap<String, String> {
+    sessions_file(app)
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// Keep the app's login to a library (``None``: forget it, as when the
+/// library no longer takes it).
+pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
+    let mut kept = sessions(app);
+    let before = kept.get(&key(library)).cloned();
+    match token {
+        Some(token) => kept.insert(key(library), token.to_owned()),
+        None => kept.remove(&key(library)),
+    };
+    if kept.get(&key(library)) == before.as_ref() {
+        return;
+    }
+    let Some(path) = sessions_file(app) else {
+        return;
+    };
+    if let Some(folder) = path.parent() {
+        let _ = fs::create_dir_all(folder);
+    }
+    if let Ok(bytes) = serde_json::to_vec(&kept) {
+        let _ = fs::write(&path, bytes);
+        // Only for the person themselves.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+        }
+    }
 }
 
 /// For talking to libraries. Certificates are checked as the system does
