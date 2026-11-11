@@ -169,7 +169,11 @@ fn download() -> Result<Vec<u8>, String> {
             None => format!("Downloading the library's parts… {} MB", data.len() >> 20),
         });
     }
-    let got = format!("{:x}", Sha256::digest(&data));
+    // Byte by byte: sha2 0.11's digest has no hex formatting.
+    let got: String = Sha256::digest(&data)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     if got != expected {
         return Err("The downloaded parts are not the release's (their SHA-256 differs).".into());
     }
