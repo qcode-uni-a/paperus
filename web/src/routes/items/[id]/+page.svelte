@@ -37,6 +37,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import StarButton from '#lib/StarButton.svelte';
 	import { canKeep, keep, keeping } from '#lib/offline.svelte.ts';
+	import OfflineIcon from '#lib/OfflineIcon.svelte';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
@@ -337,6 +338,7 @@
 					>{/if}
 			</h1>
 			{#if !item.deleted_at}
+				{#if keeping.available.includes(item.id)}<OfflineIcon size={18} />{/if}
 				<StarButton item={item.id} starred={item.favourite ?? false} />
 				<MenuButton label="Item actions">
 					{#if viewed}

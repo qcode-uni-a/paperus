@@ -161,6 +161,11 @@ try {
 	await until(async () => /^paperus-offline:\/\/localhost\//.test(await shown()), 30);
 	await until(async () => (await pageText()).includes('Offline:'), 30);
 	await until(async () => (await pageText()).includes(title), 30);
+	// The paper opened last is marked as available offline.
+	const marked = await inApp(
+		`done(document.querySelectorAll('[aria-label="Available offline on this device"]').length)`
+	);
+	assert.ok(marked >= 1);
 	console.log('ok: offline, the library as last synced');
 	await inApp(`location.href = '/items/${paper}'; done()`);
 	await until(async () => (await pageText()).includes(title), 30);

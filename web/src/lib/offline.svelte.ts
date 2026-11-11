@@ -1,14 +1,16 @@
 /** "Keep offline" on this device, in the app (app/src-tauri/src/offline):
  * papers and collections marked so are kept whole with their PDFs, and a
  * collection's new papers too. The app says what is kept after each page
- * load (``window.paperusApp.kept``); marking asks it with a link of its
- * own, as logging in in the browser does. */
+ * load (``window.paperusApp.kept``), also in the copy offline; marking asks
+ * it with a link of its own, as logging in in the browser does. */
 import { app, offline } from '#lib/app.ts';
 
 function told() {
 	return {
 		items: [...(app?.kept?.items ?? [])],
-		collections: [...(app?.kept?.collections ?? [])]
+		collections: [...(app?.kept?.collections ?? [])],
+		/** The papers kept whole on this device now (as of the last sync). */
+		available: [...(app?.kept?.available ?? [])]
 	};
 }
 

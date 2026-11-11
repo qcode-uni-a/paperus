@@ -8,6 +8,8 @@
 	import { isShared } from '#lib/organize.svelte.ts';
 	import FileIcon from '#lib/FileIcon.svelte';
 	import SharedIcon from '#lib/SharedIcon.svelte';
+	import OfflineIcon from '#lib/OfflineIcon.svelte';
+	import { keeping } from '#lib/offline.svelte.ts';
 	import StarButton from '#lib/StarButton.svelte';
 	import { none } from '#lib/transitions.ts';
 	import type { TransitionConfig } from 'svelte/transition';
@@ -70,7 +72,11 @@
 	<span class="corner"
 		><FileIcon files={item.files ?? []} />{#if isShared(item.library_id)}<SharedIcon
 				owner={item.library_id}
-			/>{/if}<StarButton item={item.id} starred={item.favourite ?? false} size={16} /></span
+			/>{/if}{#if keeping.available.includes(item.id)}<OfflineIcon />{/if}<StarButton
+			item={item.id}
+			starred={item.favourite ?? false}
+			size={16}
+		/></span
 	>
 	{#if note}<span class="note">{note}</span>{/if}
 	<a class="title" href={resolve('/items/[id]', { id: item.id })}><Title text={item.title} /></a>

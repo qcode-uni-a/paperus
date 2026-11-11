@@ -147,6 +147,22 @@ impl Store {
         Ok(())
     }
 
+    /// The papers kept whole on this device (with their files), as of the
+    /// last sync.
+    pub fn available(&self) -> Vec<String> {
+        self.state("available")
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn set_available(&self, papers: &[String]) -> rusqlite::Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO state (key, value) VALUES ('available', ?1)",
+            [serde_json::to_string(papers).unwrap_or_default()],
+        )?;
+        Ok(())
+    }
+
     /// The libraries the person read at the last sync.
     pub fn libraries(&self) -> Vec<String> {
         self.state("libraries")

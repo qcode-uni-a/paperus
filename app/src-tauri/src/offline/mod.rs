@@ -576,16 +576,30 @@ pub fn mark(window: &WebviewWindow, kind: &str, id: &str, on: bool) {
 /// (`window.paperusApp.kept`, web/src/lib/offline.svelte.ts).
 pub fn tell_kept(window: &WebviewWindow) {
     let app = window.app_handle();
-    let Some(library) = window.url().ok().and_then(|url| libraries::of(app, &url)) else {
+    // A library's page, or its copy offline.
+    let Ok(url) = window.url() else {
         return;
     };
-    let marked = open_store(app, &library.url)
-        .map(|store| store.marked())
-        .unwrap_or_default();
+    let copy =
+        url.scheme() == SCHEME || url.host_str() == Some(format!("{SCHEME}.localhost").as_str());
+    let Some(library) = libraries::of(app, &url)
+        .map(|library| library.url)
+        .or_else(|| copy.then(open_library).flatten())
+    else {
+        return;
+    };
+    let Some(store) = open_store(app, &library) else {
+        return;
+    };
+    let marked = store.marked();
     let _ = window.eval(format!(
         "if (window.paperusApp) {{ window.paperusApp.kept = {}; \
          window.dispatchEvent(new Event('paperus-kept')); }}",
-        serde_json::json!({"items": marked.items, "collections": marked.collections})
+        serde_json::json!({
+            "items": marked.items,
+            "collections": marked.collections,
+            "available": store.available(),
+        })
     ));
 }
 
@@ -597,6 +611,7 @@ fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
     let _ = fs::create_dir_all(&files);
     let kept = kept(store, server);
     let mut wanted: HashSet<String> = HashSet::new();
+    let mut available: Vec<String> = Vec::new();
     for id in &kept {
         let Some(item) = store.get("item", id) else {
             continue;
@@ -633,7 +648,17 @@ fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
                 let _ = server.keep(store, path, change);
             }
         }
+        let files_kept = item["files"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|file| file["id"].as_str())
+            .all(|file| files.join(file).exists());
+        if files_kept && store.answer(&page).is_some() {
+            available.push(id.clone());
+        }
     }
+    let _ = store.set_available(&available);
     // Let go of what is no longer kept.
     let keep: HashSet<&String> = kept.iter().collect();
     for prefix in ["/api/items/", "/api/files/"] {

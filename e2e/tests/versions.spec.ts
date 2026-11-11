@@ -40,10 +40,19 @@ test('keep a paper offline, in the app only', async ({ page }) => {
 		(window as unknown as { paperusApp: object }).paperusApp = {
 			version: '999.0.0',
 			features: { offline: 1 },
-			kept: { items: [id], collections: [] }
+			kept: { items: [id], collections: [], available: [id] }
 		};
 	}, paper.id);
 	await page.reload();
 	await page.getByRole('button', { name: 'Item actions' }).click();
 	await expect(entry).toHaveAttribute('aria-checked', 'true');
+	// Kept whole: marked in the lists and on its page.
+	const mark = page.getByRole('img', { name: 'Available offline on this device' });
+	await expect(mark).toBeVisible();
+	await page.goto('/');
+	await expect(
+		page.getByRole('listitem').filter({ hasText: paper.title }).getByRole('img', {
+			name: 'Available offline on this device'
+		})
+	).toBeVisible();
 });

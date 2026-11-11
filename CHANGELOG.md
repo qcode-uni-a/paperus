@@ -16,7 +16,8 @@
   collections, annotations, where one stopped reading; whole, with their
   PDFs: the papers opened last, and those marked "Keep offline on this
   device", alone or by collection, whose new papers come by themselves)
-  and of the website, synced every minute.
+  and of the website, synced every minute. Papers kept so carry a small
+  mark in the lists and on their page.
   When the server cannot be reached, the app opens that copy: lists,
   papers, notes, annotations and keyword search work, and annotations,
   notes and where one stopped reading can be changed: queued, and sent

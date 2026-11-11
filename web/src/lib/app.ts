@@ -4,7 +4,7 @@ export interface App {
 	version?: string;
 	features?: Record<string, number>;
 	/** What this device keeps offline (told after each page load). */
-	kept?: { items: string[]; collections: string[] };
+	kept?: { items: string[]; collections: string[]; available?: string[] };
 }
 
 export const app: App | null =
