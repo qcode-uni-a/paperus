@@ -53,5 +53,5 @@ for _ in $(seq 30); do curl -sf http://127.0.0.1:4444/status >/dev/null && break
 PAPERUS_APP_TESTS_SYSTEM=windows node "$ROOT/app/tests/journeys.mjs" "$APP" "$STATE/opened.txt" \
   "$(cygpath -w "$STATE/opened-with.pdf")" "$APPDATA/io.github.qcode-uni-a.paperus" ||
   { tail -n 30 "$STATE/server.log" >&2
-    grep -E "offline:|login to|panicked" "$STATE/driver.log" >&2 || tail -n 30 "$STATE/driver.log" >&2
+    echo "--- tauri-driver:" >&2; tail -n 60 "$STATE/driver.log" >&2
     exit 1; }

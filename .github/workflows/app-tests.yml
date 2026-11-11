@@ -35,10 +35,18 @@ jobs:
       - run: cargo build --locked
         working-directory: app/src-tauri
       - run: cargo install tauri-driver --locked
-      # Edge's WebDriver matching the runner's WebView2.
-      - run: |
-          cargo install --git https://github.com/chippers/msedgedriver-tool
-          msedgedriver-tool
+      # Edge's WebDriver for exactly the runner's WebView2 runtime (which
+      # may differ from the Edge browser's version).
+      - name: Edge's WebDriver for WebView2
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $version = (Get-ItemProperty -Path $key).pv
+          Write-Output "WebView2 runtime: $version"
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile edgedriver.zip
+          Expand-Archive edgedriver.zip -DestinationPath edgedriver
+          Copy-Item edgedriver\msedgedriver.exe msedgedriver.exe
+          .\msedgedriver.exe --version
       # nmake and cl for pgvector.
       - uses: ilammy/msvc-dev-cmd@v1
       # The server, PostgreSQL with pgvector and the website, as the app's
