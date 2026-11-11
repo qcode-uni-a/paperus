@@ -774,7 +774,7 @@ mark {
 
 .ideas {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: clamp(28px, 3vw, 40px);
 	margin-top: clamp(48px, 7vw, 88px);
 }
@@ -791,7 +791,7 @@ mark {
 	line-height: 1.5;
 }
 
-/* The four small pictures. Each one's plain style is its last frame. */
+/* The six small pictures. Each one's plain style is its last frame. */
 .art {
 	position: relative;
 	display: grid;
@@ -1023,6 +1023,132 @@ mark {
 	border-right: 2.5px solid #1b2440;
 	border-bottom: 2.5px solid #1b2440;
 	rotate: 45deg;
+}
+
+/* Offline: the papers kept, a highlight made without a connection. */
+.offline .sheet {
+	position: relative;
+	display: grid;
+	gap: 10px;
+	width: 70%;
+	padding: 18px 16px 16px;
+	border-radius: 12px;
+	background: var(--surface);
+	box-shadow: 0 1px 2px rgb(27 36 64 / 0.08);
+}
+.offline .signal {
+	position: absolute;
+	top: -12px;
+	right: -12px;
+	width: 30px;
+	height: 30px;
+	padding: 5px;
+	border-radius: 50%;
+	background: var(--surface);
+	box-shadow: 0 1px 2px rgb(27 36 64 / 0.12);
+	fill: none;
+	stroke: var(--muted);
+	stroke-width: 2;
+	stroke-linecap: round;
+}
+.offline .signal circle {
+	fill: var(--muted);
+	stroke: none;
+}
+.offline .signal .cut {
+	stroke: var(--royal);
+}
+.offline .row {
+	position: relative;
+	isolation: isolate;
+	display: grid;
+	grid-template-columns: 18px 1fr;
+	align-items: center;
+	gap: 8px;
+}
+.offline .row b {
+	height: 22px;
+	border-radius: 3px;
+	background: var(--rule);
+}
+.offline .row i {
+	height: 6px;
+	background: var(--rule);
+}
+.offline .row i.short {
+	width: 60%;
+}
+.offline .row i.mark {
+	position: absolute;
+	top: calc(50% - 5px);
+	left: 26px;
+	right: 30%;
+	height: 10px;
+	background: var(--highlighter);
+	opacity: 0.8;
+	transform-origin: left;
+	z-index: -1;
+}
+.offline .kept {
+	position: absolute;
+	right: 0;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--royal);
+}
+.offline .kept::after {
+	content: '';
+	position: absolute;
+	left: 4px;
+	top: 2px;
+	width: 4px;
+	height: 7px;
+	border-right: 2px solid var(--on-royal);
+	border-bottom: 2px solid var(--on-royal);
+	rotate: 45deg;
+}
+
+/* A library on one's own computer: the database inside the laptop. */
+.local .laptop {
+	display: grid;
+	justify-items: center;
+	width: 66%;
+}
+.local .screen {
+	display: grid;
+	align-content: center;
+	justify-items: center;
+	gap: 7px;
+	width: 84%;
+	height: 92px;
+	border: 5px solid var(--ink);
+	border-bottom-width: 6px;
+	border-radius: 10px 10px 0 0;
+	background: var(--surface);
+}
+.local .screen i {
+	width: 60%;
+	height: 6px;
+	background: var(--rule);
+}
+.local .screen i.short {
+	width: 40%;
+}
+.local .db {
+	position: relative;
+	width: 30px;
+	height: 26px;
+	margin-bottom: 4px;
+	border-radius: 50% / 6px;
+	background: var(--royal);
+	box-shadow: inset 0 6px 0 -3px color-mix(in srgb, var(--on-royal) 40%, var(--royal));
+}
+.local .base {
+	width: 100%;
+	height: 9px;
+	border-radius: 0 0 8px 8px;
+	background: var(--ink);
 }
 
 /* Getting it. */
@@ -1499,6 +1625,29 @@ pre {
 	}
 	.js .publish .tick {
 		animation: pop 0.5s var(--spring) 2.4s both;
+	}
+
+	.js .offline .signal {
+		animation: drop 0.6s var(--spring) 0.3s both;
+	}
+	.js .offline .kept {
+		animation: pop 0.5s var(--spring) 0.9s both;
+	}
+	.js .offline .r2 .kept {
+		animation-delay: 1.1s;
+	}
+	.js .offline .row i.mark {
+		animation: sweep 0.9s var(--ease) 1.6s both;
+	}
+
+	.js .local .laptop {
+		animation: pop 0.7s var(--spring) 0.2s both;
+	}
+	.js .local .db {
+		animation: drop 0.6s var(--spring) 0.8s both;
+	}
+	.js .local .screen i {
+		animation: rise 0.6s var(--ease) 1.2s both;
 	}
 }
 
