@@ -19,10 +19,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The oldest supported runner: the C extension built here (pgvector)
-          # then loads on older Linux too.
+          # PostgreSQL's binaries need glibc 2.36 or later (Debian 12,
+          # Ubuntu 23.04, Fedora 37); pgvector is built against them here.
           - name: Linux
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
           - name: macOS
             os: macos-latest
