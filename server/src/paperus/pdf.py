@@ -12,8 +12,8 @@ import ctypes
 import logging
 import os
 import re
-import resource
 import struct
+import sys
 import threading
 import zlib
 from collections.abc import Callable, Generator
@@ -27,6 +27,11 @@ import pypdfium2
 import pypdfium2.raw as pdfium_c
 
 from paperus import page_layout
+
+# Unix only; on Windows (the app's library on this computer) the helpers go
+# without a memory limit.
+if sys.platform != "win32":
+    import resource
 
 log = logging.getLogger(__name__)
 
@@ -53,8 +58,9 @@ _pool_lock = threading.Lock()
 
 def _limit_memory() -> None:
     # Where not allowed (some containers), the helper goes without.
-    with contextlib.suppress(ValueError, OSError):
-        resource.setrlimit(resource.RLIMIT_AS, (MEMORY_BYTES, MEMORY_BYTES))
+    if sys.platform != "win32":
+        with contextlib.suppress(ValueError, OSError):
+            resource.setrlimit(resource.RLIMIT_AS, (MEMORY_BYTES, MEMORY_BYTES))
 
 
 def _get_pool() -> ProcessPoolExecutor:
