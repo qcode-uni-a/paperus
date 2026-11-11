@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import storage, system
 from paperus.models import Blob, File, Item, SystemSetting, Version
 from paperus.storage import BlobStore
 
@@ -66,7 +67,8 @@ def check(
     ]
     unused_bytes = sum(stored[sha][1] for sha in unused)
     removed = 0
-    if remove_unused:
+    # Only from a folder this library owns (``storage.owns``).
+    if remove_unused and unused and storage.owns(blobs, system.installation_id(db)):
         for sha in unused:
             blobs.delete(sha)
             removed += 1

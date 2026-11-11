@@ -13,6 +13,11 @@
   in as copy-on-write clones on APFS, Btrfs and XFS (edits in the copy
   stay apart from the library's), else as hard links if chosen, else as
   copies; the administration page says how many of each.
+- **A folder of stored files belongs to one library** (#28): a marker in
+  it (`.paperus-library`) names the installation; a library deletes
+  nothing from a folder another one owns, or one out of reach (an
+  unmounted share), where its clean-ups would otherwise delete the other's
+  files.
 - **Installers tested** (#45): each release installs the `.deb`, the
   `.msi`, the setup `.exe` and the `.dmg` as people do, starts the app from
   there and removes it again.

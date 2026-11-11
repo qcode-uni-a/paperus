@@ -358,6 +358,15 @@ backup with an empty storage, or an incomplete one) get a warning naming
 the papers that would open without their file. Files in the storage that
 the backup does not know (added after it) stay on disk.
 
+**One library per folder.** The folder of stored files (`files/`, or
+`PAPERUS_STORAGE_PATH`) carries a marker, `.paperus-library`, naming the
+installation that owns it, written at its first clean-up. Two libraries
+must not share a folder: each one's clean-up (emptying the trash, removing
+what nothing uses) deletes files its own database does not know. A library
+whose folder names another deletes nothing there and logs an error;
+writing stays safe (each content is written once, by its SHA-256). A
+restored backup keeps the installation's id, so it owns its folder again.
+
 **Replacing** a running installation's database needs it stopped first:
 
 ```sh

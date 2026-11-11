@@ -210,6 +210,32 @@ class S3Store(BlobStore):
                         continue
 
 
+MARKER = ".paperus-library"
+
+
+def owns(blobs: BlobStore, installation: str) -> bool:
+    """Whether this library may delete from the store's folder: its marker
+    names this library, or there is none and this library claims it. Two
+    libraries sharing a folder would each delete the other's files (those
+    its own database does not know). Writing is safe either way (each
+    content is written once, by its SHA-256). False if the folder cannot be
+    reached."""
+    if not isinstance(blobs, FilesystemStore):
+        return True
+    marker = blobs.root / MARKER
+    try:
+        return marker.read_text().strip() == installation
+    except FileNotFoundError:
+        try:
+            blobs.root.mkdir(parents=True, exist_ok=True)
+            marker.write_text(installation + "\n")
+        except OSError:
+            return False
+        return True
+    except OSError:
+        return False
+
+
 def make_blob_store(settings: Settings) -> BlobStore:
     if settings.storage_backend == "s3":
         if not settings.s3_bucket:

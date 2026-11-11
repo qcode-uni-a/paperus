@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, delete, exists, select
 from sqlalchemy.orm import Session
 
-from paperus import changes
+from paperus import changes, storage, system
 from paperus.models import (
     Blob,
     Chunk,
@@ -112,6 +112,13 @@ def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
     db.commit()
     # After the commit: a crash in between leaves files without a row (found
     # by an integrity check), never a row without its file.
+    if orphans and not storage.owns(blobs, system.installation_id(db)):
+        log.error(
+            "the folder of stored files is another library's (or out of reach):"
+            " %d unused contents left in it",
+            len(orphans),
+        )
+        return len(orphans), sum(size or 0 for _, size in orphans)
     for sha256, _ in orphans:
         try:
             blobs.delete(sha256)

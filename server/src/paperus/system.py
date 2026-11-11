@@ -189,6 +189,24 @@ def save_config(db: Session, config: SystemConfig) -> None:
     _save(db, KEY, config.model_dump(mode="json"))
 
 
+INSTALLATION_KEY = "installation"
+
+
+def installation_id(db: Session) -> str:
+    """This library's own id, made once: it names the folder of stored files
+    the library owns (``storage.owns``). Commits when it makes it."""
+    row = db.get(SystemSetting, INSTALLATION_KEY)
+    if row is None:
+        db.execute(
+            insert(SystemSetting)
+            .values(key=INSTALLATION_KEY, value={"id": str(uuid.uuid4())})
+            .on_conflict_do_nothing()
+        )
+        db.commit()
+        row = db.get_one(SystemSetting, INSTALLATION_KEY)
+    return str(row.value["id"])
+
+
 OIDC_SECRET_KEY = "oidc_secret"
 
 
