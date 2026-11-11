@@ -1,10 +1,14 @@
 """Change numbers, syncing, edits with If-Match, and the trash."""
 
+import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
+from paperus.models import Annotation, ItemView
 from tests.conftest import FakeDOIRegistry
+from tests.people import Person
 
 PDF = b"%PDF-1.7\n%%EOF\n"
 
@@ -65,6 +69,47 @@ def test_sync_since(logged_in: TestClient) -> None:
 
     everything = logged_in.get("/api/items", params={"since": 0}).json()
     assert {item["id"] for item in everything} == {a["id"], b["id"], c["id"]}
+
+
+def test_annotations_and_reading_positions_are_numbered(
+    client: TestClient, db: Session
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Read and marked")["id"]
+    file = ada.post(
+        f"/api/items/{paper}/files",
+        files={"upload": ("a.pdf", PDF, "application/pdf")},
+    ).json()["id"]
+    before = int(ada.get("/api/items").headers["Last-Change"])
+
+    def view() -> ItemView | None:
+        db.expire_all()
+        return db.get(ItemView, (uuid.UUID(ada.id), uuid.UUID(paper)))
+
+    ada.post(f"/api/items/{paper}/viewed")
+    opened = view()
+    assert opened is not None and opened.change == before + 1
+    place = {"file_id": file, "page": 1, "top": 10.0}
+    ada.put(f"/api/items/{paper}/reading", place)
+    read = view()
+    assert read is not None and read.change == before + 2
+
+    mark = ada.post(
+        f"/api/files/{file}/annotations",
+        {
+            "kind": "note",
+            "page_index": 0,
+            "position": {"rects": [[10, 10, 20, 20]]},
+            "color": "#ffd400",
+        },
+    ).json()
+    annotation = db.get(Annotation, uuid.UUID(mark["id"]))
+    assert annotation is not None and annotation.change == before + 3
+    ada.patch(f"/api/annotations/{mark['id']}", {"comment": "Later"})
+    db.refresh(annotation)
+    assert annotation.change == before + 4
+    # The paper's own number stays: none of this changed the paper.
+    assert ada.get(f"/api/items/{paper}").json()["change"] == before
 
 
 def test_overrides_need_current_etag(logged_in: TestClient) -> None:

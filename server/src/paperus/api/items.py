@@ -789,12 +789,18 @@ def unstar_item(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
 def mark_viewed(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
     """Remember that the person opened the item (for their recent papers)."""
     get_readable_item(db, access, item_id)
+    change = changes.change_number(db)
     db.execute(
         insert(ItemView)
-        .values(user_id=access.user.id, item_id=item_id, viewed_at=func.now())
+        .values(
+            user_id=access.user.id,
+            item_id=item_id,
+            viewed_at=func.now(),
+            change=change,
+        )
         .on_conflict_do_update(
             index_elements=[ItemView.user_id, ItemView.item_id],
-            set_={"viewed_at": func.now()},
+            set_={"viewed_at": func.now(), "change": change},
         )
     )
     db.commit()
@@ -832,6 +838,7 @@ def set_reading(
     if not any(f.id == body.file_id for v in item.versions for f in v.files):
         raise HTTPException(404, "no such file of this item")
     reading = body.model_dump(mode="json")
+    change = changes.change_number(db)
     db.execute(
         insert(ItemView)
         .values(
@@ -839,10 +846,11 @@ def set_reading(
             item_id=item_id,
             viewed_at=func.now(),
             reading=reading,
+            change=change,
         )
         .on_conflict_do_update(
             index_elements=[ItemView.user_id, ItemView.item_id],
-            set_={"reading": reading},
+            set_={"reading": reading, "change": change},
         )
     )
     db.commit()

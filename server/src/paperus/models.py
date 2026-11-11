@@ -614,6 +614,10 @@ class ItemView(Base):
     reading: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     """Where they stopped (``api.items.Reading``: the file, its page, the
     place on it), to go on from there in either view."""
+    change: Mapped[int] = mapped_column(
+        BigInteger, server_default=text("0"), index=True
+    )
+    """Change number of the last open or reading position (``paperus.changes``)."""
 
 
 class Version(Record, Base):
@@ -1274,6 +1278,10 @@ class Annotation(Record, Base):
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    change: Mapped[int] = mapped_column(
+        BigInteger, server_default=text("0"), index=True
+    )
+    """Change number of the last change (``paperus.changes``)."""
     # Named like SQLAlchemy's text(): after the defaults that use it.
     text: Mapped[str | None] = mapped_column(Text)
     """The text marked, or written (``text``)."""

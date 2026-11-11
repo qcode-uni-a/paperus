@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **A library on this computer, without a server** (the app, #39): made
+  from the app's start page, for one person. The first time, the app
+  downloads its parts from the GitHub release (Python with the server,
+  PostgreSQL with pgvector, the website; about 150 MB, checked against
+  their SHA-256), makes a database with a random password and the only
+  account, and opens the library logged in. The server and the worker stop
+  with the app, also when it crashes. The parts are built for Linux
+  (glibc 2.36 or later), macOS (Apple silicon) and Windows, and attached
+  to each release (`app/local/`, `local.yml`).
+- **The server runs on Windows** (for that library): the PDF helpers'
+  memory limit is left out there.
+- **Change numbers for annotations and reading positions**, a first step
+  towards syncing for offline use (migration 0008).
+
 ## 0.0.21 (2026-11-11)
 
 - **Scans are drawn**: PDFs whose pages are images in JBIG2 or JPEG 2000

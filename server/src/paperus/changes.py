@@ -1,7 +1,8 @@
 """Change numbers: which items changed since a client last looked.
 
 Every transaction that changes an item (or its versions, identifiers, files,
-tags and collection memberships), a tag or a collection takes the next number
+tags and collection memberships), a tag, a collection, a note, an annotation
+or where someone is reading (``ItemView``) takes the next number
 from the library's counter and stamps it on what changed (like Zotero's
 library version). Taking the number locks the counter row
 until commit, so numbers become visible in order and ``since=N`` never misses
@@ -15,6 +16,7 @@ from sqlalchemy import event, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.models import (
+    Annotation,
     ChangeCounter,
     Collection,
     CollectionItem,
@@ -23,6 +25,7 @@ from paperus.models import (
     Identifier,
     Item,
     ItemTag,
+    ItemView,
     Note,
     NoteItem,
     Tag,
@@ -53,10 +56,21 @@ def _next_change(db: Session) -> int:
     )
 
 
-def _stamped(obj: object) -> Item | Tag | Collection | Note | None:
+def change_number(db: Session) -> int:
+    """This transaction's change number, taken at its first change (for
+    statements that bypass the ORM's flush, such as upserts)."""
+    if _INFO_KEY not in db.info:
+        db.info[_INFO_KEY] = _next_change(db)
+    return db.info[_INFO_KEY]
+
+
+Stamped = Item | Tag | Collection | Note | Annotation | ItemView
+
+
+def _stamped(obj: object) -> Stamped | None:
     """The object whose change number a change to ``obj`` moves."""
     match obj:
-        case Item() | Tag() | Collection() | Note():
+        case Item() | Tag() | Collection() | Note() | Annotation() | ItemView():
             return obj
         case NoteItem() | CollectionNote():
             return obj.note
@@ -99,11 +113,10 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
         and (target := _stamped(obj)) is not None
     }
     with db.no_autoflush:
-        if _INFO_KEY not in db.info:
-            db.info[_INFO_KEY] = _next_change(db)
+        number = change_number(db)
         now = datetime.now(UTC)
         for target in stamped:
-            target.change = db.info[_INFO_KEY]
+            target.change = number
             if isinstance(target, Item | Note) and id(target) in own_change | content:
                 target.changed_at = now
 
