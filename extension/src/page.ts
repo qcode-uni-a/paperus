@@ -136,7 +136,15 @@ export async function fetchPdf(
 	| { error: string; status?: number; html?: string; next?: string }
 > {
 	try {
-		let response = await fetch(url, { credentials: 'include' });
+		let response: Response;
+		try {
+			response = await fetch(url, { credentials: 'include' });
+		} catch (error) {
+			// The browser let the page not fetch it (a redirect to another
+			// site, as AIP's PDFs go to Silverchair's signed addresses): the
+			// extension may.
+			return { error: `The PDF could not be fetched: ${String(error)}`, next: url };
+		}
 		// A page in between that sends the browser on to the PDF
 		// (ScienceDirect's "pdfft": a refresh to its PDF's signed address, or
 		// a link in its message): followed once.

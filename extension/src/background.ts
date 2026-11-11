@@ -387,8 +387,9 @@ async function saveClosedTab(
     : saveFile(pdf, url, owner);
 }
 
-/** A PDF the page could not fetch from another site (where a page in
- * between sent it): fetched by the extension, if it may go there. */
+/** A PDF the page could not fetch (from another site: where a page in
+ * between sent it, or a redirect): fetched by the extension, if it may go
+ * there; once. */
 async function onwards(pdf: Pdf): Promise<Pdf> {
   if (!("error" in pdf) || !pdf.next) return pdf;
   const next = pdf.next;

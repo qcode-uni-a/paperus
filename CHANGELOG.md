@@ -7,6 +7,10 @@
   1.7 GB, CUDA's more), the CUDA image's GPU runtime comes before the code,
   and the build cache lives in the registry next to the images (GitHub's
   10 GB cache pushed the big layers out). An update downloads what changed.
+- **The extension gets PDFs that the browser would not let the page
+  fetch** (AIP's: their PDF link redirects to a signed address on another
+  site, Silverchair's): "NetworkError when attempting to fetch resource".
+  The extension fetches those itself, with its access to websites.
 - **The extension's popup**: a site at a numbered address (127.0.0.1)
   showed as "0"; a site without a favicon shows a globe.
 
