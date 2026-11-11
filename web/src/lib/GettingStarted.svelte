@@ -46,8 +46,8 @@
 					{
 						done: steps.imported,
 						title: 'Bring your library from Zotero',
-						text: 'Or from Mendeley, JabRef or EndNote: its export, with the files.',
-						links: [[resolve('/import'), 'Import a library']]
+						text: 'Or from Mendeley, JabRef or EndNote: its export with the files, a zip or the whole folder.',
+						links: [[`${resolve('/settings')}?open=import`, 'Settings → Import']]
 					},
 					{
 						done: steps.extension,

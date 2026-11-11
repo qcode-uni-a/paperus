@@ -15,7 +15,7 @@ const PAGES = [
 	'/collections',
 	'/settings',
 	'/trash',
-	'/import',
+	'/settings?open=import',
 	'/notes',
 	'/manage/tags',
 	'/manage/authors',

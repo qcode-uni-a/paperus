@@ -81,13 +81,13 @@ export function watchImport(importId: string, filename: string): void {
 							(missing ? `; ${missing} files were not in the export` : '') +
 							(problems ? `; ${problems} problems` : '') +
 							'.',
-						link: { href: resolve('/import'), label: 'See the report' }
+						link: { href: `${resolve('/settings')}?open=import`, label: 'See the report' }
 					}
 				: {
 						kind: 'warning',
 						title: `Import of ${filename} failed`,
 						text: data.error ?? undefined,
-						link: { href: resolve('/import'), label: 'Details' }
+						link: { href: `${resolve('/settings')}?open=import`, label: 'Details' }
 					}
 		);
 	};

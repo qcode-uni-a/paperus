@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		changePassword,
 		errorMessage,
@@ -12,6 +13,7 @@
 	import {
 		mdiAccountCircleOutline,
 		mdiDatabaseExportOutline,
+		mdiDatabaseImportOutline,
 		mdiFolderAccountOutline,
 		mdiKeyChainVariant,
 		mdiLockOutline,
@@ -28,6 +30,7 @@
 	import AccessTokens from '#lib/AccessTokens.svelte';
 	import ConnectedApps from '#lib/ConnectedApps.svelte';
 	import ExportLibrary from '#lib/ExportLibrary.svelte';
+	import ImportLibrary from '#lib/ImportLibrary.svelte';
 	import { page } from '$app/state';
 	import { session } from '#lib/session.svelte.ts';
 	import { theme, type Theme } from '#lib/theme.svelte.ts';
@@ -55,6 +58,11 @@
 		const listed = (page.url.searchParams.get('open') ?? '').split(',').filter(Boolean);
 		const exporting = page.url.searchParams.has('export') || page.url.hash === '#export';
 		return exporting && !listed.includes('export') ? [...listed, 'export'] : listed;
+	});
+	// Opened by a link to it (the import's notification, Getting started):
+	// in view, once.
+	onMount(() => {
+		if (open.length === 1) document.getElementById(open[0])?.scrollIntoView();
 	});
 	function toggle(slug: string, opened: boolean) {
 		const next = opened ? [...open, slug] : open.filter((s) => s !== slug);
@@ -332,6 +340,17 @@
 		<AccessTokens />
 		<h3>Connected apps</h3>
 		<ConnectedApps />
+	</SettingSection>
+
+	<SettingSection
+		id="import"
+		title="Import"
+		subtitle="Your library from Zotero, Mendeley, JabRef, EndNote or another paperus"
+		icon={mdiDatabaseImportOutline}
+		open={open.includes('import')}
+		ontoggle={(opened) => toggle('import', opened)}
+	>
+		<ImportLibrary />
 	</SettingSection>
 
 	<SettingSection

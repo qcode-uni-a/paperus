@@ -29,11 +29,6 @@
 		await startNote();
 	}
 
-	function importLibrary() {
-		menu?.hidePopover();
-		goto(resolve('/import'));
-	}
-
 	function closeForm() {
 		dialog?.close();
 	}
@@ -56,10 +51,6 @@
 	<button role="menuitem" onclick={writeNote}>
 		<strong>New note</strong>
 		<span>Your own writing, in Markdown</span>
-	</button>
-	<button role="menuitem" onclick={importLibrary}>
-		<strong>Import a library</strong>
-		<span>From Zotero, JabRef, Mendeley, EndNote…</span>
 	</button>
 </div>
 

@@ -8,6 +8,9 @@
   so no upload limit in between (a reverse proxy's 500 MB) stops it; if
   the upload breaks off, choosing the same folder again goes on with what
   has not arrived. The import page's instructions say so.
+- **Import moved to Settings**, next to Export (one usually imports once):
+  Settings → Import; the Add menu no longer offers it, Getting started and
+  the import's notifications lead there, and old links to `/import` too.
 
 ## 0.0.23 (2026-11-11)
 

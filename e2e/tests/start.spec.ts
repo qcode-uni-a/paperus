@@ -18,9 +18,9 @@ test('a new person gets started, step by step', async ({ page, browser }) => {
 	await expect(steps).toContainText('0 of 4 done');
 	// Not an administrator: no server steps.
 	await expect(steps.getByRole('heading', { name: 'Your server' })).toBeHidden();
-	await expect(steps.getByRole('link', { name: 'Import a library' })).toHaveAttribute(
+	await expect(steps.getByRole('link', { name: 'Settings → Import' })).toHaveAttribute(
 		'href',
-		'/import'
+		'/settings?open=import'
 	);
 
 	await uploadPaper(own, 'started');
