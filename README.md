@@ -6,6 +6,7 @@
 </h1>
 
 [![CI](https://github.com/qcode-uni-a/paperus/actions/workflows/ci.yml/badge.svg)](https://github.com/qcode-uni-a/paperus/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/qcode-uni-a/paperus/graph/badge.svg)](https://codecov.io/gh/qcode-uni-a/paperus)
 [![Release](https://img.shields.io/github/v/release/qcode-uni-a/paperus?label=release)](https://github.com/qcode-uni-a/paperus/releases/latest)
 [![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/paperus?label=PyPI)](https://pypi.org/project/paperus/)

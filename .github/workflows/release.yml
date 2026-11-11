@@ -17,6 +17,10 @@ permissions:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    # Its test jobs send coverage to Codecov (OIDC).
+    permissions:
+      contents: read
+      id-token: write
 
   versions:
     name: Tag matches the package versions

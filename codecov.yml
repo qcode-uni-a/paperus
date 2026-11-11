@@ -1,0 +1,12 @@
+# Codecov (coverage from CI's server and ML tests, uploaded with OIDC).
+# CI itself requires 95%; Codecov only reports: no checks failing on a
+# small drop, no comments on pull requests.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+comment: false
