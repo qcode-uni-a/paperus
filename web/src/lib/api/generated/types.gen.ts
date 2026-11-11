@@ -1072,6 +1072,10 @@ export type CopyReport = {
      */
     at: string;
     /**
+     * Change
+     */
+    change?: number | null;
+    /**
      * Files
      */
     files?: number;

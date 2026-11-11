@@ -842,16 +842,25 @@ def update_readable_copy(remove: bool = False) -> None:
     log.info("readable copy: %s", report.model_dump())
 
 
-@tasks.periodic(cron="50 * * * *")
-@tasks.task(name="nightly_readable_copy", queue="backup")
-def nightly_readable_copy(timestamp: int) -> None:
-    """At ten to the end of the night hour (after the trash and the integrity
-    check): the readable copy, if switched on."""
+@tasks.periodic(cron="*/5 * * * *")
+@tasks.task(
+    name="keep_readable_copy", queue="backup", queueing_lock="keep-readable-copy"
+)
+def keep_readable_copy(timestamp: int) -> None:
+    """The readable copy, if switched on, within five minutes of a change to
+    the library (an upload, details found or edited, a paper filed): only
+    what changed is written. Whole at ten to the end of the night hour
+    (after the trash and the integrity check), also for what is no change
+    (a group renamed, a file deleted from the copy by hand)."""
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
-    hour = datetime.fromtimestamp(timestamp, UTC).hour
-    if config.copy_enabled and hour == config.night_hour:
+        last = readable.last_report(db)
+        current = changes.current_change(db)
+    at = datetime.fromtimestamp(timestamp, UTC)
+    night = at.hour == config.night_hour and at.minute == 50
+    behind = last is None or last.change is None or current > last.change
+    if config.copy_enabled and (night or behind):
         update_readable_copy()
 
 

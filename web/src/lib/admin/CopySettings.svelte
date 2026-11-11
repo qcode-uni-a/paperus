@@ -107,7 +107,8 @@
 <p class="muted intro">
 	paperus stores each file once, named by its fingerprint. Here it can also keep a copy of every
 	paper’s files under readable names, in folders, for browsing the library on disk or with other
-	programs. It is updated every night; only files paperus wrote there are ever changed or removed.
+	programs. It follows the library within minutes of a change, and is checked whole every night;
+	only files paperus wrote there are ever changed or removed.
 </p>
 
 <SettingRow
@@ -188,7 +189,12 @@
 				<span class="muted">{formatSize(info.free_bytes)} free there.</span>
 			{/if}
 			{#if config?.copy_enabled}
-				<span class="muted">Next update tonight at {localTime(config.night_hour ?? 2, 50)}.</span>
+				<span class="muted"
+					>Changes follow within minutes; checked whole tonight at {localTime(
+						config.night_hour ?? 2,
+						50
+					)}.</span
+				>
 			{/if}
 		</p>
 		<div class="buttons">

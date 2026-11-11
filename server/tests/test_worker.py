@@ -412,14 +412,20 @@ def test_maintenance_jobs(
     copied = list(settings.copy_path.rglob("*.pdf"))
     assert len(copied) == 1
 
-    # At the night hour only, by the clock.
+    # Nothing changed: whole again at the night hour only, by the clock.
     copied[0].unlink()
-    defer(worker, "nightly_readable_copy", timestamp=at(2))
+    defer(worker, "keep_readable_copy", timestamp=at(2))
     run_jobs(worker)
     assert not any(settings.copy_path.rglob("*.pdf"))
-    defer(worker, "nightly_readable_copy", timestamp=at(3))
-    assert run_jobs(worker) == {"nightly_readable_copy succeeded": 1}
+    defer(worker, "keep_readable_copy", timestamp=at(3))
+    assert run_jobs(worker) == {"keep_readable_copy succeeded": 1}
     assert any(settings.copy_path.rglob("*.pdf"))
+    # A paper added: in the copy at the next round, whatever the hour.
+    upload(ada, make_pdf([["Another paper", "typed text"]]), "another.pdf")
+    run_jobs(worker)
+    defer(worker, "keep_readable_copy", timestamp=at(2))
+    run_jobs(worker)
+    assert len(list(settings.copy_path.rglob("*.pdf"))) == 2
 
     root.post("/api/admin/jobs/copy-remove")
     run_jobs(worker)

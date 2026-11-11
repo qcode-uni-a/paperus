@@ -10223,6 +10223,17 @@
             "format": "date-time",
             "title": "At"
           },
+          "change": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
           "files": {
             "type": "integer",
             "title": "Files",

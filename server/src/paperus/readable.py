@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import changes
 from paperus.citations import citation_key_base, year_of
 from paperus.library import citation_csl, preferred_version
 from paperus.models import FileRole, Group, Item, Library, SystemSetting, User
@@ -222,6 +223,9 @@ def wanted(
 
 class CopyReport(BaseModel):
     at: datetime
+    change: int | None = None
+    """The library's change number it was made from (``paperus.changes``):
+    a later one means the copy is behind."""
     files: int = 0
     bytes: int = 0
     written: int = 0
@@ -283,7 +287,7 @@ def sync(
     db: Session, blobs: BlobStore, root: Path, template: str, *, links: bool
 ) -> CopyReport:
     """Bring the copy in line with the library; saves the report."""
-    report = CopyReport(at=datetime.now(UTC))
+    report = CopyReport(at=datetime.now(UTC), change=changes.current_change(db))
     try:
         root.mkdir(parents=True, exist_ok=True)
         manifest = _read_manifest(root)
