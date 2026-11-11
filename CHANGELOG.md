@@ -13,8 +13,10 @@
   to each release (`app/local/`, `local.yml`).
 - **Libraries offline in the app**: while a server library is open, the
   app keeps a copy of what one sees there (papers' details, notes, tags,
-  collections, annotations, where one stopped reading; the papers opened
-  last whole, with their PDFs) and of the website, synced every minute.
+  collections, annotations, where one stopped reading; whole, with their
+  PDFs: the papers opened last, and those marked "Keep offline on this
+  device", alone or by collection, whose new papers come by themselves)
+  and of the website, synced every minute.
   When the server cannot be reached, the app opens that copy: lists,
   papers, notes, annotations and keyword search work, and annotations,
   notes and where one stopped reading can be changed: queued, and sent

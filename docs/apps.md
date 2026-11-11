@@ -94,10 +94,10 @@ The goal: papers kept on the device and read without a connection, changes
 made offline sent when back online. For a server library, in the app on
 every platform (and the installable website, as far as browsers allow).
 
-- **What is kept**: the details, tags, collections, notes, annotations and
-  reading positions of everything one sees (a few MB); the files of papers
-  opened recently, and of those marked "Keep offline" (or whole
-  collections). Marked on each device for itself (a phone keeps less than
+- **What is kept** (built): the details, tags, collections, notes,
+  annotations and reading positions of everything one sees (a few MB);
+  whole, with their files, the 20 papers opened last, and those marked
+  "Keep offline on this device" (or whole collections). Marked on each device for itself (a phone keeps less than
   a laptop); the server does not know. A collection kept offline stays
   current: after each sync, the files of papers newly in it (or in a
   collection inside it; papers in `/api/changes` list their collections)
@@ -196,8 +196,8 @@ Each step usable on its own:
    search by meaning there (the ML service), Intel Macs.
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (done), the app's copy
-   and the website offline, the queue of changes made offline (done,
-   `app/src-tauri/src/offline/`), then "Keep offline".
+   and the website offline, the queue of changes made offline, "Keep
+   offline" for papers and collections (done, `app/src-tauri/src/offline/`).
 6. **iOS**, with an Apple developer account (#40).
 
 ## Open

@@ -7,6 +7,7 @@
 	import MenuButton from '#lib/MenuButton.svelte';
 	import NoteRow from '#lib/NoteRow.svelte';
 	import { listNotes, pinCollection, unpinCollection } from '#lib/api/client.ts';
+	import { canKeep, keep, keeping } from '#lib/offline.svelte.ts';
 	import type { NoteOut } from '#lib/api/generated/types.gen.ts';
 	import { startNote } from '#lib/notes.ts';
 	import { downloadCitations } from '#lib/citations.ts';
@@ -116,6 +117,19 @@
 					<button role="menuitem" onclick={togglePin}
 						>{collection.pinned ? 'Unpin from the sidebar' : 'Pin to the sidebar'}</button
 					>
+					{#if canKeep}
+						{@const kept = keeping.collections.includes(id)}
+						<button
+							role="menuitemcheckbox"
+							aria-checked={kept}
+							onclick={() => keep('collection', id, !kept)}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								{#if kept}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
+							</svg>
+							Keep offline on this device
+						</button>
+					{/if}
 					<button
 						role="menuitem"
 						onclick={() => downloadCitations({ collection: id, nested: includeInside }, 'bibtex')}

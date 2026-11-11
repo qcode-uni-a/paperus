@@ -31,6 +31,13 @@ struct Removed {
     kind: String,
 }
 
+/// Papers and collections marked "Keep offline" on this device.
+#[derive(Clone, Debug, Default, Deserialize, serde::Serialize, PartialEq)]
+pub struct Marked {
+    pub items: Vec<String>,
+    pub collections: Vec<String>,
+}
+
 /// A change made offline, queued to send.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Queued {
@@ -112,6 +119,32 @@ impl Store {
         self.state("favourites")
             .and_then(|value| serde_json::from_str(&value).ok())
             .unwrap_or_default()
+    }
+
+    /// What the person marked "Keep offline" on this device.
+    pub fn marked(&self) -> Marked {
+        self.state("marked")
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_default()
+    }
+
+    /// Mark (or unmark) a paper or collection "Keep offline".
+    pub fn mark(&self, kind: &str, id: &str, on: bool) -> rusqlite::Result<()> {
+        let mut marked = self.marked();
+        let list = if kind == "collection" {
+            &mut marked.collections
+        } else {
+            &mut marked.items
+        };
+        list.retain(|kept| kept != id);
+        if on {
+            list.push(id.to_owned());
+        }
+        self.db.execute(
+            "INSERT OR REPLACE INTO state (key, value) VALUES ('marked', ?1)",
+            [serde_json::to_string(&marked).unwrap_or_default()],
+        )?;
+        Ok(())
     }
 
     /// The libraries the person read at the last sync.
@@ -293,8 +326,10 @@ impl Store {
 
     /// Forget everything (a sync from 0 follows).
     pub fn clear(&mut self) -> rusqlite::Result<()> {
-        self.db
-            .execute_batch("DELETE FROM records; DELETE FROM state; DELETE FROM answers;")
+        // What the person marked stays (it is this device's, not the server's).
+        self.db.execute_batch(
+            "DELETE FROM records; DELETE FROM state WHERE key != 'marked'; DELETE FROM answers;",
+        )
     }
 
     /// Keep the server's answer to ``path`` (as of change number
@@ -610,8 +645,18 @@ mod tests {
             (4, vec!["own".to_owned()])
         );
 
+        store.mark("collection", "c1", true).unwrap();
+        store.mark("item", "p9", true).unwrap();
+        store.mark("item", "p9", false).unwrap();
         store.clear().unwrap();
         assert_eq!(store.since(), 0);
+        assert_eq!(
+            store.marked(),
+            Marked {
+                items: vec![],
+                collections: vec!["c1".into()]
+            }
+        );
         assert!(ids(&store, "item").is_empty());
     }
 }

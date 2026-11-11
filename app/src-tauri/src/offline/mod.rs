@@ -440,19 +440,135 @@ impl Server<'_> {
     }
 }
 
-/// The papers kept whole: the ones opened last.
-fn kept(store: &Store) -> Vec<String> {
+/// The papers in a collection and those inside it (from the copy).
+fn papers_in(store: &Store, collection: &str) -> Vec<String> {
+    let collections = store.all("collection");
+    let mut inside = HashSet::from([collection.to_owned()]);
+    loop {
+        let more: Vec<String> = collections
+            .iter()
+            .filter(|c| {
+                c["parent_id"]
+                    .as_str()
+                    .is_some_and(|parent| inside.contains(parent))
+                    && c["id"].as_str().is_some_and(|id| !inside.contains(id))
+            })
+            .filter_map(|c| c["id"].as_str().map(str::to_owned))
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        inside.extend(more);
+    }
+    store
+        .all("item")
+        .into_iter()
+        .filter(|item| {
+            item["deleted_at"].is_null()
+                && item["collection_ids"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|id| id.as_str().is_some_and(|id| inside.contains(id)))
+        })
+        .filter_map(|item| item["id"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// A smart collection's papers, as the server finds them (its rules).
+fn smart_papers(server: &Server, collection: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut before: Option<String> = None;
+    loop {
+        let after = before
+            .as_ref()
+            .map(|id| format!("&before={id}"))
+            .unwrap_or_default();
+        let Ok((_, body)) = server.get(&format!(
+            "/api/items?collection={collection}&limit=200{after}"
+        )) else {
+            break;
+        };
+        let page: Vec<Value> = serde_json::from_slice(&body).unwrap_or_default();
+        let ids: Vec<String> = page
+            .iter()
+            .filter_map(|item| item["id"].as_str().map(str::to_owned))
+            .collect();
+        let done = ids.len() < 200;
+        before = ids.last().cloned();
+        found.extend(ids);
+        if done {
+            break;
+        }
+    }
+    found
+}
+
+/// The papers kept whole: those opened last, those marked "Keep offline",
+/// and those in collections marked so (new ones too: asked anew each sync).
+fn kept(store: &Store, server: &Server) -> Vec<String> {
     let mut views = store.all("view");
     views.sort_by(|a, b| {
         let at = |view: &Value| view["viewed_at"].as_str().unwrap_or_default().to_owned();
         at(b).cmp(&at(a))
     });
-    views
+    let recent = views
         .iter()
         .filter_map(|view| view["item_id"].as_str().map(str::to_owned))
         .filter(|id| store.get("item", id).is_some())
-        .take(KEPT_RECENT)
-        .collect()
+        .take(KEPT_RECENT);
+    let marked = store.marked();
+    let in_collections = marked.collections.iter().flat_map(|collection| {
+        let smart = store
+            .get("collection", collection)
+            .is_some_and(|found| !found["rules"].is_null());
+        if smart {
+            smart_papers(server, collection)
+        } else {
+            papers_in(store, collection)
+        }
+    });
+    let mut kept: Vec<String> = Vec::new();
+    for id in recent
+        .chain(marked.items.iter().cloned())
+        .chain(in_collections)
+    {
+        if !kept.contains(&id) && store.get("item", &id).is_some() {
+            kept.push(id);
+        }
+    }
+    kept
+}
+
+/// Mark (or unmark) a paper or collection of the library open in
+/// ``window`` "Keep offline", and tell the page.
+pub fn mark(window: &WebviewWindow, kind: &str, id: &str, on: bool) {
+    let app = window.app_handle();
+    let Some(library) = window.url().ok().and_then(|url| libraries::of(app, &url)) else {
+        return;
+    };
+    if let Some(store) = open_store(app, &library.url) {
+        let _ = store.mark(kind, id, on);
+    }
+    tell_kept(window);
+    nudge();
+}
+
+/// Tell the page what this device keeps offline
+/// (`window.paperusApp.kept`, web/src/lib/offline.svelte.ts).
+pub fn tell_kept(window: &WebviewWindow) {
+    let app = window.app_handle();
+    let Some(library) = window.url().ok().and_then(|url| libraries::of(app, &url)) else {
+        return;
+    };
+    let marked = open_store(app, &library.url)
+        .map(|store| store.marked())
+        .unwrap_or_default();
+    let _ = window.eval(format!(
+        "if (window.paperusApp) {{ window.paperusApp.kept = {}; \
+         window.dispatchEvent(new Event('paperus-kept')); }}",
+        serde_json::json!({"items": marked.items, "collections": marked.collections})
+    ));
 }
 
 /// Keep the papers to read offline whole: their page, their files with
@@ -461,7 +577,7 @@ fn kept(store: &Store) -> Vec<String> {
 fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
     let files = folder.join("files");
     let _ = fs::create_dir_all(&files);
-    let kept = kept(store);
+    let kept = kept(store, server);
     let mut wanted: HashSet<String> = HashSet::new();
     for id in &kept {
         let Some(item) = store.get("item", id) else {

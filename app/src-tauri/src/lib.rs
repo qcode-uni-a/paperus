@@ -217,6 +217,19 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
                 if url.path() == "online" {
                     back_online(&opener, &own);
                 }
+                // "Keep offline" on this device (web/src/lib/offline.svelte.ts).
+                if url.path() == "keep" {
+                    let asked: std::collections::HashMap<String, String> =
+                        url.query_pairs().into_owned().collect();
+                    let kind = asked.get("kind").cloned().unwrap_or_default();
+                    let id = asked.get("id").cloned().unwrap_or_default();
+                    let on = asked.get("on").is_some_and(|on| on == "true");
+                    if let Some(window) = opener.get_webview_window(&own)
+                        && matches!(kind.as_str(), "item" | "collection")
+                    {
+                        std::thread::spawn(move || offline::mark(&window, &kind, &id, on));
+                    }
+                }
                 false
             }
             // mailto: and the like: the system's programs.
@@ -238,7 +251,13 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
         // Files dropped on the window are the website's (its drop zone).
         .disable_drag_drop_handler()
         .on_page_load(|window, payload| {
-            if window.label() == MAIN && payload.event() == PageLoadEvent::Finished {
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+            // What this device keeps offline, for the page's buttons.
+            let told = window.clone();
+            std::thread::spawn(move || offline::tell_kept(&told));
+            if window.label() == MAIN {
                 open_with::loaded(window.app_handle());
                 offline::nudge();
             }

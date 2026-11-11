@@ -34,8 +34,10 @@ What the app does around the website:
 - Offline use of server libraries (`offline/`, [apps.md](../docs/apps.md),
   "Offline and sync"): while one is open, a copy in SQLite in the app's
   data folder, synced every minute and when a page loads (`/api/changes`,
-  with the window's login), the papers opened last whole with their PDFs,
-  and the website itself (`site.rs`). Out of reach, the window opens the
+  with the window's login), whole with their PDFs the papers opened last
+  and those marked "Keep offline" (alone or by collection: the website asks
+  with `paperus-app://keep`, the app tells it `window.paperusApp.kept`), and
+  the website itself (`site.rs`). Out of reach, the window opens the
   copy at `paperus-offline://`, where the app answers the website's calls
   (`answer.rs`) and queues its changes (`write.rs`), sent when the library
   is back; those it refuses are listed on the app's page. Only with

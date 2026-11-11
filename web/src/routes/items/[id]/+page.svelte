@@ -36,6 +36,7 @@
 	import { notify } from '#lib/toasts.svelte.ts';
 	import MenuButton from '#lib/MenuButton.svelte';
 	import StarButton from '#lib/StarButton.svelte';
+	import { canKeep, keep, keeping } from '#lib/offline.svelte.ts';
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
@@ -341,6 +342,19 @@
 					{#if viewed}
 						<button role="menuitem" onclick={() => (showDetails = !showDetails)}>
 							{showDetails ? 'Hide details' : 'Details and files'}
+						</button>
+					{/if}
+					{#if canKeep}
+						{@const kept = keeping.items.includes(id)}
+						<button
+							role="menuitemcheckbox"
+							aria-checked={kept}
+							onclick={() => keep('item', id, !kept)}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								{#if kept}<path d="m5 12.5 4.5 4.5L19 7.5" />{/if}
+							</svg>
+							Keep offline on this device
 						</button>
 					{/if}
 					<button role="menuitem" onclick={copyBibtex}>Copy BibTeX</button>

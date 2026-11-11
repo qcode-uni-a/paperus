@@ -133,6 +133,10 @@ try {
 	// paper just opened whole, with its PDF.
 	const paper = (await shown()).split('/').pop();
 	const title = await until(() => inApp(`done(document.querySelector('h1')?.innerText)`));
+	// Marked "Keep offline" on this device: the app keeps it, and says so.
+	await inApp(`location.href = 'paperus-app://keep?kind=item&id=${paper}&on=true'; done()`);
+	await until(() => inApp(`done((window.paperusApp.kept?.items ?? []).includes('${paper}'))`));
+	console.log('ok: kept offline on this device, the page told');
 	await sleep(1000);
 	await inApp(`location.reload(); done()`);
 	const copy = () => {
