@@ -26,11 +26,8 @@ jobs:
           node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
-      # nmake and cl for pgvector.
-      - uses: ilammy/msvc-dev-cmd@v1
-      # The server, PostgreSQL with pgvector and the website, as the app's
-      # library on this computer has them.
-      - run: bash app/local/build.sh x86_64-pc-windows-msvc local
+      # The Rust builds first: the Visual Studio environment set up for
+      # pgvector below gets in the way of Rust's own linking.
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app/src-tauri
@@ -42,4 +39,9 @@ jobs:
       - run: |
           cargo install --git https://github.com/chippers/msedgedriver-tool
           msedgedriver-tool
+      # nmake and cl for pgvector.
+      - uses: ilammy/msvc-dev-cmd@v1
+      # The server, PostgreSQL with pgvector and the website, as the app's
+      # library on this computer has them.
+      - run: bash app/local/build.sh x86_64-pc-windows-msvc local
       - run: bash app/tests/windows.sh local "$PWD/msedgedriver.exe"
