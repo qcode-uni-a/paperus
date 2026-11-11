@@ -11,6 +11,12 @@
 - **Import moved to Settings**, next to Export (one usually imports once):
   Settings → Import; the Add menu no longer offers it, Getting started and
   the import's notifications lead there, and old links to `/import` too.
+- **PDFs the export does not name come along too**: Mendeley Reference
+  Manager exports no file links, and EndNote's may be missing. Put the
+  export and the PDFs in one folder (or zip) and import that: each PDF no
+  entry points to is added as if uploaded, joins the paper whose DOI it
+  carries once read, and otherwise stays a paper of its own. The
+  instructions for Mendeley and EndNote say how.
 
 ## 0.0.23 (2026-11-11)
 

@@ -53,10 +53,17 @@ class Files(Protocol):
 
     def open(self, path: str) -> IO[bytes] | None: ...
 
+    def loose_pdfs(self, paths: list[str]) -> list[str]:
+        """The PDFs none of these paths (the export's) point to."""
+        ...
+
 
 class NoFiles:
     def open(self, path: str) -> IO[bytes] | None:
         return None
+
+    def loose_pdfs(self, paths: list[str]) -> list[str]:
+        return []
 
 
 class _ByName:
@@ -99,6 +106,22 @@ class _ByName:
         winners = [name for name, n in shared.items() if n == best]
         return winners[0] if best >= 2 and len(winners) == 1 else None
 
+    def loose_pdfs(self, paths: list[str]) -> list[str]:
+        """The PDFs none of the paths point to. None in a LaTeX project (its
+        PDFs are figures), nor macOS's resource forks."""
+        names = list(self.exact.values())
+        if any(name.lower().endswith(".tex") for name in names):
+            return []
+        used = {self.find(path) for path in paths}
+        return [
+            name
+            for name in names
+            if name.lower().endswith(".pdf")
+            and name not in used
+            and "__macosx/" not in self._key(name)
+            and not self._basename(name).startswith("._")
+        ]
+
 
 def _common_tail(a: list[str], b: list[str]) -> int:
     """How many path parts two paths share from their end."""
@@ -117,6 +140,9 @@ class ZipFiles:
         name = self.names.find(path)
         return self.archive.open(name) if name else None
 
+    def loose_pdfs(self, paths: list[str]) -> list[str]:
+        return self.names.loose_pdfs(paths)
+
 
 class FolderFiles:
     def __init__(self, folder: Path) -> None:
@@ -128,6 +154,9 @@ class FolderFiles:
         name = self.names.find(path)
         return (self.folder / name).open("rb") if name else None
 
+    def loose_pdfs(self, paths: list[str]) -> list[str]:
+        return self.names.loose_pdfs(paths)
+
 
 @dataclass
 class Report:
@@ -138,6 +167,9 @@ class Report:
     files: int = 0
     notes: int = 0
     collections: int = 0
+    loose_pdfs: int = 0
+    """PDFs no entry named, added as uploads: one whose DOI is a paper's
+    joins it once its text is read (``paperus.identify``)."""
     missing_files: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
 
@@ -173,14 +205,17 @@ def apply(
     file_added: Callable[[uuid.UUID], None] = lambda file_id: None,
 ) -> Report:
     """Add the export for the person, new things owned by ``owner`` (a
-    library they may add to); commits after each paper."""
+    library they may add to); commits after each paper. PDFs in the export's
+    files that no entry names come as uploads (exports that leave the files
+    out, e.g. Mendeley Reference Manager's, with its PDFs put beside them)."""
     access.require_write(owner)
     report = Report(papers=len(export.papers), problems=list(export.problems))
     run = _Run(db, blobs, access, owner, files, max_file_bytes, report)
     for path in export.collections:
         _collection(run, path)
     db.commit()
-    total = len(export.papers) + len(export.notes)
+    loose = files.loose_pdfs([f.path for p in export.papers for f in p.files])
+    total = len(export.papers) + len(export.notes) + len(loose)
     for done, paper in enumerate(export.papers, 1):
         name = paper.source_key or str(paper.csl.get("title"))
         _guarded(run, name, lambda paper=paper: _paper(run, paper))
@@ -191,6 +226,13 @@ def apply(
     for done, standalone in enumerate(export.notes, len(export.papers) + 1):
         name = notes.title_of(standalone.text) or "a note"
         _guarded(run, name, lambda standalone=standalone: _note(run, standalone))
+        progress(done, total)
+    papers_and_notes = len(export.papers) + len(export.notes)
+    for done, path in enumerate(loose, papers_and_notes + 1):
+        _guarded(run, path, lambda path=path: _loose_pdf(run, path))
+        for file_id in run.new_files:
+            file_added(file_id)
+        run.new_files.clear()
         progress(done, total)
     return report
 
@@ -207,7 +249,14 @@ def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
     except Exception as error:
         run.db.rollback()
         log.warning("import of %s failed", name, exc_info=True)
-        for counter in ("added", "found", "files", "notes", "collections"):
+        for counter in (
+            "added",
+            "found",
+            "files",
+            "notes",
+            "collections",
+            "loose_pdfs",
+        ):
             setattr(run.report, counter, getattr(counts, counter))
         del run.report.missing_files[missing:]
         run.seen = seen
@@ -315,6 +364,32 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
         note = notes.create(db, run.owner, text, access.user.id)
         note.item_links.append(NoteItem(item_id=item.id, added_by=access.user.id))
         run.report.notes += 1
+
+
+def _loose_pdf(run: _Run, path: str) -> None:
+    """A PDF no entry named, as if uploaded: titled after its name until its
+    text tells more; nothing if the person has its content already."""
+    stored = _store(run, ExportedFile(path=path))
+    if stored is None:
+        return
+    sha, name, media_type = stored
+    if media_type != PDF or ("file", sha.hex()) in run.seen:
+        return
+    if item_with_file(run.db, run.access.readable, sha) is not None:
+        return
+    item = library.create_item(
+        run.db,
+        run.owner,
+        kind=VersionKind.OTHER,
+        label=None,
+        csl={"type": "document", "title": PurePosixPath(name).stem or "Untitled"},
+        source=MetadataSource.FILE,
+        identifiers=[],
+        added_by=run.access.user.id,
+    )
+    run.seen[("file", sha.hex())] = item.id
+    run.report.loose_pdfs += 1
+    _attach_files(run, item, [stored])
 
 
 def _tag(run: _Run, item: Item, paper: ExportedPaper) -> None:

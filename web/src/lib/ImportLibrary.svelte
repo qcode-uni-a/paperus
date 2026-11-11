@@ -30,11 +30,12 @@
 		{
 			name: 'Mendeley',
 			steps:
-				'Select all references → Export → BibTeX (.bib) or RIS. Mendeley does not export collections; PDFs come along if you put the export and the PDFs in one folder and “Choose a folder”.'
+				'Select all references → Export → BibTeX (.bib) or RIS. For the PDFs, put the export and your PDFs in one folder and “Choose a folder”: the new Mendeley Reference Manager does not say which PDF is whose, so each PDF is read and joins the paper whose DOI it carries; the rest become papers of their own. Mendeley does not export collections.'
 		},
 		{
 			name: 'EndNote, Citavi, others',
-			steps: 'Export as RIS (.ris) or BibTeX (.bib) and choose the file here.'
+			steps:
+				'Export as RIS (.ris) or BibTeX (.bib) and choose the file here; in EndNote: File → Export…, style “RefMan (RIS) Export”. With the PDFs: put the export and the PDFs (EndNote: the library’s .Data folder) in one folder and “Choose a folder”. A PDF the export does not name joins the paper whose DOI it carries, or becomes a paper of its own.'
 		},
 		{
 			name: 'paperus',
@@ -55,6 +56,7 @@
 		files: number;
 		notes: number;
 		collections: number;
+		loose_pdfs?: number;
 		missing_files: string[];
 		problems: string[];
 	};
@@ -356,6 +358,10 @@
 							'new collection',
 							'new collections'
 						)}.
+						{#if report.loose_pdfs}
+							{count(report.loose_pdfs, 'PDF', 'PDFs')} the export did not name: added like uploads, each
+							joining its paper once read (by its DOI).
+						{/if}
 					</p>
 					{#if report.missing_files?.length}
 						<details>

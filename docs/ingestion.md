@@ -223,6 +223,15 @@ Decided 2026-11-05; built in steps (see the changelog).
 
 Mendeley's exports do not include its collections.
 
+**PDFs the export does not name** (Mendeley Reference Manager leaves file
+links out; a person may also just put their PDFs beside a `.bib`): in a
+folder or zip, every PDF no entry points to is added as if uploaded,
+titled after its name. Once its text is read, a DOI on its first pages
+joins it to the paper with that DOI, imported or there before (see
+uploads, `paperus.identify`); otherwise it stays a paper of its own. Not in
+a LaTeX project (its PDFs are figures), and not again for a PDF the person
+has already.
+
 What came with a paper's details rather than from a person (Zotero's
 "automatic tags": arXiv categories, a publisher's subjects; Mendeley's
 author keywords, i.e. its `keywords` beyond `mendeley-tags`) is imported

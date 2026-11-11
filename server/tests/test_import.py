@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from procrastinate import App
@@ -27,10 +28,12 @@ from paperus.importing import (
     zotero,
 )
 from paperus.importing import apply as apply_module
-from paperus.importing.apply import NoFiles, Report, ZipFiles, apply
+from paperus.importing.apply import FolderFiles, NoFiles, Report, ZipFiles, apply
 from paperus.importing.run import run_import
 from paperus.models import Import, User
+from paperus.processing import process_file
 from paperus.storage import BlobStore
+from tests.conftest import FakeDOIRegistry
 from tests.pdfs import make_pdf
 from tests.people import Person, group
 
@@ -631,3 +634,76 @@ def test_snapshots_next_to_a_pdf_are_left_out() -> None:
     assert zotero._without_snapshots([page, pdf, slides]) == [pdf, slides]
     # Alone, the snapshot is the paper's only text: it stays.
     assert zotero._without_snapshots([page]) == [page]
+
+
+def test_pdfs_no_entry_names_come_as_uploads(
+    client: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    doi_registry: FakeDOIRegistry,
+    tmp_path: Path,
+) -> None:
+    """Mendeley Reference Manager exports no file links: its PDFs, put in the
+    folder beside the export, are uploads; one whose DOI is an entry's joins
+    it once read, the others stay papers of their own."""
+    ada = Person(client, db, "ada")
+    owner = uuid.UUID(ada.libraries()["Me"]["id"])
+    doi = "10.1234/drought.2024.5"
+    doi_registry.records[doi] = {
+        "type": "journal-article",
+        "title": "Drought indices for Bavarian rivers",
+        "issued": {"date-parts": [[2024]]},
+    }
+    bib = (
+        "@article{huber2024, title = {Drought indices for Bavarian rivers},"
+        f" doi = {{{doi}}}}}"
+    )
+    (tmp_path / "library.bib").write_text(bib)
+    files = tmp_path / "Mendeley Files"
+    files.mkdir()
+    (files / "8f3a.pdf").write_bytes(
+        make_pdf([["Drought indices for Bavarian rivers", f"doi:{doi}"]])
+    )
+    (files / "Unrelated notes.pdf").write_bytes(make_pdf([["Seminar notes"]]))
+    (files / "8f3a copy.pdf").write_bytes((files / "8f3a.pdf").read_bytes())
+    (files / "._8f3a.pdf").write_bytes(b"macOS resource fork")
+    added_files: list[uuid.UUID] = []
+
+    def run(max_file_bytes: int = 10**6) -> Report:
+        return apply(
+            db, blobs, access_of(db, ada), bibtex.read(bib), FolderFiles(tmp_path),
+            owner=owner, max_file_bytes=max_file_bytes,
+            file_added=added_files.append,
+        )  # fmt: skip
+
+    report = run()
+    assert (report.added, report.loose_pdfs, report.files) == (1, 2, 2)
+    assert len(ada.get("/api/items").json()) == 3
+    http = httpx2.Client(transport=httpx2.MockTransport(doi_registry))
+    for file_id in added_files:
+        process_file(db, blobs, file_id, http)
+    db.expire_all()
+    items = {i["title"]: i for i in ada.get("/api/items").json()}
+    assert set(items) == {"Drought indices for Bavarian rivers", "Unrelated notes"}
+    paper = ada.get(f"/api/items/{items['Drought indices for Bavarian rivers']['id']}")
+    [version] = paper.json()["versions"]
+    # Once, though it lay there twice.
+    [file] = version["files"]
+    assert file["filename"] in {"8f3a.pdf", "8f3a copy.pdf"}
+
+    # Importing again adds neither PDF again.
+    again = run()
+    assert (again.found, again.loose_pdfs, again.files) == (1, 0, 0)
+    too_large = run(max_file_bytes=10)
+    assert too_large.loose_pdfs == 0
+    assert any("too large" in problem for problem in too_large.problems)
+
+
+def test_no_loose_pdfs_in_a_latex_project_or_without_files() -> None:
+    project = zipped(
+        **{"paper.tex": b"\\cite{a}", "refs.bib": b"", "fig.pdf": b"%PDF-"}
+    )
+    assert project.loose_pdfs([]) == []
+    assert NoFiles().loose_pdfs(["a.pdf"]) == []
+    named = zipped(**{"refs.bib": b"", "papers/a.pdf": b"%PDF-", "b.pdf": b"%PDF-"})
+    assert named.loose_pdfs(["C:/Users/ada/a.pdf"]) == ["b.pdf"]
