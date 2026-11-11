@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.23 (2026-11-11)
 
 - **Live signals** (#46): `GET /api/changes/live` keeps a stream open
   (server-sent events) that says, within seconds, that the library changed
