@@ -40,6 +40,11 @@
   heading showed without scrolling. How full the storage is stays under
   Administration → Server (with the library's share); `GET /api/storage`,
   which only the box used, is gone.
+- **The extension on Google Scholar**: a small paperus button after each
+  result's title, as on arXiv; a check where you have the paper (found by
+  the DOI or arXiv ID in the result's link: APS, Nature, Wiley, ACS, IOP,
+  Springer, arXiv…), and a click on a dimmed one saves it from its page,
+  opened out of sight, with its PDF.
 - **The extension fetches the PDF while paperus adds the paper** (looking
   its DOI up), not one after the other: a little quicker per save.
 - **The extension reads a page sooner**: it no longer waits until the

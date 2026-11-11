@@ -146,6 +146,9 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       if (waiting) void getPdfs(waiting.papers, waiting.tabId);
       return { ok: true };
     },
+    // Google Scholar's buttons (scholar.ts).
+    lookupKeys: () => lookupKeys(message.keys),
+    saveLink: () => saveLink(message.url),
     // The popup: save its tab (the button's click), move a paper it saved.
     popupSave: async () => {
       if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
@@ -819,6 +822,45 @@ async function lookup(ids: string[]): Promise<Record<string, string | null>> {
     },
   );
   return Object.fromEntries(ids.map((id) => [id, data[`arxiv:${id}`] ?? null]));
+}
+
+/** For papers on someone else's page (Google Scholar): which of these
+ * ("doi:…", "arxiv:…") one has. */
+async function lookupKeys(
+  keys: string[],
+): Promise<Record<string, string | null>> {
+  if (!(await settings()) || keys.length === 0) return {};
+  const { data } = await call<Api.LookupItemsData, Api.LookupItemsResponse>(
+    "/api/items/lookup",
+    { query: { id: keys.slice(0, 200) } },
+  );
+  return data ?? {};
+}
+
+/** A paper from its page, opened in a tab out of sight and saved as a
+ * click on it would (its PDF too); the tab closes. */
+async function saveLink(
+  url: string,
+): Promise<Saved | { ok: false; text: string }> {
+  if (!(await settings())) {
+    await chrome.runtime.openOptionsPage();
+    return { ok: false, text: "Connect the extension to paperus first." };
+  }
+  if (!/^https?:\/\//.test(url))
+    return { ok: false, text: "No address to open." };
+  trace("Saving a paper from its link", { url });
+  const tab = await chrome.tabs.create({ url, active: false });
+  try {
+    await loaded(tab.id!);
+    return await saveTab(await chrome.tabs.get(tab.id!), undefined, true);
+  } catch (error) {
+    return {
+      ok: false,
+      text: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    await chrome.tabs.remove(tab.id!).catch(() => undefined);
+  }
 }
 
 async function saveArxiv(

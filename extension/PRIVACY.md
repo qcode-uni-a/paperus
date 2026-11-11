@@ -13,6 +13,9 @@ What it sends to your paperus, and when:
   it to).
 - **On arXiv pages**: the arXiv IDs of the papers listed there, to show
   which ones are already in your library.
+- **On Google Scholar's results**: the DOIs and arXiv IDs found in the
+  results' links, to show which ones are already in your library; on a
+  click, the paper's page is opened out of sight and saved like any other.
 - **When you ask from paperus' Missing page**: for each paper you chose,
   the extension opens its publisher's page in a background tab (with your
   access), downloads the PDF the page links and sends it to your paperus.

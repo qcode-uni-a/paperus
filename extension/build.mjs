@@ -38,6 +38,13 @@ const base = {
 			],
 			js: ['arxiv.js'],
 			run_at: 'document_idle'
+		},
+		{
+			// Google Scholar's results, on any of its country domains.
+			matches: ['https://*/*'],
+			include_globs: ['https://scholar.google.*/scholar?*'],
+			js: ['scholar.js'],
+			run_at: 'document_idle'
 		}
 	],
 	web_accessible_resources: [{ resources: ['icons/icon-32.png'], matches: ['https://arxiv.org/*'] }],
@@ -53,6 +60,13 @@ const base = {
 // cannot click the browser's permission prompt.
 if (process.env.PAPERUS_EXTENSION_TEST_HOST) {
 	base.host_permissions = [...base.host_permissions, process.env.PAPERUS_EXTENSION_TEST_HOST];
+	// A stand-in for Google Scholar's results, on a local test server.
+	base.content_scripts.push({
+		matches: ['http://127.0.0.1/*'],
+		include_globs: ['http://127.0.0.1:*/scholar?*'],
+		js: ['scholar.js'],
+		run_at: 'document_idle'
+	});
 }
 
 const browsers = {
@@ -97,8 +111,10 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	});
 	// Content scripts are not modules.
 	await build({
-		entryPoints: ['src/arxiv.ts', 'src/site.ts'],
+		entryPoints: ['src/arxiv.ts', 'src/site.ts', 'src/scholar.ts'],
 		bundle: true,
+		// The icon inside the script: no extension file for every site to see.
+		loader: { '.png': 'dataurl' },
 		format: 'iife',
 		target: 'es2022',
 		outdir: out,

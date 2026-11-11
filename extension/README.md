@@ -9,6 +9,9 @@ does the same; a full one with a check means you have it already.
   it shows each step, then the paper, its PDF or why not, and a link to it
   in paperus. A paper just added moves to another owner (a group) by
   choosing it there.
+- **On arXiv and Google Scholar**: a small button next to each paper; a
+  full one with a check means you have it, a click on a dimmed one saves
+  it (on Scholar from its page, opened out of sight, with its PDF).
 - **An open PDF** is saved as it is; paperus reads its details from the
   file (a DOI or arXiv ID in it). Firefox's PDF viewer lets no extension
   in, so there the extension fetches the PDF itself.
