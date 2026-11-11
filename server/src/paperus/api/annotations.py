@@ -16,6 +16,7 @@ from paperus import annotations, pdf
 from paperus.access import Access
 from paperus.annotations import AnnotationIn, Position
 from paperus.api.deps import DB, CurrentAccess
+from paperus.api.ids import NewId, new_id, sent_again
 from paperus.api.items import get_readable_item
 from paperus.models import Annotation, AnnotationKind, File, User
 
@@ -56,6 +57,10 @@ class FileAnnotations(BaseModel):
     can_share: bool
     """The paper belongs to a group (others may read it)."""
     colors: list[str] = annotations.COLORS
+
+
+class NewAnnotation(AnnotationIn):
+    id: NewId = None
 
 
 class AnnotationChange(BaseModel):
@@ -129,14 +134,18 @@ def file_annotations(
 
 @router.post("/api/files/{file_id}/annotations", status_code=201)
 def add_annotation(
-    file_id: uuid.UUID, body: AnnotationIn, db: DB, access: CurrentAccess
+    file_id: uuid.UUID, body: NewAnnotation, db: DB, access: CurrentAccess
 ) -> AnnotationOut:
     """A new annotation of the person's (anyone who may read the paper may
     annotate it, readers too)."""
+    again = sent_again(db, Annotation, body.id, lambda a: a.user_id == access.user.id)
+    if again is not None:
+        return annotation_out(db, access, again, {})
     file = _file(db, access, file_id)
     if file.deleted_at is not None or file.version.item.deleted_at is not None:
         raise HTTPException(409, "the file is in the trash")
     annotation = Annotation(
+        **new_id(body.id),
         file_id=file.id,
         user_id=access.user.id,
         kind=body.kind,

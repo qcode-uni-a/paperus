@@ -12,7 +12,7 @@ import {
 } from '#lib/api/client.ts';
 import type {
 	AnnotationChange,
-	AnnotationIn,
+	NewAnnotation,
 	AnnotationKind,
 	AnnotationOut
 } from '#lib/api/generated/types.gen.ts';
@@ -136,7 +136,7 @@ export class FileAnnotations {
 	}
 
 	/** ``record``: false while undoing (that is no step of its own). */
-	async add(input: AnnotationIn, open = false, record = true): Promise<AnnotationOut | null> {
+	async add(input: NewAnnotation, open = false, record = true): Promise<AnnotationOut | null> {
 		const { data, error } = await addAnnotation({
 			path: { file_id: this.fileId },
 			body: input
@@ -230,7 +230,7 @@ export class FileAnnotations {
 					kind: a.kind,
 					page_index: a.page_index,
 					page_label: a.page_label,
-					position: a.position as AnnotationIn['position'],
+					position: a.position as NewAnnotation['position'],
 					color: a.color,
 					text: a.text,
 					comment: a.comment,

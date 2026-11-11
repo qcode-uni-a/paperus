@@ -119,7 +119,8 @@ every platform (and the installable website, as far as browsers allow).
   that merge (add a tag, remove one from a collection, one annotation)
   rather than whole lists; new records with IDs made on the device
   (UUIDv7, as on the server), and a create sent twice after a dropped
-  connection makes one record.
+  connection makes one record (done on the server for notes, tags,
+  collections and annotations, `api/ids.py`; papers later).
 - **Files** by SHA-256: only missing ones are downloaded.
 - **Search offline**: keyword search in the kept papers; search by meaning
   needs the server (a small model on the device later perhaps).

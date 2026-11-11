@@ -58,10 +58,16 @@ def save(
 
 
 def create(
-    db: Session, library_id: uuid.UUID, text: str, user_id: uuid.UUID | None
+    db: Session,
+    library_id: uuid.UUID,
+    text: str,
+    user_id: uuid.UUID | None,
+    note_id: uuid.UUID | None = None,
 ) -> Note:
+    """A new note (with ``note_id`` if given: made on a device)."""
     now = datetime.now(UTC)
     note = Note(
+        **({"id": note_id} if note_id is not None else {}),
         library_id=library_id,
         text=text,
         title=title_of(text),

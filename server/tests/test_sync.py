@@ -1,8 +1,10 @@
 """Syncing: ``/api/changes`` (``paperus.api.sync``)."""
 
+import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from tests.people import Person, group
@@ -100,3 +102,35 @@ def test_everything_since_and_what_is_gone(client: TestClient, db: Session) -> N
     only = changes(bob, 0, library=[lab["library_id"], mine["library_id"]])
     assert only["libraries"] == [lab["library_id"]]
     assert ids(only["items"]) == [paper["id"]]
+
+
+def test_ids_made_on_a_device(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    paper = ada.add("Read offline")
+    file = ada.post(
+        f"/api/items/{paper['id']}/files",
+        files={"upload": ("p.pdf", PDF, "application/pdf")},
+    ).json()["id"]
+    creates = {
+        "/api/notes": {"text": "# Written on the train"},
+        "/api/tags": {"name": "train"},
+        "/api/collections": {"name": "Commute"},
+        f"/api/files/{file}/annotations": MARK,
+    }
+    for url, body in creates.items():
+        made = str(db.scalar(text("SELECT uuidv7()")))
+        first = ada.post(url, {"id": made, **body})
+        assert first.status_code == 201, (url, first.text)
+        assert first.json()["id"] == made
+        # Sent again (the answer was lost): the same record, not a second.
+        again = ada.post(url, {"id": made, **body})
+        assert (again.status_code, again.json()["id"]) == (201, made)
+        # Someone who does not see it cannot take its ID.
+        assert bob.post(url, {"id": made, **body}).status_code in (404, 409)
+    assert len(ada.get("/api/notes").json()) == 1
+    assert [t["name"] for t in ada.get("/api/tags").json()] == ["train"]
+    assert len(ada.get(f"/api/files/{file}/annotations").json()["annotations"]) == 1
+
+    # Only UUIDv7s, as the server makes them.
+    old_style = ada.post("/api/tags", {"id": str(uuid.uuid4()), "name": "v4"})
+    assert old_style.status_code == 422

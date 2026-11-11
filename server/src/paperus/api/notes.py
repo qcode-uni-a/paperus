@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from paperus import library, notes, organize
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
+from paperus.api.ids import NewId, sent_again
 from paperus.api.items import Owner, require_readable
 from paperus.api.organize import _collection
 from paperus.jobs import queue_note_embedding
@@ -65,6 +66,7 @@ class LinkIn(BaseModel):
 
 
 class NoteIn(BaseModel):
+    id: NewId = None
     text: str = Field(default="", max_length=1_000_000)
     library_id: uuid.UUID | None = None
     """The owner; by default the person's default owner."""
@@ -210,6 +212,9 @@ def create_note(
 ) -> NoteDetail:
     """A new note for the given owner (or the person's default owner), about
     the given papers, optionally put into a collection."""
+    again = sent_again(db, Note, body.id, lambda n: access.can_read(n.library_id))
+    if again is not None:
+        return note_detail(db, again, access, response)
     owner = access.target_library(body.library_id)
     links = [
         (_readable_item(db, access, link.item_id), link.page) for link in body.items
@@ -219,7 +224,7 @@ def create_note(
         if body.collection_id
         else None
     )
-    note = notes.create(db, owner, body.text, access.user.id)
+    note = notes.create(db, owner, body.text, access.user.id, body.id)
     seen: set[uuid.UUID] = set()
     for item, page in links:
         if item.id not in seen:

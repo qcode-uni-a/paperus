@@ -20,7 +20,10 @@
   leaves a library: moved to another, or annotations no longer shared.
   `GET /api/changes?since=N` gives everything changed since, in one answer
   (papers, notes, tags, collections, annotations, reading positions, what
-  is gone, and the libraries one reads now).
+  is gone, and the libraries one reads now). New notes, tags, collections
+  and annotations may bring their own ID (a UUIDv7 made on the device): a
+  create sent again makes no second one. The client's `AnnotationIn` is
+  now `NewAnnotation`.
 
 ## 0.0.21 (2026-11-11)
 

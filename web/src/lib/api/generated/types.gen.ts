@@ -86,38 +86,6 @@ export type AnnotationChange = {
 };
 
 /**
- * AnnotationIn
- */
-export type AnnotationIn = {
-    kind: AnnotationKind;
-    /**
-     * Page Index
-     */
-    page_index: number;
-    /**
-     * Page Label
-     */
-    page_label?: string | null;
-    position: Position;
-    /**
-     * Color
-     */
-    color?: string;
-    /**
-     * Text
-     */
-    text?: string | null;
-    /**
-     * Comment
-     */
-    comment?: string | null;
-    /**
-     * Tags
-     */
-    tags?: Array<string>;
-};
-
-/**
  * AnnotationKind
  *
  * As PDF annotations (Zotero's kinds, plus strike-through).
@@ -887,6 +855,10 @@ export type CollectionChanged = {
  * CollectionIn
  */
 export type CollectionIn = {
+    /**
+     * Id
+     */
+    id?: string | null;
     /**
      * Name
      */
@@ -2866,6 +2838,42 @@ export type NameFormatIn = {
 };
 
 /**
+ * NewAnnotation
+ */
+export type NewAnnotation = {
+    kind: AnnotationKind;
+    /**
+     * Page Index
+     */
+    page_index: number;
+    /**
+     * Page Label
+     */
+    page_label?: string | null;
+    position: Position;
+    /**
+     * Color
+     */
+    color?: string;
+    /**
+     * Text
+     */
+    text?: string | null;
+    /**
+     * Comment
+     */
+    comment?: string | null;
+    /**
+     * Tags
+     */
+    tags?: Array<string>;
+    /**
+     * Id
+     */
+    id?: string | null;
+};
+
+/**
  * NewItemUpload
  */
 export type NewItemUpload = {
@@ -3016,6 +3024,10 @@ export type NoteIds = {
  * NoteIn
  */
 export type NoteIn = {
+    /**
+     * Id
+     */
+    id?: string | null;
     /**
      * Text
      */
@@ -4426,6 +4438,10 @@ export type TagIn = {
  * TagNew
  */
 export type TagNew = {
+    /**
+     * Id
+     */
+    id?: string | null;
     /**
      * Name
      */
@@ -7129,7 +7145,7 @@ export type FileAnnotationsResponses = {
 export type FileAnnotationsResponse = FileAnnotationsResponses[keyof FileAnnotationsResponses];
 
 export type AddAnnotationData = {
-    body: AnnotationIn;
+    body: NewAnnotation;
     path: {
         /**
          * File Id

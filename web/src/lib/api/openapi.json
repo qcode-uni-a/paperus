@@ -3607,7 +3607,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnnotationIn"
+                "$ref": "#/components/schemas/NewAnnotation"
               }
             }
           }
@@ -8483,78 +8483,6 @@
         "type": "object",
         "title": "AnnotationChange"
       },
-      "AnnotationIn": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/AnnotationKind"
-          },
-          "page_index": {
-            "type": "integer",
-            "maximum": 100000.0,
-            "minimum": 0.0,
-            "title": "Page Index"
-          },
-          "page_label": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 32
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Label"
-          },
-          "position": {
-            "$ref": "#/components/schemas/Position"
-          },
-          "color": {
-            "type": "string",
-            "title": "Color",
-            "default": "#ffd400"
-          },
-          "text": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Text"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 20000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          },
-          "tags": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "maxItems": 50,
-            "title": "Tags"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind",
-          "page_index",
-          "position"
-        ],
-        "title": "AnnotationIn"
-      },
       "AnnotationKind": {
         "type": "string",
         "enum": [
@@ -9837,6 +9765,18 @@
       },
       "CollectionIn": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "name": {
             "type": "string",
             "maxLength": 200,
@@ -13367,6 +13307,90 @@
         ],
         "title": "NameFormatIn"
       },
+      "NewAnnotation": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AnnotationKind"
+          },
+          "page_index": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Page Index"
+          },
+          "page_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Label"
+          },
+          "position": {
+            "$ref": "#/components/schemas/Position"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "default": "#ffd400"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Tags"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "page_index",
+          "position"
+        ],
+        "title": "NewAnnotation"
+      },
       "NewItemUpload": {
         "properties": {
           "item_id": {
@@ -13621,6 +13645,18 @@
       },
       "NoteIn": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "text": {
             "type": "string",
             "maxLength": 1000000,
@@ -16171,6 +16207,18 @@
       },
       "TagNew": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "name": {
             "type": "string",
             "maxLength": 200,

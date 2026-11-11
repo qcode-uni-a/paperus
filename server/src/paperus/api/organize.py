@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from paperus import library, organize
 from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
+from paperus.api.ids import NewId, new_id, sent_again
 from paperus.models import (
     Collection,
     CollectionItem,
@@ -94,6 +95,7 @@ class CollectionOut(BaseModel):
 
 
 class CollectionIn(BaseModel):
+    id: NewId = None
     name: Name
     description: str | None = None
     parent_id: uuid.UUID | None = None
@@ -246,6 +248,7 @@ def tag_outs(db: DB, access: Access, condition: ColumnElement[bool]) -> list[Tag
 
 
 class TagNew(BaseModel):
+    id: NewId = None
     name: Name
     color: TagColor | None = None
     description: Annotated[str | None, Field(max_length=2000)] = None
@@ -256,6 +259,9 @@ class TagNew(BaseModel):
 @router.post("/api/tags", status_code=201)
 def create_tag(body: TagNew, db: DB, access: CurrentAccess) -> TagOut:
     """A tag not on any item yet (409 if the library has one of that name)."""
+    again = sent_again(db, Tag, body.id, lambda t: access.can_read(t.library_id))
+    if again is not None:
+        return tag_outs(db, access, Tag.id == again.id)[0]
     library_id = access.target_library(body.library_id)
     try:
         name = organize.clean_name(body.name)
@@ -264,6 +270,7 @@ def create_tag(body: TagNew, db: DB, access: CurrentAccess) -> TagOut:
     if organize.find_tag(db, library_id, name) is not None:
         raise HTTPException(409, f"a tag {name!r} exists already")
     tag = Tag(
+        **new_id(body.id),
         library_id=library_id,
         name=name,
         color=body.color,
@@ -272,7 +279,7 @@ def create_tag(body: TagNew, db: DB, access: CurrentAccess) -> TagOut:
     )
     db.add(tag)
     db.commit()
-    return next(t for t in list_tags(db, access) if t.id == tag.id)
+    return tag_outs(db, access, Tag.id == tag.id)[0]
 
 
 @router.post("/api/items/{item_id}/tags", status_code=201)
@@ -568,6 +575,9 @@ def _contents(
 def create_collection(
     body: CollectionIn, db: DB, access: CurrentAccess
 ) -> CollectionOut:
+    again = sent_again(db, Collection, body.id, lambda c: access.can_read(c.library_id))
+    if again is not None:
+        return collection_out(db, access, again)
     try:
         name = organize.clean_name(body.name)
     except ValueError as error:
@@ -582,6 +592,7 @@ def create_collection(
     else:
         library_id = access.target_library(body.library_id)
     collection = Collection(
+        **new_id(body.id),
         library_id=library_id,
         name=name,
         description=body.description,
