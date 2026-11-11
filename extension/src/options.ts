@@ -16,6 +16,9 @@ function insecure(address: string): boolean {
 
 const warn = (address: string) => ($('insecure').hidden = !insecure(address));
 
+// The version installed (as the browser's extension list shows it).
+$('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
+
 async function show(): Promise<void> {
 	const config = await settings();
 	warn(config ? config.server : $<HTMLInputElement>('server').value.trim());

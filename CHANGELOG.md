@@ -37,6 +37,7 @@
   is still saved, and the missing PDF is put down to the check, not to
   "the page links no PDF"; a page that did not load (IEEE Xplore's
   "Unable to Load Page") is no longer saved as a paper of that title.
+- **The extension's settings show its version**, as installed.
 - **The app keeps papers offline where you choose**: its start page shows
   the folder and moves them to another (another disk), or back.
 - **OIDC login can no longer claim an administrator's account by its
