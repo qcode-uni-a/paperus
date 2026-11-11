@@ -8,9 +8,12 @@ library version). Taking the number locks the counter row
 until commit, so numbers become visible in order and ``since=N`` never misses
 a change that commits late.
 
-What is deleted for good is recorded as a ``Removal`` with the number of
-the transaction that deleted it, so a device that synced before learns to
-remove it too.
+What is deleted for good, or leaves a library (moved to another, an
+annotation no longer shared), is recorded as a ``Removal`` there with the
+number of the transaction, so a device that synced before learns to remove
+it too. What only moved is changed in that transaction too: a device
+applies the removals first, then the changes (which are as things are
+now), and keeps what it may still see.
 """
 
 import uuid
@@ -18,7 +21,8 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from itertools import chain
 
-from sqlalchemy import event, insert, select, update
+from sqlalchemy import event, inspect, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.models import (
@@ -88,34 +92,56 @@ def _stamped(obj: object) -> Stamped | None:
     return None
 
 
-def _removal(db: Session, obj: object, deleted: set[object]) -> Removal | None:
-    """The record of ``obj`` deleted for good, unless it goes with a paper
-    deleted too (a file; annotations go with their file in the database)."""
+Gone = tuple[str, uuid.UUID, uuid.UUID]
+"""Kind, id and the library it is gone from."""
+
+
+def _deleted(db: Session, obj: object, deleted: set[object]) -> Gone | None:
+    """``obj`` deleted for good, unless it goes with a paper deleted too (a
+    file; annotations go with their file in the database)."""
     match obj:
         case Item() | Note() | Tag() | Collection():
-            kind, library_id = type(obj).__name__.lower(), obj.library_id
+            return type(obj).__name__.lower(), obj.id, obj.library_id
         case File(version=Version(item=item)) if item not in deleted:
-            kind, library_id = "file", item.library_id
+            return "file", obj.id, item.library_id
         case Annotation():
             file = db.get_one(File, obj.file_id)
-            kind, library_id = "annotation", file.version.item.library_id
-        case _:
-            return None
-    return Removal(record_id=obj.id, kind=kind, library_id=library_id)
+            return "annotation", obj.id, file.version.item.library_id
+    return None
+
+
+def _moved(obj: object) -> Gone | None:
+    """``obj`` moved to another library."""
+    if isinstance(obj, Item | Note | Tag | Collection):
+        before = inspect(obj).attrs.library_id.history.deleted
+        if before and before[0] is not None and before[0] != obj.library_id:
+            return type(obj).__name__.lower(), obj.id, before[0]
+    return None
 
 
 def removed(
     db: Session, kind: str, records: Iterable[tuple[uuid.UUID, uuid.UUID]]
 ) -> None:
-    """Record (id, library id) as deleted for good, for deletes that bypass
-    the ORM's flush (bulk deletes)."""
+    """Record (id, library id) as gone from that library, for changes that
+    bypass the ORM's flush (bulk deletes)."""
     rows = [
         {"record_id": record_id, "kind": kind, "library_id": library_id}
         for record_id, library_id in records
     ]
     if rows:
         number = change_number(db)
-        db.execute(insert(Removal), [row | {"change": number} for row in rows])
+        statement = insert(Removal).values([row | {"change": number} for row in rows])
+        # Gone from a library again (moved back and forth): the latest.
+        db.connection().execute(
+            statement.on_conflict_do_update(
+                index_elements=[Removal.record_id],
+                set_={
+                    "kind": statement.excluded.kind,
+                    "library_id": statement.excluded.library_id,
+                    "change": statement.excluded.change,
+                },
+            )
+        )
 
 
 @event.listens_for(Session, "before_flush")
@@ -153,10 +179,10 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
         number = change_number(db)
         now = datetime.now(UTC)
         deleted = set(db.deleted)
-        for obj in db.deleted:
-            if (removal := _removal(db, obj, deleted)) is not None:
-                removal.change = number
-                db.add(removal)
+        gone = [_deleted(db, obj, deleted) for obj in deleted]
+        gone += [_moved(obj) for obj in db.dirty]
+        for kind, record_id, library_id in filter(None, gone):
+            removed(db, kind, [(record_id, library_id)])
         for target in stamped:
             target.change = number
             if isinstance(target, Item | Note) and id(target) in own_change | content:

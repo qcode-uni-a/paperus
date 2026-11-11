@@ -21,10 +21,18 @@ import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
-from paperus.models import Annotation, AnnotationKind, AnnotationShare, File, Item
+from paperus import changes
+from paperus.models import (
+    Annotation,
+    AnnotationKind,
+    AnnotationShare,
+    File,
+    Item,
+    Version,
+)
 
 # Zotero's colours: yellow, red, green, blue, purple, magenta, orange, grey.
 COLORS = [
@@ -153,10 +161,24 @@ def share(db: Session, user_id: uuid.UUID, item: Item, shared: bool) -> None:
     """Show (or stop showing) the person's annotations of the paper to those
     who may read it. Does not commit."""
     found = db.get(AnnotationShare, (user_id, item.id))
-    if shared and found is None:
+    if shared == (found is not None):
+        return
+    if shared:
         db.add(AnnotationShare(user_id=user_id, item_id=item.id))
-    elif not shared and found is not None:
+    else:
         db.delete(found)
+    # For syncing: the annotations come into others' reach, or leave it
+    # (their author keeps them: changed after removed).
+    files = select(File.id).join(Version).where(Version.item_id == item.id)
+    mine = (Annotation.user_id == user_id, Annotation.file_id.in_(files))
+    ids = db.scalars(
+        update(Annotation)
+        .where(*mine)
+        .values(change=changes.change_number(db))
+        .returning(Annotation.id)
+    ).all()
+    if not shared:
+        changes.removed(db, "annotation", [(i, item.library_id) for i in ids])
 
 
 def hidden_marks(db: Session, user_id: uuid.UUID, file: File) -> list[dict[str, Any]]:

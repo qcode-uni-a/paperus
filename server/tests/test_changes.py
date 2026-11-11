@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from paperus.models import Annotation, Item, ItemView, Removal
 from tests.conftest import FakeDOIRegistry
-from tests.people import Person
+from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n%%EOF\n"
 
@@ -178,6 +178,62 @@ def test_what_is_deleted_for_good_is_recorded(client: TestClient, db: Session) -
     db.delete(item)
     db.commit()
     assert {v for v in removals().values() if v[1] > number} == {("item", number + 1)}
+
+
+def test_what_leaves_a_library_is_recorded(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    lab = group(root, "Lab", ada)
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", json={"role": "reader"})
+    paper = ada.add("Moves")
+    own = paper["library_id"]
+
+    def removal(record_id: str) -> tuple[str, str, int] | None:
+        db.expire_all()
+        found = db.get(Removal, uuid.UUID(record_id))
+        if found is None:
+            return None
+        return found.kind, str(found.library_id), found.change
+
+    # Moved to the group and back: gone from where it was each time, and
+    # changed with the same number (who sees it still keeps it).
+    ada.put(f"/api/items/{paper['id']}/owner", {"library_id": lab["library_id"]})
+    moved = ada.get(f"/api/items/{paper['id']}").json()["change"]
+    assert removal(paper["id"]) == ("item", own, moved)
+    ada.put(f"/api/items/{paper['id']}/owner", {"library_id": own})
+    back = ada.get(f"/api/items/{paper['id']}").json()["change"]
+    assert removal(paper["id"]) == ("item", lab["library_id"], back)
+
+    # Annotations shared and no longer: changed each time, and the second
+    # time gone from the group's paper (for Bob; Ada keeps hers).
+    shared = ada.add("Shared", lab["library_id"])
+    file = ada.post(
+        f"/api/items/{shared['id']}/files",
+        files={"upload": ("s.pdf", PDF, "application/pdf")},
+    ).json()["id"]
+    mark = ada.post(
+        f"/api/files/{file}/annotations",
+        {
+            "kind": "note",
+            "page_index": 0,
+            "position": {"rects": [[10, 10, 20, 20]]},
+            "color": "#ffd400",
+        },
+    ).json()["id"]
+    sharing = f"/api/items/{shared['id']}/annotation-sharing"
+
+    def change() -> int:
+        db.expire_all()
+        return db.get_one(Annotation, uuid.UUID(mark)).change
+
+    made = change()
+    ada.put(sharing, {"shared": True})
+    assert change() > made and removal(mark) is None
+    ada.put(sharing, {"shared": True})  # no change
+    on = change()
+    ada.put(sharing, {"shared": False})
+    assert removal(mark) == ("annotation", lab["library_id"], change())
+    assert change() > on
 
 
 def test_overrides_need_current_etag(logged_in: TestClient) -> None:

@@ -16,7 +16,8 @@
 - **Towards syncing for offline use**: annotations and reading positions
   get change numbers like papers and notes (migration 0008), and what is
   deleted for good (papers, notes, files, tags, collections, annotations)
-  is recorded, so a device can remove it too (migration 0009).
+  is recorded, so a device can remove it too (migration 0009); so is what
+  leaves a library: moved to another, or annotations no longer shared.
 
 ## 0.0.21 (2026-11-11)
 
