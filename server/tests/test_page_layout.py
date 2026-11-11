@@ -169,3 +169,31 @@ def test_an_equation_over_a_few_lines_is_no_columns() -> None:
     columns, pieces = lay_out(ink)
     assert not columns
     assert all(p["wide"] for p in pieces)
+
+
+def test_a_few_column_lines_under_a_figure_are_columns() -> None:
+    """A figure across the page, its caption, and five lines in two columns
+    under it (too few for the page's own gap): read in their columns, not
+    as part of the figure. A caption whose word spaces line up for a few
+    lines stays whole."""
+    ink = np.zeros((792, 612), dtype=bool)
+    sizes = np.zeros((792, 612), dtype=np.float32)
+
+    def lines(x0: int, x1: int, y0: int, y1: int) -> None:
+        for y in range(y0, y1, 12):
+            ink[y : y + 8, x0:x1] = (np.arange(x0, x1) % 4 != 0)[None, :]
+            sizes[y : y + 8, x0:x1] = 9
+
+    ink[60:600, 60:550:3] = True  # the figure: drawing, no text
+    lines(50, 562, 615, 680)  # its caption
+    lines(50, 297, 700, 760)
+    lines(314, 562, 700, 760)
+    _, pieces = lay_out(ink, False, sizes)
+    found = [(p["x"] < 300, p["y"] > 690, p["wide"]) for p in pieces]
+    assert found == [(True, False, True), (True, True, False), (False, True, False)]
+
+    # The five lines' gap crossed by the caption's lines around them.
+    lines(50, 562, 615, 690)
+    lines(50, 562, 760, 784)
+    _, pieces = lay_out(ink, False, sizes)
+    assert all(p["wide"] for p in pieces)

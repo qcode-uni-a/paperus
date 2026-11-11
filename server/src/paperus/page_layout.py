@@ -26,7 +26,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 6
+VERSION = 7
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -467,7 +467,11 @@ def lay_out(
         return side_rows[(x0, x1)]
 
     def gutter_of(
-        y0: int, y1: int, x0: int = left, x1: int = right
+        y0: int,
+        y1: int,
+        x0: int = left,
+        x1: int = right,
+        least: float = MIN_COLUMNS * 1.5,
     ) -> tuple[int, int] | None:
         """The gap between two columns in rows ``y0``-``y1``: a strip near
         the body's middle that long stretches of rows (a few lines at
@@ -476,7 +480,8 @@ def lay_out(
         (word spaces are narrower); a figure across the page breaks the
         stretches, not the columns beside it, and its own gaps do not
         count. None if there is none. Within ``x0``-``x1`` if given (the
-        two columns on one side of a three-column page's first gap)."""
+        two columns on one side of a three-column page's first gap).
+        ``least``: rows of text beside the gap at least."""
         across = x1 - x0 + 1
         rows = np.array(rows_in(x0, x1)[y0 : y1 + 1], dtype=bool)
         start = _round(x0 + across * 0.3)
@@ -515,7 +520,7 @@ def lay_out(
             beside = text_ink[y0 : y1 + 1, max(0, x0) : x1 + 1].any(axis=1)
             text_rows = int((beside & rows).sum())
         most = int(free.max())
-        if most < max(MIN_COLUMNS * 1.5, text_rows * 0.2):
+        if most < max(least, text_rows * 0.2):
             return None
         quiet = runs(free >= most * 0.9)
         middle = starts / 2
@@ -992,6 +997,34 @@ def lay_out(
                     parts.append(whole)
         return parts if any(not part.wide for part in parts) else column
 
+    def columns_alone(y0: int, y1: int) -> tuple[int, int] | None:
+        """A block of text in two columns (a few full lines each side, a
+        gap near the middle, blank down the whole block; a figure's labels
+        are short, word spaces lining up over a few lines leave the others
+        crossing): their gap."""
+        if drawn(left, right, y0, y1):
+            return None
+        own = gutter_of(y0, y1, least=MIN_COLUMNS)
+        if own is None or abs((own[0] + own[1]) / 2 - (left + right) / 2) > (
+            body_width * 0.1
+        ):
+            return None
+        inset = max(0, (own[1] - own[0] + 1 - 3) // 4)
+        if area(own[0] + inset, own[1] - inset, y0, y1).any():
+            return None
+        if filled(left, own[0] - 1, y0, y1, True) and filled(
+            own[1] + 1, right, y0, y1, True
+        ):
+            return own
+        return None
+
+    def own_gap(y0: int, y1: int, page_in_one: bool) -> tuple[int, int] | None:
+        """Beside a figure on a page without a gap of its own
+        (``page_in_one``): a block of text's own columns, if it has them."""
+        if not page_in_one or drawn(left, right, y0, y1):
+            return None
+        return columns_alone(y0, y1)
+
     def place(y0: int, y1: int, gutter: tuple[int, int] | None, main: bool) -> None:
         nonlocal main_span
         bands = (
@@ -1024,19 +1057,33 @@ def lay_out(
                     place(band.y0, band.y1, own, False)
                     continue
             blocks: list[Run] = []
+            # Blocks of text in two columns of their own beside a figure (a
+            # few lines under one across the page: too few for the page's
+            # gap): not joined to it.
+            own_columns: dict[tuple[int, int], tuple[int, int]] = {}
             for block in joined(runs(in_row, band.y0, band.y1), block_split):
-                if (
+                joins = bool(
                     blocks
                     and block[0] - blocks[-1][1] - 1 < FIGURE_GAP
                     and (
                         drawn(left, right, blocks[-1][0], blocks[-1][1])
                         or drawn(left, right, block[0], block[1])
                     )
-                ):
+                )
+                if joins:
+                    for b0, b1 in (block, blocks[-1]):
+                        own = own_gap(b0, b1, main and not gutter)
+                        if own:
+                            own_columns[(b0, b1)] = own
+                            joins = False
+                if joins:
                     blocks[-1][1] = block[1]
                 else:
                     blocks.append(block)
             for b0, b1 in blocks:
+                if (b0, b1) in own_columns:
+                    place(b0, b1, own_columns[(b0, b1)], False)
+                    continue
                 # A rule alone (a few rows) is no piece: the view draws its
                 # own line between pieces.
                 if b1 - b0 + 1 < 4:

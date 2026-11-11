@@ -26,6 +26,9 @@
 - **Fluent mode: an equation running on over a few lines is no columns**:
   on a one-column page, its aligned terms left blank stripes that read as
   two or three columns.
+- **Fluent mode: a few lines in two columns under a figure across the
+  page** are read in their columns, left then right, not as part of the
+  figure (too few for the page's own column gap to be found).
 - **The app keeps papers offline where you choose**: its start page shows
   the folder and moves them to another (another disk), or back.
 - **OIDC login can no longer claim an administrator's account by its
