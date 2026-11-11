@@ -32,6 +32,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - if: runner.os == 'Linux'
+        run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev patchelf
       - if: runner.os == 'macOS'
@@ -83,6 +87,10 @@ jobs:
         with:
           name: app-${{ matrix.name }}
           path: installers
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - if: runner.os == 'Linux'
+        run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - if: runner.os == 'Linux'
         name: The .deb, with what it needs from the system
         run: |

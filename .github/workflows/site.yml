@@ -76,6 +76,9 @@ jobs:
             web/package-lock.json
             e2e/package-lock.json
       # For the demo's lecture notes (e2e/demo/pdfs.sh).
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - run: >-
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
           texlive-latex-base texlive-latex-recommended texlive-fonts-recommended

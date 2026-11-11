@@ -13,6 +13,7 @@ jobs:
   pre-commit:
     name: pre-commit (all hooks, all files)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Run in their own jobs below (they need the dependencies installed).
       SKIP: ty,ty-ml,svelte-check,tsc-extension
@@ -36,6 +37,7 @@ jobs:
   server:
     name: Server (ruff, ty, pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Codecov takes the coverage on GitHub's word (OIDC), no token.
     permissions:
       contents: read
@@ -72,6 +74,7 @@ jobs:
   ml:
     name: ML service (ruff, ty, pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Codecov takes the coverage on GitHub's word (OIDC), no token.
     permissions:
       contents: read
@@ -96,6 +99,7 @@ jobs:
   web:
     name: Website (prettier, svelte-check, build)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: web
@@ -114,6 +118,7 @@ jobs:
   e2e:
     name: End-to-end (Playwright, ${{ matrix.browser }})
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -149,6 +154,9 @@ jobs:
         working-directory: web
       - run: npm ci
         working-directory: e2e
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: e2e
       - run: npm run check
@@ -169,6 +177,7 @@ jobs:
   update:
     name: Update from the last release (Docker Compose)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.3  # no moving major tag; pin an exact version
@@ -186,6 +195,7 @@ jobs:
   client:
     name: TypeScript client (generate, build)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: client
@@ -203,6 +213,7 @@ jobs:
   extension:
     name: Browser extension (tsc, build)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: extension
@@ -220,12 +231,16 @@ jobs:
   app:
     name: App (rustfmt, clippy, test)
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: app/src-tauri
     steps:
       - uses: actions/checkout@v7
       # What Tauri builds on under Linux (WebKitGTK).
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev
       - uses: Swatinem/rust-cache@v2
         with:
@@ -259,6 +274,9 @@ jobs:
           node-version: 26
           cache: npm
           cache-dependency-path: web/package-lock.json
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev webkitgtk-webdriver xvfb
       - uses: Swatinem/rust-cache@v2
         with:
@@ -277,6 +295,7 @@ jobs:
   images:
     name: Container images (build only)
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4

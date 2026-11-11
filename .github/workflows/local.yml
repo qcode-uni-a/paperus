@@ -71,6 +71,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Ubuntu's mirrors may not answer at once (on 2026-11-11 the runners
+      # could not look them up for hours): apt tries again.
+      - run: echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
       - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev webkitgtk-webdriver xvfb
       - uses: Swatinem/rust-cache@v2
         with:
