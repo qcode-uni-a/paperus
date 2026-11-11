@@ -19,7 +19,7 @@ use std::{
     path::PathBuf,
     sync::{Mutex, mpsc},
     thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use serde::Deserialize;
@@ -91,19 +91,16 @@ struct ServerVersion {
     features: std::collections::HashMap<String, i64>,
 }
 
-/// Whether the library offers syncing as this app knows it; None if it
-/// did not answer (asked again next time).
-fn syncs(url: &str) -> Option<bool> {
-    let mut response = libraries::agent()
+/// Whether the library offers syncing as this app knows it (before
+/// 0.0.22 there is no /api/version: no).
+fn syncs(url: &str) -> bool {
+    libraries::agent()
         .get(format!("{url}/api/version"))
         .call()
-        .ok()?;
-    if !response.status().is_success() {
-        // Before 0.0.22: no /api/version, so no syncing.
-        return (response.status().as_u16() == 404).then_some(false);
-    }
-    let version: ServerVersion = response.body_mut().read_json().ok()?;
-    Some(version.features.get("sync") == Some(&SYNC))
+        .ok()
+        .filter(|response| response.status().is_success())
+        .and_then(|mut response| response.body_mut().read_json::<ServerVersion>().ok())
+        .is_some_and(|version| version.features.get("sync") == Some(&SYNC))
 }
 
 /// Whether the library answers (quickly).
@@ -348,40 +345,24 @@ pub fn start(app: AppHandle) {
         *sender = Some(wake);
     }
     thread::spawn(move || {
-        // Libraries that do not sync as this app knows it, asked again
-        // after a while (the server may be updated).
-        let mut checked: std::collections::HashMap<String, (bool, Instant)> = Default::default();
         loop {
             finish_logouts(&app);
-            let _ = sync(&app, &mut checked);
+            let _ = sync(&app);
             let _ = woken.recv_timeout(EVERY);
             while woken.try_recv().is_ok() {}
         }
     });
 }
 
-fn sync(
-    app: &AppHandle,
-    checked: &mut std::collections::HashMap<String, (bool, Instant)>,
-) -> Option<()> {
+fn sync(app: &AppHandle) -> Option<()> {
     let window = app.get_webview_window(MAIN)?;
     let library = libraries::of(app, &window.url().ok()?)?;
     if library.local {
         return None;
     }
     let url = library.url.clone();
-    let known = checked
-        .get(&url)
-        .filter(|(_, at)| at.elapsed() < Duration::from_secs(3600));
-    let syncs = match known {
-        Some((syncs, _)) => *syncs,
-        None => {
-            let found = syncs(&url)?;
-            checked.insert(url.clone(), (found, Instant::now()));
-            found
-        }
-    };
-    if !syncs {
+    // Asked each time: the server may be updated (or another) since.
+    if !syncs(&url) {
         return None;
     }
     let Some(token) = libraries::session(&window, &Url::parse(&url).ok()?) else {
