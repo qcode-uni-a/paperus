@@ -51,6 +51,24 @@
 			</section>
 
 			<p id="message" role="status"></p>
+
+			<section id="log-section">
+				<h2>Log</h2>
+				<p class="muted small">
+					What the extension did, newest first: the page it read, each fetch and its answer, where a
+					PDF link led. To find out why something failed; "Copy" for passing it on. Kept in this
+					browser only (the last 400 steps), and what went wrong is also sent to your paperus
+					(Administration → Logs).
+				</p>
+				<label class="check"
+					><input id="detailed" type="checkbox" /> Detailed log: every step also to your paperus
+				</label>
+				<div class="row">
+					<button id="copy-log">Copy</button>
+					<button id="clear-log">Clear</button>
+				</div>
+				<ol id="log" class="log"></ol>
+			</section>
 			<p id="version" class="muted small"></p>
 		</main>
 		<script src="options.js" type="module"></script>

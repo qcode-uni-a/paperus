@@ -10,7 +10,7 @@ import {
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
-import { logIssue } from "./log";
+import { logIssue, trace } from "./log";
 import {
   fetchPdf,
   idsInUrl,
@@ -232,6 +232,11 @@ async function saveTab(
   const tabId = tab.id!;
   await badge(tabId, "…");
   step(tabId, "Reading the page…");
+  trace("Saving a page", {
+    page: tab.url ?? null,
+    owner: owner?.name ?? null,
+    popup: inPopup,
+  });
   try {
     const result = await saveFrom(tab, owner);
     if (result.warning)
@@ -305,7 +310,21 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   });
   const url = page?.url ?? tab.url ?? "";
   const inUrl = idsInUrl(url);
-  if (!page) return saveClosedTab(tab, url, inUrl, owner, unread);
+  if (!page) {
+    trace("The page could not be read in its tab", {
+      page: url,
+      reason: unread,
+    });
+    return saveClosedTab(tab, url, inUrl, owner, unread);
+  }
+  trace("Page read", {
+    page: url,
+    title: page.title,
+    doi: page.doi ?? inUrl.doi,
+    arxiv: page.arxiv ?? inUrl.arxiv,
+    pdfLink: page.pdfUrl,
+    isPdf: page.isPdf,
+  });
   const info = {
     ...page,
     doi: page.doi ?? inUrl.doi,
@@ -317,6 +336,11 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   // of a page that did not load.
   const signals = page.isPdf ? null : await inPage(tab.id!, pageSignals);
   const robot = signals !== null && isRobotCheck(signals);
+  if (robot)
+    trace("A check for robots on the page", {
+      page: url,
+      title: signals?.title ?? null,
+    });
   if (!info.doi && !info.arxiv && signals) {
     if (robot) throw new PaperusError(EXPLAINED["robot-check"]);
     if (isErrorPage(signals))
@@ -341,10 +365,25 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
           page.isPdf ? null : page.pdfUrl,
         )
       : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
+  trace("The PDF", { page: url, ...fetched(pdf) });
   step(tab.id!, "Saving to paperus…");
   return page.isPdf && !info.doi && !info.arxiv
     ? saveFile(pdf, url, owner)
     : save(info, pdf, owner);
+}
+
+/** A PDF's fetch, for the log: its size, or what came back instead. */
+function fetched(pdf: Pdf): Record<string, string | number | null> {
+  if (!("error" in pdf)) return { pdf: `${pdf.size} bytes` };
+  return {
+    error: pdf.error,
+    status: pdf.status ?? null,
+    landed: pdf.at ?? null,
+    next: pdf.next ?? null,
+    title: pdf.html
+      ? signalsOfHtml(pdf.html, 200).title.trim().slice(0, 120)
+      : null,
+  };
 }
 
 /** A tab the extension may not read: a browser's own PDF viewer (Firefox's),
@@ -371,6 +410,10 @@ async function saveClosedTab(
     );
   }
   const pdf = await onwards(await fetchPdf(url, MAX_BYTES));
+  trace("Fetched the tab's address from the extension", {
+    url,
+    ...fetched(pdf),
+  });
   // A web page after all, which the browser did not let the extension read
   // in its tab: the paper's details from the page as fetched from here.
   if ("error" in pdf && pdf.html !== undefined && !inUrl.doi) {
@@ -407,11 +450,17 @@ async function saveClosedTab(
 async function onwards(pdf: Pdf): Promise<Pdf> {
   if (!("error" in pdf) || !pdf.next) return pdf;
   const next = pdf.next;
+  trace("The page could not fetch the PDF: fetching it from the extension", {
+    url: next,
+    because: pdf.error,
+  });
   if (!(await chrome.permissions.contains({ origins: [site(next)] })))
     return {
       error: `The PDF is at ${new URL(next).host}, which paperus may not fetch from yet: allow it there, then save again.`,
     };
-  return fetchPdf(next, MAX_BYTES);
+  const again = await fetchPdf(next, MAX_BYTES);
+  trace("Fetched from the extension", { url: next, ...fetched(again) });
+  return again;
 }
 
 /** A paper's details from a page's HTML (Highwire's citation_* tags, Dublin
@@ -511,6 +560,11 @@ async function save(
   }
   const item = added.data;
   const known = added.status === 200;
+  trace(known ? "Already in paperus" : "Added to paperus", {
+    item: item.id,
+    title: item.title,
+    by: doi ? "DOI" : "the page's details",
+  });
   const hasPdf = item.files?.some((f) => f.media_type === "application/pdf");
   // Why the paper is saved without its PDF, if it is.
   let missing: string | null = null;
@@ -887,6 +941,11 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
       }
       const publisher = publisherOf(paper);
       busy.add(publisher);
+      trace("Getting a PDF (Missing)", {
+        paper: paper.title,
+        page: paper.url,
+        publisher,
+      });
       let problem: { cause: Cause; reason: string } | null;
       try {
         problem = await Promise.race([
@@ -913,6 +972,10 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
           item: paper.item_id,
         });
       } else saved++;
+      trace(problem ? "No PDF for it (Missing)" : "PDF saved (Missing)", {
+        paper: paper.title,
+        reason: problem?.reason ?? null,
+      });
       done++;
       await report({
         type: "getPdfsProgress",
@@ -963,12 +1026,18 @@ async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
   try {
     await loaded(tab.id!);
     const landed = (await chrome.tabs.get(tab.id!)).url ?? "";
+    trace("The PDF link opened in a tab", { link: url, landed });
     if (!landed || landed === url || !/^https?:/.test(landed)) return failed;
     if (!(await chrome.permissions.contains({ origins: [site(landed)] })))
       return failed;
     const pdf = await fetchPdf(landed, MAX_BYTES);
+    trace("Fetched where the tab landed", { url: landed, ...fetched(pdf) });
     return "error" in pdf ? failed : pdf;
-  } catch {
+  } catch (error) {
+    trace("The tab for the PDF link failed", {
+      link: url,
+      reason: String(error),
+    });
     return failed;
   } finally {
     await chrome.tabs.remove(tab.id!).catch(() => undefined);
@@ -1045,11 +1114,17 @@ async function getOne(
     await loaded(tabId);
     const page = await inPage(tabId, readPage);
     const pdfUrl = page.isPdf ? page.url : page.pdfUrl;
+    trace("Publisher's page read (Missing)", {
+      page: paper.url,
+      landed: (await chrome.tabs.get(tabId)).url ?? null,
+      pdfLink: pdfUrl,
+    });
     if (!pdfUrl) return because(causeOf(await inPage(tabId, pageSignals)));
     const pdf = await orInTab(
       await onwards(await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES)),
       pdfUrl,
     );
+    trace("The PDF (Missing)", { paper: paper.title, ...fetched(pdf) });
     if ("error" in pdf) {
       const cause =
         pdf.html === undefined

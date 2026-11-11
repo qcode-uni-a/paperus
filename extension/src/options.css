@@ -102,3 +102,53 @@ a {
 .warning[hidden] {
 	display: none;
 }
+
+/* The log: newest first, its details in small type. */
+.check {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-weight: 400;
+	margin: 8px 0;
+}
+.row {
+	display: flex;
+	gap: 8px;
+}
+.log {
+	margin: 12px 0 0;
+	padding: 0;
+	list-style: none;
+	max-height: 420px;
+	overflow-y: auto;
+	border-top: 1px solid var(--rule);
+	font-size: 13px;
+}
+.log li {
+	padding: 6px 0;
+	border-bottom: 1px solid var(--rule);
+	overflow-wrap: anywhere;
+}
+.log time {
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.log .warning > div {
+	color: #b26a00;
+}
+.log .error > div {
+	color: var(--danger);
+}
+.log dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0 10px;
+	margin: 4px 0 0 12px;
+	color: var(--muted);
+}
+.log dt {
+	font-weight: 600;
+}
+.log dd {
+	margin: 0;
+}

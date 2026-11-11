@@ -1,18 +1,42 @@
-/** What went wrong (and some of what happened), in the browser's console
- * and sent to paperus, where its administrators read it (Administration →
- * Logs): which publisher refused a PDF, and why. Sent in small batches; an
- * older paperus without the log, or none connected, lets them go. */
+/** What the extension did, to find out why something failed:
+ *
+ * - every step (``trace``) and every problem (``logIssue``) kept in the
+ *   browser, the last few hundred, for the settings page's log (to copy);
+ * - problems also sent to paperus, where its administrators read them
+ *   (Administration → Logs): which publisher refused a PDF, and why; with
+ *   "Detailed log" on in the settings, every step too.
+ *
+ * Sent in small batches; an older paperus without the log, or none
+ * connected, lets them go. */
 import { type Api, call } from "./paperus";
 
 type Level = "info" | "warning" | "error";
-type Context = Record<string, string | number | boolean | null>;
+export type Context = Record<
+  string,
+  string | number | boolean | null | undefined
+>;
+
+export interface Entry {
+  at: string;
+  level: Level;
+  message: string;
+  context?: Context;
+}
 
 const KEEP = 200;
 const BATCH = 50;
+/** Entries kept in the browser for the settings page. */
+const KEEP_HERE = 400;
 const pending: Api.ExtensionReport[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
+let written: Promise<void> = Promise.resolve();
 
-export function logIssue(level: Level, message: string, context?: Context): void {
+/** Something went wrong (or only partly right): kept and sent. */
+export function logIssue(
+  level: Level,
+  message: string,
+  context?: Context,
+): void {
   const write =
     level === "error"
       ? console.error
@@ -20,11 +44,60 @@ export function logIssue(level: Level, message: string, context?: Context): void
         ? console.warn
         : console.info;
   write("paperus:", message, context ?? "");
+  keep(level, message, context);
+  queue(level, message, context);
+}
+
+/** A step on the way (the page read, a fetch and its answer, a tab):
+ * kept; sent only with "Detailed log" on. */
+export function trace(message: string, context?: Context): void {
+  console.info("paperus:", message, context ?? "");
+  keep("info", message, context);
+  void chrome.storage.local
+    .get("detailedLog")
+    .then(({ detailedLog }) => {
+      if (detailedLog) queue("info", message, context);
+    })
+    .catch(() => undefined);
+}
+
+function clean(context?: Context): Api.ExtensionReport["context"] {
+  if (!context) return undefined;
+  return Object.fromEntries(
+    Object.entries(context)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [
+        key,
+        typeof value === "string" ? value.slice(0, 1000) : (value ?? null),
+      ]),
+  ) as Api.ExtensionReport["context"];
+}
+
+function keep(level: Level, message: string, context?: Context): void {
+  const entry: Entry = {
+    at: new Date().toISOString(),
+    level,
+    message: message.slice(0, 2000),
+    context: clean(context) ?? undefined,
+  };
+  // One after another: two steps at once must not lose each other.
+  written = written
+    .then(async () => {
+      const { log = [] } = (await chrome.storage.local.get("log")) as {
+        log?: Entry[];
+      };
+      log.push(entry);
+      await chrome.storage.local.set({ log: log.slice(-KEEP_HERE) });
+    })
+    .catch(() => undefined);
+}
+
+function queue(level: Level, message: string, context?: Context): void {
   pending.push({
     level,
     message: message.slice(0, 4000),
     at: new Date().toISOString(),
-    context,
+    context: clean(context),
   });
   pending.splice(0, Math.max(0, pending.length - KEEP));
   clearTimeout(timer);
@@ -41,7 +114,7 @@ async function send(): Promise<void> {
         json: { version: chrome.runtime.getManifest().version, entries },
       });
     } catch {
-      return; // not connected, or paperus away: these stay in the console
+      return; // not connected, or paperus away: kept here all the same
     }
   }
 }

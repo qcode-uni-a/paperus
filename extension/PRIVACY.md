@@ -22,10 +22,17 @@ What it sends to your paperus, and when:
   could not get, an error): what happened, with the page's address and
   the extension's version, for the administrators of your paperus
   (Administration → Logs). Papers saved without trouble are not reported.
+- **With "Detailed log" on** (in its settings; off unless you switch it
+  on): every step of a save too (the page's address and details, each
+  address it fetched from and the answer), to your paperus's log, for
+  finding out what goes wrong.
 
 On your paperus' own pages, a small script tells paperus that the
 extension is installed and passes on such requests; it reads nothing
 there.
+
+It also keeps a log of its last 400 steps in your browser, shown in its
+settings (to copy and pass on, or clear).
 
 What it keeps in your browser: your paperus address, an access token that
 may only add papers and see which ones you have, the owner new papers go
