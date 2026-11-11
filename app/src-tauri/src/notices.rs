@@ -1,5 +1,6 @@
 //! The bell's notifications as the system's (docs/apps.md): papers others
-//! add to one's groups, published versions found. Asked for every minute,
+//! add to one's groups, published versions found, the zips of one's
+//! exports as they are ready. Asked for every minute,
 //! with the window's login; only those that come while the app runs, and
 //! not while its window is in front (the bell shows them there).
 
@@ -108,6 +109,19 @@ fn text(notice: &Notice) -> String {
             };
             format!("Published{place}: “{}”", title.unwrap_or_default())
         }
+        "export" => {
+            let part = notice.data["part"].as_i64().unwrap_or(1);
+            match notice.data["parts"].as_i64().unwrap_or(1) {
+                1 => "Your export is ready to download".into(),
+                parts if part < parts => {
+                    format!("Part {part} of {parts} of your export is ready to download")
+                }
+                parts => {
+                    format!("Your export is complete: part {part} of {parts} is ready to download")
+                }
+            }
+        }
+        "export_failed" => "Your export failed: see why, and start it again".into(),
         other => title.unwrap_or_else(|| other.to_owned()),
     }
 }
@@ -144,5 +158,31 @@ mod tests {
         );
         let bare = serde_json::json!({"title": "On light"});
         assert_eq!(text(&notice("published", bare)), "Published: “On light”");
+    }
+
+    #[test]
+    fn each_zip_of_an_export() {
+        let part = |part: i64, parts: i64| {
+            text(&notice(
+                "export",
+                serde_json::json!({"export_id": "x", "part": part, "parts": parts}),
+            ))
+        };
+        assert_eq!(part(1, 1), "Your export is ready to download");
+        assert_eq!(
+            part(2, 3),
+            "Part 2 of 3 of your export is ready to download"
+        );
+        assert_eq!(
+            part(3, 3),
+            "Your export is complete: part 3 of 3 is ready to download"
+        );
+        assert_eq!(
+            text(&notice(
+                "export_failed",
+                serde_json::json!({"export_id": "x"})
+            )),
+            "Your export failed: see why, and start it again"
+        );
     }
 }

@@ -13,6 +13,7 @@
 	import { ago, fileSize } from '#lib/format.ts';
 	import { collectionPath, flatTree, libraryName, organize } from '#lib/organize.svelte.ts';
 	import { watchExport } from '#lib/processing.svelte.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 
 	/** Settings → Export: everything the person sees, as a SQLite database
 	 * and the files, in zips to download (docs/export.md). */
@@ -145,6 +146,15 @@
 			error = errorMessage(failure);
 			return;
 		}
+		const zips = estimate && estimate.parts > 1 ? `each of its ${estimate.parts} zips` : 'it';
+		notify(
+			{
+				kind: 'info',
+				title: 'Your export is being prepared',
+				text: `You get a notification (the bell) when ${zips} is ready to download. You can leave this page meanwhile.`
+			},
+			12
+		);
 		watchExport(data.id);
 		await load();
 	}
@@ -274,24 +284,32 @@
 					<p class="error">{record.error}</p>
 				{:else if record.status === 'expired'}
 					<small>Expired: exports can be downloaded for a day.</small>
-				{:else}
+				{/if}
+				<!-- Each zip as soon as it is written. -->
+				{#if (record.status === 'running' || record.status === 'done') && record.parts.length}
+					{@const numbered = record.parts.length > 1 || record.status === 'running'}
 					<ul class="parts">
 						{#each record.parts as part (part.part)}
 							<li>
 								<a
 									href={apiHref(`/api/exports/${record.id}/parts/${part.part}`)}
-									download={part.name}
-									>Download{record.parts.length > 1 ? ` part ${part.part}` : ''}</a
+									download={part.name}>Download{numbered ? ` part ${part.part}` : ''}</a
 								>
 								<small>{part.name}, {fileSize(part.size)}</small>
 							</li>
 						{/each}
 					</ul>
-					{#if record.expires_at}<small
-							>Until {formatDateTime(record.expires_at)}{record.parts.length > 1
-								? '. Unpack all zips into one folder.'
-								: '.'}</small
-						>{/if}
+				{/if}
+				{#if record.status === 'waiting' || record.status === 'running'}
+					<small
+						>You get a notification (the bell) as each zip is ready; you can leave this page.</small
+					>
+				{:else if record.status === 'done' && record.expires_at}
+					<small
+						>Until {formatDateTime(record.expires_at)}{record.parts.length > 1
+							? '. Unpack all zips into one folder.'
+							: '.'}</small
+					>
 				{/if}
 			</li>
 		{/each}

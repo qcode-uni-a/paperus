@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { mdiBellOutline } from '@mdi/js';
 	import { resolve } from '$app/paths';
-	import { listNotifications, markNotificationsRead } from '#lib/api/client.ts';
+	import { apiHref, listNotifications, markNotificationsRead } from '#lib/api/client.ts';
 	import type { NotificationOut } from '#lib/api/generated/types.gen.ts';
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { ago } from '#lib/format.ts';
 	import Icon from '#lib/Icon.svelte';
 
 	/** What happened that concerns the person (server: paperus.notifications):
-	 * papers added to their groups, published versions found. The count of
+	 * papers added to their groups, published versions found, the zips of
+	 * their exports as they are written. The count of
 	 * unread ones on the bell; opening the list marks them read (they stay
 	 * marked as new while it is open). */
 	const WIDTH = 340;
@@ -65,7 +66,7 @@
 	const plural = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'paper' : 'papers'}`;
 
 	/** What it says, and where it leads. */
-	function told(notice: NotificationOut): { text: string; href: string } {
+	function told(notice: NotificationOut): { text: string; href: string; reload?: boolean } {
 		const d = notice.data as Record<string, string | number | null>;
 		const item = d.item_id ? resolve('/items/[id]', { id: String(d.item_id) }) : resolve('/');
 		if (notice.kind === 'added') {
@@ -82,6 +83,28 @@
 			return {
 				text: `Published${where ? ` in ${where}` : ''}: “${d.title}”`,
 				href: item
+			};
+		}
+		// An export's zip, to download: a link the browser follows itself
+		// (once the zip is gone, the server sends it on to the exports).
+		if (notice.kind === 'export') {
+			const part = Number(d.part ?? 1);
+			const parts = Number(d.parts ?? 1);
+			return {
+				text:
+					parts === 1
+						? 'Your export is ready to download'
+						: part < parts
+							? `Part ${part} of ${parts} of your export is ready to download`
+							: `Your export is complete: part ${part} of ${parts} is ready to download`,
+				href: apiHref(`/api/exports/${d.export_id}/parts/${part}`),
+				reload: true
+			};
+		}
+		if (notice.kind === 'export_failed') {
+			return {
+				text: 'Your export failed: see why, and start it again',
+				href: `${resolve('/settings')}?open=export`
 			};
 		}
 		return { text: String(d.title ?? notice.kind), href: item };
@@ -116,17 +139,19 @@
 	{#if notices.length}
 		<ul>
 			{#each notices as notice (notice.id)}
-				{@const { text, href } = told(notice)}
+				{@const { text, href, reload } = told(notice)}
 				<li class:new={fresh.has(notice.id)}>
-					<a {href} onclick={() => menu?.hidePopover()}>{text}</a>
+					<a {href} data-sveltekit-reload={reload || undefined} onclick={() => menu?.hidePopover()}
+						>{text}</a
+					>
 					<time datetime={notice.at}>{ago(notice.at)}</time>
 				</li>
 			{/each}
 		</ul>
 	{:else}
 		<p class="muted">
-			Nothing yet. Papers others add to your groups, and published versions found for your
-			preprints, are told here.
+			Nothing yet. Papers others add to your groups, published versions found for your preprints,
+			and your exports as they are ready, are told here.
 		</p>
 	{/if}
 </div>

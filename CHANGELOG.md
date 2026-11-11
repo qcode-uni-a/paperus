@@ -28,6 +28,13 @@
   and collections take an optional `If-Match` with their `change` (now in
   the answers): 412 if they changed since, so a device's queued edit
   overwrites nothing.
+- **Exports tell you when each zip is ready**: after clicking Export a
+  message says it is being prepared and you can leave the page. Each zip
+  can be downloaded as soon as it is written (not only when all are), and
+  a notification under the bell (and in the app) links to it: "Part 2 of
+  3 of your export is ready to download", the last one says the export is
+  complete. A failed export is notified too. A link to a zip that has
+  expired leads to the list of exports.
 
 ## 0.0.21 (2026-11-11)
 
