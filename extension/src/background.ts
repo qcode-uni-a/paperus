@@ -35,7 +35,7 @@ const FIREFOX = chrome.runtime.getURL("").startsWith("moz-extension:");
 
 type Pdf =
   | { base64: string; size: number }
-  | { error: string; status?: number; html?: string };
+  | { error: string; status?: number; html?: string; next?: string };
 /** Saved; with ``warning``, only in part: the paper without its PDF. */
 type Saved = { ok: true; text: string; link: string; warning?: boolean };
 /** How the badge and the note look: saved, saved in part, not saved. */
@@ -251,10 +251,14 @@ async function tell(
 }
 
 async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
-  const page = await inPage(tab.id!, readPage).catch(() => null);
+  let unread = "";
+  const page = await inPage(tab.id!, readPage).catch((error) => {
+    unread = String(error?.message ?? error);
+    return null;
+  });
   const url = page?.url ?? tab.url ?? "";
   const inUrl = idsInUrl(url);
-  if (!page) return saveClosedTab(tab, url, inUrl, owner);
+  if (!page) return saveClosedTab(tab, url, inUrl, owner, unread);
   const info = {
     ...page,
     doi: page.doi ?? inUrl.doi,
@@ -276,11 +280,13 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
     : page.isPdf || page.pdfUrl
-      ? await inPage(
-          tab.id!,
-          fetchPdf,
-          page.isPdf ? page.url : page.pdfUrl!,
-          MAX_BYTES,
+      ? await onwards(
+          await inPage(
+            tab.id!,
+            fetchPdf,
+            page.isPdf ? page.url : page.pdfUrl!,
+            MAX_BYTES,
+          ),
         )
       : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
   return page.isPdf && !info.doi && !info.arxiv
@@ -295,6 +301,7 @@ async function saveClosedTab(
   url: string,
   inUrl: { doi: string | null; arxiv: string | null },
   owner?: Owner,
+  unread = "",
 ): Promise<Saved> {
   if (!/^https?:/.test(url))
     throw new PaperusError("The browser lets no extension into this page.");
@@ -310,12 +317,85 @@ async function saveClosedTab(
       `To save this PDF, paperus needs to fetch it from ${new URL(url).host}, and the browser asks you first.`,
     );
   }
-  const pdf = await fetchPdf(url, MAX_BYTES);
-  if ("error" in pdf && !inUrl.doi)
-    throw new PaperusError("The browser lets no extension into this page.");
+  const pdf = await onwards(await fetchPdf(url, MAX_BYTES));
+  // A web page after all, which the browser did not let the extension read
+  // in its tab: the paper's details from the page as fetched from here.
+  if ("error" in pdf && pdf.html !== undefined && !inUrl.doi) {
+    const found = detailsOfHtml(pdf.html, url);
+    if (found.doi) {
+      const itsPdf = found.pdfUrl
+        ? await onwards(await fetchPdf(found.pdfUrl, MAX_BYTES))
+        : { error: "The page links no PDF." };
+      return save({ ...found, url, isPdf: false }, itsPdf, owner);
+    }
+    if (isRobotCheck(signalsOfHtml(pdf.html, pdf.status ?? 200)))
+      throw new PaperusError(EXPLAINED["robot-check"]);
+  }
+  if ("error" in pdf && !inUrl.doi) {
+    logIssue("warning", "A page the extension could not read", {
+      page: url,
+      reason: unread || null,
+      fetched: pdf.error,
+    });
+    throw new PaperusError(
+      unread
+        ? `The browser did not let the extension read this page (${unread}). Reload it and save again.`
+        : "The browser lets no extension into this page.",
+    );
+  }
   return inUrl.doi
     ? save({ ...inUrl, title: null, url, isPdf: true }, pdf, owner)
     : saveFile(pdf, url, owner);
+}
+
+/** A PDF the page could not fetch from another site (where a page in
+ * between sent it): fetched by the extension, if it may go there. */
+async function onwards(pdf: Pdf): Promise<Pdf> {
+  if (!("error" in pdf) || !pdf.next) return pdf;
+  const next = pdf.next;
+  if (!(await chrome.permissions.contains({ origins: [site(next)] })))
+    return {
+      error: `The PDF is at ${new URL(next).host}, which paperus may not fetch from yet: allow it there, then save again.`,
+    };
+  return fetchPdf(next, MAX_BYTES);
+}
+
+/** A paper's details from a page's HTML (Highwire's citation_* tags, Dublin
+ * Core), for a page the extension could not read in its tab. */
+function detailsOfHtml(
+  html: string,
+  url: string,
+): {
+  doi: string | null;
+  arxiv: string | null;
+  title: string | null;
+  pdfUrl: string | null;
+} {
+  const meta = (name: string): string | null => {
+    const tag = [...html.matchAll(/<meta\b[^>]*>/gi)]
+      .map((m) => m[0])
+      .find((t) =>
+        new RegExp(
+          `(name|property)=["']${name.replace(".", "\\.")}["']`,
+          "i",
+        ).test(t),
+      );
+    const value = tag?.match(/content=["']([^"']*)["']/i)?.[1]?.trim();
+    return value ? value.replace(/&amp;/g, "&").replace(/&quot;/g, '"') : null;
+  };
+  const doiText =
+    meta("citation_doi") ?? meta("dc.identifier") ?? meta("prism.doi");
+  const doi = doiText?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1] ?? null;
+  // The page's own link to its PDF (ScienceDirect's …/pdfft?…).
+  const own = html.match(/href=["']([^"']*\/pdfft[^"']*)["']/i)?.[1];
+  const link =
+    meta("citation_pdf_url") ?? (own ? own.replace(/&amp;/g, "&") : null);
+  return {
+    doi,
+    arxiv: meta("citation_arxiv_id"),
+    title: meta("citation_title") ?? meta("dc.title"),
+    pdfUrl: link ? new URL(link, url).href : null,
+  };
 }
 
 function defaultOwner(config: Settings | null): Owner | undefined {
@@ -798,7 +878,7 @@ async function getOne(
     const page = await inPage(tabId, readPage);
     const pdfUrl = page.isPdf ? page.url : page.pdfUrl;
     if (!pdfUrl) return because(causeOf(await inPage(tabId, pageSignals)));
-    const pdf = await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES);
+    const pdf = await onwards(await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES));
     if ("error" in pdf) {
       const cause =
         pdf.html === undefined

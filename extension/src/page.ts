@@ -54,14 +54,26 @@ export function readPage(): PageInfo {
 		// citation_pdf_url); never just any PDF the page links.
 		const article = location.pathname.split('/').filter(Boolean).at(-1) ?? '';
 		const names = (href: URL) => {
-			const path = decodeURIComponent(href.pathname).toLowerCase();
+			let path = href.pathname.toLowerCase();
+			try {
+				path = decodeURIComponent(href.pathname).toLowerCase();
+			} catch {
+				// A malformed link: as it is.
+			}
 			return (
 				(!!doi && path.includes(doi.toLowerCase())) ||
 				(article.length >= 8 && path.includes(article.toLowerCase()))
 			);
 		};
 		const own = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')]
-			.map((a) => new URL(a.href, location.href))
+			.map((a) => {
+				try {
+					return new URL(String(a.getAttribute('href')), location.href);
+				} catch {
+					return null;
+				}
+			})
+			.filter((href): href is URL => href !== null)
 			.find(
 				(href) =>
 					href.origin === location.origin &&
@@ -120,10 +132,30 @@ export async function fetchPdf(
 	url: string,
 	maxBytes: number
 ): Promise<
-	{ base64: string; size: number } | { error: string; status?: number; html?: string }
+	| { base64: string; size: number }
+	| { error: string; status?: number; html?: string; next?: string }
 > {
 	try {
-		const response = await fetch(url, { credentials: 'include' });
+		let response = await fetch(url, { credentials: 'include' });
+		// A page in between that sends the browser on to the PDF
+		// (ScienceDirect's "pdfft": a refresh to its PDF's signed address, or
+		// a link in its message): followed once.
+		if ((response.headers.get('content-type') ?? '').includes('text/html')) {
+			const html = await response.clone().text();
+			const refresh =
+				html.match(/<meta[^>]+http-equiv=["']?refresh["']?[^>]*content=["']?\s*\d+\s*;\s*url=([^"'>]+)/i) ??
+				html.match(/<meta[^>]+content=["']?\s*\d+\s*;\s*url=([^"'>]+)["']?[^>]*http-equiv=["']?refresh/i) ??
+				html.match(/id=["']redirect-message["'][\s\S]{0,500}?href=["']([^"']+)/i);
+			if (refresh) {
+				const next = new URL(refresh[1].replace(/&amp;/g, '&').trim(), response.url).href;
+				try {
+					response = await fetch(next, { credentials: 'include' });
+				} catch (error) {
+					// Another site the page may not fetch from: the extension may.
+					return { error: `The PDF could not be fetched: ${String(error)}`, next };
+				}
+			}
+		}
 		const buffer = await response.arrayBuffer();
 		// Views on the buffer, never .slice() or .subarray(): in some pages
 		// (Nature's) Firefox refuses those their "constructor".

@@ -38,6 +38,12 @@
   "the page links no PDF"; a page that did not load (IEEE Xplore's
   "Unable to Load Page") is no longer saved as a paper of that title.
 - **The extension's settings show its version**, as installed.
+- **The extension gets ScienceDirect's PDFs**: their link leads to a page
+  in between that sends the browser on to the PDF's signed address (on
+  another site, fetched by the extension if the page may not); followed
+  now, as Zotero does. A page the browser did not let the extension read
+  is read from its HTML (DOI, title, PDF link) instead of being taken for
+  a PDF viewer, and the browser's reason is reported.
 - **The app keeps papers offline where you choose**: its start page shows
   the folder and moves them to another (another disk), or back.
 - **OIDC login can no longer claim an administrator's account by its
