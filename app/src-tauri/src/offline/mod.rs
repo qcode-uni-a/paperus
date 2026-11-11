@@ -58,6 +58,8 @@ const ACCOUNT: [&str; 7] = [
 static OPEN: Mutex<Option<String>> = Mutex::new(None);
 /// Wakes the sync before its minute is up.
 static WAKE: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
+/// Held while kept files are written or moved: a move waits for the sync.
+static FILES: Mutex<()> = Mutex::new(());
 
 /// Where an offline copy is opened: the scheme's address on this system.
 pub fn address() -> Url {
@@ -188,6 +190,7 @@ fn forget_copy(app: &AppHandle, library: &str) {
         let _ = store.clear();
     }
     if let Some(folder) = folder(app, library) {
+        let _ = fs::remove_dir_all(files_root(app, &folder));
         for part in ["files", "site", "site.next", "site.old"] {
             let _ = fs::remove_dir_all(folder.join(part));
         }
@@ -312,7 +315,7 @@ pub fn serve(
                         .expect("a response")
                 } else if path.starts_with("/api/") {
                     match open_store(&app, &library) {
-                        Some(store) => answer::answer(&store, &folder, &request),
+                        Some(store) => answer::answer(&store, &files_root(&app, &folder), &request),
                         None => answer::unavailable(),
                     }
                 } else {
@@ -460,7 +463,10 @@ fn sync(app: &AppHandle) -> Option<()> {
             let _ = server.keep(&store, path, store.since());
         }
     }
-    keep_papers(&server, &store, &folder);
+    {
+        let _writing = FILES.lock().ok()?;
+        keep_papers(&server, &store, &files_root(app, &folder));
+    }
     site::copy(&url, &folder).ok()
 }
 
@@ -774,9 +780,63 @@ pub fn tell_kept(window: &WebviewWindow) {
 /// their layouts (fluent mode) and annotations' page marks, references and
 /// cited-by; again when they changed. Others let go.
 /// The folder of a library's kept files, by content (`store.kept_file` paths
-/// are relative to it).
-pub fn files_root(folder: &std::path::Path) -> PathBuf {
-    folder.join("files")
+/// are relative to it): in the folder chosen for papers kept offline, one
+/// per library (named like its copy's), else beside its copy.
+pub fn files_root(app: &AppHandle, folder: &std::path::Path) -> PathBuf {
+    files_in(libraries::load(app).offline_files.as_deref(), folder)
+}
+
+fn files_in(chosen: Option<&std::path::Path>, folder: &std::path::Path) -> PathBuf {
+    match (chosen, folder.file_name()) {
+        (Some(root), Some(name)) => root.join(name),
+        _ => folder.join("files"),
+    }
+}
+
+/// The folder papers kept offline are in, and whether it was chosen (else
+/// the app's own); none without a server's library.
+pub fn files_folder(app: &AppHandle) -> Option<(PathBuf, bool)> {
+    let saved = libraries::load(app);
+    if saved.libraries.iter().all(|library| library.local) {
+        return None;
+    }
+    match saved.offline_files {
+        Some(chosen) => Some((chosen, true)),
+        None => Some((app.path().app_data_dir().ok()?.join("offline"), false)),
+    }
+}
+
+/// Keep the papers kept offline in ``to`` from now on (``None``: the app's
+/// own folder again): each library's copied over, checked, and removed
+/// where they were, while no sync writes them.
+pub fn move_files(app: &AppHandle, to: Option<&std::path::Path>) -> Result<(), String> {
+    let _writing = FILES.lock().map_err(|_| "Kept files are being written.")?;
+    let mut saved = libraries::load(app);
+    if let (Some(to), Ok(own)) = (to, app.path().app_data_dir())
+        && to.starts_with(own.join("offline"))
+    {
+        return Err("That is inside the app's own folder for offline copies.".into());
+    }
+    let mut moved = Vec::new();
+    for library in saved.libraries.iter().filter(|library| !library.local) {
+        let Some(folder) = folder(app, &library.url) else {
+            continue;
+        };
+        let from = files_in(saved.offline_files.as_deref(), &folder);
+        let target = files_in(to, &folder);
+        if from == target || !from.exists() {
+            continue;
+        }
+        crate::local::copy_tree(&from, &from, &target)?;
+        moved.push(from);
+    }
+    saved.offline_files = to.map(std::path::Path::to_path_buf);
+    libraries::save(app, &saved)?;
+    // Only once all is over and the setting saved.
+    for from in moved {
+        let _ = fs::remove_dir_all(from);
+    }
+    Ok(())
 }
 
 /// Where content is kept, relative to the files' folder: by its SHA-256
@@ -811,8 +871,7 @@ fn shas_of(store: &Store, item_id: &str) -> std::collections::HashMap<String, St
 /// Keep the papers to read offline whole: their page, their files with
 /// their layouts (fluent mode) and annotations' page marks, references and
 /// cited-by; again when they changed. Each content once. Others let go.
-fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
-    let root = files_root(folder);
+fn keep_papers(server: &Server, store: &Store, root: &std::path::Path) {
     let kept = kept(store, server);
     let mut wanted: HashSet<String> = HashSet::new();
     let mut available: Vec<String> = Vec::new();
@@ -904,7 +963,7 @@ fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
         .into_iter()
         .map(|(_, path)| path)
         .collect();
-    remove_unused(&root, &root, &in_use);
+    remove_unused(root, root, &in_use);
 }
 
 /// Files under ``folder`` no kept file uses (and folders left empty).
@@ -936,6 +995,14 @@ mod tests {
     #[test]
     fn named_after_the_address() {
         assert_eq!(hex(&[0, 15, 255]), "000fff");
+    }
+
+    #[test]
+    fn kept_files_in_the_chosen_folder() {
+        let copy = std::path::Path::new("/data/offline/ab12");
+        assert_eq!(files_in(None, copy), copy.join("files"));
+        let chosen = std::path::Path::new("/mnt/share/papers");
+        assert_eq!(files_in(Some(chosen), copy), chosen.join("ab12"));
     }
 
     #[test]

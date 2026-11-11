@@ -87,7 +87,8 @@ fn kept(store: &Store, path: &str) -> Option<Response<Vec<u8>>> {
 }
 
 /// The answer to the website's call ``request``.
-pub fn answer(store: &Store, folder: &Path, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+/// ``files``: the folder of the library's kept files (`super::files_root`).
+pub fn answer(store: &Store, files: &Path, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     let path = request.uri().path();
     let query = Query::parse(request.uri().query());
     let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
@@ -110,7 +111,7 @@ pub fn answer(store: &Store, folder: &Path, request: &Request<Vec<u8>>) -> Respo
         ["api", "notes", id] => store
             .get("note", id)
             .map_or_else(unavailable, |note| json_response(200, &note)),
-        ["api", "files", id, "content"] => content(store, folder, id),
+        ["api", "files", id, "content"] => content(store, files, id),
         ["api", "files", id, "annotations"] => annotations(store, path, id),
         ["api", "search"] => search(store, &query),
         _ => kept(store, path).unwrap_or_else(unavailable),
@@ -346,10 +347,8 @@ fn notes(store: &Store, query: &Query) -> Response<Vec<u8>> {
 }
 
 /// A file kept with its paper.
-fn content(store: &Store, folder: &Path, id: &str) -> Response<Vec<u8>> {
-    let kept = store
-        .kept_file(id)
-        .map(|path| super::files_root(folder).join(path));
+fn content(store: &Store, files: &Path, id: &str) -> Response<Vec<u8>> {
+    let kept = store.kept_file(id).map(|path| files.join(path));
     let Some(Ok(bytes)) = kept.map(fs::read) else {
         return json_response(
             503,

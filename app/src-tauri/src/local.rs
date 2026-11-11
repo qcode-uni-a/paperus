@@ -527,7 +527,7 @@ pub fn move_pdf_folder(app: &AppHandle, to: &Path) -> Result<(), String> {
 
 /// Copy everything under ``folder`` (inside ``root``) to the same place
 /// under ``to``, each file checked by its size.
-fn copy_tree(root: &Path, folder: &Path, to: &Path) -> Result<(), String> {
+pub fn copy_tree(root: &Path, folder: &Path, to: &Path) -> Result<(), String> {
     let Ok(entries) = fs::read_dir(folder) else {
         return Ok(());
     };

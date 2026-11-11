@@ -174,6 +174,37 @@ choosePdfs.addEventListener('click', async () => {
 	}
 });
 showPdfFolder();
+// Where the papers kept offline are, and moving them.
+const offlineFiles = document.getElementById('offline-files');
+const chooseOffline = document.getElementById('choose-offline');
+const offlineBack = document.getElementById('offline-back');
+const offlineError = document.getElementById('offline-error');
+async function showOfflineFolder() {
+	const found = await invoke('offline_folder');
+	offlineFiles.hidden = !found;
+	const [folder, chosen] = found ?? ['', false];
+	document.getElementById('offline-folder').textContent = folder;
+	offlineBack.hidden = !chosen;
+}
+for (const [button, back] of [
+	[chooseOffline, false],
+	[offlineBack, true]
+]) {
+	button.addEventListener('click', async () => {
+		chooseOffline.disabled = offlineBack.disabled = true;
+		offlineError.hidden = true;
+		try {
+			await invoke('choose_offline_folder', { back });
+		} catch (message) {
+			offlineError.textContent = String(message);
+			offlineError.hidden = false;
+		} finally {
+			chooseOffline.disabled = offlineBack.disabled = false;
+			await showOfflineFolder();
+		}
+	});
+}
+showOfflineFolder();
 // Where logins are kept, if not in the system's keyring.
 invoke('logins_in_file').then((inFile) => {
 	document.getElementById('logins-in-file').hidden = !inFile;

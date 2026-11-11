@@ -34,6 +34,10 @@ pub struct Saved {
     pub libraries: Vec<Library>,
     /// The library opened last: opened again when the app starts.
     pub last: Option<String>,
+    /// Where the papers kept offline are, if not in the app's own folder
+    /// (`offline::files_root`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offline_files: Option<PathBuf>,
 }
 
 fn file(app: &AppHandle) -> Option<PathBuf> {

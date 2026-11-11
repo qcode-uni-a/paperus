@@ -104,6 +104,11 @@ every platform (and the installable website, as far as browsers allow).
   are downloaded by themselves, and those of papers that left it are let
   go unless kept otherwise. A smart collection's papers are asked from the
   server (its rules decide); without a connection it keeps what it had.
+- **Where kept papers are** (built): in the app's data folder, or in a
+  folder chosen on the app's start page ("Papers kept offline", e.g.
+  another disk), a folder per library inside it. Choosing moves what is
+  kept (copied, checked, then removed), while no sync writes; paths in the
+  copy's database are relative, so nothing else changes.
 - **The website offline** (built, `app/src-tauri/src/offline/`): the app
   keeps the copy of the server's website it last loaded (`/api/web-files`:
   only changed files are fetched), so offline it runs the same version as

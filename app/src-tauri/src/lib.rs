@@ -182,6 +182,43 @@ async fn choose_pdf_folder(app: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Where the papers kept offline are, and whether that folder was chosen;
+/// none without a server's library.
+#[tauri::command]
+fn offline_folder(app: AppHandle) -> Option<(String, bool)> {
+    offline::files_folder(&app).map(|(folder, chosen)| (folder.display().to_string(), chosen))
+}
+
+/// Keep the papers kept offline in a folder chosen in the system's dialog
+/// (another disk), or (``back``) in the app's own folder again: moved over.
+/// False if none was chosen.
+#[tauri::command]
+async fn choose_offline_folder(app: AppHandle, back: bool) -> Result<bool, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = if back {
+        None
+    } else {
+        let asking = app.clone();
+        let chosen = tauri::async_runtime::spawn_blocking(move || {
+            asking
+                .dialog()
+                .file()
+                .set_title("Where to keep the papers kept offline")
+                .blocking_pick_folder()
+        })
+        .await
+        .map_err(|error| error.to_string())?;
+        let Some(folder) = chosen.and_then(|path| path.into_path().ok()) else {
+            return Ok(false);
+        };
+        Some(folder)
+    };
+    tauri::async_runtime::spawn_blocking(move || offline::move_files(&app, folder.as_deref()))
+        .await
+        .map_err(|error| error.to_string())??;
+    Ok(true)
+}
+
 /// Libraries logged out offline, whose login ends when they are back.
 #[tauri::command]
 fn logging_out(app: AppHandle) -> Vec<offline::LoggingOut> {
@@ -425,7 +462,9 @@ pub fn run() {
             logins_in_file,
             logging_out,
             local_pdf_folder,
-            choose_pdf_folder
+            choose_pdf_folder,
+            offline_folder,
+            choose_offline_folder
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());

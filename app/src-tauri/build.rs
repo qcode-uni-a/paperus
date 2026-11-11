@@ -13,6 +13,8 @@ fn main() {
             "logging_out",
             "local_pdf_folder",
             "choose_pdf_folder",
+            "offline_folder",
+            "choose_offline_folder",
         ]),
     ))
     .expect("failed to build the app");

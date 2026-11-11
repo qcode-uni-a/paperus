@@ -15,6 +15,8 @@
 		"allow-logins-in-file",
 		"allow-logging-out",
 		"allow-local-pdf-folder",
-		"allow-choose-pdf-folder"
+		"allow-choose-pdf-folder",
+		"allow-offline-folder",
+		"allow-choose-offline-folder"
 	]
 }
