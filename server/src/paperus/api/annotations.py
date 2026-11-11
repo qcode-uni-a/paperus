@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from paperus import annotations, pdf
 from paperus.access import Access
 from paperus.annotations import AnnotationIn, Position
-from paperus.api.deps import DB, CurrentAccess
+from paperus.api.deps import DB, CurrentAccess, IfMatch, check_unchanged
 from paperus.api.ids import NewId, new_id, sent_again
 from paperus.api.items import get_readable_item
 from paperus.models import Annotation, AnnotationKind, File, User
@@ -44,6 +44,8 @@ class AnnotationOut(BaseModel):
     """Who made it (display name, else username)."""
     created_at: datetime
     changed_at: datetime
+    change: int
+    """For ``If-Match`` when changing it."""
 
 
 class FileAnnotations(BaseModel):
@@ -109,6 +111,7 @@ def annotation_out(
         author=_name(db, annotation.user_id, names),
         created_at=annotation.created_at,
         changed_at=annotation.changed_at,
+        change=annotation.change,
     )
 
 
@@ -173,11 +176,16 @@ def _own(db: Session, access: Access, annotation_id: uuid.UUID) -> Annotation:
 
 @router.patch("/api/annotations/{annotation_id}")
 def change_annotation(
-    annotation_id: uuid.UUID, body: AnnotationChange, db: DB, access: CurrentAccess
+    annotation_id: uuid.UUID,
+    body: AnnotationChange,
+    db: DB,
+    access: CurrentAccess,
+    if_match: IfMatch = None,
 ) -> AnnotationOut:
     """Change one's annotation: only the fields given (an empty comment
-    removes it)."""
+    removes it). With ``If-Match``, 412 if it changed since."""
     annotation = _own(db, access, annotation_id)
+    check_unchanged(if_match, annotation.change)
     given = body.model_fields_set
     checked = AnnotationIn(
         kind=AnnotationKind(annotation.kind),

@@ -24,7 +24,10 @@
   and annotations may bring their own ID (a UUIDv7 made on the device): a
   create sent again makes no second one. The client's `AnnotationIn` is
   now `NewAnnotation`. Removals are kept a year (migration 0010); syncing
-  from before that answers 410, to sync anew.
+  from before that answers 410, to sync anew. Changes to annotations, tags
+  and collections take an optional `If-Match` with their `change` (now in
+  the answers): 412 if they changed since, so a device's queued edit
+  overwrites nothing.
 
 ## 0.0.21 (2026-11-11)
 

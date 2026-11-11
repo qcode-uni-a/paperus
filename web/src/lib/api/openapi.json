@@ -3642,7 +3642,7 @@
           "annotations"
         ],
         "summary": "Change Annotation",
-        "description": "Change one's annotation: only the fields given (an empty comment\nremoves it).",
+        "description": "Change one's annotation: only the fields given (an empty comment\nremoves it). With ``If-Match``, 412 if it changed since.",
         "operationId": "change_annotation",
         "parameters": [
           {
@@ -3653,6 +3653,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Annotation Id"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -6499,7 +6515,7 @@
           "organize"
         ],
         "summary": "Change Tag",
-        "description": "Rename a tag everywhere (409 if another tag of its owner has that\nname), set its colour or description, or give it to another owner.",
+        "description": "Rename a tag everywhere (409 if another tag of its owner has that\nname), set its colour or description, or give it to another owner. With\n``If-Match``, 412 if it changed since.",
         "operationId": "change_tag",
         "parameters": [
           {
@@ -6510,6 +6526,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Tag Id"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -6675,7 +6707,7 @@
           "organize"
         ],
         "summary": "Change Collection",
-        "description": "Rename, describe or move a collection (not into itself), also into\nanother library the person may change.",
+        "description": "Rename, describe or move a collection (not into itself), also into\nanother library the person may change. With ``If-Match``, 412 if it\nchanged since.",
         "operationId": "change_collection",
         "parameters": [
           {
@@ -6686,6 +6718,22 @@
               "type": "string",
               "format": "uuid",
               "title": "Collection Id"
+            }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
@@ -8586,6 +8634,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Changed At"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
           }
         },
         "type": "object",
@@ -8604,7 +8656,8 @@
           "mine",
           "author",
           "created_at",
-          "changed_at"
+          "changed_at",
+          "change"
         ],
         "title": "AnnotationOut"
       },
@@ -9746,6 +9799,11 @@
               }
             ]
           },
+          "change": {
+            "type": "integer",
+            "title": "Change",
+            "default": 0
+          },
           "left_out": {
             "type": "integer",
             "title": "Left Out",
@@ -9905,6 +9963,11 @@
                 "type": "null"
               }
             ]
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change",
+            "default": 0
           }
         },
         "type": "object",
@@ -16333,6 +16396,10 @@
               }
             ],
             "title": "Last Used"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
           }
         },
         "type": "object",
@@ -16345,7 +16412,8 @@
           "count",
           "sources",
           "created_at",
-          "last_used"
+          "last_used",
+          "change"
         ],
         "title": "TagOut"
       },

@@ -158,3 +158,45 @@ def test_offline_too_long(client: TestClient, db: Session) -> None:
     assert response.status_code == 410
     assert changes(ada, later["change"])["removed"] == []
     assert ids(changes(ada)["tags"]) == []
+
+
+def test_queued_edits_do_not_overwrite(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Edited twice")
+    file = ada.post(
+        f"/api/items/{paper['id']}/files",
+        files={"upload": ("p.pdf", PDF, "application/pdf")},
+    ).json()["id"]
+    made = {
+        "/api/tags": ada.post("/api/tags", {"name": "draft"}).json(),
+        "/api/collections": ada.post("/api/collections", {"name": "Draft"}).json(),
+        "/api/annotations": ada.post(f"/api/files/{file}/annotations", MARK).json(),
+    }
+    edits = {
+        "/api/tags": ({"name": "second"}, {"name": "third"}),
+        "/api/collections": ({"name": "Second"}, {"name": "Third"}),
+        "/api/annotations": ({"comment": "second"}, {"comment": "third"}),
+    }
+    for kind, record in made.items():
+        url = f"{kind}/{record['id']}"
+        read = f'"{record["change"]}"'
+        first, queued = edits[kind]
+        # Changed elsewhere (no If-Match: as the website does).
+        changed = ada.client.patch(url, json=first, headers=ada.headers)
+        assert changed.status_code == 200, changed.text
+        # The device's edit from the old version: refused, nothing lost.
+        stale = ada.client.patch(
+            url, json=queued, headers={**ada.headers, "If-Match": read}
+        )
+        assert stale.status_code == 412, (kind, stale.text)
+        current = f'"{changed.json()["change"]}"'
+        assert (
+            ada.client.patch(
+                url, json=queued, headers={**ada.headers, "If-Match": current}
+            ).status_code
+            == 200
+        )
+        broken = ada.client.patch(
+            url, json=queued, headers={**ada.headers, "If-Match": "yesterday"}
+        )
+        assert broken.status_code == 412

@@ -746,7 +746,7 @@ export const deleteAnnotation = <ThrowOnError extends boolean = false>(options: 
  * Change Annotation
  *
  * Change one's annotation: only the fields given (an empty comment
- * removes it).
+ * removes it). With ``If-Match``, 412 if it changed since.
  */
 export const changeAnnotation = <ThrowOnError extends boolean = false>(options: Options<ChangeAnnotationData, ThrowOnError>): RequestResult<ChangeAnnotationResponses, ChangeAnnotationErrors, ThrowOnError> => (options.client ?? client).patch<ChangeAnnotationResponses, ChangeAnnotationErrors, ThrowOnError>({
     url: '/api/annotations/{annotation_id}',
@@ -1407,7 +1407,8 @@ export const deleteTag = <ThrowOnError extends boolean = false>(options: Options
  * Change Tag
  *
  * Rename a tag everywhere (409 if another tag of its owner has that
- * name), set its colour or description, or give it to another owner.
+ * name), set its colour or description, or give it to another owner. With
+ * ``If-Match``, 412 if it changed since.
  */
 export const changeTag = <ThrowOnError extends boolean = false>(options: Options<ChangeTagData, ThrowOnError>): RequestResult<ChangeTagResponses, ChangeTagErrors, ThrowOnError> => (options.client ?? client).patch<ChangeTagResponses, ChangeTagErrors, ThrowOnError>({
     url: '/api/tags/{tag_id}',
@@ -1459,7 +1460,8 @@ export const deleteCollection = <ThrowOnError extends boolean = false>(options: 
  * Change Collection
  *
  * Rename, describe or move a collection (not into itself), also into
- * another library the person may change.
+ * another library the person may change. With ``If-Match``, 412 if it
+ * changed since.
  */
 export const changeCollection = <ThrowOnError extends boolean = false>(options: Options<ChangeCollectionData, ThrowOnError>): RequestResult<ChangeCollectionResponses, ChangeCollectionErrors, ThrowOnError> => (options.client ?? client).patch<ChangeCollectionResponses, ChangeCollectionErrors, ThrowOnError>({
     url: '/api/collections/{collection_id}',

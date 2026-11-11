@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library, organize
 from paperus.access import Access, Forbidden
-from paperus.api.deps import DB, CurrentAccess
+from paperus.api.deps import DB, CurrentAccess, IfMatch, check_unchanged
 from paperus.api.ids import NewId, new_id, sent_again
 from paperus.models import (
     Collection,
@@ -43,6 +43,8 @@ class TagOut(BaseModel):
     created_at: datetime
     last_used: datetime | None
     """When the tag was last put on an item."""
+    change: int
+    """For ``If-Match`` when changing it."""
 
 
 class ItemTagOut(BaseModel):
@@ -92,6 +94,8 @@ class CollectionOut(BaseModel):
     rules: organize.Rules | None = None
     """A smart collection: it holds the papers matching these rules (papers
     cannot be added to it, and it holds no collections)."""
+    change: int = 0
+    """For ``If-Match`` when changing it."""
 
 
 class CollectionIn(BaseModel):
@@ -242,6 +246,7 @@ def tag_outs(db: DB, access: Access, condition: ColumnElement[bool]) -> list[Tag
             sources=sources.get(tag.id, {}),
             created_at=tag.created_at,
             last_used=last_used.get(tag.id),
+            change=tag.change,
         )
         for tag in tags
     ]
@@ -325,11 +330,17 @@ def remove_tag(
 
 @router.patch("/api/tags/{tag_id}")
 def change_tag(
-    tag_id: uuid.UUID, body: TagChange, db: DB, access: CurrentAccess
+    tag_id: uuid.UUID,
+    body: TagChange,
+    db: DB,
+    access: CurrentAccess,
+    if_match: IfMatch = None,
 ) -> TagOut:
     """Rename a tag everywhere (409 if another tag of its owner has that
-    name), set its colour or description, or give it to another owner."""
+    name), set its colour or description, or give it to another owner. With
+    ``If-Match``, 412 if it changed since."""
     tag = _tag(db, access, tag_id, write=True)
+    check_unchanged(if_match, tag.change)
     target = body.library_id
     if target is not None and target != tag.library_id:
         access.target_library(target)
@@ -348,7 +359,7 @@ def change_tag(
     if "description" in body.model_fields_set:
         tag.description = (body.description or "").strip() or None
     db.commit()
-    return next(t for t in list_tags(db, access) if t.id == tag.id)
+    return tag_outs(db, access, Tag.id == tag.id)[0]
 
 
 class RemovedTags(BaseModel):
@@ -434,6 +445,7 @@ def collection_out(db: DB, access: Access, collection: Collection) -> Collection
         recent=recent,
         pinned=collection.id in _pinned(db, access),
         rules=_rules(collection),
+        change=collection.change,
     )
 
 
@@ -516,6 +528,7 @@ def list_collections(db: DB, access: CurrentAccess) -> list[CollectionOut]:
                 recent=recent,
                 pinned=c.id in pinned,
                 rules=_rules(c),
+                change=c.change,
             )
         )
     return result
@@ -608,11 +621,17 @@ def create_collection(
 
 @router.patch("/api/collections/{collection_id}")
 def change_collection(
-    collection_id: uuid.UUID, body: CollectionChange, db: DB, access: CurrentAccess
+    collection_id: uuid.UUID,
+    body: CollectionChange,
+    db: DB,
+    access: CurrentAccess,
+    if_match: IfMatch = None,
 ) -> CollectionChanged:
     """Rename, describe or move a collection (not into itself), also into
-    another library the person may change."""
+    another library the person may change. With ``If-Match``, 412 if it
+    changed since."""
     collection = _collection(db, access, collection_id, write=True)
+    check_unchanged(if_match, collection.change)
     given = body.model_fields_set
     left_out = 0
     try:

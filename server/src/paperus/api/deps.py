@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Iterator
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from paperus import tokens
@@ -77,3 +77,20 @@ SessionUser = Annotated[User, Depends(session_user)]
 
 
 CurrentAccess = Annotated[Access, Depends(current_access)]
+
+IfMatch = Annotated[str | None, Header()]
+"""``If-Match: "<change>"``: the change number of the record as last read."""
+
+
+def check_unchanged(if_match: str | None, change: int) -> None:
+    """For edits where ``If-Match`` is optional (an annotation, a tag, a
+    collection): 412 if it is given and the record changed since (a device's
+    edit queued offline; docs/apps.md), so nothing is overwritten."""
+    if if_match is None:
+        return
+    try:
+        expected = int(if_match.removeprefix("W/").strip().strip('"'))
+    except ValueError as error:
+        raise HTTPException(412, "If-Match does not match") from error
+    if expected != change:
+        raise HTTPException(412, "changed since it was read")

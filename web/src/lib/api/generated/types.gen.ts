@@ -155,6 +155,10 @@ export type AnnotationOut = {
      * Changed At
      */
     changed_at: string;
+    /**
+     * Change
+     */
+    change: number;
 };
 
 /**
@@ -846,6 +850,10 @@ export type CollectionChanged = {
     pinned?: boolean;
     rules?: Rules | null;
     /**
+     * Change
+     */
+    change?: number;
+    /**
      * Left Out
      */
     left_out?: number;
@@ -919,6 +927,10 @@ export type CollectionOut = {
      */
     pinned?: boolean;
     rules?: Rules | null;
+    /**
+     * Change
+     */
+    change?: number;
 };
 
 /**
@@ -4496,6 +4508,10 @@ export type TagOut = {
      * Last Used
      */
     last_used: string | null;
+    /**
+     * Change
+     */
+    change: number;
 };
 
 /**
@@ -7206,6 +7222,12 @@ export type DeleteAnnotationResponse = DeleteAnnotationResponses[keyof DeleteAnn
 
 export type ChangeAnnotationData = {
     body: AnnotationChange;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'if-match'?: string | null;
+    };
     path: {
         /**
          * Annotation Id
@@ -8975,6 +8997,12 @@ export type DeleteTagResponse = DeleteTagResponses[keyof DeleteTagResponses];
 
 export type ChangeTagData = {
     body: TagChange;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'if-match'?: string | null;
+    };
     path: {
         /**
          * Tag Id
@@ -9094,6 +9122,12 @@ export type DeleteCollectionResponse = DeleteCollectionResponses[keyof DeleteCol
 
 export type ChangeCollectionData = {
     body: CollectionChange;
+    headers?: {
+        /**
+         * If-Match
+         */
+        'if-match'?: string | null;
+    };
     path: {
         /**
          * Collection Id
