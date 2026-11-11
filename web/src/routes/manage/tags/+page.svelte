@@ -416,6 +416,8 @@
 		color: var(--tag-ink, var(--ink));
 		font-size: 0.95em;
 		text-align: left;
+		/* A long word breaks too: the table never outgrows a phone. */
+		overflow-wrap: anywhere;
 	}
 	.chip:disabled {
 		cursor: default;
