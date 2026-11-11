@@ -4,25 +4,30 @@ One click on the paperus button saves the paper you are reading to your
 paperus library, with its PDF. On arXiv, a small button next to each paper
 does the same; a full one with a check means you have it already.
 
+- **The popup**: a click on the button opens a small window under it (as
+  Zotero's does) and saves at once, to the owner chosen in the settings:
+  it shows each step, then the paper, its PDF or why not, and a link to it
+  in paperus. A paper just added moves to another owner (a group) by
+  choosing it there.
 - **An open PDF** is saved as it is; paperus reads its details from the
   file (a DOI or arXiv ID in it). Firefox's PDF viewer lets no extension
-  in, so there the extension fetches the PDF itself: Firefox asks once per
-  website for that.
-- **Another owner** (a group): right-click the button, "Save to …". A plain
-  click saves to the owner chosen in the settings.
-- **The settings** (address, owner): right-click the button, "paperus
-  settings".
-- **When saving fails**, the page says why; where it cannot (a browser's own
-  PDF viewer), a small window does, with "Allow and save" if the extension
-  first needs access to the PDF's site.
+  in, so there the extension fetches the PDF itself.
+- **Another owner** at once: right-click the button, "Save to …".
+- **The settings** (address, owner, the version installed): "Settings" in
+  the popup, or right-click the button, "paperus settings".
+- **When saving fails**, the popup says why; with "Allow paperus on all
+  websites" if that access was taken back (Firefox lets one).
 - **Many PDFs at once**: paperus' Manage → Missing page asks the extension
   to get the PDFs of papers it lacks: each opened at its publisher in a
-  background tab, its PDF saved into the paper. The first time, a small
-  window asks for access to publisher sites (the browser's prompt). Open
-  copies whose sites refused paperus' server are fetched first. A
+  background tab, its PDF saved into the paper. Open copies whose sites
+  refused paperus' server are fetched first. A
   paper that fails says why: a check for robots (a captcha), no access (a
   login or paywall), or no PDF on the page. The result shows in paperus.
 
+- **Access to websites** is asked for once, when installing (as Zotero's
+  extension does): to read the page you click on, fetch its PDF (also where
+  a publisher sends it on to another site, as ScienceDirect does), reach
+  your paperus, and get PDFs for Manage → Missing. It is used only then.
 - The PDF is downloaded in your browser, with your own access (campus
   network, publisher login), and sent to paperus; one paperus has already
   (same SHA-256) is not sent again.
@@ -66,7 +71,8 @@ PDFs for Manage → Missing, `src/page.ts` runs inside the web page
 (details, PDF, the note, what a page shows), `src/causes.ts` tells why a
 page gave no PDF, `src/arxiv.ts` puts the buttons on arXiv, `src/site.ts`
 runs on the connected paperus (marks the page, passes requests on),
-`src/allow.*` asks for access to publisher sites, `src/options.*` is the
+`src/popup.*` is the popup under the button, `src/allow.*` asks again for
+access to websites (taken back in Firefox), `src/options.*` is the
 settings page. For automated tests, `PAPERUS_EXTENSION_TEST_HOST="http://localhost/*"`
 allows a paperus address up front (a robot cannot answer the permission
 prompt) and lets extension pages ask for a save by message (`testSave`,

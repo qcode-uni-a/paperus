@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>paperus</title>
+		<link rel="stylesheet" href="options.css" />
+		<link rel="stylesheet" href="popup.css" />
+	</head>
+	<body>
+		<main>
+			<p id="state" class="state" role="status">Reading the page…</p>
+			<p id="title" class="title" hidden></p>
+			<p id="detail" class="muted small" hidden></p>
+			<label id="owner-field" hidden
+				>Saved to
+				<select id="owner"></select>
+			</label>
+			<button id="allow" class="primary" hidden>Allow paperus on all websites</button>
+			<button id="connect" class="primary" hidden>Connect paperus</button>
+			<p class="links small">
+				<a id="open" target="_blank" hidden>Open in paperus</a>
+				<a id="settings" href="#">Settings</a>
+				<span id="version" class="muted"></span>
+			</p>
+		</main>
+		<script src="popup.js" type="module"></script>
+	</body>
+</html>

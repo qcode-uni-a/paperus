@@ -1,0 +1,51 @@
+/* The popup under the button: what the click saved, as it goes. */
+body {
+	width: 340px;
+}
+main {
+	margin: 0;
+	padding: 14px 16px 10px;
+}
+p {
+	margin: 0 0 8px;
+}
+.state {
+	font-weight: 600;
+}
+.state.ok::before {
+	content: '✓ ';
+	color: #1e7a3e;
+}
+.state.warning::before {
+	content: '! ';
+	color: #b26a00;
+}
+.state.error::before {
+	content: '✕ ';
+	color: var(--danger);
+}
+.title {
+	font: 15px/1.35 Georgia, serif;
+}
+label {
+	margin: 4px 0 10px;
+	font-weight: 400;
+	font-size: 13px;
+}
+button {
+	margin: 2px 0 10px;
+}
+.links {
+	display: flex;
+	gap: 14px;
+	margin: 6px 0 0;
+	padding-top: 8px;
+	border-top: 1px solid var(--rule);
+}
+.links span {
+	margin-left: auto;
+}
+
+[hidden] {
+	display: none !important;
+}

@@ -16,8 +16,8 @@ What it sends to your paperus, and when:
 - **When you ask from paperus' Missing page**: for each paper you chose,
   the extension opens its publisher's page in a background tab (with your
   access), downloads the PDF the page links and sends it to your paperus.
-  For that it asks you once for access to websites; it uses it only for
-  these requests and for the paperus button.
+  It uses its access to websites (asked for once, when installing) only
+  for these requests and for the paperus button.
 - **When something goes wrong** (a paper saved without its PDF, a PDF it
   could not get, an error): what happened, with the page's address and
   the extension's version, for the administrators of your paperus

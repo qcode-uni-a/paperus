@@ -14,15 +14,20 @@ const base = {
 	icons: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png', 48: 'icons/icon-48.png', 128: 'icons/icon-128.png' },
 	action: {
 		default_title: 'Save to paperus',
-		default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' }
+		default_icon: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png' },
+		// The click opens it, and it saves (popup.ts).
+		default_popup: 'popup.html'
 	},
-	// activeTab: the page one clicks on, only then; scripting: to read its
-	// details and fetch its PDF there; storage: the connection; contextMenus:
-	// the button's menu (save to another owner).
+	// activeTab: the page one clicks on; scripting: to read its details and
+	// fetch its PDF there; storage: the connection; contextMenus: the
+	// button's menu (save to another owner).
 	permissions: ['activeTab', 'scripting', 'storage', 'contextMenus'],
-	host_permissions: ['https://arxiv.org/*'],
-	// The person's own paperus, asked for when connecting.
-	optional_host_permissions: ['https://*/*', 'http://*/*'],
+	// Websites, asked for once when installing (as Zotero's does): the
+	// person's own paperus, publishers' pages and the PDFs they send on to
+	// other sites (ScienceDirect's), and Manage → Missing. Used only on a
+	// click or a request from the connected paperus. (Firefox lets people
+	// take it back: then each site is asked for when needed.)
+	host_permissions: ['https://*/*', 'http://*/*'],
 	content_scripts: [
 		{
 			matches: [
@@ -76,7 +81,13 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	const out = `dist/${name}`;
 	mkdirSync(out, { recursive: true });
 	await build({
-		entryPoints: ['src/background.ts', 'src/options.ts', 'src/allow.ts', 'src/note.ts'],
+		entryPoints: [
+			'src/background.ts',
+			'src/options.ts',
+			'src/allow.ts',
+			'src/note.ts',
+			'src/popup.ts'
+		],
 		bundle: true,
 		define: { TEST: String(!!process.env.PAPERUS_EXTENSION_TEST_HOST) },
 		format: 'esm',
@@ -97,6 +108,8 @@ for (const [name, manifest] of Object.entries(browsers)) {
 	cpSync('src/allow.html', `${out}/allow.html`);
 	cpSync('src/note.html', `${out}/note.html`);
 	cpSync('src/options.css', `${out}/options.css`);
+	cpSync('src/popup.html', `${out}/popup.html`);
+	cpSync('src/popup.css', `${out}/popup.css`);
 	// The PNGs only; their sources (icon.svg, icon-16.svg) stay out.
 	cpSync('icons', `${out}/icons`, { recursive: true, filter: (path) => !path.endsWith('.svg') });
 	writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, '\t') + '\n');

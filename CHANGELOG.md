@@ -37,7 +37,15 @@
   is still saved, and the missing PDF is put down to the check, not to
   "the page links no PDF"; a page that did not load (IEEE Xplore's
   "Unable to Load Page") is no longer saved as a paper of that title.
-- **The extension's settings show its version**, as installed.
+- **The extension's popup**, as Zotero's: a click on the button opens a
+  small window under it that saves at once, shows each step, then the
+  paper, its PDF or why not, and a link to it; a paper just added moves to
+  another owner by choosing it there. Its settings show the version
+  installed.
+- **The extension asks for access to websites once, when installing**, as
+  Zotero's does, instead of per site when needed (which Firefox allowed
+  only in the click itself, and which failed on ScienceDirect). Firefox
+  asks to approve it with the update.
 - **The extension gets ScienceDirect's PDFs**: their link leads to a page
   in between that sends the browser on to the PDF's signed address (on
   another site, fetched by the extension if the page may not); followed

@@ -37,7 +37,21 @@ type Pdf =
   | { base64: string; size: number }
   | { error: string; status?: number; html?: string; next?: string };
 /** Saved; with ``warning``, only in part: the paper without its PDF. */
-type Saved = { ok: true; text: string; link: string; warning?: boolean };
+type Saved = {
+  ok: true;
+  text: string;
+  link: string;
+  warning?: boolean;
+  /** The paper, for the popup (moving one just added to another owner). */
+  item?: { id: string; libraryId: string | null; title: string; added: boolean };
+};
+
+/** What the popup shows while a tab is saved. */
+function step(tabId: number, text: string): void {
+  chrome.runtime
+    .sendMessage({ type: "saveStep", tabId, text })
+    .catch(() => undefined); // no popup open
+}
 /** How the badge and the note look: saved, saved in part, not saved. */
 type Outcome = "ok" | "warning" | "error";
 /** A library one may add to, named for menus and messages. */
@@ -120,6 +134,25 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       if (waiting) void getPdfs(waiting.papers, waiting.tabId);
       return { ok: true };
     },
+    // The popup: save its tab (the button's click), move a paper it saved.
+    popupSave: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
+        return { ok: false };
+      return saveTab(await chrome.tabs.get(message.tabId), undefined, true);
+    },
+    moveItem: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
+        return { ok: false };
+      const { status } = await call<Api.SetOwnerData>(
+        "/api/items/{item_id}/owner",
+        {
+          method: "PUT",
+          path: { item_id: message.itemId },
+          json: { library_id: message.libraryId },
+        },
+      );
+      return { ok: status < 400 };
+    },
   };
   // Automated tests cannot click the button; they send this instead.
   if (TEST) {
@@ -183,9 +216,11 @@ async function inPage<A extends unknown[], R>(
 async function saveTab(
   tab: chrome.tabs.Tab,
   owner?: Owner,
+  inPopup = false,
 ): Promise<Saved | { ok: false; text: string }> {
   const tabId = tab.id!;
   await badge(tabId, "…");
+  step(tabId, "Reading the page…");
   try {
     const result = await saveFrom(tab, owner);
     if (result.warning)
@@ -195,12 +230,13 @@ async function saveTab(
       });
     if (result.warning) await badge(tabId, "!", "#b26a00");
     else await badge(tabId, "✓", "#1e7a3e");
-    await tell(
-      tabId,
-      result.text,
-      result.link,
-      result.warning ? "warning" : "ok",
-    );
+    if (!inPopup)
+      await tell(
+        tabId,
+        result.text,
+        result.link,
+        result.warning ? "warning" : "ok",
+      );
     return result;
   } catch (error) {
     const text =
@@ -215,7 +251,7 @@ async function saveTab(
         : { stack: String((error as Error)?.stack ?? "").slice(0, 2000) }),
     });
     await badge(tabId, "!", "#c0392b");
-    await tell(tabId, text, null, "error");
+    if (!inPopup) await tell(tabId, text, null, "error");
     return { ok: false, text };
   } finally {
     refreshMenu(); // groups one joined since
@@ -277,6 +313,8 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
         `The page did not load (“${signals.title.trim()}”): reload it, then save again.`,
       );
   }
+  if (info.arxiv || page.isPdf || page.pdfUrl)
+    step(tab.id!, "Fetching the PDF…");
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
     : page.isPdf || page.pdfUrl
@@ -289,6 +327,7 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
           ),
         )
       : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
+  step(tab.id!, "Saving to paperus…");
   return page.isPdf && !info.doi && !info.arxiv
     ? saveFile(pdf, url, owner)
     : save(info, pdf, owner);
@@ -477,14 +516,26 @@ async function save(
   // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
   const title = item.title.replace(/<\/?(i|b|em|strong|sub|sup|scp)>/gi, "");
   const saved = `${known ? "Already in paperus" : `Saved to ${where}`}: “${title}”`;
+  const paper = {
+    id: item.id,
+    libraryId: item.library_id,
+    title,
+    added: !known,
+  };
   return missing
     ? {
         ok: true,
         warning: true,
         text: `${saved}, without its PDF. ${missing}`,
         link: await itemLink(item.id),
+        item: paper,
       }
-    : { ok: true, text: `${saved}.${fileNote}`, link: await itemLink(item.id) };
+    : {
+        ok: true,
+        text: `${saved}.${fileNote}`,
+        link: await itemLink(item.id),
+        item: paper,
+      };
 }
 
 /** Add the PDF to the paper: null if it was, else why not. */
@@ -520,6 +571,7 @@ async function saveFile(pdf: Pdf, url: string, owner?: Owner): Promise<Saved> {
       ok: true,
       text: "This PDF is in paperus already.",
       link: await itemLink(existing),
+      item: { id: existing, libraryId: null, title: "", added: false },
     };
   const target = owner ?? defaultOwner(await settings());
   const form = new FormData();
@@ -537,6 +589,7 @@ async function saveFile(pdf: Pdf, url: string, owner?: Owner): Promise<Saved> {
     ok: true,
     text: `Saved to ${owner ? owner.name : "paperus"}: ${name}. paperus reads its details from the PDF.`,
     link: await itemLink(data.item_id),
+    item: { id: data.item_id, libraryId: target?.id ?? null, title: name, added: true },
   };
 }
 
