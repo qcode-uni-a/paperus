@@ -41,7 +41,8 @@ What the app does around the website:
   copy at `paperus-offline://`, where the app answers the website's calls
   (`answer.rs`) and queues its changes (`write.rs`), sent when the library
   is back; those it refuses are listed on the app's page. Only with
-  servers that offer it (`/api/version`).
+  servers that offer it (`/api/version`). Live signals
+  (`/api/changes/live`) sync at once when the library changes.
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 

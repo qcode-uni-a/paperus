@@ -263,9 +263,19 @@ pub fn agent() -> ureq::Agent {
 /// For downloading the library on this computer's parts: as long as it
 /// takes, but giving up on a connection that stays silent.
 pub fn agent_for_downloads() -> ureq::Agent {
+    agent_receiving_for(Duration::from_secs(60))
+}
+
+/// For a stream kept open (live signals): one connection for at most ten
+/// minutes, then another (one gone quiet is not waited on forever).
+pub fn agent_for_streams() -> ureq::Agent {
+    agent_receiving_for(Duration::from_secs(600))
+}
+
+fn agent_receiving_for(body: Duration) -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(30)))
-        .timeout_recv_body(Some(Duration::from_secs(60)))
+        .timeout_recv_body(Some(body))
         .http_status_as_error(false)
         .tls_config(
             ureq::tls::TlsConfig::builder()

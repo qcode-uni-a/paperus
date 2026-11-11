@@ -337,9 +337,66 @@ pub fn nudge() {
     }
 }
 
+/// Live signals (#46): the stream of the library open in the main window
+/// (`/api/changes/live`); each signal syncs at once. Again after a pause
+/// when it ends (offline, another library, the server restarted).
+fn listen(app: &AppHandle) {
+    use std::io::BufRead;
+    let Some(window) = app.get_webview_window(MAIN) else {
+        return;
+    };
+    let Some(library) = window.url().ok().and_then(|url| libraries::of(app, &url)) else {
+        return;
+    };
+    let Ok(url) = Url::parse(&library.url) else {
+        return;
+    };
+    if library.local || !syncs(&library.url) {
+        return;
+    }
+    let Some(token) = libraries::session(&window, &url) else {
+        return;
+    };
+    let Ok(response) = libraries::agent_for_streams()
+        .get(format!("{}/api/changes/live", library.url))
+        .header("Cookie", &format!("{}={token}", libraries::SESSION_COOKIE))
+        .call()
+    else {
+        return;
+    };
+    if !response.status().is_success() {
+        return;
+    }
+    let reader = std::io::BufReader::new(response.into_body().into_reader());
+    for line in reader.lines() {
+        let Ok(line) = line else {
+            return;
+        };
+        if line == "event: change" {
+            nudge();
+        }
+        // Another library opened meanwhile: its own stream.
+        let still = window
+            .url()
+            .ok()
+            .and_then(|now| libraries::of(app, &now))
+            .is_some_and(|now| now.url == library.url);
+        if !still {
+            return;
+        }
+    }
+}
+
 /// Keeps the copy of the library open in the main window up to date,
 /// every minute while it is reachable.
 pub fn start(app: AppHandle) {
+    let listening = app.clone();
+    thread::spawn(move || {
+        loop {
+            listen(&listening);
+            thread::sleep(Duration::from_secs(5));
+        }
+    });
     let (wake, woken) = mpsc::channel();
     if let Ok(mut sender) = WAKE.lock() {
         *sender = Some(wake);

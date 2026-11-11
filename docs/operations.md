@@ -106,6 +106,12 @@ server {
 Tested with Caddy in front of the container images: HTTPS, login with the
 Secure session cookie, uploads, downloads with range requests.
 
+Live signals (`/api/changes/live`, the website's and the apps' "something
+changed") are a stream kept open: it asks nginx not to buffer it
+(`X-Accel-Buffering: no`) and sends a comment every 20 seconds, so the
+settings above suffice. Proxies that buffer anyway, or close connections
+quiet for under 20 seconds, only delay updates to the next minute.
+
 ## ML service (search by meaning)
 
 The `ml` container computes the vectors for search by meaning, on the CPU
