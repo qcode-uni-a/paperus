@@ -19,6 +19,15 @@ const ROBOT_CHECK =
 const NO_ACCESS =
 	/sign in|log ?in|institutional (access|login)|access through your (institution|organization)|purchase (this )?(article|pdf)|buy (this )?article|rent this|subscribe|get access|access options|check access|shibboleth|openathens|seamless access/i;
 
+const ERROR_PAGE =
+	/unable to load (the )?page|page not found|page (could not|cannot) be (found|loaded|displayed)|access denied|^\s*(400|403|404|500|502|503)\b|forbidden|internal server error|service (temporarily )?unavailable|bad gateway/i;
+
+/** The page did not load (IEEE Xplore's "Unable to Load Page", a 404): its
+ * title names no paper. By the title only. */
+export function isErrorPage(signals: Signals): boolean {
+	return ERROR_PAGE.test(signals.title);
+}
+
 /** The page itself is a check for robots (Cloudflare's "Just a moment…"),
  * not the paper: by its captcha or its title only (an article may well
  * mention captchas). */

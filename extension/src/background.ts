@@ -6,6 +6,7 @@ import {
   type Cause,
   causeOf,
   EXPLAINED,
+  isErrorPage,
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
@@ -259,15 +260,19 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
     doi: page.doi ?? inUrl.doi,
     arxiv: page.arxiv ?? inUrl.arxiv,
   };
-  // Without a DOI or arXiv ID the page's title names the paper: not that
-  // of a check for robots in front of it.
-  if (
-    !info.doi &&
-    !info.arxiv &&
-    !page.isPdf &&
-    isRobotCheck(await inPage(tab.id!, pageSignals))
-  )
-    throw new PaperusError(EXPLAINED["robot-check"]);
+  // A check for robots in front of the paper: with a DOI or arXiv ID the
+  // paper is saved still, without its PDF, and the check says why; without
+  // one the page's title would name the paper: not that of the check, nor
+  // of a page that did not load.
+  const signals = page.isPdf ? null : await inPage(tab.id!, pageSignals);
+  const robot = signals !== null && isRobotCheck(signals);
+  if (!info.doi && !info.arxiv && signals) {
+    if (robot) throw new PaperusError(EXPLAINED["robot-check"]);
+    if (isErrorPage(signals))
+      throw new PaperusError(
+        `The page did not load (“${signals.title.trim()}”): reload it, then save again.`,
+      );
+  }
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
     : page.isPdf || page.pdfUrl
@@ -277,7 +282,7 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
           page.isPdf ? page.url : page.pdfUrl!,
           MAX_BYTES,
         )
-      : { error: "The page links no PDF." };
+      : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
   return page.isPdf && !info.doi && !info.arxiv
     ? saveFile(pdf, url, owner)
     : save(info, pdf, owner);
@@ -389,7 +394,9 @@ async function save(
     }
   }
   const where = owner ? owner.name : "paperus";
-  const saved = `${known ? "Already in paperus" : `Saved to ${where}`}: “${item.title}”`;
+  // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
+  const title = item.title.replace(/<\/?(i|b|em|strong|sub|sup|scp)>/gi, "");
+  const saved = `${known ? "Already in paperus" : `Saved to ${where}`}: “${title}”`;
   return missing
     ? {
         ok: true,
