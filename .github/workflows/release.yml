@@ -260,13 +260,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - if: needs.app.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: app-*
           merge-multiple: true
           path: app-installers
       - if: needs.local.result == 'success'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: local-*
           merge-multiple: true
