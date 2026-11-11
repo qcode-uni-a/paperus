@@ -91,15 +91,19 @@ struct ServerVersion {
     features: std::collections::HashMap<String, i64>,
 }
 
-/// Whether the library offers syncing as this app knows it.
-fn syncs(url: &str) -> bool {
-    libraries::agent()
+/// Whether the library offers syncing as this app knows it; None if it
+/// did not answer (asked again next time).
+fn syncs(url: &str) -> Option<bool> {
+    let mut response = libraries::agent()
         .get(format!("{url}/api/version"))
         .call()
-        .ok()
-        .filter(|response| response.status().is_success())
-        .and_then(|mut response| response.body_mut().read_json::<ServerVersion>().ok())
-        .is_some_and(|version| version.features.get("sync") == Some(&SYNC))
+        .ok()?;
+    if !response.status().is_success() {
+        // Before 0.0.22: no /api/version, so no syncing.
+        return (response.status().as_u16() == 404).then_some(false);
+    }
+    let version: ServerVersion = response.body_mut().read_json().ok()?;
+    Some(version.features.get("sync") == Some(&SYNC))
 }
 
 /// Whether the library answers (quickly).
@@ -372,7 +376,7 @@ fn sync(
     let syncs = match known {
         Some((syncs, _)) => *syncs,
         None => {
-            let found = syncs(&url);
+            let found = syncs(&url)?;
             checked.insert(url.clone(), (found, Instant::now()));
             found
         }
