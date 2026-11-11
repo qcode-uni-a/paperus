@@ -34,6 +34,7 @@ from paperus import (
     ocr,
     published,
     readable,
+    storage,
     system,
     trash,
 )
@@ -56,9 +57,18 @@ from paperus.importing.references import complete
 from paperus.importing.run import run_export, run_import
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLRejected, MLUnavailable, make_ml_client
-from paperus.models import File, FileChunk, Import, ImportStatus, Item, User, Version
+from paperus.models import (
+    Blob,
+    File,
+    FileChunk,
+    Import,
+    ImportStatus,
+    Item,
+    User,
+    Version,
+)
 from paperus.processing import pending_files, process_file
-from paperus.storage import BlobStore, make_blob_store
+from paperus.storage import BlobStore, FilesystemStore, make_blob_store
 from paperus.system import (
     SystemConfig,
     apply,
@@ -741,6 +751,29 @@ def empty_old_trash(timestamp: int) -> None:
             before=datetime.now(UTC) - timedelta(days=config.trash_days),
         )
     log.info("emptied the trash: %s", done)
+
+
+def claim_storage(db: Session, blobs: BlobStore) -> None:
+    """The folder of stored files marked as this library's if it is new
+    (``storage.claim_if_new``)."""
+    has_contents = db.scalar(select(exists().where(Blob.sha256.is_not(None))))
+    storage.claim_if_new(blobs, system.installation_id(db), bool(has_contents))
+
+
+@tasks.periodic(cron="*/5 * * * *")
+@tasks.task(name="move_incoming", queue="backup", queueing_lock="move-incoming")
+def move_incoming(timestamp: int) -> None:
+    """Files that waited in the incoming folder while the folder of stored
+    files was out of reach (a network share), moved over once it is back."""
+    context = _worker_context()
+    blobs = context.blobs
+    if not isinstance(blobs, FilesystemStore) or blobs.incoming is None:
+        return
+    with context.sessions() as db:
+        claim_storage(db, blobs)
+    moved = blobs.move_incoming()
+    if moved:
+        log.info("moved %d waiting files to the folder of stored files", moved)
 
 
 @tasks.task(name="check_integrity", queue="backup", queueing_lock="integrity")

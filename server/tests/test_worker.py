@@ -31,7 +31,7 @@ from paperus.models import (
     OcrStatus,
     TextStatus,
 )
-from paperus.storage import BlobStore
+from paperus.storage import BlobStore, FilesystemStore
 from paperus.system import BackupConfig, load_config, save_backup_config, save_config
 from tests.conftest import FakeDOIRegistry, FakeML
 from tests.pdfs import make_pdf
@@ -589,3 +589,18 @@ def test_the_ml_service_switches_files_meanwhile(
     upload(Person(client, db, "ada"), make_pdf([[TYPED]]))
     run_jobs(worker)
     assert (embedded(db), embedded(db, "bge-m3@fp16")) == (0, 1)
+
+
+def test_waiting_files_move_when_the_folder_is_back(
+    worker: App, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Without an incoming folder: nothing to do.
+    defer(worker, "move_incoming", timestamp=at(3))
+    assert run_jobs(worker) == {"move_incoming succeeded": 1}
+    # A new library's folder, claimed at the round; what waited moves over.
+    shared = FilesystemStore(tmp_path / "share", tmp_path / "incoming")
+    sha = shared.put([b"waited"], max_size=1 << 20).sha256
+    monkeypatch.setattr(jobs._worker_context(), "blobs", shared)
+    defer(worker, "move_incoming", timestamp=at(3))
+    run_jobs(worker)
+    assert shared.path(sha).is_relative_to(tmp_path / "share")

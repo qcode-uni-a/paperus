@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Iterable, Iterator
@@ -105,18 +106,57 @@ class BlobStore(ABC):
 
 
 class FilesystemStore(BlobStore):
-    def __init__(self, root: Path) -> None:
+    """Contents in a folder (any mounted path). With ``incoming``, a local
+    folder: new contents wait there while the folder is out of reach (a
+    network share not mounted: its marker missing, ``MARKER``), readable
+    meanwhile, and move over when it is back (``move_incoming``)."""
+
+    def __init__(self, root: Path, incoming: Path | None = None) -> None:
         self.root = root
-        super().__init__(root / "tmp")
+        self.incoming = incoming
+        super().__init__((incoming or root) / "tmp")
+
+    def reachable(self) -> bool:
+        """Whether the folder is there: its marker is (an empty mount point
+        is no folder of ours). Without an incoming folder, always."""
+        return self.incoming is None or (self.root / MARKER).is_file()
 
     def path(self, sha256: bytes) -> Path:
-        return self.root / "blobs" / blob_name(sha256)
+        main = self.root / "blobs" / blob_name(sha256)
+        if self.incoming is not None:
+            waiting = self.incoming / "blobs" / blob_name(sha256)
+            if waiting.exists():
+                return waiting
+        return main
 
     def _commit(self, tmp: Path, sha256: bytes) -> None:
-        target = self.path(sha256)
-        if not target.exists():
+        if self.exists(sha256):
+            return
+        folder = self.root if self.reachable() else self.incoming
+        assert folder is not None
+        target = folder / "blobs" / blob_name(sha256)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Across disks (the incoming folder is local): copied, then renamed.
+        shutil.move(tmp, target)
+
+    def move_incoming(self) -> int:
+        """Move what waits in the incoming folder to the folder, if it is
+        there; how many."""
+        if self.incoming is None or not self.reachable():
+            return 0
+        moved = 0
+        for waiting in (self.incoming / "blobs").glob("*/*/*"):
+            target = self.root / "blobs" / waiting.relative_to(self.incoming / "blobs")
+            if target.exists():
+                waiting.unlink()
+                continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            tmp.replace(target)
+            partial = target.with_name(target.name + ".partial")
+            shutil.copyfile(waiting, partial)
+            partial.replace(target)
+            waiting.unlink()
+            moved += 1
+        return moved
 
     def exists(self, sha256: bytes) -> bool:
         return self.path(sha256).exists()
@@ -132,9 +172,11 @@ class FilesystemStore(BlobStore):
 
     def delete(self, sha256: bytes) -> None:
         self.path(sha256).unlink(missing_ok=True)
+        (self.root / "blobs" / blob_name(sha256)).unlink(missing_ok=True)
 
     def iter_stored(self) -> Iterator[tuple[bytes, datetime, int]]:
-        for path in (self.root / "blobs").glob("*/*/*"):
+        folders = [self.root, *([self.incoming] if self.incoming else [])]
+        for path in (p for folder in folders for p in (folder / "blobs").glob("*/*/*")):
             if len(path.name) == 64 and path.is_file():
                 try:
                     stat = path.stat()
@@ -213,6 +255,25 @@ class S3Store(BlobStore):
 MARKER = ".paperus-library"
 
 
+def claim_if_new(blobs: BlobStore, installation: str, has_contents: bool) -> None:
+    """Mark the folder as this library's when it is plainly new: it holds
+    stored contents already (an installation from before markers), or the
+    library has none yet. Otherwise, without its marker, it is out of reach
+    (``FilesystemStore.reachable``)."""
+    if not isinstance(blobs, FilesystemStore) or blobs.incoming is None:
+        return
+    marker = blobs.root / MARKER
+    try:
+        if marker.exists():
+            return
+        holds = any((blobs.root / "blobs").glob("*/*/*"))
+        if holds or not has_contents:
+            blobs.root.mkdir(parents=True, exist_ok=True)
+            marker.write_text(installation + "\n")
+    except OSError:
+        return
+
+
 def owns(blobs: BlobStore, installation: str) -> bool:
     """Whether this library may delete from the store's folder: its marker
     names this library, or there is none and this library claims it. Two
@@ -248,7 +309,7 @@ def make_blob_store(settings: Settings) -> BlobStore:
         return S3Store(
             client, settings.s3_bucket, settings.s3_prefix, settings.temp_path
         )
-    return FilesystemStore(settings.storage_path)
+    return FilesystemStore(settings.storage_path, settings.incoming_path)
 
 
 __all__ = [

@@ -18,6 +18,13 @@
   nothing from a folder another one owns, or one out of reach (an
   unmounted share), where its clean-ups would otherwise delete the other's
   files.
+- **A folder of stored files out of reach** (#28; with
+  `PAPERUS_INCOMING_PATH`, a local folder): new files wait there while the
+  folder (a network share, say) is not mounted, readable meanwhile, and
+  move over within five minutes once it is back. A file that is only in
+  the folder answers "not reachable" (503) meanwhile, not an error. The
+  folder counts as there when its marker is (an empty mount point is no
+  folder of ours).
 - **Installers tested** (#45): each release installs the `.deb`, the
   `.msi`, the setup `.exe` and the `.dmg` as people do, starts the app from
   there and removes it again.

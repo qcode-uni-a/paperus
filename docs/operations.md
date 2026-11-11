@@ -367,6 +367,15 @@ whose folder names another deletes nothing there and logs an error;
 writing stays safe (each content is written once, by its SHA-256). A
 restored backup keeps the installation's id, so it owns its folder again.
 
+**Files on a network share.** `PAPERUS_STORAGE_PATH` may be a mounted share
+(NFS, SMB). With `PAPERUS_INCOMING_PATH` set to a local folder, paperus
+copes with the share being away (not mounted, off the network): new files
+wait in the local folder, readable, and the worker moves them over within
+five minutes once the share is back; a file only on the share answers
+"not reachable" meanwhile. The share counts as there when its marker is,
+so files are never written into an empty mount point. Without
+`PAPERUS_INCOMING_PATH`, nothing changes: the folder is assumed to be there.
+
 **Replacing** a running installation's database needs it stopped first:
 
 ```sh

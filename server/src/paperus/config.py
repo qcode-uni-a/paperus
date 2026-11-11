@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # way, e.g. AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY).
     storage_backend: Literal["filesystem", "s3"] = "filesystem"
     storage_path: Path = Path("data/files")
+    incoming_path: Path | None = None
+    """A local folder for new files while ``storage_path`` (a network share,
+    say) is out of reach: they wait there, readable, and move over when it
+    is back. Off unless set (the app's library on this computer sets it)."""
     backup_path: Path = Path("data/backups")
     """Where backups go: best another disk or a network share."""
     export_path: Path | None = None

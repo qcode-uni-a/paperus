@@ -50,7 +50,7 @@ from paperus.api import authors as author_api
 from paperus.api import tokens as token_api
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
-from paperus.jobs import make_job_app, queue_ml_configuration
+from paperus.jobs import claim_storage, make_job_app, queue_ml_configuration
 from paperus.mcp_server import build_mcp
 from paperus.metadata import make_http_client
 from paperus.ml import MLClient, make_ml_client
@@ -77,10 +77,12 @@ def create_app(
         # which bring their own job app.
         if job_app is None:
             logbook.install(engine, "server")
-        # Log level and contact email as set in the administration.
+        # Log level and contact email as set in the administration; the
+        # folder of stored files marked as this library's if new.
         try:
             with app.state.sessionmaker() as db:
                 system.apply(system.load_config(db, settings), http)
+                claim_storage(db, app.state.blobs)
         except Exception:
             logging.getLogger(__name__).warning(
                 "could not apply the saved settings", exc_info=True

@@ -336,6 +336,14 @@ def download_file(
     if etag in request.headers.get("If-None-Match", "").split(", "):
         return Response(status_code=304, headers=safety)
     if isinstance(blobs, FilesystemStore):
+        if not blobs.path(file.blob_sha256).exists():
+            if not blobs.reachable():
+                raise HTTPException(
+                    503,
+                    "The folder of stored files is not reachable (a network"
+                    " share not mounted?); the file opens when it is back.",
+                )
+            raise HTTPException(404, "the file's contents are missing")
         # Supports range requests, which PDF.js uses for large files.
         return FileResponse(
             blobs.path(file.blob_sha256),
