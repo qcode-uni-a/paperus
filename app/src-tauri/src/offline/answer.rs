@@ -347,7 +347,10 @@ fn notes(store: &Store, query: &Query) -> Response<Vec<u8>> {
 
 /// A file kept with its paper.
 fn content(store: &Store, folder: &Path, id: &str) -> Response<Vec<u8>> {
-    let Ok(bytes) = fs::read(folder.join("files").join(id)) else {
+    let kept = store
+        .kept_file(id)
+        .map(|path| super::files_root(folder).join(path));
+    let Some(Ok(bytes)) = kept.map(fs::read) else {
         return json_response(
             503,
             &json!({"detail": "This file was not kept for offline use."}),

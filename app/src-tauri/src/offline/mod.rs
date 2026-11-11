@@ -773,9 +773,46 @@ pub fn tell_kept(window: &WebviewWindow) {
 /// Keep the papers to read offline whole: their page, their files with
 /// their layouts (fluent mode) and annotations' page marks, references and
 /// cited-by; again when they changed. Others let go.
+/// The folder of a library's kept files, by content (`store.kept_file` paths
+/// are relative to it).
+pub fn files_root(folder: &std::path::Path) -> PathBuf {
+    folder.join("files")
+}
+
+/// Where content is kept, relative to the files' folder: by its SHA-256
+/// (the same PDF in two papers, once), else by the file's id.
+fn kept_path(sha256: Option<&str>, file_id: &str) -> String {
+    match sha256 {
+        Some(sha) if sha.len() > 2 => format!("{}/{sha}", &sha[..2]),
+        _ => format!("by-id/{file_id}"),
+    }
+}
+
+/// The SHA-256 of each file of a paper, from its page kept.
+fn shas_of(store: &Store, item_id: &str) -> std::collections::HashMap<String, String> {
+    let page = store
+        .answer(&format!("/api/items/{item_id}"))
+        .and_then(|(_, _, body)| serde_json::from_slice::<Value>(&body).ok())
+        .unwrap_or_default();
+    page["versions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|version| version["files"].as_array().cloned().unwrap_or_default())
+        .filter_map(|file| {
+            Some((
+                file["id"].as_str()?.to_owned(),
+                file["sha256"].as_str()?.to_owned(),
+            ))
+        })
+        .collect()
+}
+
+/// Keep the papers to read offline whole: their page, their files with
+/// their layouts (fluent mode) and annotations' page marks, references and
+/// cited-by; again when they changed. Each content once. Others let go.
 fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
-    let files = folder.join("files");
-    let _ = fs::create_dir_all(&files);
+    let root = files_root(folder);
     let kept = kept(store, server);
     let mut wanted: HashSet<String> = HashSet::new();
     let mut available: Vec<String> = Vec::new();
@@ -788,39 +825,55 @@ fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
         let current = store
             .answer(&page)
             .is_some_and(|(kept_at, _, _)| kept_at >= change);
-        let mut paths = vec![
-            page.clone(),
-            format!("/api/items/{id}/references"),
-            format!("/api/items/{id}/cited-by"),
-        ];
-        for file in item["files"].as_array().into_iter().flatten() {
-            let Some(file_id) = file["id"].as_str() else {
-                continue;
-            };
-            wanted.insert(file_id.to_owned());
-            paths.push(format!("/api/files/{file_id}/layout"));
-            paths.push(format!("/api/files/{file_id}/annotations"));
-            let path = files.join(file_id);
-            if !path.exists()
-                && let Ok((_, body)) = server.get(&format!("/api/files/{file_id}/content"))
-            {
-                let partial = files.join(format!("{file_id}.partial"));
-                if fs::write(&partial, body).is_ok() {
-                    let _ = fs::rename(&partial, &path);
-                }
-            }
-        }
+        let file_ids: Vec<String> = item["files"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|file| file["id"].as_str().map(str::to_owned))
+            .collect();
         if !current {
+            let mut paths = vec![
+                page.clone(),
+                format!("/api/items/{id}/references"),
+                format!("/api/items/{id}/cited-by"),
+            ];
+            for file_id in &file_ids {
+                paths.push(format!("/api/files/{file_id}/layout"));
+                paths.push(format!("/api/files/{file_id}/annotations"));
+            }
             for path in &paths {
                 let _ = server.keep(store, path, change);
             }
         }
-        let files_kept = item["files"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|file| file["id"].as_str())
-            .all(|file| files.join(file).exists());
+        let shas = shas_of(store, id);
+        for file_id in &file_ids {
+            wanted.insert(file_id.clone());
+            let sha = shas.get(file_id).map(String::as_str);
+            let path = sha
+                .and_then(|sha| store.kept_content(sha))
+                .unwrap_or_else(|| kept_path(sha, file_id));
+            if !root.join(&path).exists() {
+                let Ok((_, body)) = server.get(&format!("/api/files/{file_id}/content")) else {
+                    continue;
+                };
+                let target = root.join(&path);
+                let partial = target.with_extension("partial");
+                let written = target
+                    .parent()
+                    .is_some_and(|parent| fs::create_dir_all(parent).is_ok())
+                    && fs::write(&partial, body).is_ok()
+                    && fs::rename(&partial, &target).is_ok();
+                if !written {
+                    continue;
+                }
+            }
+            let _ = store.keep_file(file_id, sha.unwrap_or_default(), &path);
+        }
+        let files_kept = file_ids.iter().all(|file_id| {
+            store
+                .kept_file(file_id)
+                .is_some_and(|path| root.join(path).exists())
+        });
         if files_kept && store.answer(&page).is_some() {
             available.push(id.clone());
         }
@@ -841,11 +894,36 @@ fn keep_papers(server: &Server, store: &Store, folder: &std::path::Path) {
             }
         }
     }
-    if let Ok(entries) = fs::read_dir(&files) {
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !wanted.contains(&name) {
-                let _ = fs::remove_file(entry.path());
+    for (file_id, _) in store.kept_files() {
+        if !wanted.contains(&file_id) {
+            let _ = store.drop_file(&file_id);
+        }
+    }
+    let in_use: HashSet<String> = store
+        .kept_files()
+        .into_iter()
+        .map(|(_, path)| path)
+        .collect();
+    remove_unused(&root, &root, &in_use);
+}
+
+/// Files under ``folder`` no kept file uses (and folders left empty).
+fn remove_unused(root: &std::path::Path, folder: &std::path::Path, in_use: &HashSet<String>) {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            remove_unused(root, &path, in_use);
+            let _ = fs::remove_dir(&path);
+        } else {
+            let relative = path
+                .strip_prefix(root)
+                .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default();
+            if !in_use.contains(&relative) {
+                let _ = fs::remove_file(&path);
             }
         }
     }
@@ -858,5 +936,34 @@ mod tests {
     #[test]
     fn named_after_the_address() {
         assert_eq!(hex(&[0, 15, 255]), "000fff");
+    }
+
+    #[test]
+    fn kept_by_content() {
+        assert_eq!(kept_path(Some("ab12cd"), "f1"), "ab/ab12cd");
+        assert_eq!(kept_path(None, "f1"), "by-id/f1");
+
+        let root = std::env::temp_dir().join(format!("paperus-kept-{}", std::process::id()));
+        fs::create_dir_all(root.join("ab")).unwrap();
+        fs::create_dir_all(root.join("cd")).unwrap();
+        fs::write(root.join("ab/ab12"), "used").unwrap();
+        fs::write(root.join("cd/cd34"), "no longer").unwrap();
+        fs::write(root.join("old-file-id"), "from before").unwrap();
+        let in_use = HashSet::from(["ab/ab12".to_owned()]);
+        remove_unused(&root, &root, &in_use);
+        assert!(root.join("ab/ab12").exists());
+        assert!(!root.join("cd").exists() && !root.join("old-file-id").exists());
+        fs::remove_dir_all(&root).unwrap();
+
+        let store = Store::in_memory().unwrap();
+        store.keep_file("f1", "ab12", "ab/ab12").unwrap();
+        store.keep_file("f2", "ab12", "ab/ab12").unwrap();
+        assert_eq!(store.kept_content("ab12").as_deref(), Some("ab/ab12"));
+        assert_eq!(store.kept_file("f2").as_deref(), Some("ab/ab12"));
+        store.drop_file("f1").unwrap();
+        assert_eq!(
+            store.kept_files(),
+            [("f2".to_owned(), "ab/ab12".to_owned())]
+        );
     }
 }

@@ -96,6 +96,11 @@ impl Store {
                  key TEXT,
                  what TEXT NOT NULL
              );
+             CREATE TABLE IF NOT EXISTS files (
+                 id TEXT PRIMARY KEY,
+                 sha256 TEXT NOT NULL,
+                 path TEXT NOT NULL
+             );
              CREATE TABLE IF NOT EXISTS unsaved (
                  seq INTEGER PRIMARY KEY,
                  what TEXT NOT NULL,
@@ -359,11 +364,58 @@ impl Store {
         Ok(())
     }
 
+    /// Where a kept file is, relative to the folder of kept files (the
+    /// same content kept once, whatever papers it belongs to).
+    pub fn kept_file(&self, id: &str) -> Option<String> {
+        self.db
+            .query_row("SELECT path FROM files WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .optional()
+            .ok()?
+    }
+
+    /// Where content with this SHA-256 is kept already, if it is.
+    pub fn kept_content(&self, sha256: &str) -> Option<String> {
+        self.db
+            .query_row(
+                "SELECT path FROM files WHERE sha256 = ?1 LIMIT 1",
+                [sha256],
+                |row| row.get(0),
+            )
+            .optional()
+            .ok()?
+    }
+
+    pub fn keep_file(&self, id: &str, sha256: &str, path: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO files (id, sha256, path) VALUES (?1, ?2, ?3)",
+            [id, sha256, path],
+        )?;
+        Ok(())
+    }
+
+    /// The files kept: id and path.
+    pub fn kept_files(&self) -> Vec<(String, String)> {
+        let Ok(mut query) = self.db.prepare("SELECT id, path FROM files") else {
+            return Vec::new();
+        };
+        query
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn drop_file(&self, id: &str) -> rusqlite::Result<()> {
+        self.db.execute("DELETE FROM files WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
     /// Forget everything (a sync from 0 follows).
     pub fn clear(&mut self) -> rusqlite::Result<()> {
         // What the person marked stays (it is this device's, not the server's).
         self.db.execute_batch(
-            "DELETE FROM records; DELETE FROM answers;
+            "DELETE FROM records; DELETE FROM answers; DELETE FROM files;
              DELETE FROM state WHERE key NOT IN ('marked', 'logging_out');",
         )
     }
