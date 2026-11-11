@@ -270,7 +270,10 @@ fn sync(
     if !syncs {
         return None;
     }
-    let token = libraries::session(&window, &Url::parse(&url).ok()?)?;
+    let Some(token) = libraries::session(&window, &Url::parse(&url).ok()?) else {
+        eprintln!("offline: {url}: not logged in, not synced");
+        return None;
+    };
     let folder = folder(app, &url)?;
     let mut store = Store::open(&folder.join("library.sqlite")).ok()?;
     let server = Server {
@@ -287,7 +290,10 @@ fn sync(
         remember_told(&url, set_aside);
     }
     let before = store.since();
-    store::pull(&mut store, &url, &token).ok()?;
+    if let Err(error) = store::pull(&mut store, &url, &token) {
+        eprintln!("offline: {url}: not synced: {error}");
+        return None;
+    }
     if store.since() != before || store.answer(ACCOUNT[0]).is_none() {
         for path in ACCOUNT {
             let _ = server.keep(&store, path, store.since());
@@ -341,8 +347,20 @@ fn push(server: &Server, store: &Store) -> bool {
     for change in store.queued() {
         let (status, detail) = match server.send(&change) {
             Ok(answer) => answer,
-            Err(_) => return false,
+            Err(error) => {
+                eprintln!(
+                    "offline: {} {}: not sent: {error}",
+                    change.method, change.path
+                );
+                return false;
+            }
         };
+        if !(200..300).contains(&status) {
+            eprintln!(
+                "offline: {} {}: {status} {detail}",
+                change.method, change.path
+            );
+        }
         let why = match status {
             200..=299 => {
                 let _ = store.dequeue(change.seq);

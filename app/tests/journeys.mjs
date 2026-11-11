@@ -203,6 +203,11 @@ try {
 	proxy = await network();
 	await inApp(`location.href = 'paperus-app:online'; done()`);
 	await until(async () => (await shown()).startsWith(LIBRARY), 30);
+	// Logged in still (the app's login kept from before it was closed).
+	const again = await until(() =>
+		inApp(`fetch('/api/auth/me').then((r) => done(r.ok ? 'in' : 'out:' + location.pathname))`)
+	);
+	assert.equal(again, 'in');
 	const saved = async () => {
 		const found = await fetch(`${SERVER}/api/files/${file}/annotations`, {
 			headers: { Cookie: cookie }
