@@ -43,6 +43,7 @@ from paperus.api import (
     sync,
     trash,
     users,
+    version,
 )
 from paperus.api import annotations as annotation_api
 from paperus.api import authors as author_api
@@ -144,6 +145,7 @@ def create_app(
     app.include_router(manage.router)
     app.include_router(trash.router)
     app.include_router(sync.router)
+    app.include_router(version.router)
     app.include_router(admin.router)
     app.include_router(organize.router)
     app.include_router(groups.router)

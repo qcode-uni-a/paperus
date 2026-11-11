@@ -1,26 +1,18 @@
-//! Offline use of a server library (docs/apps.md, "Offline and sync"): a
-//! copy of what the person sees there, in SQLite in the app's data folder
-//! (one file per library), brought up to date from `/api/changes` with the
-//! window's login while the library is open: the details of every paper,
-//! notes, tags, collections, annotations and where one stopped reading.
-
-use std::{fs, path::PathBuf, thread, time::Duration};
+//! The copy of one library (see the module): its records as `/api/changes`
+//! gives them, and answers kept whole (a paper's page, the person's
+//! account), in one SQLite file.
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Deserialize;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Manager, Url};
 
-use crate::{MAIN, libraries};
-
-const EVERY: Duration = Duration::from_secs(60);
+use crate::libraries;
 
 /// One answer of `/api/changes`.
 #[derive(Deserialize)]
 pub struct Changes {
-    change: i64,
-    libraries: Vec<String>,
+    pub change: i64,
+    pub libraries: Vec<String>,
     removed: Vec<Removed>,
     items: Vec<Value>,
     notes: Vec<Value>,
@@ -28,6 +20,9 @@ pub struct Changes {
     collections: Vec<Value>,
     annotations: Vec<Value>,
     views: Vec<Value>,
+    /// All the papers the person starred (servers before 0.0.22: none).
+    #[serde(default)]
+    favourites: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -47,7 +42,7 @@ impl Store {
     }
 
     #[cfg(test)]
-    fn in_memory() -> rusqlite::Result<Store> {
+    pub fn in_memory() -> rusqlite::Result<Store> {
         Store::new(Connection::open_in_memory()?)
     }
 
@@ -63,7 +58,13 @@ impl Store {
                  PRIMARY KEY (kind, id)
              );
              CREATE INDEX IF NOT EXISTS records_item ON records (item_id);
-             CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+             CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS answers (
+                 path TEXT PRIMARY KEY,
+                 change INTEGER NOT NULL,
+                 type TEXT NOT NULL,
+                 body BLOB NOT NULL
+             );",
         )?;
         Ok(Store { db })
     }
@@ -73,6 +74,13 @@ impl Store {
         self.state("since")
             .and_then(|value| value.parse().ok())
             .unwrap_or(0)
+    }
+
+    /// The papers the person starred, as of the last sync.
+    pub fn favourites(&self) -> Vec<String> {
+        self.state("favourites")
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .unwrap_or_default()
     }
 
     /// The libraries the person read at the last sync.
@@ -94,7 +102,6 @@ impl Store {
 
     /// A record kept (``kind``: item, note, tag, collection, annotation,
     /// view; a view's id is its paper's).
-    #[cfg_attr(not(test), expect(dead_code, reason = "read offline (next step)"))]
     pub fn get(&self, kind: &str, id: &str) -> Option<Value> {
         let json: String = self
             .db
@@ -109,7 +116,6 @@ impl Store {
     }
 
     /// All records of a kind.
-    #[cfg_attr(not(test), expect(dead_code, reason = "read offline (next step)"))]
     pub fn all(&self, kind: &str) -> Vec<Value> {
         let Ok(mut query) = self
             .db
@@ -129,7 +135,56 @@ impl Store {
     /// Forget everything (a sync from 0 follows).
     pub fn clear(&mut self) -> rusqlite::Result<()> {
         self.db
-            .execute_batch("DELETE FROM records; DELETE FROM state;")
+            .execute_batch("DELETE FROM records; DELETE FROM state; DELETE FROM answers;")
+    }
+
+    /// Keep the server's answer to ``path`` (as of change number
+    /// ``change``) to give it offline.
+    pub fn keep_answer(
+        &self,
+        path: &str,
+        change: i64,
+        media_type: &str,
+        body: &[u8],
+    ) -> rusqlite::Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO answers (path, change, type, body) VALUES (?1, ?2, ?3, ?4)",
+            params![path, change, media_type, body],
+        )?;
+        Ok(())
+    }
+
+    /// An answer kept: its change number, media type and body.
+    pub fn answer(&self, path: &str) -> Option<(i64, String, Vec<u8>)> {
+        self.db
+            .query_row(
+                "SELECT change, type, body FROM answers WHERE path = ?1",
+                [path],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()
+            .ok()?
+    }
+
+    /// Answers kept whose path starts with ``prefix``.
+    pub fn answer_paths(&self, prefix: &str) -> Vec<String> {
+        let Ok(mut query) = self
+            .db
+            .prepare("SELECT path FROM answers WHERE substr(path, 1, length(?1)) = ?1")
+        else {
+            return Vec::new();
+        };
+        query
+            .query_map([prefix], |row| row.get(0))
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default()
+    }
+
+    /// Let an answer go.
+    pub fn drop_answer(&self, path: &str) -> rusqlite::Result<()> {
+        self.db
+            .execute("DELETE FROM answers WHERE path = ?1", [path])?;
+        Ok(())
     }
 
     /// Take in an answer of `/api/changes`: removals first, then the
@@ -228,26 +283,15 @@ impl Store {
         )?;
         if !partial {
             let readable = serde_json::to_string(&changes.libraries).unwrap_or_default();
+            let starred = serde_json::to_string(&changes.favourites).unwrap_or_default();
             db.execute(
                 "INSERT OR REPLACE INTO state (key, value) VALUES
-                 ('since', ?1), ('libraries', ?2)",
-                [changes.change.to_string(), readable],
+                 ('since', ?1), ('libraries', ?2), ('favourites', ?3)",
+                [changes.change.to_string(), readable, starred],
             )?;
         }
         db.commit()
     }
-}
-
-/// Where the copy of a library is kept: a name from its address.
-fn path(app: &AppHandle, library: &str) -> Option<PathBuf> {
-    let folder = app.path().app_data_dir().ok()?.join("offline");
-    fs::create_dir_all(&folder).ok()?;
-    let name = hex(&Sha256::digest(library.as_bytes())[..12]);
-    Some(folder.join(format!("{name}.sqlite")))
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// Asks the library for what changed (``library``: only these, from 0).
@@ -257,7 +301,7 @@ fn changes(
     since: i64,
     library: &[String],
 ) -> Result<Option<Changes>, String> {
-    let mut request = libraries::agent()
+    let mut request = libraries::agent_for_downloads()
         .get(format!("{url}/api/changes"))
         .query("since", since.to_string())
         .header("Cookie", &format!("{}={token}", libraries::SESSION_COOKIE));
@@ -306,28 +350,6 @@ pub fn pull(store: &mut Store, url: &str, token: &str) -> Result<(), String> {
     store
         .apply(&found, false)
         .map_err(|error| error.to_string())
-}
-
-/// Keeps the copy of the library open in the main window up to date,
-/// every minute while it is reachable.
-pub fn start(app: AppHandle) {
-    thread::spawn(move || {
-        loop {
-            let _ = sync(&app);
-            thread::sleep(EVERY);
-        }
-    });
-}
-
-fn sync(app: &AppHandle) -> Option<()> {
-    let window = app.get_webview_window(MAIN)?;
-    let library = libraries::of(app, &window.url().ok()?)?;
-    if library.local {
-        return None;
-    }
-    let token = libraries::session(&window, &Url::parse(&library.url).ok()?)?;
-    let mut store = Store::open(&path(app, &library.url)?).ok()?;
-    pull(&mut store, &library.url, &token).ok()
 }
 
 #[cfg(test)]
@@ -432,10 +454,5 @@ mod tests {
         store.clear().unwrap();
         assert_eq!(store.since(), 0);
         assert!(ids(&store, "item").is_empty());
-    }
-
-    #[test]
-    fn named_after_the_address() {
-        assert_eq!(hex(&[0, 15, 255]), "000fff");
     }
 }

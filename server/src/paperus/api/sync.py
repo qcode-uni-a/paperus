@@ -19,6 +19,7 @@ from paperus.models import (
     Annotation,
     AnnotationShare,
     Collection,
+    Favourite,
     File,
     Item,
     ItemView,
@@ -67,6 +68,8 @@ class Changes(BaseModel):
     annotations: list[SyncedAnnotation]
     """The person's own and those shared with them."""
     views: list[View]
+    favourites: list[uuid.UUID]
+    """The papers the person starred, all of them (starring is no change)."""
 
 
 @router.get("/api/changes")
@@ -142,6 +145,12 @@ def changes_since(
         if since
         else []
     )
+    favourites = db.scalars(
+        select(Favourite.item_id)
+        .join(Item, Item.id == Favourite.item_id)
+        .where(Favourite.user_id == access.user.id, Item.library_id.in_(libraries))
+        .order_by(Favourite.item_id)
+    ).all()
     names: dict[uuid.UUID, str] = {}
     return Changes(
         change=number,
@@ -168,4 +177,5 @@ def changes_since(
             )
             for view in views
         ],
+        favourites=list(favourites),
     )

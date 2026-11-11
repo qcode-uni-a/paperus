@@ -85,8 +85,38 @@ async fn open_library(app: AppHandle, url: String) -> Result<(), String> {
     saved.last = Some(url.clone());
     libraries::save(&app, &saved)?;
     let window = app.get_webview_window(MAIN).ok_or("The window is gone.")?;
+    // Out of reach: its copy, if there is one (offline.rs).
+    let checked = url.clone();
+    let reachable = tauri::async_runtime::spawn_blocking(move || offline::reachable(&checked))
+        .await
+        .unwrap_or(true);
+    if !reachable && offline::has_copy(&app, &url) {
+        return offline::open(&window, &url).map_err(|error| error.to_string());
+    }
     let to = Url::parse(&url).map_err(|error| error.to_string())?;
     window.navigate(to).map_err(|error| error.to_string())
+}
+
+/// The library of the copy open in ``window`` again, if it answers.
+fn back_online(app: &AppHandle, label: &str) {
+    let app = app.clone();
+    let label = label.to_owned();
+    std::thread::spawn(move || {
+        let Some(window) = app.get_webview_window(&label) else {
+            return;
+        };
+        let library = offline::open_library();
+        match library.filter(|url| offline::reachable(url)) {
+            Some(url) => {
+                if let Ok(to) = Url::parse(&url) {
+                    let _ = window.navigate(to);
+                }
+            }
+            None => {
+                let _ = window.eval("alert('The library still cannot be reached.')");
+            }
+        }
+    });
 }
 
 /// Makes the library on this computer (its parts downloaded, a database
@@ -144,13 +174,21 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
     WebviewWindowBuilder::new(app, label, url)
         .title("paperus")
         // The website knows it is in the app (its login page offers the
-        // browser's then: web/src/routes/login).
-        .initialization_script("window.paperusApp = {};")
+        // browser's then: web/src/routes/login), which version, and what
+        // it can do (web/src/lib/app.ts).
+        .initialization_script(format!(
+            "window.paperusApp = {};",
+            serde_json::json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "features": {"offline": offline::SYNC},
+            })
+        ))
         .inner_size(1280.0, 860.0)
         .min_inner_size(420.0, 520.0)
         .on_navigation(move |url| match url.scheme() {
-            // The page, a library, its login (its OIDC provider's pages).
-            "http" | "https" | "tauri" => true,
+            // The page, a library, its login (its OIDC provider's pages),
+            // a library's copy offline.
+            "http" | "https" | "tauri" | offline::SCHEME => true,
             "about" | "blob" | "data" => true,
             // The website asking the app: log in in the system's browser.
             "paperus-app" => {
@@ -162,6 +200,10 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
                         .filter(|path| path.starts_with('/') && !path.starts_with("//"))
                         .unwrap_or_else(|| "/".into());
                     login::start(opener.clone(), own.clone(), next);
+                }
+                // The copy's "Go online" (web/src/lib/OfflineBanner.svelte).
+                if url.path() == "online" {
+                    back_online(&opener, &own);
                 }
                 false
             }
@@ -186,6 +228,7 @@ fn window(app: &AppHandle, label: &str, url: WebviewUrl) -> tauri::Result<Webvie
         .on_page_load(|window, payload| {
             if window.label() == MAIN && payload.event() == PageLoadEvent::Finished {
                 open_with::loaded(window.app_handle());
+                offline::nudge();
             }
         })
         .on_document_title_changed(|window, title| {
@@ -270,6 +313,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .register_asynchronous_uri_scheme_protocol(offline::SCHEME, offline::serve)
         .menu(menu)
         .on_menu_event(|app, event| {
             let Some(window) = focused(app) else { return };
@@ -305,7 +349,18 @@ pub fn run() {
                     .map_or(WebviewUrl::App("index.html".into()), WebviewUrl::External),
                 _ => WebviewUrl::App("index.html".into()),
             };
-            window(app.handle(), MAIN, url)?;
+            let main = window(app.handle(), MAIN, url)?;
+            // The library open last, out of reach: its copy.
+            if let Some(library) = last.filter(|library| !library.local).cloned() {
+                let opening = app.handle().clone();
+                std::thread::spawn(move || {
+                    if !offline::reachable(&library.url)
+                        && offline::has_copy(&opening, &library.url)
+                    {
+                        let _ = offline::open(&main, &library.url);
+                    }
+                });
+            }
             if last.is_some_and(|library| library.local) {
                 let opening = app.handle().clone();
                 tauri::async_runtime::spawn(async move {

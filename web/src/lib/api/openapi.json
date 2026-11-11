@@ -5887,6 +5887,28 @@
         }
       }
     },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Server Version",
+        "description": "This server's version and what it offers apps (no login needed).",
+        "operationId": "server_version",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/config": {
       "get": {
         "tags": [
@@ -9533,6 +9555,14 @@
             },
             "type": "array",
             "title": "Views"
+          },
+          "favourites": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Favourites"
           }
         },
         "type": "object",
@@ -9545,7 +9575,8 @@
           "tags",
           "collections",
           "annotations",
-          "views"
+          "views",
+          "favourites"
         ],
         "title": "Changes"
       },
@@ -15469,6 +15500,32 @@
         ],
         "title": "ServerSteps",
         "description": "What an administrator should set up before others rely on paperus."
+      },
+      "ServerVersion": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "oldest_app": {
+            "type": "string",
+            "title": "Oldest App"
+          },
+          "features": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "oldest_app",
+          "features"
+        ],
+        "title": "ServerVersion"
       },
       "SetupState": {
         "properties": {

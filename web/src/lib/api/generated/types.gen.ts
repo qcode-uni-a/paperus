@@ -693,6 +693,10 @@ export type Changes = {
      * Views
      */
     views: Array<View>;
+    /**
+     * Favourites
+     */
+    favourites: Array<string>;
 };
 
 /**
@@ -4021,6 +4025,26 @@ export type ServerSteps = {
      * Ml Device
      */
     ml_device: 'cpu' | 'cuda' | null;
+};
+
+/**
+ * ServerVersion
+ */
+export type ServerVersion = {
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Oldest App
+     */
+    oldest_app: string;
+    /**
+     * Features
+     */
+    features: {
+        [key: string]: number;
+    };
 };
 
 /**
@@ -8614,6 +8638,22 @@ export type ChangesSinceResponses = {
 };
 
 export type ChangesSinceResponse = ChangesSinceResponses[keyof ChangesSinceResponses];
+
+export type ServerVersionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/version';
+};
+
+export type ServerVersionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ServerVersion;
+};
+
+export type ServerVersionResponse = ServerVersionResponses[keyof ServerVersionResponses];
 
 export type GetConfigData = {
     body?: never;

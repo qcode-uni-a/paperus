@@ -294,6 +294,7 @@ ROUTES = {
     ("PUT", "/api/groups/{group_id}/members/{user_id}"): None,
     ("GET", "/api/health"): None,
     ("GET", "/api/health/db"): None,
+    ("GET", "/api/version"): None,
     ("GET", "/api/imports"): None,
     ("POST", "/api/imports"): None,
     ("POST", "/api/imports/arxiv"): None,

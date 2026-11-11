@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from paperus import __version__
 from paperus.app import create_app
 from paperus.config import Settings
 
@@ -33,6 +34,9 @@ def test_serves_the_website(tmp_path: Path) -> None:
     assert client.get("/../pyproject.toml").text == "<html>app</html>"
     assert client.get("/api/unknown").status_code == 404
     assert client.get("/api/health").json() == {"status": "ok"}
+    # What the server is, for the apps (no login).
+    told = client.get("/api/version").json()
+    assert told["version"] == __version__ and told["features"]["sync"] == 1
 
     # Its files, for the app's copy to run offline.
     listed = client.get("/api/web-files").json()

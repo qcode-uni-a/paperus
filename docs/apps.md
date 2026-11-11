@@ -104,14 +104,21 @@ every platform (and the installable website, as far as browsers allow).
   are downloaded by themselves, and those of papers that left it are let
   go unless kept otherwise. A smart collection's papers are asked from the
   server (its rules decide); without a connection it keeps what it had.
-- **The website offline**: the app keeps the copy of the server's website
-  it last loaded, so offline it runs the same version as the server it
-  synced with; never a website newer or older than the server's API.
-- **An offline layer** between the pages and the API (all calls already go
-  through the generated client, `web/src/lib/api/client.ts`): online,
-  answers for kept papers are stored too; offline, reads come from the
-  store and changes go into a queue. Kept in the app's own storage, not the
-  browser's, which the system may clear.
+- **The website offline** (built, `app/src-tauri/src/offline/`): the app
+  keeps the copy of the server's website it last loaded (`/api/web-files`:
+  only changed files are fetched), so offline it runs the same version as
+  the server it synced with. When the library cannot be reached, the
+  window opens that copy at an address of the app's own
+  (`paperus-offline://`), with a banner and "Go online".
+- **Answered by the app** there, from its copy in SQLite in the app's data
+  folder (not the browser's storage, which the system may clear): lists of
+  papers and notes (filters, collections, tags, authors, favourites,
+  recent), a paper's page (whole for the papers opened last, kept with
+  their PDFs, layouts and references; else from its details), annotations
+  as they are now, where one stopped reading, keyword search in details
+  and notes; the account and lists as last seen. Not offline: smart
+  collections' papers, search in the full text and by meaning, the admin
+  pages. Changes are refused for now (503) until the queue exists.
 - **Pulling** (done on the server): change numbers (`changes.py`) stamp
   items (with their versions, identifiers and files), tags, collections,
   notes, annotations and reading positions. What is deleted for good, or
@@ -146,6 +153,22 @@ Two-way sync between a library on a computer and a server's library (two
 servers) is a later, larger question; the same pulling and pushing would be
 its base.
 
+## Versions
+
+The website always matches its server; the app's own parts (logging in in
+the browser, notifications, offline use) talk to servers older and newer
+than the app. `GET /api/version` (public) says the server's version, the
+oldest app it serves fully, and the features it offers apps with a level
+(`{"sync": 1}`).
+
+- **An older server**: the app goes without what the server does not
+  offer, or offers at another level (before 0.0.22: no `/api/version`, so
+  no offline use); nothing else changes.
+- **An older app**: the app tells the website its version and features
+  (`window.paperusApp`); below the server's oldest app, the website asks
+  to update it (`AppUpdateBanner.svelte`). A feature changed so an older
+  app would get it wrong gets a new level: that app goes without it.
+
 ## Order
 
 Each step usable on its own:
@@ -163,11 +186,12 @@ Each step usable on its own:
    built per platform in CI (`app/local/`, `.github/workflows/local.yml`:
    Linux, macOS on Apple silicon, Windows), made and started by the app
    (`app/src-tauri/src/local.rs`, see `app/README.md`), tested end to end
-   on Linux. Not yet: search by meaning there (the ML service), attaching
-   the parts to releases, Intel Macs.
+   on Linux; the parts attached to each release (`release.yml`). Not yet:
+   search by meaning there (the ML service), Intel Macs.
 4. **Android** (#30): "Share → paperus".
-5. **Offline**: what the server needs for sync (above), then the offline
-   layer, kept papers, the queue.
+5. **Offline**: what the server needs for sync (done), the app's copy
+   and the website offline (done, `app/src-tauri/src/offline/`), then the
+   queue of changes made offline, and "Keep offline".
 6. **iOS**, with an Apple developer account (#40).
 
 ## Open

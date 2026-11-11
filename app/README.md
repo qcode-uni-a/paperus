@@ -31,10 +31,13 @@ What the app does around the website:
 - The bell's notifications as the system's (`notices.rs`): asked for every
   minute with the window's login; those that come while the app runs, and
   not while its window is in front.
-- A copy of the open server library for offline use (`offline.rs`, begun):
-  in SQLite in the app's data folder, brought up to date every minute
-  from `/api/changes` with the window's login ([apps.md](../docs/apps.md),
-  "Offline and sync"). Not yet read offline.
+- Offline use of server libraries (`offline/`, [apps.md](../docs/apps.md),
+  "Offline and sync"): while one is open, a copy in SQLite in the app's
+  data folder, synced every minute and when a page loads (`/api/changes`,
+  with the window's login), the papers opened last whole with their PDFs,
+  and the website itself (`site.rs`). Out of reach, the window opens the
+  copy at `paperus-offline://`, where the app answers the website's calls
+  (`answer.rs`). Only with servers that offer it (`/api/version`).
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 
@@ -111,7 +114,9 @@ Ubuntu `webkitgtk-webdriver`, Arch's comes with `webkit2gtk-4.1`), against
 the e2e tests' paperus (as `e2e/scripts/serve.sh` starts it; needs
 `web/build` and the compose Postgres). Connecting to a library, the
 website kept out of the app, logging in in the browser (whose part goes
-over HTTP; its page is in `e2e/tests/app-login.spec.ts`), "Open with". On
+over HTTP; its page is in `e2e/tests/app-login.spec.ts`), "Open with",
+and offline: the server stopped, the app started again opens its copy,
+with the paper opened last and its PDF. On
 its own display (Xvfb, else GTK's Broadway) and session bus; the
 browser it opens is a stand-in that writes the address down. CI runs it.
 

@@ -11,6 +11,17 @@
   with the app, also when it crashes. The parts are built for Linux
   (glibc 2.36 or later), macOS (Apple silicon) and Windows, and attached
   to each release (`app/local/`, `local.yml`).
+- **Libraries offline in the app**: while a server library is open, the
+  app keeps a copy of what one sees there (papers' details, notes, tags,
+  collections, annotations, where one stopped reading; the papers opened
+  last whole, with their PDFs) and of the website, synced every minute.
+  When the server cannot be reached, the app opens that copy: lists,
+  papers, notes, annotations and keyword search work; changes wait for
+  the connection.
+- **Apps and servers of different versions**: `GET /api/version` says the
+  server's version, the oldest app it serves fully and what it offers
+  apps. An app goes without what an older server lacks (offline use needs
+  0.0.22); the website asks to update an app that is too old.
 - **The server runs on Windows** (for that library): the PDF helpers'
   memory limit is left out there.
 - **Towards syncing for offline use**: annotations and reading positions

@@ -15,6 +15,8 @@
 	import Toasts from '#lib/Toasts.svelte';
 	import UserMenu from '#lib/UserMenu.svelte';
 	import DemoBanner from '#lib/DemoBanner.svelte';
+	import AppUpdateBanner from '#lib/AppUpdateBanner.svelte';
+	import OfflineBanner from '#lib/OfflineBanner.svelte';
 	import { DEMO } from '#lib/demo.ts';
 	import type { LayoutProps } from './$types';
 
@@ -53,6 +55,8 @@
 </svelte:head>
 
 {#if DEMO}<DemoBanner />{/if}
+<AppUpdateBanner />
+<OfflineBanner />
 {#if onLoginPage}
 	<main class="login">{@render children()}</main>
 {:else}

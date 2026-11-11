@@ -3,10 +3,11 @@
 // browser's side of logging in goes over HTTP here (its page is tested in
 // e2e/tests/app-login.spec.ts). Run by run.sh.
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 
-const [APP, OPENED, PDF] = process.argv.slice(2);
+const [APP, OPENED, PDF, DATA] = process.argv.slice(2);
 const DRIVER = 'http://127.0.0.1:4444';
 const LIBRARY = `http://127.0.0.1:${process.env.PAPERUS_E2E_PORT ?? 8100}`;
 const ADMIN = { username: 'admin', password: 'e2e-admin-password' };
@@ -34,7 +35,7 @@ async function until(check, seconds = 20) {
 	throw new Error(`waited ${seconds} s for ${check}`);
 }
 
-const { sessionId } = await webdriver('POST', '/session', {
+let { sessionId } = await webdriver('POST', '/session', {
 	capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } }
 });
 /** ``script`` in the app's window; it ends by calling ``done(value)``. */
@@ -47,6 +48,8 @@ const shown = () => webdriver('GET', `/session/${sessionId}/url`);
 const invoke = (command, args) =>
 	inApp(`window.__TAURI__.core.invoke('${command}', ${JSON.stringify(args)})
 		.then((value) => done({ value }), (error) => done({ refused: String(error) }))`);
+/** The text of the window's page. */
+const pageText = () => inApp(`done(document.body.innerText)`);
 
 try {
 	// The app's own page; connecting to a library, checked first.
@@ -99,6 +102,52 @@ try {
 	assert.equal(await new Promise((done) => second.on('exit', done)), 0);
 	await until(async () => /\/items\/[0-9a-f-]+$/.test(await shown()));
 	console.log('ok: a PDF opened with the app is added');
+
+	// Offline: the copy kept while online (synced when a page loads), the
+	// paper just opened whole, with its PDF.
+	const paper = (await shown()).split('/').pop();
+	const title = await until(() => inApp(`done(document.querySelector('h1')?.innerText)`));
+	await sleep(1000);
+	await inApp(`location.reload(); done()`);
+	const copy = () => {
+		const folder = join(DATA, 'offline');
+		const [library] = existsSync(folder) ? readdirSync(folder) : [];
+		const kept = library && join(folder, library);
+		return (
+			kept &&
+			existsSync(join(kept, 'site', 'listing.json')) &&
+			existsSync(join(kept, 'files')) &&
+			readdirSync(join(kept, 'files')).length > 0 &&
+			kept
+		);
+	};
+	await until(copy, 60);
+	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
+	// The library goes away; the app, started again, opens the copy.
+	process.kill(-Number(process.env.PAPERUS_APP_TESTS_SERVER), 'SIGTERM');
+	await until(async () => !(await fetch(`${LIBRARY}/api/health`).then(() => true, () => false)), 30);
+	({ sessionId } = await webdriver('POST', '/session', {
+		capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } }
+	}));
+	await until(async () => /^paperus-offline:\/\/localhost\//.test(await shown()), 30);
+	await until(async () => (await pageText()).includes('Offline:'), 30);
+	await until(async () => (await pageText()).includes(title), 30);
+	console.log('ok: offline, the library as last synced');
+	await inApp(`location.href = '/items/${paper}'; done()`);
+	await until(async () => (await pageText()).includes(title), 30);
+	const pdf = await inApp(
+		`fetch('/api/items/${paper}').then((r) => r.json())` +
+			`.then((item) => fetch('/api/files/' + item.files[0].id + '/content'))` +
+			`.then((r) => r.arrayBuffer()).then((bytes) => done(new TextDecoder().decode(bytes.slice(0, 5))))`
+	);
+	assert.equal(pdf, '%PDF-');
+	// Changes wait for the connection.
+	const offlineChange = await inApp(
+		`fetch('/api/notes', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})` +
+			`.then((r) => done(r.status))`
+	);
+	assert.equal(offlineChange, 503);
+	console.log('ok: a paper opened last, read offline with its PDF');
 } finally {
 	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
 }

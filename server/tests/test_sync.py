@@ -74,6 +74,9 @@ def test_everything_since_and_what_is_gone(client: TestClient, db: Session) -> N
         }
     ]
     assert ids(changes(ada)["items"]) == [mine["id"], paper["id"]]
+    assert first["favourites"] == []
+    bob.put(f"/api/items/{paper['id']}/favourite")
+    assert changes(bob)["favourites"] == [paper["id"]]
     assert ids(changes(ada)["annotations"]) == [mark]
 
     # Nothing since.
@@ -82,6 +85,7 @@ def test_everything_since_and_what_is_gone(client: TestClient, db: Session) -> N
     assert {k: v for k, v in quiet.items() if v} == {
         "change": since,
         "libraries": first["libraries"],
+        "favourites": [paper["id"]],
     }
 
     # Shared, then a tag deleted: changes and removals.
