@@ -52,12 +52,18 @@ alone=$!
 sleep 15
 if kill -0 "$alone" 2>/dev/null; then
   echo "the app stays up on its own"
-  kill "$alone"; sleep 2
+  # Ended for sure (a kill here ends only bash's wrapper): one running
+  # would take over the driver's start (one app at a time).
+  taskkill //F //IM paperus-app.exe >/dev/null 2>&1 || true
+  sleep 2
 else
   echo "the app ended on its own:" >&2; cat "$STATE/app.log" >&2
 fi
 
-tauri-driver --native-driver "$DRIVER" >"$STATE/driver.log" 2>&1 &
+# Edge's WebDriver, with its own detailed log.
+printf '@"%s" --verbose --log-path="%s" %%*\r\n' "$(cygpath -w "$DRIVER")" \
+  "$(cygpath -w "$STATE/edgedriver.log")" >"$STATE/msedgedriver.cmd"
+tauri-driver --native-driver "$(cygpath -w "$STATE/msedgedriver.cmd")" >"$STATE/driver.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 30); do curl -sf http://127.0.0.1:4444/status >/dev/null && break; sleep 1; done
 
@@ -65,4 +71,6 @@ PAPERUS_APP_TESTS_SYSTEM=windows node "$ROOT/app/tests/journeys.mjs" "$APP" "$ST
   "$(cygpath -w "$STATE/opened-with.pdf")" "$APPDATA/io.github.qcode-uni-a.paperus" ||
   { tail -n 30 "$STATE/server.log" >&2
     echo "--- tauri-driver:" >&2; tail -n 60 "$STATE/driver.log" >&2
+    echo "--- msedgedriver:" >&2; grep -iE "error|fail|exited|devtools|launch|webview" \
+      "$STATE/edgedriver.log" 2>/dev/null | tail -n 40 >&2
     exit 1; }
