@@ -118,12 +118,9 @@ def test_storage_usage(client: TestClient, db: Session) -> None:
     root = Person(client, db, "root", admin=True)
     item = root.add("A paper")
     upload(root, item["id"], PDF)
-    space = root.get("/api/storage").json()
-    assert space["library_bytes"] == len(PDF)
-    assert space["disk_total"] > space["disk_free"] > 0
     stats = root.get("/api/admin/stats").json()["storage"]
     assert stats["library_bytes"] == len(PDF)
-    assert stats["disk"]["total"] == space["disk_total"]
+    assert stats["disk"]["total"] > stats["disk"]["free"] > 0
 
 
 class UndeletableStore(FilesystemStore):

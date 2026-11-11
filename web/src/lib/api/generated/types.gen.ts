@@ -4287,24 +4287,6 @@ export type Stats = {
 };
 
 /**
- * Storage
- */
-export type Storage = {
-    /**
-     * Library Bytes
-     */
-    library_bytes: number;
-    /**
-     * Disk Total
-     */
-    disk_total: number | null;
-    /**
-     * Disk Free
-     */
-    disk_free: number | null;
-};
-
-/**
  * Suggestion
  */
 export type Suggestion = {
@@ -8807,22 +8789,6 @@ export type TrashRulesResponses = {
 };
 
 export type TrashRulesResponse = TrashRulesResponses[keyof TrashRulesResponses];
-
-export type StorageData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/storage';
-};
-
-export type StorageResponses = {
-    /**
-     * Successful Response
-     */
-    200: Storage;
-};
-
-export type StorageResponse = StorageResponses[keyof StorageResponses];
 
 export type ChangesSinceData = {
     body?: never;

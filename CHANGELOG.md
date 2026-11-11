@@ -19,6 +19,10 @@
   access", …), not the "Sign in" in every page's header; when the PDF still
   cannot be had, the message says what came back (the page's title and
   site).
+- **The storage box leaves the menu**: at the menu's foot only its
+  heading showed without scrolling. How full the storage is stays under
+  Administration → Server (with the library's share); `GET /api/storage`,
+  which only the box used, is gone.
 - **The extension's popup**: a site at a numbered address (127.0.0.1)
   showed as "0"; a site without a favicon shows a globe.
 

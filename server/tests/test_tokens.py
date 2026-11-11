@@ -381,7 +381,6 @@ ROUTES = {
     ("DELETE", "/api/tags/{tag_id}"): "tags.write",
     ("PATCH", "/api/tags/{tag_id}"): "tags.write",
     ("POST", "/api/tags/remove-keywords"): "tags.write",
-    ("GET", "/api/storage"): None,
     ("DELETE", "/api/trash"): None,
     ("PUT", "/api/auth/name-format"): None,
     ("PUT", "/api/auth/profile"): None,

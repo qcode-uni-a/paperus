@@ -27,7 +27,6 @@
 	import { manageCounts } from '#lib/api/client.ts';
 	import type { ManageCounts } from '#lib/api/generated/types.gen.ts';
 	import Icon from '#lib/Icon.svelte';
-	import StorageMeter from '#lib/StorageMeter.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
 	import { loadOrganize, organize } from '#lib/organize.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -199,7 +198,6 @@
 						>{/if}</a
 				>
 			{/each}
-			{#if session.user}<StorageMeter />{/if}
 		</div>
 	{/if}
 </nav>

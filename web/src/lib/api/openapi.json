@@ -5980,28 +5980,6 @@
         }
       }
     },
-    "/api/storage": {
-      "get": {
-        "tags": [
-          "trash"
-        ],
-        "summary": "Storage",
-        "description": "How full the storage is (for the bar at the bottom of the menu).",
-        "operationId": "storage",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Storage"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/changes": {
       "get": {
         "tags": [
@@ -16138,43 +16116,6 @@
           "storage"
         ],
         "title": "Stats"
-      },
-      "Storage": {
-        "properties": {
-          "library_bytes": {
-            "type": "integer",
-            "title": "Library Bytes"
-          },
-          "disk_total": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Disk Total"
-          },
-          "disk_free": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Disk Free"
-          }
-        },
-        "type": "object",
-        "required": [
-          "library_bytes",
-          "disk_total",
-          "disk_free"
-        ],
-        "title": "Storage"
       },
       "Suggestion": {
         "properties": {
