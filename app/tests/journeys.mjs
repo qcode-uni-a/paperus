@@ -170,9 +170,9 @@ try {
 			`.then((r) => r.arrayBuffer()).then((bytes) => done(new TextDecoder().decode(bytes.slice(0, 5))))`
 	);
 	assert.equal(pdf, '%PDF-');
-	// Changes wait for the connection.
+	// Changes the app cannot keep say they need the server.
 	const offlineChange = await inApp(
-		`fetch('/api/notes', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})` +
+		`fetch('/api/tags', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'})` +
 			`.then((r) => done(r.status))`
 	);
 	assert.equal(offlineChange, 503);
