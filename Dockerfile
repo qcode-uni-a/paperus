@@ -12,6 +12,23 @@ RUN npm ci
 COPY web/ ./
 RUN npm run build
 
+# The dependencies' files with the project's own version as 0: each release
+# changes only that, and the dependencies' layer stays the same layer, which
+# an update then need not download again.
+FROM python:3.13-slim AS dependencies
+COPY server/pyproject.toml server/uv.lock /lock/
+RUN python3 - <<'PY'
+import re
+from pathlib import Path
+project = Path("/lock/pyproject.toml")
+text = project.read_text()
+name = re.search(r'^name = "([^"]+)"', text, re.M).group(1)
+project.write_text(re.sub(r'^version = "[^"]*"', 'version = "0"', text, count=1, flags=re.M))
+lock = Path("/lock/uv.lock")
+pattern = r'(name = "%s"\nversion = )"[^"]*"' % re.escape(name)
+lock.write_text(re.sub(pattern, r'\1"0"', lock.read_text()))
+PY
+
 FROM python:3.13-slim
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
       org.opencontainers.image.description="paperus server: API, website and worker" \
@@ -27,9 +44,9 @@ ENV UV_COMPILE_BYTECODE=1 \
     PAPERUS_COPY_PATH=/data/copy
 
 WORKDIR /app
-COPY server/pyproject.toml server/uv.lock ./
+COPY --from=dependencies /lock/pyproject.toml /lock/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY server/README.md ./
+COPY server/pyproject.toml server/uv.lock server/README.md ./
 COPY server/src ./src
 RUN uv sync --frozen --no-dev
 COPY --from=web /web/build ./web

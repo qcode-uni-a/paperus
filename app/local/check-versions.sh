@@ -20,7 +20,9 @@ for file in compose.yaml deploy/compose.yaml .github/workflows/ci.yml; do
   done
 done
 for file in Dockerfile ml/Dockerfile; do
-  py=$(grep -oE '^FROM python:[0-9]+\.[0-9]+' "$file" | grep -oE '[0-9]+\.[0-9]+$')
-  same "Python in $file" "$py" "$bundle_py"
+  # Each version once (a Dockerfile may have several stages on Python).
+  for py in $(grep -oE '^FROM python:[0-9]+\.[0-9]+' "$file" | grep -oE '[0-9]+\.[0-9]+$' | sort -u); do
+    same "Python in $file" "$py" "$bundle_py"
+  done
 done
 exit $fail

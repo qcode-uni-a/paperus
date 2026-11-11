@@ -84,8 +84,12 @@ jobs:
           build-args: DEVICE=${{ matrix.device || 'cpu' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.image }}${{ matrix.suffix || '' }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}${{ matrix.suffix || '' }}
+          # The build cache in the registry, next to the image (GitHub's
+          # Actions cache holds 10 GB, and the CUDA image's layers alone
+          # push the rest out): unchanged layers are built from it, so they
+          # keep their digests and updates download only what changed.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache${{ matrix.suffix || '' }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache${{ matrix.suffix || '' }},mode=max,image-manifest=true,oci-mediatypes=true
 
   pypi:
     name: PyPI (${{ matrix.package }})

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Smaller updates of the images**: the release's version number no
+  longer touches the layer with the Python dependencies (the ML service's
+  1.7 GB, CUDA's more), the CUDA image's GPU runtime comes before the code,
+  and the build cache lives in the registry next to the images (GitHub's
+  10 GB cache pushed the big layers out). An update downloads what changed.
+- **The extension's popup**: a site at a numbered address (127.0.0.1)
+  showed as "0"; a site without a favicon shows a globe.
+
 ## 0.0.24 (2026-11-11)
 
 *The PDF now takes the scenic route: off the publisher's site, through you, into paperus, with a little window to watch it go.*

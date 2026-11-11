@@ -9,6 +9,23 @@
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
 FROM ghcr.io/astral-sh/uv:0.13.7 AS uv
 
+# The dependencies' files with the project's own version as 0: each release
+# changes only that, and the dependencies' layer stays the same layer, which
+# an update then need not download again.
+FROM python:3.13-slim AS dependencies
+COPY pyproject.toml uv.lock /lock/
+RUN python3 - <<'PY'
+import re
+from pathlib import Path
+project = Path("/lock/pyproject.toml")
+text = project.read_text()
+name = re.search(r'^name = "([^"]+)"', text, re.M).group(1)
+project.write_text(re.sub(r'^version = "[^"]*"', 'version = "0"', text, count=1, flags=re.M))
+lock = Path("/lock/uv.lock")
+pattern = r'(name = "%s"\nversion = )"[^"]*"' % re.escape(name)
+lock.write_text(re.sub(pattern, r'\1"0"', lock.read_text()))
+PY
+
 FROM python:3.13-slim
 ARG DEVICE=cpu
 LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
@@ -24,17 +41,20 @@ ENV UV_COMPILE_BYTECODE=1 \
     HF_HUB_DISABLE_TELEMETRY=1
 
 WORKDIR /app
-COPY pyproject.toml uv.lock ./
+COPY --from=dependencies /lock/pyproject.toml /lock/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY README.md ./
-COPY src ./src
-RUN uv sync --frozen --no-dev
-# The GPU build of the same ONNX Runtime version as in uv.lock.
+# The GPU build of the same ONNX Runtime version as in uv.lock (before the
+# code: a change to it leaves this layer alone too).
 RUN if [ "$DEVICE" = cuda ]; then \
         version="$(uv pip show onnxruntime | sed -n 's/^Version: //p')" \
         && uv pip uninstall onnxruntime \
         && uv pip install "onnxruntime-gpu[cuda,cudnn]==$version"; \
     elif [ "$DEVICE" != cpu ]; then echo "DEVICE must be cpu or cuda" >&2; exit 1; fi
+# Then the project itself, with its real version; ONNX Runtime left as it is
+# (the CPU build, or the GPU one in its place).
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+RUN uv sync --frozen --no-dev --inexact --no-install-package onnxruntime
 # For the NVIDIA Container Toolkit: which GPU features the container needs.
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
