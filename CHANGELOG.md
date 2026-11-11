@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.0.24 (2026-11-11)
+
+*The PDF now takes the scenic route: off the publisher's site, through you, into paperus, with a little window to watch it go.*
 
 - **Import a whole folder from the browser**: a Zotero export with its
   files, however large, needs no zip any more. "Choose a folder…" on the
