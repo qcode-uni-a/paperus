@@ -258,3 +258,33 @@ def test_openapi_script_prints_the_schema(
         env={**os.environ, "PAPERUS_DATABASE_URL": database_url},
     ).stdout
     assert json.loads(printed) == create_app(settings).openapi()
+
+
+def test_runs_as_a_module() -> None:
+    """``python -m paperus``, as the app's library on this computer starts it."""
+    done = subprocess.run(
+        [sys.executable, "-m", "paperus", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "usage: paperus" in done.stdout
+
+
+def test_stops_with_standard_input() -> None:
+    """``--stop-with-stdin``: the process ends once its input closes (when
+    the app that started it ends, however it ends)."""
+    code = (
+        "import sys, time; from paperus import cli; cli.stop_with_stdin(); "
+        "print('watching', flush=True); time.sleep(30); sys.exit(3)"
+    )
+    with subprocess.Popen(
+        [sys.executable, "-c", code],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    ) as process:
+        assert process.stdout is not None and process.stdin is not None
+        assert process.stdout.readline().strip() == "watching"
+        process.stdin.close()
+        assert process.wait(timeout=10) == 0

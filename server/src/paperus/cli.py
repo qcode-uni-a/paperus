@@ -4,9 +4,11 @@
 import argparse
 import getpass
 import logging
+import os
 import shutil
 import sys
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 
@@ -37,6 +39,22 @@ from paperus.models import Group, Import, ImportStatus, User
 from paperus.storage import make_blob_store
 from paperus.system import load_config, max_upload_bytes
 
+STOP_WITH_STDIN = (
+    "end when standard input closes: when the program that started this one "
+    "ends, however it ends (the app's library on this computer)"
+)
+
+
+def stop_with_stdin() -> None:
+    """End the process once standard input reaches its end (in a thread)."""
+
+    def watch() -> None:
+        sys.stdin.buffer.read()
+        logging.getLogger(__name__).info("standard input closed: stopping")
+        os._exit(0)
+
+    threading.Thread(target=watch, name="stop-with-stdin", daemon=True).start()
+
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="paperus")
@@ -46,8 +64,12 @@ def main(argv: list[str] | None = None) -> None:
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--reload", action="store_true")
+    serve.add_argument("--stop-with-stdin", action="store_true", help=STOP_WITH_STDIN)
 
-    commands.add_parser("worker", help="run background jobs (text extraction, …)")
+    worker = commands.add_parser(
+        "worker", help="run background jobs (text extraction, …)"
+    )
+    worker.add_argument("--stop-with-stdin", action="store_true", help=STOP_WITH_STDIN)
     commands.add_parser("migrate", help="bring the database schema up to date")
 
     user = commands.add_parser("user", help="manage users")
@@ -148,6 +170,8 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
+    if args.command in ("serve", "worker") and args.stop_with_stdin:
+        stop_with_stdin()
     if args.command == "serve":
         uvicorn.run(
             "paperus.app:create_app",
