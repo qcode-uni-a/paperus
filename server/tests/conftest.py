@@ -38,6 +38,12 @@ TEST_DATABASE_URL = os.environ.get(
     "PAPERUS_TEST_DATABASE_URL",
     "postgresql+psycopg://paperus:paperus@localhost:5432/paperus_test",
 )
+# Run in parallel (pytest -n, pytest-xdist): a database for each worker.
+if worker := os.environ.get("PYTEST_XDIST_WORKER"):
+    _url = make_url(TEST_DATABASE_URL)
+    TEST_DATABASE_URL = _url.set(database=f"{_url.database}_{worker}").render_as_string(
+        hide_password=False
+    )
 SERVER_DIR = Path(__file__).parent.parent
 
 

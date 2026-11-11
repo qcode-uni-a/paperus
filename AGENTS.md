@@ -18,8 +18,9 @@ close them from commits with "Fixes #n".
 - Frontend and browser extension in TypeScript.
 - The app (`app/`): Tauri 2, Rust; `cargo fmt`, `cargo clippy -- -D warnings`.
 - Tests: server and ML service keep line coverage above 95% (CI checks with
-  `pytest --cov`); browser journeys in `e2e/` (Playwright, `npm test` there);
-  fluent mode's page layouts on layout twins (`server/tests/twins/`, in
+  `pytest --cov`; the server's in parallel, `pytest -n 8 --cov`, a test
+  database per worker); browser journeys in `e2e/` (Playwright, `npm test`
+  there); fluent mode's page layouts on layout twins (`server/tests/twins/`, in
   pytest): never check in a paper's PDF, only its measured layout. Raise
   `page_layout.VERSION` when a change alters layouts (stored ones are then
   made again).
