@@ -160,7 +160,11 @@
 		if (!wanted.length) return;
 		for (const p of wanted) problems[p.item_id] = '';
 		fetching = { done: 0, total: wanted.length };
-		window.postMessage({ type: 'paperus:get-pdfs', papers: wanted }, location.origin);
+		// Plain data: the lists' reactive proxies cannot be posted (cloned).
+		window.postMessage(
+			{ type: 'paperus:get-pdfs', papers: $state.snapshot(wanted) },
+			location.origin
+		);
 	}
 	let problems = $state<Record<string, string>>({});
 	let got = $state(0);
