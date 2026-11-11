@@ -676,7 +676,7 @@ export type Changes = {
     /**
      * Notes
      */
-    notes: Array<NoteDetail>;
+    notes: Array<SyncedNote>;
     /**
      * Tags
      */
@@ -4357,6 +4357,64 @@ export type SyncedAnnotation = {
      * Item Id
      */
     item_id: string;
+};
+
+/**
+ * SyncedNote
+ */
+export type SyncedNote = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Excerpt
+     */
+    excerpt: string;
+    /**
+     * Items
+     */
+    items: Array<NoteLinkOut>;
+    /**
+     * Collection Ids
+     */
+    collection_ids: Array<string>;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Changed At
+     */
+    changed_at: string;
+    /**
+     * Changed By
+     */
+    changed_by: string | null;
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Deleted At
+     */
+    deleted_at: string | null;
+    /**
+     * Text
+     */
+    text: string;
+    /**
+     * Etag
+     */
+    etag: string;
 };
 
 /**

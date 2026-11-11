@@ -4,15 +4,41 @@
 // e2e/tests/app-login.spec.ts). Run by run.sh.
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createServer, connect } from 'node:net';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
 
 const [APP, OPENED, PDF, DATA] = process.argv.slice(2);
 const DRIVER = 'http://127.0.0.1:4444';
-const LIBRARY = `http://127.0.0.1:${process.env.PAPERUS_E2E_PORT ?? 8100}`;
+const PORT = Number(process.env.PAPERUS_E2E_PORT ?? 8100);
+// The app reaches the library through a stand-in for the network, cut to
+// go offline and joined again.
+const SERVER = `http://127.0.0.1:${PORT}`;
+const LIBRARY = `http://127.0.0.1:${PORT + 1}`;
 const ADMIN = { username: 'admin', password: 'e2e-admin-password' };
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+const connections = new Set();
+/** The network up: connections to LIBRARY go to the server. */
+function network() {
+	const proxy = createServer((client) => {
+		const server = connect(PORT, '127.0.0.1');
+		for (const end of [client, server]) {
+			connections.add(end);
+			end.on('error', () => {});
+			end.on('close', () => connections.delete(end));
+		}
+		client.pipe(server).pipe(client);
+	});
+	return new Promise((done) => proxy.listen(PORT + 1, '127.0.0.1', () => done(proxy)));
+}
+/** The network down. */
+function cut(proxy) {
+	for (const end of connections) end.destroy();
+	return new Promise((done) => proxy.close(done));
+}
+let proxy = await network();
 
 async function webdriver(method, path, body) {
 	const response = await fetch(DRIVER + path, {
@@ -123,9 +149,8 @@ try {
 	};
 	await until(copy, 60);
 	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
-	// The library goes away; the app, started again, opens the copy.
-	process.kill(-Number(process.env.PAPERUS_APP_TESTS_SERVER), 'SIGTERM');
-	await until(async () => !(await fetch(`${LIBRARY}/api/health`).then(() => true, () => false)), 30);
+	// The network goes; the app, started again, opens the copy.
+	await cut(proxy);
 	({ sessionId } = await webdriver('POST', '/session', {
 		capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } }
 	}));
@@ -148,6 +173,40 @@ try {
 	);
 	assert.equal(offlineChange, 503);
 	console.log('ok: a paper opened last, read offline with its PDF');
+
+	// Annotated offline: kept at once, saved when the library is back.
+	const file = await inApp(
+		`fetch('/api/items/${paper}').then((r) => r.json()).then((item) => done(item.files[0].id))`
+	);
+	const mark = {
+		kind: 'note',
+		page_index: 0,
+		position: { rects: [[10, 10, 20, 20]] },
+		color: '#ffd400',
+		comment: 'Written offline'
+	};
+	const made = await inApp(
+		`fetch('/api/files/${file}/annotations', {method: 'POST',` +
+			` headers: {'Content-Type': 'application/json'}, body: ${JSON.stringify(JSON.stringify(mark))}})` +
+			`.then((r) => r.json()).then(done)`
+	);
+	assert.equal(made.comment, 'Written offline');
+	const listed = await inApp(
+		`fetch('/api/files/${file}/annotations').then((r) => r.json())` +
+			`.then((found) => done(found.annotations.map((a) => a.comment)))`
+	);
+	assert.deepEqual(listed, ['Written offline']);
+	proxy = await network();
+	await inApp(`location.href = 'paperus-app://online'; done()`);
+	await until(async () => (await shown()).startsWith(LIBRARY), 30);
+	const saved = async () => {
+		const found = await fetch(`${SERVER}/api/files/${file}/annotations`, {
+			headers: { Cookie: cookie }
+		}).then((r) => r.json());
+		return found.annotations?.some((a) => a.id === made.id && a.comment === 'Written offline');
+	};
+	await until(saved, 60);
+	console.log('ok: annotated offline, saved when the library was back');
 } finally {
 	await webdriver('DELETE', `/session/${sessionId}`).catch(() => {});
 }

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import exists, or_, select
 
 from paperus import changes
+from paperus import notes as notes_module
 from paperus.api.annotations import AnnotationOut, annotation_out
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.items import ItemOut, Reading, item_out
@@ -45,6 +46,11 @@ class SyncedAnnotation(AnnotationOut):
     """Its paper (a device drops it with the paper)."""
 
 
+class SyncedNote(NoteDetail):
+    etag: str
+    """Its text's version, for ``If-Match`` when a device saves it."""
+
+
 class Removed(BaseModel):
     id: uuid.UUID
     kind: str
@@ -62,7 +68,7 @@ class Changes(BaseModel):
     before the rest, which is as things are now."""
     items: list[ItemOut]
     """Changed, trashed ones too (``deleted_at``)."""
-    notes: list[NoteDetail]
+    notes: list[SyncedNote]
     tags: list[TagOut]
     collections: list[CollectionOut]
     annotations: list[SyncedAnnotation]
@@ -158,7 +164,11 @@ def changes_since(
         removed=[Removed(id=r.record_id, kind=r.kind) for r in removed],
         items=[item_out(item, access) for item in items],
         notes=[
-            NoteDetail(**note_out(db, note, access).model_dump(), text=note.text)
+            SyncedNote(
+                **note_out(db, note, access).model_dump(),
+                text=note.text,
+                etag=notes_module.etag(note),
+            )
             for note in notes
         ],
         tags=tag_outs(db, access, Tag.library_id.in_(libraries) & (Tag.change > since)),

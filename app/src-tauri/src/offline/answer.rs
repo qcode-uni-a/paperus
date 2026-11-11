@@ -2,7 +2,8 @@
 //! them (`server/src/paperus/api`): lists of papers and notes, a paper's
 //! page (kept whole for the papers opened last, else from its details),
 //! its files and annotations, keyword search in the details and notes, and
-//! the account as last seen. What cannot be done offline says so (503).
+//! the account as last seen. Changes go to `write`. What cannot be done
+//! offline says so (503).
 
 use std::{collections::HashSet, fs, path::Path};
 
@@ -91,19 +92,7 @@ pub fn answer(store: &Store, folder: &Path, request: &Request<Vec<u8>>) -> Respo
     let query = Query::parse(request.uri().query());
     let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
     if request.method() != Method::GET {
-        return match (request.method().as_str(), parts.as_slice()) {
-            // Opened, and where one stopped: not kept until back online.
-            ("POST", ["api", "items", _, "viewed"]) | ("PUT", ["api", "items", _, "reading"]) => {
-                Response::builder()
-                    .status(204)
-                    .body(Vec::new())
-                    .expect("a response")
-            }
-            _ => json_response(
-                503,
-                &json!({"detail": "You are offline: changes can be made when the library is back."}),
-            ),
-        };
+        return super::write::change(store, request.method().as_str(), path, request.body());
     }
     match parts.as_slice() {
         ["api", "items"] => items(store, &query),
@@ -689,7 +678,7 @@ mod tests {
         assert_eq!(get(&store, "/api/duplicates").0, 503);
         let post = Request::builder()
             .method("POST")
-            .uri("paperus-offline://localhost/api/notes")
+            .uri("paperus-offline://localhost/api/tags")
             .body(Vec::new())
             .unwrap();
         assert_eq!(answer(&store, Path::new("/nowhere"), &post).status(), 503);

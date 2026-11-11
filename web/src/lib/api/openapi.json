@@ -9523,7 +9523,7 @@
           },
           "notes": {
             "items": {
-              "$ref": "#/components/schemas/NoteDetail"
+              "$ref": "#/components/schemas/SyncedNote"
             },
             "type": "array",
             "title": "Notes"
@@ -16066,6 +16066,105 @@
           "item_id"
         ],
         "title": "SyncedAnnotation"
+      },
+      "SyncedNote": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NoteLinkOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "collection_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Collection Ids"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Changed At"
+          },
+          "changed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By"
+          },
+          "change": {
+            "type": "integer",
+            "title": "Change"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "etag": {
+            "type": "string",
+            "title": "Etag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "library_id",
+          "title",
+          "excerpt",
+          "items",
+          "collection_ids",
+          "created_at",
+          "changed_at",
+          "changed_by",
+          "change",
+          "deleted_at",
+          "text",
+          "etag"
+        ],
+        "title": "SyncedNote"
       },
       "SystemConfig": {
         "properties": {

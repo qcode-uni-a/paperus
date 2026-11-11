@@ -135,6 +135,18 @@ fn local_progress() -> String {
         .unwrap_or_default()
 }
 
+/// Changes made offline that libraries refused (changed or gone meanwhile).
+#[tauri::command]
+fn unsaved_changes(app: AppHandle) -> Vec<offline::Unsaved> {
+    offline::unsaved(&app)
+}
+
+/// The person has seen one of them.
+#[tauri::command]
+fn dismiss_unsaved(app: AppHandle, library: String, seq: i64) -> Result<(), String> {
+    offline::dismiss(&app, &library, seq)
+}
+
 /// Starts the library on this computer if needed, logs the window in and
 /// opens it; kept in the list (its address follows its port).
 async fn open_local(app: AppHandle) -> Result<(), String> {
@@ -334,7 +346,9 @@ pub fn run() {
             forget_library,
             open_library,
             make_local_library,
-            local_progress
+            local_progress,
+            unsaved_changes,
+            dismiss_unsaved
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());

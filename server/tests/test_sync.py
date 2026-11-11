@@ -63,6 +63,8 @@ def test_everything_since_and_what_is_gone(client: TestClient, db: Session) -> N
     assert ids(first["items"]) == [paper["id"]]
     assert ids(first["notes"]) == [note["id"]]
     assert first["notes"][0]["text"].startswith("# Seminar")
+    etag = ada.get(f"/api/notes/{note['id']}").headers["ETag"]
+    assert f'"{first["notes"][0]["etag"]}"' == etag
     assert ids(first["tags"]) == [tag.json()["id"]]
     assert ids(first["collections"]) == [shelf["id"]]
     assert first["annotations"] == [] and first["removed"] == []

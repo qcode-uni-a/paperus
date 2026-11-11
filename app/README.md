@@ -37,7 +37,9 @@ What the app does around the website:
   with the window's login), the papers opened last whole with their PDFs,
   and the website itself (`site.rs`). Out of reach, the window opens the
   copy at `paperus-offline://`, where the app answers the website's calls
-  (`answer.rs`). Only with servers that offer it (`/api/version`).
+  (`answer.rs`) and queues its changes (`write.rs`), sent when the library
+  is back; those it refuses are listed on the app's page. Only with
+  servers that offer it (`/api/version`).
 - Only the app's own page may call the app (`capabilities/start.json`); a
   library's website, a remote address, gets no access to it.
 
@@ -115,8 +117,9 @@ the e2e tests' paperus (as `e2e/scripts/serve.sh` starts it; needs
 `web/build` and the compose Postgres). Connecting to a library, the
 website kept out of the app, logging in in the browser (whose part goes
 over HTTP; its page is in `e2e/tests/app-login.spec.ts`), "Open with",
-and offline: the server stopped, the app started again opens its copy,
-with the paper opened last and its PDF. On
+and offline (the network to the library cut by a stand-in proxy): the app
+started again opens its copy, with the paper opened last and its PDF; an
+annotation made offline reaches the server when it is back. On
 its own display (Xvfb, else GTK's Broadway) and session bus; the
 browser it opens is a stand-in that writes the address down. CI runs it.
 

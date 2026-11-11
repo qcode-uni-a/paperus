@@ -27,8 +27,6 @@ trap cleanup EXIT
 
 PAPERUS_E2E_LOGS=$STATE/server-logs setsid bash "$ROOT/e2e/scripts/serve.sh" >"$STATE/serve.log" 2>&1 &
 pids+=($!)
-# The journeys stop it to go offline (its process group).
-export PAPERUS_APP_TESTS_SERVER=$!
 for _ in $(seq 180); do curl -sf "$LIBRARY/api/health" >/dev/null && break; sleep 1; done
 curl -sf -X POST "$LIBRARY/api/setup/admin" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"e2e-admin-password"}' >/dev/null

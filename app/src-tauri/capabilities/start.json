@@ -1,7 +1,7 @@
 {
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "start",
-	"description": "The app's own page (start/): listing, adding and opening libraries, making the one on this computer. A library's website (a remote address) has no capability, so no access to the app.",
+	"description": "The app's own page (start/): listing, adding and opening libraries, making the one on this computer, changes made offline that could not be saved. A library's website (a remote address) has no capability, so no access to the app.",
 	"windows": ["main"],
 	"permissions": [
 		"allow-libraries",
@@ -9,6 +9,8 @@
 		"allow-forget-library",
 		"allow-open-library",
 		"allow-make-local-library",
-		"allow-local-progress"
+		"allow-local-progress",
+		"allow-unsaved-changes",
+		"allow-dismiss-unsaved"
 	]
 }

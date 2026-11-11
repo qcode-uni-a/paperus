@@ -31,6 +31,21 @@ struct Removed {
     kind: String,
 }
 
+/// A change made offline, queued to send.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Queued {
+    pub seq: i64,
+    pub method: String,
+    pub path: String,
+    /// JSON.
+    pub body: Option<String>,
+    pub if_match: Option<String>,
+    /// Changes with one key are one (the latest counts).
+    pub key: Option<String>,
+    /// What it is, in words, if it cannot be saved.
+    pub what: String,
+}
+
 /// The copy of one library.
 pub struct Store {
     db: Connection,
@@ -64,6 +79,22 @@ impl Store {
                  change INTEGER NOT NULL,
                  type TEXT NOT NULL,
                  body BLOB NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS queue (
+                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                 method TEXT NOT NULL,
+                 path TEXT NOT NULL,
+                 body TEXT,
+                 if_match TEXT,
+                 key TEXT,
+                 what TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS unsaved (
+                 seq INTEGER PRIMARY KEY,
+                 what TEXT NOT NULL,
+                 why TEXT NOT NULL,
+                 body TEXT,
+                 at TEXT NOT NULL DEFAULT (datetime('now'))
              );",
         )?;
         Ok(Store { db })
@@ -130,6 +161,134 @@ impl Store {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Keep a record as it is now on this device (changed offline).
+    pub fn put(&self, kind: &str, record: &Value) -> rusqlite::Result<()> {
+        let text = |field: &str| record[field].as_str().map(str::to_owned);
+        let (library_id, item_id) = match kind {
+            "annotation" => (None, text("item_id")),
+            "view" => (None, text("item_id")),
+            _ => (text("library_id"), None),
+        };
+        let id = if kind == "view" {
+            text("item_id")
+        } else {
+            text("id")
+        };
+        self.db.execute(
+            "INSERT OR REPLACE INTO records (kind, id, library_id, item_id, json)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![kind, id, library_id, item_id, record.to_string()],
+        )?;
+        Ok(())
+    }
+
+    /// Forget a record on this device (removed offline).
+    pub fn remove(&self, kind: &str, id: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "DELETE FROM records WHERE kind = ?1 AND id = ?2",
+            [kind, id],
+        )?;
+        Ok(())
+    }
+
+    /// Queue a change made offline, to send when the library is back.
+    /// With a ``key``, it takes the place of the one queued with that key,
+    /// keeping its place and the version it started from (``if_match``).
+    pub fn enqueue(&self, change: &Queued) -> rusqlite::Result<()> {
+        if let Some(key) = &change.key {
+            let replaced = self.db.execute(
+                "UPDATE queue SET body = ?1, what = ?2 WHERE key = ?3",
+                params![change.body, change.what, key],
+            )?;
+            if replaced > 0 {
+                return Ok(());
+            }
+        }
+        self.db.execute(
+            "INSERT INTO queue (method, path, body, if_match, key, what)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                change.method,
+                change.path,
+                change.body,
+                change.if_match,
+                change.key,
+                change.what
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// The changes queued, in order.
+    pub fn queued(&self) -> Vec<Queued> {
+        let Ok(mut query) = self
+            .db
+            .prepare("SELECT seq, method, path, body, if_match, key, what FROM queue ORDER BY seq")
+        else {
+            return Vec::new();
+        };
+        query
+            .query_map([], |row| {
+                Ok(Queued {
+                    seq: row.get(0)?,
+                    method: row.get(1)?,
+                    path: row.get(2)?,
+                    body: row.get(3)?,
+                    if_match: row.get(4)?,
+                    key: row.get(5)?,
+                    what: row.get(6)?,
+                })
+            })
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default()
+    }
+
+    /// A queued change, by its key.
+    pub fn queued_by_key(&self, key: &str) -> Option<Queued> {
+        self.queued()
+            .into_iter()
+            .find(|change| change.key.as_deref() == Some(key))
+    }
+
+    /// A queued change sent (or no longer to be sent).
+    pub fn dequeue(&self, seq: i64) -> rusqlite::Result<()> {
+        self.db.execute("DELETE FROM queue WHERE seq = ?1", [seq])?;
+        Ok(())
+    }
+
+    /// A queued change the library refused (changed or gone meanwhile):
+    /// set aside, with what it was, for the person to see.
+    pub fn set_aside(&self, change: &Queued, why: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "INSERT INTO unsaved (seq, what, why, body) VALUES (?1, ?2, ?3, ?4)",
+            params![change.seq, change.what, why, change.body],
+        )?;
+        self.dequeue(change.seq)
+    }
+
+    /// The changes set aside: what, why, the text sent.
+    pub fn unsaved(&self) -> Vec<(i64, String, String, Option<String>)> {
+        let Ok(mut query) = self
+            .db
+            .prepare("SELECT seq, what, why, body FROM unsaved ORDER BY seq")
+        else {
+            return Vec::new();
+        };
+        query
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default()
+    }
+
+    /// The person has seen a change set aside.
+    pub fn dismiss(&self, seq: i64) -> rusqlite::Result<()> {
+        self.db
+            .execute("DELETE FROM unsaved WHERE seq = ?1", [seq])?;
+        Ok(())
     }
 
     /// Forget everything (a sync from 0 follows).

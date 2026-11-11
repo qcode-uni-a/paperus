@@ -16,8 +16,11 @@
   collections, annotations, where one stopped reading; the papers opened
   last whole, with their PDFs) and of the website, synced every minute.
   When the server cannot be reached, the app opens that copy: lists,
-  papers, notes, annotations and keyword search work; changes wait for
-  the connection.
+  papers, notes, annotations and keyword search work, and annotations,
+  notes and where one stopped reading can be changed: queued, and sent
+  when the library is back, each with the version it started from. What
+  the library refuses (changed meanwhile, or gone) is listed on the app's
+  page with what one wrote, and a notification says so.
 - **Apps and servers of different versions**: `GET /api/version` says the
   server's version, the oldest app it serves fully and what it offers
   apps. An app goes without what an older server lacks (offline use needs

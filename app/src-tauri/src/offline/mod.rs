@@ -11,6 +11,7 @@
 mod answer;
 mod site;
 mod store;
+mod write;
 
 use std::{
     collections::HashSet,
@@ -111,6 +112,58 @@ pub fn reachable(url: &str) -> bool {
         .get(format!("{url}/api/health"))
         .call()
         .is_ok_and(|response| response.status().is_success())
+}
+
+/// A change made offline that the library refused, for the app's page.
+#[derive(serde::Serialize)]
+pub struct Unsaved {
+    library: String,
+    name: String,
+    seq: i64,
+    what: String,
+    why: String,
+    /// What was written (a note's text, an annotation's comment).
+    written: Option<String>,
+}
+
+/// The changes made offline that libraries refused.
+pub fn unsaved(app: &AppHandle) -> Vec<Unsaved> {
+    libraries::load(app)
+        .libraries
+        .into_iter()
+        .filter(|library| !library.local)
+        .flat_map(|library| {
+            let set_aside = open_store(app, &library.url)
+                .map(|store| store.unsaved())
+                .unwrap_or_default();
+            set_aside.into_iter().map(move |(seq, what, why, body)| {
+                let written = body
+                    .and_then(|body| serde_json::from_str::<Value>(&body).ok())
+                    .and_then(|body| {
+                        ["text", "comment"]
+                            .into_iter()
+                            .find_map(|field| body[field].as_str().map(str::to_owned))
+                    })
+                    .filter(|written| !written.is_empty());
+                Unsaved {
+                    library: library.url.clone(),
+                    name: library.name.clone(),
+                    seq,
+                    what,
+                    why,
+                    written,
+                }
+            })
+        })
+        .collect()
+}
+
+/// The person has seen a change set aside.
+pub fn dismiss(app: &AppHandle, library: &str, seq: i64) -> Result<(), String> {
+    open_store(app, library)
+        .ok_or("No copy of that library.")?
+        .dismiss(seq)
+        .map_err(|error| error.to_string())
 }
 
 /// Whether there is a copy of the library to open: synced, with its website.
@@ -220,12 +273,21 @@ fn sync(
     let token = libraries::session(&window, &Url::parse(&url).ok()?)?;
     let folder = folder(app, &url)?;
     let mut store = Store::open(&folder.join("library.sqlite")).ok()?;
-    let before = store.since();
-    store::pull(&mut store, &url, &token).ok()?;
     let server = Server {
         url: &url,
         token: &token,
     };
+    // What was changed offline first: what comes back then includes it.
+    if !push(&server, &store) {
+        return None;
+    }
+    let set_aside = store.unsaved().len();
+    if set_aside > 0 && set_aside != told(&url) {
+        tell(app, &library.name, set_aside);
+        remember_told(&url, set_aside);
+    }
+    let before = store.since();
+    store::pull(&mut store, &url, &token).ok()?;
     if store.since() != before || store.answer(ACCOUNT[0]).is_none() {
         for path in ACCOUNT {
             let _ = server.keep(&store, path, store.since());
@@ -233,6 +295,68 @@ fn sync(
     }
     keep_papers(&server, &store, &folder);
     site::copy(&url, &folder).ok()
+}
+
+/// How many changes set aside the person was told of, per library.
+static TOLD: Mutex<Vec<(String, usize)>> = Mutex::new(Vec::new());
+
+fn told(url: &str) -> usize {
+    TOLD.lock()
+        .ok()
+        .and_then(|told| told.iter().find(|(at, _)| at == url).map(|(_, n)| *n))
+        .unwrap_or(0)
+}
+
+fn remember_told(url: &str, count: usize) {
+    if let Ok(mut told) = TOLD.lock() {
+        told.retain(|(at, _)| at != url);
+        told.push((url.to_owned(), count));
+    }
+}
+
+/// The person is told of changes made offline the library refused.
+fn tell(app: &AppHandle, library: &str, count: usize) {
+    use tauri_plugin_notification::NotificationExt;
+    let changes = if count == 1 { "1 change" } else { "changes" };
+    let _ = app
+        .notification()
+        .builder()
+        .title(library)
+        .body(format!(
+            "{} made offline could not be saved: see Library → Libraries…",
+            if count == 1 {
+                changes.to_owned()
+            } else {
+                format!("{count} {changes}")
+            }
+        ))
+        .show();
+}
+
+/// Send the changes made offline, in order. One the library refuses
+/// (changed or gone meanwhile) is set aside for the person to see; the
+/// first that cannot be sent (offline again, logged out) stops it.
+/// Whether all were sent.
+fn push(server: &Server, store: &Store) -> bool {
+    for change in store.queued() {
+        let (status, detail) = match server.send(&change) {
+            Ok(answer) => answer,
+            Err(_) => return false,
+        };
+        let why = match status {
+            200..=299 => {
+                let _ = store.dequeue(change.seq);
+                continue;
+            }
+            412 => "It was changed on the server meanwhile.".to_owned(),
+            404 => "It is no longer in the library.".to_owned(),
+            403 => "You may no longer change it.".to_owned(),
+            409 | 422 => format!("The library refused it: {detail}"),
+            _ => return false,
+        };
+        let _ = store.set_aside(&change, &why);
+    }
+    true
 }
 
 /// The library, asked with the window's login.
@@ -267,6 +391,44 @@ impl Server<'_> {
             .read_to_vec()
             .map_err(|error| error.to_string())?;
         Ok((media_type, body))
+    }
+
+    /// Send a change made offline: its status, and the server's reason.
+    fn send(&self, change: &store::Queued) -> Result<(u16, String), String> {
+        let url = format!("{}{}", self.url, change.path);
+        let cookie = format!("{}={}", libraries::SESSION_COOKIE, self.token);
+        let agent = libraries::agent();
+        let response = if change.method == "DELETE" {
+            let mut request = agent.delete(&url).header("Cookie", &cookie);
+            if let Some(version) = &change.if_match {
+                request = request.header("If-Match", version);
+            }
+            request.call()
+        } else {
+            let mut request = match change.method.as_str() {
+                "PUT" => agent.put(&url),
+                "PATCH" => agent.patch(&url),
+                _ => agent.post(&url),
+            }
+            .header("Cookie", &cookie)
+            .header("Content-Type", "application/json");
+            if let Some(version) = &change.if_match {
+                request = request.header("If-Match", version);
+            }
+            match &change.body {
+                Some(body) => request.send(body.as_bytes()),
+                None => request.send_empty(),
+            }
+        };
+        let mut response = response.map_err(|error| error.to_string())?;
+        let status = response.status().as_u16();
+        let detail = response
+            .body_mut()
+            .read_json::<Value>()
+            .ok()
+            .and_then(|body| body["detail"].as_str().map(str::to_owned))
+            .unwrap_or_default();
+        Ok((status, detail))
     }
 
     /// Keep the answer to ``path`` (as of change ``change``).

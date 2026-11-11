@@ -81,6 +81,44 @@ async function show() {
 	if (libraries.length === 0) address.focus();
 }
 
+// Changes made offline the libraries refused (offline/mod.rs, push).
+const unsaved = document.getElementById('unsaved');
+const unsavedList = document.getElementById('unsaved-list');
+
+async function showUnsaved() {
+	const changes = await invoke('unsaved_changes');
+	unsaved.hidden = changes.length === 0;
+	unsavedList.replaceChildren(
+		...changes.map((change) => {
+			const item = document.createElement('li');
+			item.className = 'unsaved';
+			const what = document.createElement('div');
+			what.className = 'what';
+			const title = document.createElement('strong');
+			title.textContent = change.what;
+			const why = document.createElement('span');
+			why.className = 'where';
+			why.textContent = `${change.name}: ${change.why}`;
+			what.append(title, why);
+			if (change.written) {
+				const written = document.createElement('pre');
+				written.textContent = change.written;
+				what.append(written);
+			}
+			const dismiss = document.createElement('button');
+			dismiss.className = 'forget';
+			dismiss.type = 'button';
+			dismiss.textContent = 'Dismiss';
+			dismiss.addEventListener('click', async () => {
+				await invoke('dismiss_unsaved', { library: change.library, seq: change.seq });
+				await showUnsaved();
+			});
+			item.append(what, dismiss);
+			return item;
+		})
+	);
+}
+
 form.addEventListener('submit', async (event) => {
 	event.preventDefault();
 	const button = form.querySelector('button');
@@ -100,3 +138,4 @@ form.addEventListener('submit', async (event) => {
 });
 
 show();
+showUnsaved();

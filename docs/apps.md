@@ -118,7 +118,12 @@ every platform (and the installable website, as far as browsers allow).
   as they are now, where one stopped reading, keyword search in details
   and notes; the account and lists as last seen. Not offline: smart
   collections' papers, search in the full text and by meaning, the admin
-  pages. Changes are refused for now (503) until the queue exists.
+  pages.
+- **Changed offline** (built, `offline/write.rs`): annotations made,
+  changed or removed, notes written or edited, where one stopped reading
+  and what one opened: applied to the copy at once and queued; one made
+  and changed offline is sent as one, one made and removed is not sent.
+  Other changes say they need the server.
 - **Pulling** (done on the server): change numbers (`changes.py`) stamp
   items (with their versions, identifiers and files), tags, collections,
   notes, annotations and reading positions. What is deleted for good, or
@@ -131,11 +136,12 @@ every platform (and the installable website, as far as browsers allow).
   are kept a year: a device offline for longer gets 410, sends its own
   changes (they need no removals), tells the person it is getting the
   library again, and syncs from 0.
-- **Pushing**: queued changes sent in order with `If-Match` (required for
-  paper details and note texts, optional for annotations, tags and
-  collections: their `change`); on 412 the conflict is shown, nothing
-  overwritten. After a long time offline, the conflicts and what could
-  not be applied (its paper deleted meanwhile: 404) are shown together. Changes as small operations
+- **Pushing** (built): queued changes sent in order before each pull,
+  with `If-Match` (required for paper details and note texts, optional
+  for annotations, tags and collections: their `change`), so nothing is
+  overwritten. What the library refuses (changed meanwhile: 412; gone:
+  404) is set aside and listed on the app's page with what one wrote, all
+  together, and one notification says so. Changes as small operations
   that merge (add a tag, remove one from a collection, one annotation)
   rather than whole lists; new records with IDs made on the device
   (UUIDv7, as on the server), and a create sent twice after a dropped
@@ -190,8 +196,8 @@ Each step usable on its own:
    search by meaning there (the ML service), Intel Macs.
 4. **Android** (#30): "Share → paperus".
 5. **Offline**: what the server needs for sync (done), the app's copy
-   and the website offline (done, `app/src-tauri/src/offline/`), then the
-   queue of changes made offline, and "Keep offline".
+   and the website offline, the queue of changes made offline (done,
+   `app/src-tauri/src/offline/`), then "Keep offline".
 6. **iOS**, with an Apple developer account (#40).
 
 ## Open
