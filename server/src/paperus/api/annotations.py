@@ -85,7 +85,7 @@ def _name(db: Session, user_id: uuid.UUID, cache: dict[uuid.UUID, str]) -> str:
     return cache[user_id]
 
 
-def _out(
+def annotation_out(
     db: Session, access: Access, annotation: Annotation, names: dict[uuid.UUID, str]
 ) -> AnnotationOut:
     return AnnotationOut(
@@ -118,7 +118,7 @@ def file_annotations(
     names: dict[uuid.UUID, str] = {}
     return FileAnnotations(
         annotations=[
-            _out(db, access, a, names)
+            annotation_out(db, access, a, names)
             for a in annotations.of_file(db, access.user.id, file)
         ],
         hidden_marks=annotations.hidden_marks(db, access.user.id, file),
@@ -150,7 +150,7 @@ def add_annotation(
     )
     db.add(annotation)
     db.commit()
-    return _out(db, access, annotation, {})
+    return annotation_out(db, access, annotation, {})
 
 
 def _own(db: Session, access: Access, annotation_id: uuid.UUID) -> Annotation:
@@ -188,7 +188,7 @@ def change_annotation(
     annotation.tags = checked.tags
     annotation.changed_at = datetime.now(UTC)
     db.commit()
-    return _out(db, access, annotation, {})
+    return annotation_out(db, access, annotation, {})
 
 
 @router.delete("/api/annotations/{annotation_id}", status_code=204)

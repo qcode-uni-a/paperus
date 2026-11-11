@@ -105,11 +105,15 @@ every platform (and the installable website, as far as browsers allow).
   answers for kept papers are stored too; offline, reads come from the
   store and changes go into a queue. Kept in the app's own storage, not the
   browser's, which the system may clear.
-- **Pulling**: change numbers (`changes.py`) already stamp items, versions,
-  identifiers, files, tags, collections and notes, and `since=N` lists what
-  changed (as Zotero does). Missing: annotations and reading positions, a
-  record of what was deleted or went out of one's reach (a paper purged, a
-  group left), and one call for everything changed since N.
+- **Pulling** (done on the server): change numbers (`changes.py`) stamp
+  items (with their versions, identifiers and files), tags, collections,
+  notes, annotations and reading positions. What is deleted for good, or
+  leaves a library (moved, annotations no longer shared), is recorded as a
+  removal there. `GET /api/changes?since=N` gives all of it in one answer:
+  the number for next time, the libraries the person reads now (what a
+  device keeps from others is out of reach: a group left; a new one is
+  synced from 0 with `library=`), the removals, then the records as they
+  are now. A device applies the removals first, then the rest.
 - **Pushing**: queued changes sent in order with `If-Match`, as now; on 412
   the conflict is shown, nothing overwritten. Changes as small operations
   that merge (add a tag, remove one from a collection, one annotation)

@@ -5803,6 +5803,71 @@
         }
       }
     },
+    "/api/changes": {
+      "get": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Changes Since",
+        "description": "Everything the person sees that changed after change number\n``since`` (all of it with 0), in change order, and what is gone since;\n``library`` (repeatable) for only these libraries, e.g. one the person\nmay read since. Number first: what changes meanwhile comes next time.",
+        "operationId": "changes_since",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Since"
+            }
+          },
+          {
+            "name": "library",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Library"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Changes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/config": {
       "get": {
         "tags": [
@@ -9421,6 +9486,84 @@
           "skipped"
         ],
         "title": "BulkOut"
+      },
+      "Changes": {
+        "properties": {
+          "change": {
+            "type": "integer",
+            "title": "Change"
+          },
+          "libraries": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Libraries"
+          },
+          "removed": {
+            "items": {
+              "$ref": "#/components/schemas/Removed"
+            },
+            "type": "array",
+            "title": "Removed"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NoteDetail"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagOut"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionOut"
+            },
+            "type": "array",
+            "title": "Collections"
+          },
+          "annotations": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationOut"
+            },
+            "type": "array",
+            "title": "Annotations"
+          },
+          "views": {
+            "items": {
+              "$ref": "#/components/schemas/View"
+            },
+            "type": "array",
+            "title": "Views"
+          }
+        },
+        "type": "object",
+        "required": [
+          "change",
+          "libraries",
+          "removed",
+          "items",
+          "notes",
+          "tags",
+          "collections",
+          "annotations",
+          "views"
+        ],
+        "title": "Changes"
       },
       "Choices": {
         "properties": {
@@ -14775,6 +14918,25 @@
         ],
         "title": "RemoveTag"
       },
+      "Removed": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "Removed"
+      },
       "RemovedTags": {
         "properties": {
           "links": {
@@ -16951,6 +17113,38 @@
           "created_at"
         ],
         "title": "VersionOut"
+      },
+      "View": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "viewed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Viewed At"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reading"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "viewed_at",
+          "reading"
+        ],
+        "title": "View",
+        "description": "When the person last opened a paper, and where they stopped."
       },
       "WorkOut": {
         "properties": {

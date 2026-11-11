@@ -40,6 +40,7 @@ from paperus.api import (
     search,
     setup,
     start,
+    sync,
     trash,
     users,
 )
@@ -142,6 +143,7 @@ def create_app(
     app.include_router(duplicates.router)
     app.include_router(manage.router)
     app.include_router(trash.router)
+    app.include_router(sync.router)
     app.include_router(admin.router)
     app.include_router(organize.router)
     app.include_router(groups.router)

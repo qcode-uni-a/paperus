@@ -18,6 +18,9 @@
   deleted for good (papers, notes, files, tags, collections, annotations)
   is recorded, so a device can remove it too (migration 0009); so is what
   leaves a library: moved to another, or annotations no longer shared.
+  `GET /api/changes?since=N` gives everything changed since, in one answer
+  (papers, notes, tags, collections, annotations, reading positions, what
+  is gone, and the libraries one reads now).
 
 ## 0.0.21 (2026-11-11)
 

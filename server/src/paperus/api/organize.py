@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import ColumnElement, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library, organize
@@ -208,6 +208,12 @@ def _color(tag: Tag) -> TagColor | None:
 def list_tags(db: DB, access: CurrentAccess) -> list[TagOut]:
     """The tags of the libraries the person can read, with how they are used
     (items in the trash do not count)."""
+    return tag_outs(db, access, Tag.library_id.in_(access.readable))
+
+
+def tag_outs(db: DB, access: Access, condition: ColumnElement[bool]) -> list[TagOut]:
+    """The tags matching ``condition`` (in libraries the person reads), by
+    name, with how they are used."""
     usage = db.execute(
         select(
             ItemTag.tag_id, ItemTag.source, func.count(), func.max(ItemTag.created_at)
@@ -222,11 +228,7 @@ def list_tags(db: DB, access: CurrentAccess) -> list[TagOut]:
         sources.setdefault(tag_id, {})[TagSource(source)] = count
         if tag_id not in last_used or last > last_used[tag_id]:
             last_used[tag_id] = last
-    tags = db.scalars(
-        select(Tag)
-        .where(Tag.library_id.in_(access.readable))
-        .order_by(func.lower(Tag.name))
-    )
+    tags = db.scalars(select(Tag).where(condition).order_by(func.lower(Tag.name)))
     return [
         TagOut(
             id=tag.id,
@@ -407,7 +409,7 @@ def delete_tag(tag_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
 # Collections
 
 
-def _collection_out(db: DB, access: Access, collection: Collection) -> CollectionOut:
+def collection_out(db: DB, access: Access, collection: Collection) -> CollectionOut:
     if collection.rules is not None:
         count, recent = _smart_contents(db, access, collection)
         direct = count
@@ -590,7 +592,7 @@ def create_collection(
     )
     db.add(collection)
     db.commit()
-    return _collection_out(db, access, collection)
+    return collection_out(db, access, collection)
 
 
 @router.patch("/api/collections/{collection_id}")
@@ -638,7 +640,7 @@ def change_collection(
         raise HTTPException(422, str(error)) from error
     db.commit()
     return CollectionChanged(
-        **_collection_out(db, access, collection).model_dump(), left_out=left_out
+        **collection_out(db, access, collection).model_dump(), left_out=left_out
     )
 
 
@@ -740,7 +742,7 @@ def add_items(
         may_hold=lambda item: access.may_hold(collection.library_id, item),
     )
     db.commit()
-    return _collection_out(db, access, collection)
+    return collection_out(db, access, collection)
 
 
 @router.delete("/api/collections/{collection_id}/items/{item_id}")
@@ -754,4 +756,4 @@ def remove_item(
         link for link in item.collection_links if link.collection_id != collection_id
     ]
     db.commit()
-    return _collection_out(db, access, collection)
+    return collection_out(db, access, collection)

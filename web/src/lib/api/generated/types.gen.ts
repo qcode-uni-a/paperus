@@ -682,6 +682,48 @@ export type BulkOut = {
 };
 
 /**
+ * Changes
+ */
+export type Changes = {
+    /**
+     * Change
+     */
+    change: number;
+    /**
+     * Libraries
+     */
+    libraries: Array<string>;
+    /**
+     * Removed
+     */
+    removed: Array<Removed>;
+    /**
+     * Items
+     */
+    items: Array<ItemOut>;
+    /**
+     * Notes
+     */
+    notes: Array<NoteDetail>;
+    /**
+     * Tags
+     */
+    tags: Array<TagOut>;
+    /**
+     * Collections
+     */
+    collections: Array<CollectionOut>;
+    /**
+     * Annotations
+     */
+    annotations: Array<AnnotationOut>;
+    /**
+     * Views
+     */
+    views: Array<View>;
+};
+
+/**
  * Choices
  *
  * The person's choices (what is not named takes its default).
@@ -3693,6 +3735,20 @@ export type RemoveTag = {
 };
 
 /**
+ * Removed
+ */
+export type Removed = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+};
+
+/**
  * RemovedTags
  */
 export type RemovedTags = {
@@ -4871,6 +4927,23 @@ export type VersionOut = {
      * Created At
      */
     created_at: string;
+};
+
+/**
+ * View
+ *
+ * When the person last opened a paper, and where they stopped.
+ */
+export type View = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Viewed At
+     */
+    viewed_at: string;
+    reading: Reading | null;
 };
 
 /**
@@ -8396,6 +8469,40 @@ export type StorageResponses = {
 };
 
 export type StorageResponse = StorageResponses[keyof StorageResponses];
+
+export type ChangesSinceData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Since
+         */
+        since?: number;
+        /**
+         * Library
+         */
+        library?: Array<string> | null;
+    };
+    url: '/api/changes';
+};
+
+export type ChangesSinceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ChangesSinceError = ChangesSinceErrors[keyof ChangesSinceErrors];
+
+export type ChangesSinceResponses = {
+    /**
+     * Successful Response
+     */
+    200: Changes;
+};
+
+export type ChangesSinceResponse = ChangesSinceResponses[keyof ChangesSinceResponses];
 
 export type GetConfigData = {
     body?: never;
