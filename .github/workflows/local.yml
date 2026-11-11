@@ -79,7 +79,7 @@ jobs:
       - run: cargo build --locked
         working-directory: app/src-tauri
       - run: cargo install tauri-driver --locked
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: local-Linux
       - run: mkdir bundle && tar xzf paperus-local-*-x86_64-unknown-linux-gnu.tar.gz -C bundle

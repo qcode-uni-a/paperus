@@ -63,7 +63,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ty check src tests
       - run: uv run pytest -q -n auto --cov --cov-fail-under=95 --cov-report=term --cov-report=xml
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           files: server/coverage.xml
@@ -87,7 +87,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ty check src tests
       - run: uv run pytest -q --cov --cov-fail-under=95 --cov-report=term --cov-report=xml
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           files: ml/coverage.xml
