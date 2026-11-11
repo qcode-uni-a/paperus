@@ -94,9 +94,16 @@ The goal: papers kept on the device and read without a connection, changes
 made offline sent when back online. For a server library, in the app on
 every platform (and the installable website, as far as browsers allow).
 
-- **What is kept**: papers marked "available offline" (or whole
-  collections) and recently opened ones: their details, tags, collections,
-  notes, annotations, reading positions, and their files.
+- **What is kept**: the details, tags, collections, notes, annotations and
+  reading positions of everything one sees (a few MB); the files of papers
+  opened recently, and of those marked "Keep offline" (or whole
+  collections). Marked on each device for itself (a phone keeps less than
+  a laptop); the server does not know. A collection kept offline stays
+  current: after each sync, the files of papers newly in it (or in a
+  collection inside it; papers in `/api/changes` list their collections)
+  are downloaded by themselves, and those of papers that left it are let
+  go unless kept otherwise. A smart collection's papers are asked from the
+  server (its rules decide); without a connection it keeps what it had.
 - **The website offline**: the app keeps the copy of the server's website
   it last loaded, so offline it runs the same version as the server it
   synced with; never a website newer or older than the server's API.
@@ -117,8 +124,11 @@ every platform (and the installable website, as far as browsers allow).
   are kept a year: a device offline for longer gets 410, sends its own
   changes (they need no removals), tells the person it is getting the
   library again, and syncs from 0.
-- **Pushing**: queued changes sent in order with `If-Match`, as now; on 412
-  the conflict is shown, nothing overwritten. Changes as small operations
+- **Pushing**: queued changes sent in order with `If-Match` (required for
+  paper details and note texts, optional for annotations, tags and
+  collections: their `change`); on 412 the conflict is shown, nothing
+  overwritten. After a long time offline, the conflicts and what could
+  not be applied (its paper deleted meanwhile: 404) are shown together. Changes as small operations
   that merge (add a tag, remove one from a collection, one annotation)
   rather than whole lists; new records with IDs made on the device
   (UUIDv7, as on the server), and a create sent twice after a dropped
