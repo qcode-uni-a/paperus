@@ -1,0 +1,86 @@
+name: Library on this computer
+
+# The app's library on this computer (docs/apps.md): app/local/build.sh's
+# folder for each platform, started once by app/local/smoke.sh, packed as
+# paperus-local-<version>-<target>.tar.gz with its SHA-256. Run by hand to
+# try it, and by release.yml (with PUBLISH_APP), which attaches them to the
+# GitHub release, where the app downloads them.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Local library (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported runner: the C extension built here (pgvector)
+          # then loads on older Linux too.
+          - name: Linux
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: macOS
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # no moving major tag; pin an exact version
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # nmake and cl for pgvector.
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - run: bash app/local/build.sh ${{ matrix.target }} local
+      - run: bash app/local/smoke.sh local
+      - name: Pack
+        run: |
+          version=$(cat local/VERSION)
+          name=paperus-local-$version-${{ matrix.target }}.tar.gz
+          tar czf "$name" -C local .
+          if command -v sha256sum >/dev/null; then sha256sum "$name"; else shasum -a 256 "$name"; fi > "$name.sha256"
+          ls -la "$name"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: local-${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            paperus-local-*.tar.gz
+            paperus-local-*.tar.gz.sha256
+
+  # The app with that bundle, end to end (app/tests/local.sh): made from its
+  # page, logged in, opened again after the app was killed, nothing left
+  # running afterwards.
+  app:
+    name: App with the local library (Linux)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev webkitgtk-webdriver xvfb
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+          key: e2e
+      - run: cargo build --locked
+        working-directory: app/src-tauri
+      - run: cargo install tauri-driver --locked
+      - uses: actions/download-artifact@v7
+        with:
+          name: local-Linux
+      - run: mkdir bundle && tar xzf paperus-local-*-x86_64-unknown-linux-gnu.tar.gz -C bundle
+      - run: bash app/tests/local.sh bundle
