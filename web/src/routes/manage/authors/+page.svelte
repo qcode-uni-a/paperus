@@ -7,7 +7,8 @@
 		errorMessage,
 		keepApart,
 		getAuthor,
-		listAuthors
+		listAuthors,
+		mergeAuthors
 	} from '#lib/api/client.ts';
 	import type { AuthorOut } from '#lib/api/generated/types.gen.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -73,6 +74,29 @@
 
 	/** Compared side by side: these pairs, one after another. */
 	let comparing = $state<LikelyOut[] | null>(null);
+
+	/** Obviously one person: merged at once, without comparing. The record
+	 * with an ORCID iD stays, else the one with more papers (as comparing
+	 * would choose; two ORCID iDs the server refuses). */
+	async function same(pair: LikelyOut) {
+		const [kept, merged] =
+			(pair.other.orcid && !pair.one.orcid) ||
+			(!!pair.other.orcid === !!pair.one.orcid && pair.other.papers > pair.one.papers)
+				? [pair.other, pair.one]
+				: [pair.one, pair.other];
+		const { error } = await mergeAuthors({
+			path: { author_id: kept.id },
+			body: { other_id: merged.id }
+		});
+		if (error) {
+			notify({ kind: 'warning', title: 'Not merged', text: errorMessage(error) });
+			return;
+		}
+		notify({ kind: 'success', title: `One person now: ${personName(kept)}` });
+		likely = likely.filter((p) => p !== pair);
+		loadLikely();
+		load();
+	}
 
 	async function different(pair: LikelyOut) {
 		await keepApart({ path: { author_id: pair.one.id }, body: { other_id: pair.other.id } });
@@ -158,6 +182,7 @@
 					</p>
 					<div class="row">
 						<button onclick={() => (comparing = [pair])}>Compare…</button>
+						<button onclick={() => same(pair)}>Same person</button>
 						<button class="quiet" onclick={() => different(pair)}>Different people</button>
 					</div>
 				</li>

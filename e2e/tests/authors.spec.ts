@@ -138,6 +138,22 @@ test('probably the same person: merged, or kept apart', async ({ page }) => {
 	await expect(section.getByRole('listitem').filter({ hasText: family })).toHaveCount(0);
 });
 
+test('obviously the same person: merged at once, without comparing', async ({ page }) => {
+	const family = unique('Loss');
+	const coauthor = { family: unique('DiVincenzo'), given: 'David' };
+	await add(page, unique('Full name '), [{ family, given: 'Daniel' }, coauthor]);
+	const last = await add(page, unique('Initial '), [{ family, given: 'D.' }, coauthor]);
+	await linked(page, last);
+
+	await page.goto('/manage/authors');
+	const section = page.locator('section').filter({ hasText: 'Probably the same' });
+	const pair = section.getByRole('listitem').filter({ hasText: `${family}, Daniel` });
+	await pair.getByRole('button', { name: 'Same person' }).click();
+	await expect(page.getByText(`One person now: ${family}, Daniel`)).toBeVisible();
+	await expect(pair).toBeHidden();
+	await expect(section.getByRole('listitem').filter({ hasText: family })).toHaveCount(0);
+});
+
 test('a smart collection of an author’s papers', async ({ page }) => {
 	const family = unique('Platero');
 	const gloria = { family, given: 'Gloria' };

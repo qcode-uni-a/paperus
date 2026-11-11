@@ -25,6 +25,9 @@
   around the website; the author dialog closes at once. If the extension
   does not answer for three minutes, the panel says so instead of standing
   at "0 of …".
+- **Manage → Authors: "Same person"** next to "Compare…" and "Different
+  people", for pairs that are obviously one person: merged at once (the
+  record with an ORCID iD stays, else the one with more papers).
 - **The extension gets several PDFs at once**: three papers at a time, one
   per publisher (more would look like a robot to it); each paper at most 90
   seconds, each fetch at most 60, then the next.
