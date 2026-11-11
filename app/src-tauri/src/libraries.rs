@@ -189,22 +189,8 @@ pub fn kept_login(app: &AppHandle, library: &Url) -> Option<String> {
     if let Some(token) = known.get(&key(library)) {
         return Some(token.clone());
     }
-    let in_system = with_system_store(library, |entry| entry.get_password().ok());
-    let token = in_system
-        .clone()
+    let token = with_system_store(library, |entry| entry.get_password().ok())
         .or_else(|| file_sessions(app).remove(&key(library)));
-    eprintln!(
-        "login to {} [{} sees {:?}]: {} ({:?})",
-        key(library),
-        std::process::id(),
-        file_sessions(app).keys().collect::<Vec<_>>(),
-        match (&in_system, &token) {
-            (Some(_), _) => "kept in the system's store",
-            (None, Some(_)) => "kept in the file",
-            (None, None) => "none kept",
-        },
-        sessions_file(app)
-    );
     let token = token?;
     known.insert(key(library), token.clone());
     Some(token)
@@ -229,9 +215,8 @@ pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
             let kept =
                 with_system_store(library, move |entry| entry.set_password(&secret).ok()).is_some();
             eprintln!(
-                "login to {} [{}]: kept in {}",
+                "login to {}: kept in {}",
                 key(library),
-                std::process::id(),
                 if kept {
                     "the system's store"
                 } else {
