@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { makePdf } from '../fixtures/pdf.ts';
 
 export const ADMIN = { username: 'admin', password: 'e2e-admin-password' };
@@ -46,8 +46,11 @@ export async function uploadPaper(
 	await row.getByRole('link', { name: 'Open' }).click();
 	await expect(page).toHaveURL(/\/items\/[0-9a-f-]+$/);
 	const id = page.url().split('/').pop() ?? '';
-	// The item page reloads itself while the worker reads the file.
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText(title, { timeout: 30_000 });
+	// The item page reloads itself while the worker reads the file: on a
+	// busy CI runner that may take a while, so the test gets that time on
+	// top of its own (else the wait used up the whole test's).
+	test.info().setTimeout(test.info().timeout + 60_000);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText(title, { timeout: 60_000 });
 	return { id, title, word };
 }
 
