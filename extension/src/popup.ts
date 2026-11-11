@@ -31,6 +31,8 @@ $('settings').addEventListener('click', async (event) => {
  * stand under its icon: the address's name before its ending (before
  * ".co.uk" and the like, too). */
 function siteName(host: string): string {
+	// An address by number, or a machine's own name: as it is.
+	if (/^[\d.]+$|^\[|^[^.]+$/.test(host)) return host;
 	const parts = host.split('.');
 	let name = parts.at(-2) ?? host;
 	if (parts.length > 2 && /^(co|ac|com|org|edu|gov|net)$/.test(name)) name = parts.at(-3)!;
@@ -141,8 +143,16 @@ async function save(tabId: number, owners: Owner[]): Promise<void> {
 	});
 	// The page's site: its icon and name.
 	const icon = $<HTMLImageElement>('site-icon');
-	if (tab.favIconUrl) icon.src = tab.favIconUrl;
-	else icon.hidden = true;
+	if (tab.favIconUrl) {
+		icon.src = tab.favIconUrl;
+		icon.addEventListener('error', () => {
+			icon.hidden = true;
+			$('site-globe').removeAttribute('hidden'); // an SVG: no .hidden
+		});
+	} else {
+		icon.hidden = true;
+		$('site-globe').removeAttribute('hidden'); // an SVG: no .hidden
+	}
 	try {
 		$('site-name').textContent = siteName(new URL(tab.url ?? '').hostname);
 	} catch {
