@@ -84,18 +84,14 @@
 {/if}
 
 <style>
+	/* In the corner (the layout places it). */
 	.tray {
-		position: fixed;
-		right: 16px;
-		bottom: 16px;
-		width: min(340px, calc(100vw - 32px));
 		max-height: 50vh;
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
 		padding: 12px;
 		box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
-		z-index: 20;
 	}
 	.head {
 		display: flex;

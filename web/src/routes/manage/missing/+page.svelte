@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { startExtensionTask } from '#lib/tasks.svelte.ts';
 	import {
 		downloadAllOpenAccess,
 		downloadOpenAccess,
@@ -160,6 +161,7 @@
 		if (!wanted.length) return;
 		for (const p of wanted) problems[p.item_id] = '';
 		fetching = { done: 0, total: wanted.length };
+		startExtensionTask(wanted.length);
 		// Plain data: the lists' reactive proxies cannot be posted (cloned).
 		window.postMessage(
 			{ type: 'paperus:get-pdfs', papers: $state.snapshot(wanted) },

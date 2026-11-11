@@ -836,8 +836,24 @@ interface Wanted {
 }
 
 const PUBLISHERS = { origins: ["https://*/*", "http://*/*"] };
-// One at a time: publishers take many quick downloads for a robot.
 const PAGE_WAIT_MS = 45_000;
+/** Papers at once, each from another publisher: one publisher gets one
+ * request at a time (many quick downloads look like a robot to it). */
+const AT_ONCE = 3;
+/** One paper at most this long (its page, its PDF): then the next. */
+const PAPER_MS = 90_000;
+
+/** Who publishes a paper: its DOI's prefix (links go through doi.org),
+ * else its page's site. */
+function publisherOf(paper: Wanted): string {
+  const doi = paper.url.match(/doi\.org\/(10\.\d{4,9})\//)?.[1];
+  if (doi) return doi;
+  try {
+    return new URL(paper.url).hostname;
+  } catch {
+    return paper.url;
+  }
+}
 
 async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
   if (!TEST && !(await chrome.permissions.contains(PUBLISHERS))) {
@@ -853,27 +869,65 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
   const report = (message: object) =>
     chrome.tabs.sendMessage(tabId, message).catch(() => undefined);
   let saved = 0;
+  let done = 0;
   const failed: { item_id: string; reason: string; cause: Cause }[] = [];
-  for (const [index, paper] of papers.entries()) {
-    const problem = await getOne(paper);
-    if (problem) {
-      failed.push({ item_id: paper.item_id, ...problem });
-      logIssue("warning", `No PDF for “${paper.title}”: ${problem.reason}`, {
-        page: paper.url,
-        cause: problem.cause,
-        item: paper.item_id,
+  const waiting = [...papers];
+  const busy = new Set<string>();
+  // The next paper from a publisher not busy, if any.
+  const take = (): Wanted | undefined => {
+    const index = waiting.findIndex((paper) => !busy.has(publisherOf(paper)));
+    return index < 0 ? undefined : waiting.splice(index, 1)[0];
+  };
+  const worker = async () => {
+    while (waiting.length) {
+      const paper = take();
+      if (!paper) {
+        await new Promise((wait) => setTimeout(wait, 500));
+        continue;
+      }
+      const publisher = publisherOf(paper);
+      busy.add(publisher);
+      let problem: { cause: Cause; reason: string } | null;
+      try {
+        problem = await Promise.race([
+          getOne(paper),
+          new Promise<{ cause: Cause; reason: string }>((give) =>
+            setTimeout(
+              () =>
+                give({
+                  cause: "error",
+                  reason: `The publisher took longer than ${PAPER_MS / 1000} seconds.`,
+                }),
+              PAPER_MS,
+            ),
+          ),
+        ]);
+      } finally {
+        busy.delete(publisher);
+      }
+      if (problem) {
+        failed.push({ item_id: paper.item_id, ...problem });
+        logIssue("warning", `No PDF for “${paper.title}”: ${problem.reason}`, {
+          page: paper.url,
+          cause: problem.cause,
+          item: paper.item_id,
+        });
+      } else saved++;
+      done++;
+      await report({
+        type: "getPdfsProgress",
+        done,
+        total: papers.length,
+        saved,
+        item_id: paper.item_id,
+        ok: problem === null,
+        ...(problem ?? {}),
       });
-    } else saved++;
-    await report({
-      type: "getPdfsProgress",
-      done: index + 1,
-      total: papers.length,
-      saved,
-      item_id: paper.item_id,
-      ok: problem === null,
-      ...(problem ?? {}),
-    });
-  }
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(AT_ONCE, papers.length) }, worker),
+  );
   await report({ type: "getPdfsDone", total: papers.length, saved, failed });
 }
 

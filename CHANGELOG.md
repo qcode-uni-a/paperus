@@ -19,6 +19,15 @@
   access", …), not the "Sign in" in every page's header; when the PDF still
   cannot be had, the message says what came back (the page's title and
   site).
+- **Work that follows you** (bottom right, with the uploads): getting PDFs
+  with the extension (Manage → Missing) and adding someone's papers (an
+  author's page) show their progress in a panel that stays while one moves
+  around the website; the author dialog closes at once. If the extension
+  does not answer for three minutes, the panel says so instead of standing
+  at "0 of …".
+- **The extension gets several PDFs at once**: three papers at a time, one
+  per publisher (more would look like a robot to it); each paper at most 90
+  seconds, each fetch at most 60, then the next.
 - **The storage box leaves the menu**: at the menu's foot only its
   heading showed without scrolling. How full the storage is stays under
   Administration → Server (with the library's share); `GET /api/storage`,

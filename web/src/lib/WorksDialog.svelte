@@ -3,7 +3,7 @@
 	import { addItem } from '#lib/api/client.ts';
 	import type { WorkOut } from '#lib/api/generated/types.gen.ts';
 	import { defaultLibrary, libraryName, writableLibraries } from '#lib/organize.svelte.ts';
-	import { notify } from '#lib/toasts.svelte.ts';
+	import { addByDoi } from '#lib/tasks.svelte.ts';
 
 	/** Someone's works as OpenAlex knows them: those not in the library
 	 * can be chosen and added, by their DOI (their details, open-access
@@ -24,7 +24,6 @@
 	let error = $state('');
 	let chosen = $state<string[]>([]);
 	let owner = $state('');
-	let adding = $state<{ done: number; of: number } | null>(null);
 
 	const missing = $derived((found ?? []).filter((w) => !w.item_id));
 	const here = $derived((found ?? []).filter((w) => w.item_id));
@@ -44,26 +43,16 @@
 		chosen = missing.map((w) => w.doi);
 	}
 
-	async function add() {
+	/** Added a few at a time, in the corner's task (one may move on). */
+	function add() {
 		const dois = [...chosen];
-		adding = { done: 0, of: dois.length };
-		let failed = 0;
-		for (const doi of dois) {
-			const { error: failure } = await addItem({ body: { doi, library_id: owner || null } });
-			if (failure) failed += 1;
-			adding = { done: adding.done + 1, of: dois.length };
-		}
-		adding = null;
 		dialog?.close();
-		const added = dois.length - failed;
-		notify({
-			kind: failed ? 'warning' : 'success',
-			title: `${added} ${added === 1 ? 'paper' : 'papers'} added`,
-			text: failed
-				? `${failed} could not be added (their DOI was not found).`
-				: 'Their details, open-access copies and authors are looked up now.'
-		});
-		onadded?.();
+		void addByDoi(
+			`Adding ${dois.length} ${dois.length === 1 ? 'paper' : 'papers'}`,
+			dois,
+			owner || null,
+			onadded
+		);
 	}
 </script>
 
@@ -130,12 +119,11 @@
 			>
 		{/if}
 		<div class="buttons">
-			<button onclick={() => dialog?.close()} disabled={adding !== null}>Close</button>
+			<button onclick={() => dialog?.close()}>Close</button>
 			{#if missing.length}
-				<button class="primary" onclick={add} disabled={!chosen.length || adding !== null}>
-					{adding
-						? `Adding ${adding.done + 1} of ${adding.of}…`
-						: `Add ${chosen.length} ${chosen.length === 1 ? 'paper' : 'papers'}`}
+				<button class="primary" onclick={add} disabled={!chosen.length}>
+					Add {chosen.length}
+					{chosen.length === 1 ? 'paper' : 'papers'}
 				</button>
 			{/if}
 		</div>

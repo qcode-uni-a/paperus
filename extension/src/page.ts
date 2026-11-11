@@ -138,7 +138,7 @@ export async function fetchPdf(
 	try {
 		let response: Response;
 		try {
-			response = await fetch(url, { credentials: 'include' });
+			response = await fetch(url, { credentials: 'include', signal: AbortSignal.timeout(60_000) });
 		} catch (error) {
 			// The browser let the page not fetch it (a redirect to another
 			// site, as AIP's PDFs go to Silverchair's signed addresses): the
@@ -159,7 +159,7 @@ export async function fetchPdf(
 			if (refresh) {
 				const next = new URL(refresh[1].replace(/&amp;/g, '&').trim(), response.url).href;
 				try {
-					response = await fetch(next, { credentials: 'include' });
+					response = await fetch(next, { credentials: 'include', signal: AbortSignal.timeout(60_000) });
 				} catch (error) {
 					// Another site the page may not fetch from: the extension may.
 					return { error: `The PDF could not be fetched: ${String(error)}`, next };

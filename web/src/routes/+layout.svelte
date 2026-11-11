@@ -13,6 +13,7 @@
 	import NotificationBell from '#lib/NotificationBell.svelte';
 	import AddMenu from '#lib/AddMenu.svelte';
 	import UploadTray from '#lib/UploadTray.svelte';
+	import TaskTray from '#lib/TaskTray.svelte';
 	import Toasts from '#lib/Toasts.svelte';
 	import UserMenu from '#lib/UserMenu.svelte';
 	import DemoBanner from '#lib/DemoBanner.svelte';
@@ -97,12 +98,26 @@
 
 {#if session.user && !onLoginPage}
 	<DropZone />
-	<UploadTray />
+	<!-- Bottom right: work that goes on while one moves around. -->
+	<div class="corner"><TaskTray /><UploadTray /></div>
 	<Toasts />
 	<OwnerHint />
 {/if}
 
 <style>
+	.corner {
+		position: fixed;
+		right: 16px;
+		bottom: 16px;
+		z-index: 20;
+		display: grid;
+		gap: 8px;
+		width: min(340px, calc(100vw - 32px));
+		pointer-events: none;
+	}
+	.corner > :global(*) {
+		pointer-events: auto;
+	}
 	/* The logo over the menu, a wide search in the middle,
 	   actions at the end; on phones the search takes a row of its own. */
 	header {
