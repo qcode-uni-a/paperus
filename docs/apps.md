@@ -148,6 +148,17 @@ every platform (and the installable website, as far as browsers allow).
   connection makes one record (done on the server for notes, tags,
   collections and annotations, `api/ids.py`; papers later).
 - **Files** by SHA-256: only missing ones are downloaded.
+- **Logins** (built): the app keeps its login to each library in the
+  system's store of logins (Keychain, Credential Manager, GNOME Keyring,
+  KWallet), else in a file of the person's alone (the app's page says so):
+  WebKitGTK's cookie functions do not see the window's cookies from an
+  earlier run. A copy opens offline only with a login kept: logging in
+  needs the library (its password check, or the organisation's OIDC
+  login), so logged out and offline, nothing of it shows. Logging out
+  deletes the copy from the device (details, notes, PDFs, the website):
+  online, at the next sync (401); offline at once, with the window back on
+  the app's page, and the changes made before sent when the library is
+  back, then the logout, so the login ends there too.
 - **Search offline**: keyword search in the kept papers; search by meaning
   needs the server (a small model on the device later perhaps).
 

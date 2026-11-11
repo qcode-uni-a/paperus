@@ -121,7 +121,7 @@ pub fn session(window: &WebviewWindow, library: &Url) -> Option<String> {
             remember_session(app, library, Some(&token));
             Some(token)
         }
-        None => kept_session(app, library),
+        None => kept_login(app, library),
     }
 }
 
@@ -165,31 +165,45 @@ fn save_file_sessions(app: &AppHandle, kept: &HashMap<String, String>) {
 }
 
 /// The system's store of logins (Keychain, Windows' Credential Manager,
-/// the Secret Service: GNOME Keyring, KWallet), one entry per library.
-fn system_entry(library: &Url) -> Option<keyring::Entry> {
-    keyring::Entry::new("paperus", &key(library)).ok()
+/// the Secret Service: GNOME Keyring, KWallet), one entry per library;
+/// ``work`` with it, in time: a locked keyring may ask to be unlocked, and
+/// unanswered (nobody at the screen) the file serves instead.
+fn with_system_store<T: Send + 'static>(
+    library: &Url,
+    work: impl FnOnce(keyring::Entry) -> Option<T> + Send + 'static,
+) -> Option<T> {
+    let name = key(library);
+    let (done, answer) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let found = keyring::Entry::new("paperus", &name).ok().and_then(work);
+        let _ = done.send(found);
+    });
+    answer.recv_timeout(Duration::from_secs(5)).ok().flatten()
 }
 
 /// The app's login to a library, kept from before: in the system's store,
 /// else in the file.
-fn kept_session(app: &AppHandle, library: &Url) -> Option<String> {
+pub fn kept_login(app: &AppHandle, library: &Url) -> Option<String> {
     let mut sessions = SESSIONS.lock().ok()?;
     let known = sessions.get_or_insert_with(HashMap::new);
     if let Some(token) = known.get(&key(library)) {
         return Some(token.clone());
     }
-    let in_system = system_entry(library).and_then(|entry| entry.get_password().ok());
+    let in_system = with_system_store(library, |entry| entry.get_password().ok());
     let token = in_system
         .clone()
         .or_else(|| file_sessions(app).remove(&key(library)));
     eprintln!(
-        "login to {}: {}",
+        "login to {} [{} sees {:?}]: {} ({:?})",
         key(library),
+        std::process::id(),
+        file_sessions(app).keys().collect::<Vec<_>>(),
         match (&in_system, &token) {
             (Some(_), _) => "kept in the system's store",
             (None, Some(_)) => "kept in the file",
             (None, None) => "none kept",
-        }
+        },
+        sessions_file(app)
     );
     let token = token?;
     known.insert(key(library), token.clone());
@@ -211,10 +225,13 @@ pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
     match token {
         Some(token) => {
             known.insert(key(library), token.to_owned());
-            let kept = system_entry(library).is_some_and(|entry| entry.set_password(token).is_ok());
+            let secret = token.to_owned();
+            let kept =
+                with_system_store(library, move |entry| entry.set_password(&secret).ok()).is_some();
             eprintln!(
-                "login to {}: kept in {}",
+                "login to {} [{}]: kept in {}",
                 key(library),
+                std::process::id(),
                 if kept {
                     "the system's store"
                 } else {
@@ -229,10 +246,9 @@ pub fn remember_session(app: &AppHandle, library: &Url, token: Option<&str>) {
             }
         }
         None => {
+            eprintln!("login to {}: forgotten", key(library));
             known.remove(&key(library));
-            if let Some(entry) = system_entry(library) {
-                let _ = entry.delete_credential();
-            }
+            with_system_store(library, |entry| entry.delete_credential().ok());
             in_file.remove(&key(library));
         }
     }

@@ -163,6 +163,25 @@ impl Store {
         Ok(())
     }
 
+    /// Logged out offline: the queue is sent when the library is back,
+    /// then the login ends there (the copy is gone already).
+    pub fn logging_out(&self) -> bool {
+        self.state("logging_out").is_some()
+    }
+
+    pub fn set_logging_out(&self, on: bool) -> rusqlite::Result<()> {
+        if on {
+            self.db.execute(
+                "INSERT OR REPLACE INTO state (key, value) VALUES ('logging_out', '1')",
+                [],
+            )?;
+        } else {
+            self.db
+                .execute("DELETE FROM state WHERE key = 'logging_out'", [])?;
+        }
+        Ok(())
+    }
+
     /// The libraries the person read at the last sync.
     pub fn libraries(&self) -> Vec<String> {
         self.state("libraries")
@@ -344,7 +363,8 @@ impl Store {
     pub fn clear(&mut self) -> rusqlite::Result<()> {
         // What the person marked stays (it is this device's, not the server's).
         self.db.execute_batch(
-            "DELETE FROM records; DELETE FROM state WHERE key != 'marked'; DELETE FROM answers;",
+            "DELETE FROM records; DELETE FROM answers;
+             DELETE FROM state WHERE key NOT IN ('marked', 'logging_out');",
         )
     }
 

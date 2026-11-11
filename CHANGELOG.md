@@ -24,6 +24,12 @@
   when the library is back, each with the version it started from. What
   the library refuses (changed meanwhile, or gone) is listed on the app's
   page with what one wrote, and a notification says so.
+- **Logins kept safe, and logging out leaves nothing behind**: the app
+  keeps its login to each library in the system's store of logins
+  (Keychain, Credential Manager, GNOME Keyring, KWallet), else in a file
+  of the person's alone. A library's copy opens offline only while logged
+  in; logging out (also offline) deletes the copy from the device, and
+  what was changed offline before is still sent, then the login ends.
 - **Apps and servers of different versions**: `GET /api/version` says the
   server's version, the oldest app it serves fully and what it offers
   apps. An app goes without what an older server lacks (offline use needs

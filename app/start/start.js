@@ -139,6 +139,18 @@ form.addEventListener('submit', async (event) => {
 
 show();
 showUnsaved();
+// Logged out offline: what is still to be sent before the login ends.
+invoke('logging_out').then((libraries) => {
+	const note = document.getElementById('logging-out');
+	note.hidden = libraries.length === 0;
+	note.textContent = libraries
+		.map(({ name, waiting }) =>
+			waiting
+				? `Logged out of ${name}: ${waiting === 1 ? '1 change' : `${waiting} changes`} made offline will be sent when it can be reached, then the login ends there.`
+				: `Logged out of ${name}: the login ends there when it can be reached.`
+		)
+		.join(' ');
+});
 // Where logins are kept, if not in the system's keyring.
 invoke('logins_in_file').then((inFile) => {
 	document.getElementById('logins-in-file').hidden = !inFile;

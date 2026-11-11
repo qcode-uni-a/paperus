@@ -26,7 +26,7 @@ use tauri_plugin_opener::OpenerExt;
 const MAIN: &str = "main";
 
 /// Where the app's own page is served (the scheme differs by system).
-fn start_page() -> Url {
+pub(crate) fn start_page() -> Url {
     let base = if cfg!(any(windows, target_os = "android")) {
         "http://tauri.localhost/"
     } else {
@@ -90,8 +90,15 @@ async fn open_library(app: AppHandle, url: String) -> Result<(), String> {
     let reachable = tauri::async_runtime::spawn_blocking(move || offline::reachable(&checked))
         .await
         .unwrap_or(true);
-    if !reachable && offline::has_copy(&app, &url) {
-        return offline::open(&window, &url).map_err(|error| error.to_string());
+    if !reachable {
+        if offline::has_copy(&app, &url) {
+            return offline::open(&window, &url).map_err(|error| error.to_string());
+        }
+        // Logging in needs the library: nothing of it to show till then.
+        return Err(format!(
+            "{} cannot be reached. Open it again when you are back online.",
+            library.name
+        ));
     }
     let to = Url::parse(&url).map_err(|error| error.to_string())?;
     window.navigate(to).map_err(|error| error.to_string())
@@ -140,6 +147,12 @@ fn local_progress() -> String {
 #[tauri::command]
 fn logins_in_file(app: AppHandle) -> bool {
     libraries::logins_in_file(&app)
+}
+
+/// Libraries logged out offline, whose login ends when they are back.
+#[tauri::command]
+fn logging_out(app: AppHandle) -> Vec<offline::LoggingOut> {
+    offline::logging_out(&app)
 }
 
 /// Changes made offline that libraries refused (changed or gone meanwhile).
@@ -375,7 +388,8 @@ pub fn run() {
             local_progress,
             unsaved_changes,
             dismiss_unsaved,
-            logins_in_file
+            logins_in_file,
+            logging_out
         ])
         .setup(|app| {
             let saved = libraries::load(app.handle());
@@ -395,11 +409,15 @@ pub fn run() {
             if let Some(library) = last.filter(|library| !library.local).cloned() {
                 let opening = app.handle().clone();
                 std::thread::spawn(move || {
-                    if !offline::reachable(&library.url)
-                        && offline::has_copy(&opening, &library.url)
-                    {
-                        let _ = offline::open(&main, &library.url);
+                    if offline::reachable(&library.url) {
+                        return;
                     }
+                    // Its copy, or (none, or logged out) the app's page.
+                    let _ = if offline::has_copy(&opening, &library.url) {
+                        offline::open(&main, &library.url)
+                    } else {
+                        main.navigate(start_page())
+                    };
                 });
             }
             if last.is_some_and(|library| library.local) {

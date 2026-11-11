@@ -10,6 +10,7 @@ fn main() {
             "unsaved_changes",
             "dismiss_unsaved",
             "logins_in_file",
+            "logging_out",
         ]),
     ))
     .expect("failed to build the app");

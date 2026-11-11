@@ -166,12 +166,115 @@ pub fn dismiss(app: &AppHandle, library: &str, seq: i64) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// Whether there is a copy of the library to open: synced, with its website.
+/// Whether there is a copy of the library to open: synced, with its
+/// website, and a login kept (logged out, it is not opened: nobody could log
+/// in offline).
 pub fn has_copy(app: &AppHandle, library: &str) -> bool {
     let Some(folder) = folder(app, library) else {
         return false;
     };
-    site::has_copy(&folder) && open_store(app, library).is_some_and(|store| store.since() > 0)
+    let logged_in = Url::parse(library).is_ok_and(|url| libraries::kept_login(app, &url).is_some());
+    logged_in
+        && site::has_copy(&folder)
+        && open_store(app, library).is_some_and(|store| store.since() > 0 && !store.logging_out())
+}
+
+/// Delete the copy of a library from this device (logged out): what was
+/// synced, the papers kept, the website. Changes not sent yet stay, sent
+/// after the next login (or before the login ends, logging out offline).
+fn forget_copy(app: &AppHandle, library: &str) {
+    if let Some(mut store) = open_store(app, library) {
+        let _ = store.clear();
+    }
+    if let Some(folder) = folder(app, library) {
+        for part in ["files", "site", "site.next", "site.old"] {
+            let _ = fs::remove_dir_all(folder.join(part));
+        }
+    }
+}
+
+/// The library's login ended (logged out, or too old): forgotten, and the
+/// copy with it.
+fn logged_out(app: &AppHandle, library: &str) {
+    if let Ok(url) = Url::parse(library) {
+        libraries::remember_session(app, &url, None);
+    }
+    forget_copy(app, library);
+}
+
+/// Logged out in the copy, offline: the copy goes at once, and the window
+/// to the app's page; what was changed offline is sent when the library is
+/// back, then the login ends there too (`finish_logouts`).
+fn log_out_offline(app: &AppHandle, library: &str) {
+    forget_copy(app, library);
+    if let Some(store) = open_store(app, library) {
+        let _ = store.enqueue(&store::Queued {
+            method: "POST".into(),
+            path: "/api/auth/logout".into(),
+            what: "Logging out".into(),
+            ..store::Queued::default()
+        });
+        let _ = store.set_logging_out(true);
+    }
+    if let Ok(mut open) = OPEN.lock() {
+        *open = None;
+    }
+    if let Some(main) = app.get_webview_window(MAIN) {
+        let _ = main.navigate(crate::start_page());
+    }
+}
+
+/// Logged out offline, for the app's page: the library, and how many
+/// changes wait to be sent before the login ends there.
+#[derive(serde::Serialize)]
+pub struct LoggingOut {
+    name: String,
+    waiting: usize,
+}
+
+pub fn logging_out(app: &AppHandle) -> Vec<LoggingOut> {
+    libraries::load(app)
+        .libraries
+        .into_iter()
+        .filter(|library| !library.local)
+        .filter_map(|library| {
+            let store = open_store(app, &library.url)?;
+            store.logging_out().then(|| LoggingOut {
+                name: library.name,
+                // Not counting the logout itself.
+                waiting: store.queued().len().saturating_sub(1),
+            })
+        })
+        .collect()
+}
+
+/// Libraries logged out offline, back within reach: their queue sent, the
+/// logout last, then the login forgotten.
+fn finish_logouts(app: &AppHandle) {
+    for library in libraries::load(app).libraries {
+        let Some(store) = open_store(app, &library.url) else {
+            continue;
+        };
+        if library.local || !store.logging_out() || !reachable(&library.url) {
+            continue;
+        }
+        let Ok(url) = Url::parse(&library.url) else {
+            continue;
+        };
+        let Some(token) = libraries::kept_login(app, &url) else {
+            let _ = store.set_logging_out(false);
+            continue;
+        };
+        let server = Server {
+            url: &library.url,
+            token: &token,
+            logged_out: Default::default(),
+        };
+        if push(&server, &store) || server.logged_out.get() {
+            libraries::remember_session(app, &url, None);
+            let _ = store.set_logging_out(false);
+        }
+    }
 }
 
 /// The library whose copy is open.
@@ -200,7 +303,13 @@ pub fn serve(
         let response = match library.and_then(|library| Some((folder(&app, &library)?, library))) {
             Some((folder, library)) => {
                 let path = request.uri().path();
-                if path.starts_with("/api/") {
+                if request.method() == "POST" && path == "/api/auth/logout" {
+                    log_out_offline(&app, &library);
+                    Response::builder()
+                        .status(204)
+                        .body(Vec::new())
+                        .expect("a response")
+                } else if path.starts_with("/api/") {
                     match open_store(&app, &library) {
                         Some(store) => answer::answer(&store, &folder, &request),
                         None => answer::unavailable(),
@@ -239,6 +348,7 @@ pub fn start(app: AppHandle) {
         // after a while (the server may be updated).
         let mut checked: std::collections::HashMap<String, (bool, Instant)> = Default::default();
         loop {
+            finish_logouts(&app);
             let _ = sync(&app, &mut checked);
             let _ = woken.recv_timeout(EVERY);
             while woken.try_recv().is_ok() {}
@@ -284,7 +394,7 @@ fn sync(
     // What was changed offline first: what comes back then includes it.
     if !push(&server, &store) {
         if server.logged_out.get() {
-            libraries::remember_session(app, &Url::parse(&url).ok()?, None);
+            logged_out(app, &url);
         }
         return None;
     }
@@ -296,9 +406,10 @@ fn sync(
     let before = store.since();
     if let Err(error) = store::pull(&mut store, &url, &token) {
         eprintln!("offline: {url}: not synced: {error}");
-        // The login ended (logged out, or too old): not used again.
+        // The login ended (logged out, or too old): not used again, and
+        // the copy goes with it.
         if error.ends_with(": 401") {
-            libraries::remember_session(app, &Url::parse(&url).ok()?, None);
+            logged_out(app, &url);
         }
         return None;
     }

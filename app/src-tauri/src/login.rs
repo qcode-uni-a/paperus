@@ -48,13 +48,14 @@ pub fn start(app: AppHandle, label: String, next: String) {
         let outcome = log_in(&app, &library);
         match outcome {
             Ok(Some(session)) => {
-                libraries::remember_session(&app, &library, Some(&session.token));
+                let token = session.token.clone();
                 let set = window.set_cookie(cookie(&library, session.token, session.max_age));
-                let target = library.join(&next).unwrap_or(library);
+                let target = library.join(&next).unwrap_or_else(|_| library.clone());
                 if set.is_ok() {
                     let _ = window.navigate(target);
                 }
                 let _ = window.set_focus();
+                libraries::remember_session(&app, &library, Some(&token));
             }
             // Cancelled in the browser, or never came back.
             Ok(None) => {}
