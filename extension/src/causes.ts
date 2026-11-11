@@ -65,7 +65,13 @@ export function signalsOfHtml(html: string, status: number): Signals {
 	return {
 		title,
 		text,
-		captcha: /g-recaptcha|h-captcha|cf-turnstile|challenge-platform|captcha-delivery|px-captcha/i.test(html),
+		// Not "challenge-platform": Cloudflare's script is on every page it
+		// serves (Wiley's ePDF reader's too), a check or not; its checks
+		// carry _cf_chl_opt and the challenge form.
+		captcha:
+			/g-recaptcha|h-captcha|cf-turnstile|_cf_chl_opt|id=["']?challenge-form|captcha-delivery|px-captcha/i.test(
+				html
+			),
 		password: /type=["']?password/i.test(html),
 		status
 	};

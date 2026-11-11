@@ -10,6 +10,7 @@ import {
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
+import { directPdf, readerPdf } from "./links";
 import { logIssue, trace } from "./log";
 import {
   fetchPdf,
@@ -348,21 +349,31 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
         `The page did not load (“${signals.title.trim()}”): reload it, then save again.`,
       );
   }
-  if (info.arxiv || page.isPdf || page.pdfUrl)
-    step(tab.id!, "Fetching the PDF…");
+  // The PDF's own address (a reader's link mapped to its download).
+  const pdfLink = page.isPdf
+    ? null
+    : page.pdfUrl
+      ? directPdf(page.pdfUrl)
+      : readerPdf(url);
+  if (pdfLink !== page.pdfUrl && pdfLink)
+    trace("The PDF link leads to a reader: its download instead", {
+      link: page.pdfUrl ?? url,
+      pdf: pdfLink,
+    });
+  if (info.arxiv || page.isPdf || pdfLink) step(tab.id!, "Fetching the PDF…");
   const pdf = info.arxiv
     ? await arxivPdf(info.arxiv)
-    : page.isPdf || page.pdfUrl
+    : page.isPdf || pdfLink
       ? await orInTab(
           await onwards(
             await inPage(
               tab.id!,
               fetchPdf,
-              page.isPdf ? page.url : page.pdfUrl!,
+              page.isPdf ? page.url : pdfLink!,
               MAX_BYTES,
             ),
           ),
-          page.isPdf ? null : page.pdfUrl,
+          pdfLink,
         )
       : { error: robot ? EXPLAINED["robot-check"] : "The page links no PDF." };
   trace("The PDF", { page: url, ...fetched(pdf) });
@@ -1113,7 +1124,11 @@ async function getOne(
   try {
     await loaded(tabId);
     const page = await inPage(tabId, readPage);
-    const pdfUrl = page.isPdf ? page.url : page.pdfUrl;
+    const pdfUrl = page.isPdf
+      ? page.url
+      : page.pdfUrl
+        ? directPdf(page.pdfUrl)
+        : readerPdf(page.url);
     trace("Publisher's page read (Missing)", {
       page: paper.url,
       landed: (await chrome.tabs.get(tabId)).url ?? null,
