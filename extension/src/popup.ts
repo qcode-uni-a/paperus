@@ -95,6 +95,7 @@ function show(result: Result, owners: Owner[]): void {
 	);
 	$('owner-field').hidden = false;
 	select.addEventListener('change', async () => {
+		stay();
 		select.disabled = true;
 		const moved = (await chrome.runtime.sendMessage({
 			type: 'moveItem',
@@ -109,11 +110,53 @@ function show(result: Result, owners: Owner[]): void {
 	});
 }
 
+/** Closing by itself once done: soon when saved, later when only in
+ * part or not at all (there is more to read). It waits while the pointer
+ * is on it or it has the focus, and stays once one does something there
+ * (another owner, allowing access). */
+const CLOSE_MS = { ok: 3_000, warning: 8_000, error: 12_000 };
+let closing: ReturnType<typeof setTimeout> | undefined;
+let left = 0;
+let since = 0;
+let staying = false;
+let resting = false; // the pointer on it, or the focus in it
+
+function closeIn(ms: number): void {
+	clearTimeout(closing);
+	left = ms;
+	if (!resting && !staying) {
+		since = Date.now();
+		closing = setTimeout(() => window.close(), left);
+	}
+}
+function pause(): void {
+	resting = true;
+	if (closing === undefined) return;
+	clearTimeout(closing);
+	closing = undefined;
+	left = Math.max(1_500, left - (Date.now() - since));
+}
+function go(): void {
+	resting = false;
+	if (left && !staying) closeIn(left);
+}
+/** One did something here: it stays open. */
+function stay(): void {
+	staying = true;
+	clearTimeout(closing);
+	closing = undefined;
+}
+document.addEventListener('pointerenter', pause);
+document.addEventListener('pointerleave', go);
+document.addEventListener('focusin', pause);
+document.addEventListener('focusout', go);
+
 async function save(tabId: number, owners: Owner[]): Promise<void> {
 	state('Reading the page…');
 	stage('reading');
 	const result = (await chrome.runtime.sendMessage({ type: 'popupSave', tabId })) as Result;
 	show(result, owners);
+	closeIn(!result.ok ? CLOSE_MS.error : result.warning ? CLOSE_MS.warning : CLOSE_MS.ok);
 }
 
 (async () => {
@@ -160,6 +203,7 @@ async function save(tabId: number, owners: Owner[]): Promise<void> {
 	}
 	const { owners = [] } = (await chrome.storage.local.get('owners')) as { owners?: Owner[] };
 	$('allow').addEventListener('click', async () => {
+		stay();
 		if (!(await chrome.permissions.request(ALL_SITES).catch(() => false))) return;
 		$('allow').hidden = true;
 		$('detail').hidden = true;

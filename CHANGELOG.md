@@ -40,6 +40,9 @@
   heading showed without scrolling. How full the storage is stays under
   Administration → Server (with the library's share); `GET /api/storage`,
   which only the box used, is gone.
+- **The extension's popup closes by itself**: 3 seconds after saving, 8
+  when the PDF did not come along, 12 when nothing was saved; it waits
+  while the pointer is on it, and stays once one chooses another owner.
 - **The extension's popup**: a site at a numbered address (127.0.0.1)
   showed as "0"; a site without a favicon shows a globe.
 
