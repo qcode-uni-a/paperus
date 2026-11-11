@@ -7,12 +7,18 @@ from the library's counter and stamps it on what changed (like Zotero's
 library version). Taking the number locks the counter row
 until commit, so numbers become visible in order and ``since=N`` never misses
 a change that commits late.
+
+What is deleted for good is recorded as a ``Removal`` with the number of
+the transaction that deleted it, so a device that synced before learns to
+remove it too.
 """
 
+import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from itertools import chain
 
-from sqlalchemy import event, select, update
+from sqlalchemy import event, insert, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.models import (
@@ -28,6 +34,7 @@ from paperus.models import (
     ItemView,
     Note,
     NoteItem,
+    Removal,
     Tag,
     Version,
 )
@@ -81,6 +88,36 @@ def _stamped(obj: object) -> Stamped | None:
     return None
 
 
+def _removal(db: Session, obj: object, deleted: set[object]) -> Removal | None:
+    """The record of ``obj`` deleted for good, unless it goes with a paper
+    deleted too (a file; annotations go with their file in the database)."""
+    match obj:
+        case Item() | Note() | Tag() | Collection():
+            kind, library_id = type(obj).__name__.lower(), obj.library_id
+        case File(version=Version(item=item)) if item not in deleted:
+            kind, library_id = "file", item.library_id
+        case Annotation():
+            file = db.get_one(File, obj.file_id)
+            kind, library_id = "annotation", file.version.item.library_id
+        case _:
+            return None
+    return Removal(record_id=obj.id, kind=kind, library_id=library_id)
+
+
+def removed(
+    db: Session, kind: str, records: Iterable[tuple[uuid.UUID, uuid.UUID]]
+) -> None:
+    """Record (id, library id) as deleted for good, for deletes that bypass
+    the ORM's flush (bulk deletes)."""
+    rows = [
+        {"record_id": record_id, "kind": kind, "library_id": library_id}
+        for record_id, library_id in records
+    ]
+    if rows:
+        number = change_number(db)
+        db.execute(insert(Removal), [row | {"change": number} for row in rows])
+
+
 @event.listens_for(Session, "before_flush")
 def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> None:
     changed_objects = list(
@@ -115,6 +152,11 @@ def _stamp_changes(db: Session, flush: UOWTransaction, instances: object) -> Non
     with db.no_autoflush:
         number = change_number(db)
         now = datetime.now(UTC)
+        deleted = set(db.deleted)
+        for obj in db.deleted:
+            if (removal := _removal(db, obj, deleted)) is not None:
+                removal.change = number
+                db.add(removal)
         for target in stamped:
             target.change = number
             if isinstance(target, Item | Note) and id(target) in own_change | content:

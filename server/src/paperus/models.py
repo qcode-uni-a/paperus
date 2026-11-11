@@ -255,6 +255,24 @@ class ChangeCounter(Base):
     value: Mapped[int] = mapped_column(BigInteger)
 
 
+class Removal(Base):
+    """Something deleted for good, for syncing (``paperus.changes``): a
+    device that last synced before ``change`` removes it too. What goes to
+    the trash is a change, not a removal; what goes with a removed paper
+    (its versions, files, annotations) is not listed again."""
+
+    __tablename__ = "removals"
+
+    record_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    """``item``, ``note``, ``tag``, ``collection``, ``file`` or ``annotation``."""
+    library_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("libraries.id", ondelete="CASCADE"), index=True
+    )
+    """Where it was: who may read that library is told."""
+    change: Mapped[int] = mapped_column(BigInteger, index=True)
+
+
 class Trashable:
     """Objects in the trash have ``deleted_at`` set and can be restored."""
 

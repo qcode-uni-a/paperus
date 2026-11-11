@@ -4,9 +4,10 @@ import uuid
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus.models import Annotation, ItemView
+from paperus.models import Annotation, Item, ItemView, Removal
 from tests.conftest import FakeDOIRegistry
 from tests.people import Person
 
@@ -110,6 +111,73 @@ def test_annotations_and_reading_positions_are_numbered(
     assert annotation.change == before + 4
     # The paper's own number stays: none of this changed the paper.
     assert ada.get(f"/api/items/{paper}").json()["change"] == before
+
+
+def test_what_is_deleted_for_good_is_recorded(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    gone, stays = ada.add("Gone"), ada.add("Stays")
+    library = stays["library_id"]
+
+    def upload(item: dict[str, Any], name: str) -> str:
+        file_id: str = ada.post(
+            f"/api/items/{item['id']}/files",
+            files={"upload": (name, PDF + name.encode(), "application/pdf")},
+        ).json()["id"]
+        return file_id
+
+    upload(gone, "gone.pdf")
+    old, kept = upload(stays, "old.pdf"), upload(stays, "kept.pdf")
+    note = ada.note("Gone too")["id"]
+    tag = ada.post("/api/tags", {"name": "Unused"}).json()["id"]
+    shelf = ada.post("/api/collections", {"name": "Shelf"}).json()["id"]
+    mark = ada.post(
+        f"/api/files/{kept}/annotations",
+        {
+            "kind": "note",
+            "page_index": 0,
+            "position": {"rects": [[10, 10, 20, 20]]},
+            "color": "#ffd400",
+        },
+    ).json()["id"]
+
+    def removals() -> dict[str, tuple[str, int]]:
+        db.expire_all()
+        return {
+            str(r.record_id): (r.kind, r.change)
+            for r in db.scalars(select(Removal).where(Removal.library_id == library))
+        }
+
+    # Deleted at once: each with the number of its change.
+    before = int(ada.get("/api/items").headers["Last-Change"])
+    assert ada.delete(f"/api/tags/{tag}").status_code == 204
+    assert ada.delete(f"/api/collections/{shelf}").status_code == 204
+    assert ada.delete(f"/api/annotations/{mark}").status_code == 204
+    assert removals() == {
+        tag: ("tag", before + 1),
+        shelf: ("collection", before + 2),
+        mark: ("annotation", before + 3),
+    }
+
+    # The trash is a change; emptying it removes, all with one number. The
+    # file of the paper removed is not listed again.
+    ada.delete(f"/api/items/{gone['id']}")
+    ada.delete(f"/api/notes/{note}")
+    ada.delete(f"/api/files/{old}")
+    assert len(removals()) == 3
+    emptied = ada.delete("/api/trash").json()
+    assert emptied == {"items": 1, "notes": 1, "files": 1}
+    number = int(ada.get("/api/items").headers["Last-Change"])
+    assert {k: v for k, v in removals().items() if v[1] == number} == {
+        gone["id"]: ("item", number),
+        note: ("note", number),
+        old: ("file", number),
+    }
+
+    # A paper deleted through the ORM (merged away): only the paper.
+    item = db.get_one(Item, uuid.UUID(stays["id"]))
+    db.delete(item)
+    db.commit()
+    assert {v for v in removals().values() if v[1] > number} == {("item", number + 1)}
 
 
 def test_overrides_need_current_etag(logged_in: TestClient) -> None:

@@ -13,8 +13,10 @@
   to each release (`app/local/`, `local.yml`).
 - **The server runs on Windows** (for that library): the PDF helpers'
   memory limit is left out there.
-- **Change numbers for annotations and reading positions**, a first step
-  towards syncing for offline use (migration 0008).
+- **Towards syncing for offline use**: annotations and reading positions
+  get change numbers like papers and notes (migration 0008), and what is
+  deleted for good (papers, notes, files, tags, collections, annotations)
+  is recorded, so a device can remove it too (migration 0009).
 
 ## 0.0.21 (2026-11-11)
 

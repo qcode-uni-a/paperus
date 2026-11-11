@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import ColumnElement, delete, exists, select
 from sqlalchemy.orm import Session
 
+from paperus import changes
 from paperus.models import (
     Blob,
     Chunk,
@@ -59,23 +60,33 @@ def empty(
             conditions.append(model.library_id.in_(libraries))
         return conditions
 
-    done.items = _count(db.execute(delete(Item).where(*gone(Item))))
-    done.notes = _count(db.execute(delete(Note).where(*gone(Note))))
-    in_libraries = select(Version.id).join(Item, Item.id == Version.item_id)
+    items = db.execute(
+        delete(Item).where(*gone(Item)).returning(Item.id, Item.library_id)
+    ).all()
+    changes.removed(db, "item", items)
+    notes = db.execute(
+        delete(Note).where(*gone(Note)).returning(Note.id, Note.library_id)
+    ).all()
+    changes.removed(db, "note", notes)
+    done.items, done.notes = len(items), len(notes)
+    file_conditions = [
+        File.deleted_at.is_not(None),
+        File.version_id == Version.id,
+        Version.item_id == Item.id,
+    ]
     if libraries is not None:
-        in_libraries = in_libraries.where(Item.library_id.in_(libraries))
-    file_conditions = [File.deleted_at.is_not(None), File.version_id.in_(in_libraries)]
+        file_conditions.append(Item.library_id.in_(libraries))
     if before is not None:
         file_conditions.append(File.deleted_at < before)
-    done.files = _count(db.execute(delete(File).where(*file_conditions)))
+    rows = db.execute(
+        delete(File).where(*file_conditions).returning(File.id, Item.library_id)
+    ).all()
+    changes.removed(db, "file", rows)
+    done.files = len(rows)
     db.commit()
     unused = collect_garbage(db, blobs)
     done.blobs, done.bytes = unused
     return done
-
-
-def _count(result: object) -> int:
-    return int(getattr(result, "rowcount", 0) or 0)
 
 
 def collect_garbage(db: Session, blobs: BlobStore) -> tuple[int, int]:
