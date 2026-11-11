@@ -1,15 +1,20 @@
 """Backups: written from one snapshot, restored into an empty database."""
 
 import gzip
+import hashlib
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from procrastinate import App
 from sqlalchemy import Engine, make_url, text
+from sqlalchemy.orm import Session
 
+from paperus.app import create_app
 from paperus.backup import (
     BackupError,
     check_restore,
@@ -23,7 +28,8 @@ from paperus.backup import (
 from paperus.config import Settings
 from paperus.db import make_engine
 from paperus.storage import BlobStore, FilesystemStore
-from tests.conftest import _recreate_database
+from tests.conftest import FakeML, _recreate_database
+from tests.people import Person, group
 
 PDF = b"%PDF-1.7\n" + b"x" * 4000 + b"\n%%EOF\n"
 
@@ -342,3 +348,118 @@ def test_restore_without_a_file_the_backup_lost(
     finally:
         restored.dispose()
     assert list(store.iter_stored()) == []
+
+
+MARK = {
+    "kind": "note",
+    "page_index": 0,
+    "position": {"rects": [[10, 10, 20, 20]]},
+    "color": "#ffd400",
+    "comment": "Key result",
+}
+
+
+def what_one_sees(person: Person) -> dict[str, Any]:
+    """Everything a person sees, for comparing before and after."""
+    items = person.get("/api/items", {"limit": "200"}).json()
+    files = [f["id"] for item in items for f in item["files"]]
+    return {
+        "items": sorted(item["title"] for item in items),
+        "notes": sorted(note["title"] for note in person.get("/api/notes").json()),
+        "tags": sorted(tag["name"] for tag in person.get("/api/tags").json()),
+        "collections": sorted(c["name"] for c in person.get("/api/collections").json()),
+        "groups": sorted(g["name"] for g in person.get("/api/groups").json()),
+        "annotations": sorted(
+            a["comment"] or ""
+            for file in files
+            for a in person.get(f"/api/files/{file}/annotations").json()["annotations"]
+        ),
+        "contents": sorted(
+            hashlib.sha256(person.get(f"/api/files/{file}/content").content).hexdigest()
+            for file in files
+        ),
+    }
+
+
+def test_a_whole_library_comes_back(
+    client: TestClient,
+    db: Session,
+    engine: Engine,
+    blobs: BlobStore,
+    tmp_path: Path,
+    restore_url: str,
+    job_app: App,
+    fake_ml: FakeML,
+) -> None:
+    """A backup restored onto a fresh installation (#41): papers, files,
+    notes, annotations, tags, collections, groups and sharing come back,
+    and each person sees what they saw."""
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    lab = group(root, "Lab", ada)
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", json={"role": "reader"})
+    shared = ada.add("Shared paper", lab["library_id"])
+    ada.add("Ada's own")
+    file = ada.post(
+        f"/api/items/{shared['id']}/files",
+        files={"upload": ("paper.pdf", PDF, "application/pdf")},
+    ).json()["id"]
+    ada.note("# Seminar\n\nOn the shared paper", lab["library_id"], [shared["id"]])
+    ada.note("# Private thoughts")
+    ada.post(f"/api/items/{shared['id']}/tags", {"name": "optics"})
+    shelf = ada.post(
+        "/api/collections", {"name": "Shelf", "library_id": lab["library_id"]}
+    ).json()
+    ada.post(f"/api/collections/{shelf['id']}/items", {"item_ids": [shared["id"]]})
+    ada.post(f"/api/files/{file}/annotations", MARK)
+    bob.post(f"/api/files/{file}/annotations", MARK | {"comment": "Bob's own"})
+    ada.put(f"/api/items/{shared['id']}/annotation-sharing", {"shared": True})
+    seen = {name: what_one_sees(p) for name, p in (("ada", ada), ("bob", bob))}
+    assert seen["bob"]["items"] == ["Shared paper"]
+    assert seen["bob"]["annotations"] == ["Bob's own", "Key result"]
+    assert seen["bob"]["notes"] == ["Seminar"]
+
+    backups = tmp_path / "backups"
+    manifest = create_backup(engine, blobs, backups, with_files=True)
+    restored_files = tmp_path / "restored-files"
+    settings = Settings(database_url=restore_url, storage_path=restored_files)
+    restored_engine = make_engine(restore_url)
+    try:
+        restore_backup(
+            settings,
+            restored_engine,
+            FilesystemStore(restored_files),
+            backups,
+            manifest.name,
+            replace=False,
+        )
+
+        def rows(on: Engine) -> dict[str, int]:
+            with on.connect() as connection:
+                tables = connection.scalars(
+                    text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+                ).all()
+                return {
+                    table: connection.execute(
+                        text(f'SELECT count(*) FROM "{table}"')
+                    ).scalar_one()
+                    for table in tables
+                    # Job queue and log: the worker's, not the library's.
+                    if not table.startswith(("procrastinate", "log_entries"))
+                }
+
+        assert rows(restored_engine) == rows(engine)
+        # A fresh installation on the restored database and files: each
+        # person logs in with their password and sees what they saw.
+        app = create_app(settings, job_app=job_app, ml_client=fake_ml.client())
+        with TestClient(app, base_url="https://testserver") as fresh:
+            for name in ("ada", "bob"):
+                login = fresh.post(
+                    "/api/auth/login", json={"username": name, "password": "secret"}
+                )
+                again = Person.__new__(Person)
+                again.client = fresh
+                again.headers = {"Authorization": f"Bearer {login.json()['token']}"}
+                assert what_one_sees(again) == seen[name], name
+    finally:
+        restored_engine.dispose()
