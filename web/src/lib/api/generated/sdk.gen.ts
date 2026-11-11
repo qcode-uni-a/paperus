@@ -1060,7 +1060,8 @@ export const listExports = <ThrowOnError extends boolean = false>(options?: Opti
  * Start Export
  *
  * Export what the person sees (by default everything, with files).
- * Written in the background; poll ``GET /api/exports/{id}``.
+ * Written in the background; poll ``GET /api/exports/{id}``, or wait for
+ * the notifications (one per zip written).
  */
 export const startExport = <ThrowOnError extends boolean = false>(options: Options<StartExportData, ThrowOnError>): RequestResult<StartExportResponses, StartExportErrors, ThrowOnError> => (options.client ?? client).post<StartExportResponses, StartExportErrors, ThrowOnError>({
     url: '/api/exports',
@@ -1084,8 +1085,8 @@ export const getExport = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Download Export
  *
- * One zip of the export (from 1), while it lasts; answers range
- * requests (to read only the database out of part 1, say).
+ * One zip of the export (from 1) once written, while it lasts; answers
+ * range requests (to read only the database out of part 1, say).
  */
 export const downloadExport = <ThrowOnError extends boolean = false>(options: Options<DownloadExportData, ThrowOnError>): RequestResult<DownloadExportResponses, DownloadExportErrors, ThrowOnError> => (options.client ?? client).get<DownloadExportResponses, DownloadExportErrors, ThrowOnError>({ url: '/api/exports/{export_id}/parts/{part}', ...options });
 

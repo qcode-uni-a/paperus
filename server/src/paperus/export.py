@@ -40,7 +40,7 @@ from pydantic import BaseModel
 from sqlalchemy import Select, func, select, update
 from sqlalchemy.orm import Session
 
-from paperus import __version__, formats, organize
+from paperus import __version__, formats, notifications, organize
 from paperus.access import Access, NotVisible
 from paperus.config import Settings
 from paperus.identifiers import Scheme
@@ -1363,10 +1363,12 @@ def write_export(
     server_url: str | None = None,
     part_limit: int = PART_LIMIT,
     progress: Callable[[int, int], None] = lambda done, total: None,
+    finished: Callable[[list[Part], int], None] = lambda parts, count: None,
 ) -> Written:
     """Write the export's zips into ``folder`` (which must exist); returns
-    the parts. Reads from one snapshot of the database (callers start a
-    REPEATABLE READ transaction for that)."""
+    the parts. ``finished`` is told of each zip written (the parts so far,
+    and how many there are). Reads from one snapshot of the database
+    (callers start a REPEATABLE READ transaction for that)."""
     now = datetime.now(UTC)
     name = export_name(now, options.format)
     selection = choose(db, access, options)
@@ -1389,6 +1391,7 @@ def write_export(
                 server_url=server_url,
                 part_limit=part_limit,
                 progress=progress,
+                finished=finished,
             )
         return _paperus(
             db,
@@ -1404,6 +1407,7 @@ def write_export(
             server_url=server_url,
             part_limit=part_limit,
             progress=progress,
+            finished=finished,
         )
     finally:
         shutil.rmtree(work, ignore_errors=True)
@@ -1424,6 +1428,7 @@ def _paperus(
     server_url: str | None,
     part_limit: int,
     progress: Callable[[int, int], None],
+    finished: Callable[[list[Part], int], None],
 ) -> Written:
     """paperus' own: library.sqlite and the files."""
     database_path = folder / "work" / DATABASE
@@ -1541,6 +1546,7 @@ def _paperus(
         readme_text=text,
         by_part=by_part,
         progress=progress,
+        finished=finished,
     )
     return Written(parts=parts, counts=counts)
 
@@ -1577,6 +1583,7 @@ def _zips(
     readme_text: str,
     by_part: dict[int, list[PlannedFile]],
     progress: Callable[[int, int], None],
+    finished: Callable[[list[Part], int], None],
 ) -> list[Part]:
     """Write the zips: part 1 with ``first`` (name, its bytes, whether to
     compress), part.json, README.txt and files; later parts part.json and
@@ -1626,6 +1633,7 @@ def _zips(
                 done += 1
                 progress(done, total)
         parts.append(Part(target.name, target.stat().st_size, len(files_here)))
+        finished(parts, count)
     return parts
 
 
@@ -1784,6 +1792,7 @@ def _for_program(
     server_url: str | None,
     part_limit: int,
     progress: Callable[[int, int], None],
+    finished: Callable[[list[Part], int], None],
 ) -> Written:
     """A file for another program (paperus.rdf, .bib, .ris), its README and
     the files."""
@@ -1843,6 +1852,7 @@ def _for_program(
         readme_text="\n".join(lines),
         by_part=by_part,
         progress=progress,
+        finished=finished,
     )
     counts = {
         "items": len(selection.items),
@@ -1961,7 +1971,9 @@ def run(
     *,
     part_limit: int = PART_LIMIT,
 ) -> None:
-    """Write the export ``export_id`` asked for, keeping its row up to date."""
+    """Write the export ``export_id`` asked for, keeping its row up to date.
+    Each zip can be downloaded as soon as it is written, and the person is
+    told (of the last one once the export is done)."""
     with sessions() as db:
         record = db.get(Export, export_id)
         # Running: retried after its worker stopped; it starts again.
@@ -1972,14 +1984,15 @@ def run(
             return
         record.status = ExportStatus.RUNNING
         record.done = record.total = 0
-        user = db.get(User, record.user_id)
+        record.parts = []
+        user_id = record.user_id
+        user = db.get(User, user_id)
         options = Options.model_validate(record.options)
         server_url = load_config(db, settings).public_url
         db.commit()
         folder = folder_of(settings, export_id)
-        partial = folder.with_name(folder.name + ".partial")
-        shutil.rmtree(partial, ignore_errors=True)
-        partial.mkdir(parents=True)
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True)
 
         def progress(done: int, total: int) -> None:
             # In a session of its own: the export reads from one snapshot.
@@ -1989,6 +2002,19 @@ def run(
                     .where(Export.id == export_id)
                     .values(done=done, total=total)
                 )
+                other.commit()
+
+        def finished(parts: list[Part], count: int) -> None:
+            with sessions() as other:
+                other.execute(
+                    update(Export)
+                    .where(Export.id == export_id)
+                    .values(parts=[vars(part) for part in parts])
+                )
+                if len(parts) < count:
+                    notifications.export_ready(
+                        other, user_id, export_id, len(parts), count
+                    )
                 other.commit()
 
         try:
@@ -2002,38 +2028,42 @@ def run(
                 blobs,
                 access,
                 options,
-                partial,
+                folder,
                 export_id=export_id,
                 server_url=str(server_url).rstrip("/") if server_url else None,
                 part_limit=part_limit,
                 progress=progress,
+                finished=finished,
             )
             db.commit()
-            shutil.rmtree(folder, ignore_errors=True)
-            partial.rename(folder)
             record = db.get_one(Export, export_id)
             record.status = ExportStatus.DONE
             record.parts = [vars(part) for part in written.parts]
             record.size = sum(part.size for part in written.parts)
             record.expires_at = datetime.now(UTC) + KEEP
+            count = len(written.parts)
+            notifications.export_ready(db, user_id, export_id, count, count)
         except Exception as error:
             db.rollback()
             log.warning("export %s failed", export_id, exc_info=True)
-            shutil.rmtree(partial, ignore_errors=True)
+            shutil.rmtree(folder, ignore_errors=True)
             record = db.get_one(Export, export_id)
             record.status = ExportStatus.FAILED
+            record.parts = []  # those written so far went with the folder
             record.error = (
                 str(error)
                 if isinstance(error, ExportError | NotVisible)
                 else f"The export stopped: {error}"
             )
+            notifications.export_failed(db, user_id, export_id)
         record.finished_at = datetime.now(UTC)
         db.commit()
 
 
 def part_path(settings: Settings, record: Export, part: int) -> Path | None:
-    """The zip of one part (from 1), while it lasts."""
-    if record.status != ExportStatus.DONE or not 1 <= part <= len(record.parts):
+    """The zip of one part (from 1) once written, while it lasts."""
+    written = record.status in (ExportStatus.RUNNING, ExportStatus.DONE)
+    if not written or not 1 <= part <= len(record.parts):
         return None
     path = folder_of(settings, record.id) / str(record.parts[part - 1]["name"])
     return path if path.is_file() else None
@@ -2078,7 +2108,7 @@ def remove_expired(db: Session, settings: Settings) -> int:
             )
         }
         for path in root.iterdir():
-            if path.name.removesuffix(".partial") not in known:
+            if path.name not in known:
                 if path.is_dir():
                     shutil.rmtree(path, ignore_errors=True)
                 else:

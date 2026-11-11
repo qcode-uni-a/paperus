@@ -2,8 +2,9 @@
 not do themselves, under the bell in the header. Papers added to one of
 their groups (by upload, DOI, the extension, an import, or given to the
 group: one notification per person who added and group, counted up while
-unread for a few hours), and a published version found for one of their
-preprints. Read ones go after ``KEEP_READ``, all after ``KEEP`` (the
+unread for a few hours), a published version found for one of their
+preprints, and each zip of their export as it is written (or the export
+failing). Read ones go after ``KEEP_READ``, all after ``KEEP`` (the
 nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
@@ -37,6 +38,8 @@ unread, are one notification."""
 
 ADDED = "added"
 PUBLISHED = "published"
+EXPORT = "export"
+EXPORT_FAILED = "export_failed"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -125,6 +128,27 @@ def published(db: Session, item: Item, version: Version) -> None:
     }
     for user_id in people_of(db, item.library_id):
         db.add(Notification(user_id=user_id, kind=PUBLISHED, data=data))
+
+
+def export_ready(
+    db: Session, user_id: uuid.UUID, export_id: uuid.UUID, part: int, parts: int
+) -> None:
+    """A zip of the person's export is written (the last: all are)."""
+    db.add(
+        Notification(
+            user_id=user_id,
+            kind=EXPORT,
+            data={"export_id": str(export_id), "part": part, "parts": parts},
+        )
+    )
+
+
+def export_failed(db: Session, user_id: uuid.UUID, export_id: uuid.UUID) -> None:
+    db.add(
+        Notification(
+            user_id=user_id, kind=EXPORT_FAILED, data={"export_id": str(export_id)}
+        )
+    )
 
 
 def prune(db: Session, now: datetime | None = None) -> int:

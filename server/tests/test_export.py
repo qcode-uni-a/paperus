@@ -441,6 +441,96 @@ def test_download_answers_range_requests(
     assert rich.ada.get(f"/api/exports/{record['id']}/parts/2").status_code == 404
 
 
+def test_each_part_as_soon_as_it_is_written(
+    rich: Rich,
+    engine: Engine,
+    blobs: BlobStore,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A zip can be downloaded once written, and the person is told."""
+    export_id = rich.ada.post("/api/exports", json={}).json()["id"]
+    url = f"/api/exports/{export_id}/parts"
+    downloads: list[tuple[str, int, int, int]] = []
+    write = export.write_export
+
+    def watched(*args: Any, finished: Callable[..., None], **kwargs: Any) -> Any:  # noqa: ANN401
+        def told(parts: list[export.Part], count: int) -> None:
+            finished(parts, count)
+            record = rich.ada.get(f"/api/exports/{export_id}").json()
+            n = len(parts)
+            # This one can be downloaded; the next one not yet.
+            downloads.append(
+                (
+                    record["status"],
+                    len(record["parts"]),
+                    rich.ada.get(f"{url}/{n}").status_code,
+                    rich.ada.get(f"{url}/{n + 1}").status_code,
+                )
+            )
+
+        return write(*args, finished=told, **kwargs)
+
+    monkeypatch.setattr(export, "write_export", watched)
+    export.run(
+        make_sessionmaker(engine),
+        blobs,
+        settings,
+        uuid.UUID(export_id),
+        part_limit=1500,
+    )
+    count = len(downloads)
+    assert count > 2
+    assert downloads == [("running", n, 200, 404) for n in range(1, count + 1)]
+    # One notification per part; the last one once the export is done.
+    assert exports_told(rich.ada) == [
+        ("export", {"export_id": export_id, "part": n, "parts": count})
+        for n in range(count, 0, -1)
+    ]
+    assert exports_told(rich.bob) == []
+
+
+def test_a_failure_takes_the_parts_written(
+    rich: Rich,
+    engine: Engine,
+    blobs: BlobStore,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    export_id = rich.ada.post("/api/exports", json={}).json()["id"]
+    write = export.write_export
+
+    def failing(*args: Any, finished: Callable[..., None], **kwargs: Any) -> Any:  # noqa: ANN401
+        def told(parts: list[export.Part], count: int) -> None:
+            finished(parts, count)
+            raise OSError("no space left")
+
+        return write(*args, finished=told, **kwargs)
+
+    monkeypatch.setattr(export, "write_export", failing)
+    export.run(
+        make_sessionmaker(engine),
+        blobs,
+        settings,
+        uuid.UUID(export_id),
+        part_limit=1500,
+    )
+    record = rich.ada.get(f"/api/exports/{export_id}").json()
+    assert record["status"] == "failed" and record["parts"] == []
+    assert record["error"] == "The export stopped: no space left"
+    assert rich.ada.get(f"/api/exports/{export_id}/parts/1").status_code == 404
+    assert not export.folder_of(settings, uuid.UUID(export_id)).exists()
+    [failed, first] = exports_told(rich.ada)
+    assert failed == ("export_failed", {"export_id": export_id})
+    assert first[1]["part"] == 1
+
+
+def exports_told(person: Person) -> list[tuple[str, dict[str, Any]]]:
+    """The person's notifications about exports, newest first."""
+    notices = person.get("/api/me/notifications").json()["notifications"]
+    return [(n["kind"], n["data"]) for n in notices if n["kind"].startswith("export")]
+
+
 def test_estimate(rich: Rich) -> None:
     estimate = rich.ada.post("/api/exports/estimate", json={}).json()
     files = [rich.pdfs["radar"], b"x,y\n1,2\n", rich.pdfs["lab"]]
@@ -496,6 +586,7 @@ def test_listing_and_deleting(
 def test_expired_exports_are_removed(
     rich: Rich,
     run: Runner,
+    client: TestClient,
     db: Session,
     settings: Settings,
 ) -> None:
@@ -523,6 +614,12 @@ def test_expired_exports_are_removed(
     assert str(gone.id) not in listed
     url = f"/api/exports/{first['id']}/parts/1"
     assert rich.ada.get(url).status_code == 404
+    # Followed in a browser (from a notification): to the exports instead.
+    browsing = {**rich.ada.headers, "Accept": "text/html,*/*"}
+    for link in (url, f"/api/exports/{uuid.uuid4()}/parts/1"):
+        response = client.get(link, headers=browsing, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"].endswith("/settings?open=export")
     assert not export.folder_of(settings, uuid.UUID(first["id"])).exists()
     assert export.folder_of(settings, uuid.UUID(second["id"])).is_dir()
     assert not stray.exists()
@@ -547,6 +644,9 @@ def test_failures_are_reported(
     assert record.status == ExportStatus.FAILED
     assert record.error == "The person who asked for it cannot log in."
     assert not list(settings.exports_folder.iterdir())
+    db.get_one(User, uuid.UUID(rich.ada.id)).deactivated_at = None
+    db.commit()
+    assert exports_told(rich.ada) == [("export_failed", {"export_id": str(export_id)})]
     # Done (or gone) exports are not written again.
     export.run(make_sessionmaker(engine), blobs, settings, export_id)
     export.run(make_sessionmaker(engine), blobs, settings, uuid.uuid4())

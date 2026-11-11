@@ -5212,7 +5212,7 @@
           "exports"
         ],
         "summary": "Start Export",
-        "description": "Export what the person sees (by default everything, with files).\nWritten in the background; poll ``GET /api/exports/{id}``.",
+        "description": "Export what the person sees (by default everything, with files).\nWritten in the background; poll ``GET /api/exports/{id}``, or wait for\nthe notifications (one per zip written).",
         "operationId": "start_export",
         "requestBody": {
           "content": {
@@ -5331,7 +5331,7 @@
           "exports"
         ],
         "summary": "Download Export",
-        "description": "One zip of the export (from 1), while it lasts; answers range\nrequests (to read only the database out of part 1, say).",
+        "description": "One zip of the export (from 1) once written, while it lasts; answers\nrange requests (to read only the database out of part 1, say).",
         "operationId": "download_export",
         "parameters": [
           {
@@ -5360,6 +5360,9 @@
             "content": {
               "application/zip": {}
             }
+          },
+          "303": {
+            "description": "Gone, followed in a browser: to the exports"
           },
           "422": {
             "description": "Validation Error",

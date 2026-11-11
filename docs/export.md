@@ -15,9 +15,15 @@ beside the files (see [For other programs](#for-other-programs)).
   first), also the trash
   (off at first), and only one collection (also from a collection's menu:
   "Export with files and notes…"). The size is estimated before starting.
-  The export is written in the background; a message says when it is
-  ready, and the section lists one's exports with their zips to download
-  for a day (24 hours), then they are deleted.
+  The export is written in the background; one can leave the page
+  meanwhile. Each zip can be downloaded as soon as it is written, and a
+  notification (the bell; in the app also the system's) says so, with a
+  link to it: "Part 2 of 3 of your export is ready to download", the last
+  "Your export is complete: …" (an export in one zip: one notification).
+  If the export fails, a notification says so and leads to why. The
+  section lists one's exports with their zips to download for a day (24
+  hours), then they are deleted; a notification's link to a zip that is
+  gone leads to that list.
 - **Command line** (on the server): `paperus export --user NAME OUT.zip`,
   with `--format zotero|jabref|mendeley`, `--owner NAME` (repeatable:
   "Me" or a group's name or path),
@@ -32,8 +38,12 @@ beside the files (see [For other programs](#for-other-programs)).
   consistent snapshot of the database.
 - **API** (session only, not with access tokens, like imports):
   `POST /api/exports/estimate`, `POST /api/exports`, `GET /api/exports`,
-  `GET /api/exports/{id}`, `GET /api/exports/{id}/parts/{n}` (answers range
-  requests), `DELETE /api/exports/{id}`.
+  `GET /api/exports/{id}` (`parts`: the zips written so far),
+  `GET /api/exports/{id}/parts/{n}` (once written; answers range
+  requests), `DELETE /api/exports/{id}`. The notifications
+  (`GET /api/me/notifications`) are of kind `export` (`export_id`, `part`,
+  `parts`; the last part once the export is done) and `export_failed`
+  (`export_id`).
 
 ## The zips
 
@@ -229,7 +239,8 @@ and [import-mapping](import-mapping.md).
 
 On the server, in `exports/` beside the stored files (`PAPERUS_EXPORT_PATH`
 to change it; in the container `/data/files/exports`), one folder per
-export. This is on the disk that holds the library anyway, and outside the
+export (each zip is listed once complete, so it can be downloaded while
+the next is written). This is on the disk that holds the library anyway, and outside the
 file store: the store keeps its contents in `blobs/`, which is all that
 integrity checks, storage figures and backups with files look at (backups
 take the files the database lists). Exports are deleted after a day (an

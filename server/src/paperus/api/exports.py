@@ -1,20 +1,22 @@
 """Exports of what a person can see (Settings → Export): asked for here,
-written by the worker, downloaded for a day. See ``paperus.export`` and
-docs/export.md."""
+written by the worker, each zip downloaded from when it is written, for a
+day. See ``paperus.export`` and docs/export.md."""
 
 import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from paperus import export
 from paperus.access import Access
+from paperus.api.auth import public_base
 from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import queue_export
 from paperus.models import Collection, Export, ExportStatus
+from paperus.system import load_config
 
 router = APIRouter(prefix="/api/exports", tags=["exports"])
 
@@ -38,6 +40,7 @@ class ExportOut(BaseModel):
     total: int
     size: int | None
     parts: list[ExportPartOut]
+    """Its zips, each as soon as it is written."""
     error: str | None
     created_at: datetime
     finished_at: datetime | None
@@ -89,7 +92,8 @@ def start_export(
     body: export.Options, request: Request, db: DB, access: CurrentAccess
 ) -> ExportOut:
     """Export what the person sees (by default everything, with files).
-    Written in the background; poll ``GET /api/exports/{id}``."""
+    Written in the background; poll ``GET /api/exports/{id}``, or wait for
+    the notifications (one per zip written)."""
     options = _checked(db, access, body)
     record = Export(
         user_id=access.user.id,
@@ -148,17 +152,29 @@ def get_export(export_id: uuid.UUID, db: DB, access: CurrentAccess) -> ExportOut
 @router.get(
     "/{export_id}/parts/{part}",
     response_class=FileResponse,
-    responses={200: {"content": {"application/zip": {}}}},
+    responses={
+        200: {"content": {"application/zip": {}}},
+        303: {"description": "Gone, followed in a browser: to the exports"},
+    },
 )
 def download_export(
     export_id: uuid.UUID, part: int, request: Request, db: DB, access: CurrentAccess
 ) -> Response:
-    """One zip of the export (from 1), while it lasts; answers range
-    requests (to read only the database out of part 1, say)."""
-    record = _own(db, access, export_id)
-    path = export.part_path(request.app.state.settings, record, part)
-    if path is None:
-        raise HTTPException(404, "this export cannot be downloaded (any more)")
+    """One zip of the export (from 1) once written, while it lasts; answers
+    range requests (to read only the database out of part 1, say)."""
+    settings = request.app.state.settings
+    try:
+        record = _own(db, access, export_id)
+        path = export.part_path(settings, record, part)
+        if path is None:
+            raise HTTPException(404, "this export cannot be downloaded (any more)")
+    except HTTPException:
+        # A link followed (from a notification) after the export went: to
+        # the list of exports rather than an error page.
+        if "text/html" in request.headers.get("accept", ""):
+            base = public_base(request, load_config(db, settings))
+            return RedirectResponse(f"{base}/settings?open=export", status_code=303)
+        raise
     return FileResponse(path, media_type="application/zip", filename=path.name)
 
 

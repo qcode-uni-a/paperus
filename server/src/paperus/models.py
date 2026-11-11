@@ -866,7 +866,8 @@ class LogEntry(Base):
 
 class Notification(Base):
     """Something that happened that concerns a person (``paperus.notifications``):
-    papers added to one of their groups, a published version found."""
+    papers added to one of their groups, a published version found, a zip
+    of their export written."""
 
     __tablename__ = "notifications"
 
@@ -875,9 +876,10 @@ class Notification(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(32))
-    """"added" or "published"."""
+    """"added", "published", "export" or "export_failed"."""
     data: Mapped[dict[str, Any]] = mapped_column(JSONB)
-    """What to say: the paper, the group, who, how many."""
+    """What to say: the paper, the group, who, how many; the export and
+    which part."""
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
@@ -1194,7 +1196,7 @@ class Export(Record, Base):
     parts: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb")
     )
-    """Its zips, in order: name and size of each."""
+    """Its zips, in order: name and size of each, as each is written."""
     error: Mapped[str | None]
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
