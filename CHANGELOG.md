@@ -1,7 +1,72 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-11-12)
 
+*Version 0.1: officially a beta, which in academic terms means it has passed peer review by one very patient reviewer.*
+
+The first beta. What paperus does:
+
+- **A research library on your own server**, for one person or a group:
+  papers, books, lecture notes and meeting notes, with their versions
+  (preprint, journal version), files, notes, highlights and comments;
+  shared with groups and subgroups, private things kept private.
+- **Papers come in easily**: by DOI or arXiv ID, by dropping PDFs (their
+  details read from the file), from Zotero, Mendeley, JabRef or EndNote,
+  and with the browser extension (Firefox; Chrome as a zip), which saves a
+  publisher's page with its PDF, supplementary files and code links, and
+  gets missing PDFs with your own access.
+- **Open-access copies, published versions and authors are found for
+  you**: PDFs from arXiv and Unpaywall, a preprint's journal version when it
+  appears, authors linked to people by ORCID.
+- **Search by words and by meaning** across titles, abstracts, full texts
+  (scans read with OCR) and notes; similar papers and reference lists.
+- **Reading**: the PDF in the browser or a reflowing reading mode, with
+  highlights; the app for Linux, Windows and macOS, also offline.
+- **Tidy up**: duplicates, papers without details or PDFs, authors to
+  check, tags, collections and smart collections, archive and trash.
+- **Your AI assistant** (Claude, ChatGPT and others, over MCP) searches
+  and reads the library for you, citing the passages, and may add papers or
+  notes when you let it.
+- **Yours to keep**: backups and exports (BibTeX, the whole library); open
+  source (Apache-2.0); database changes come as migrations, each release
+  tried as an update of the one before.
+
+What changed since 0.0.29:
+
+- **Split a version off its paper**: a version merged in by mistake (a
+  paper's code from Zenodo became a "published" version of the paper, cited
+  over its own, with its title) or another work's DOI becomes an item of its
+  own with its files: "Split off" on each version of a paper that has
+  several.
+- **Code and data attached to their paper, not merged**: software and
+  datasets offer "Attach to a paper…" instead of "Merge into…": the paper
+  links to them (their DOI) and takes their files as code or data; the item
+  goes to the trash. The paper is suggested by its title.
+- **Papers whose titles share words**: suggested in the merge and attach
+  dialogs (stems, without stop words: "Code of Spin qubits" finds "Spin
+  qubits"), also when no DOI is shared.
+- **Search lists titles first**: above the passages, up to five papers
+  whose titles have all the searched words ("In titles"); the ranking below
+  is as it was.
+- **The browser extension, on a paper one has**: a click no longer saves it
+  all again; the popup says it is in paperus and offers the page's
+  supplementary files that are not ("Add to this paper"), and "Save again".
+  Supplementary files are listed under the paper, never as papers of their
+  own.
+- **The PDF to the version the page is about**: saving from a preprint's
+  page put its PDF on the journal version; it goes to the preprint now. The
+  popup says which version it saved to (Journal version, Preprint, …).
+- **Captchas on Manage → Missing**: a paper stopped by a check for robots
+  is tried again at the end in a tab in front, where such checks often pass
+  by themselves (or one answers them); up to three minutes, then the PDF is
+  saved and the tab closes.
+- **The extension's tabs out of sight**: the tabs it opens for its work are
+  hidden in Firefox (new permission: hide tabs) and open in a minimised
+  window in Chrome.
+- **"Get the PDF with the extension" on a paper's page**, next to "Upload
+  files", for a version without one.
+- **The Manage counts in the menu follow at once**: a merge on a Manage
+  page left its number standing until the next page or minute.
 - **"Probably the same person" without collaborations' namesakes**: two
   names that fit ("A. Huber" and "Anna Huber") on one paper's author list
   were suggested as one person, with all the paper's other authors as
