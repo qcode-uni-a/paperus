@@ -185,7 +185,26 @@ button.text {
 .list-head span {
 	margin-right: auto;
 }
-#listed {
+/* The paper's supplementary files: its own short list, under it. */
+#supplements {
+	margin: 10px 0 0;
+}
+#supplement-list {
+	max-height: 170px;
+}
+#supplements .primary {
+	margin-top: 0;
+}
+.more {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	margin: 8px 0 0;
+}
+.more:not(:has(button:not([hidden]))) {
+	display: none;
+}
+.rows {
 	max-height: 340px;
 	margin: 0 0 10px;
 	padding: 0;
@@ -195,7 +214,7 @@ button.text {
 	border-bottom: 1px solid var(--rule);
 	list-style: none;
 }
-#listed li {
+.rows li {
 	display: flex;
 	gap: 8px;
 	align-items: flex-start;
@@ -203,56 +222,56 @@ button.text {
 	border-bottom: 1px solid var(--rule);
 	font-size: 13px;
 }
-#listed li:last-child {
+.rows li:last-child {
 	border-bottom: none;
 }
-#listed label {
+.rows label {
 	display: flex;
 	flex: 1;
 	gap: 8px;
 	min-width: 0;
 	margin: 0;
 }
-#listed input {
+.rows input {
 	flex: none;
 	margin-top: 2px;
 }
-#listed .name {
+.rows .name {
 	display: grid;
 	min-width: 0;
 }
-#listed .name span {
+.rows .name span {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
 	-webkit-box-orient: vertical;
 }
-#listed small {
+.rows small {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--muted);
 	font-size: 11px;
 }
-#listed .mark {
+.rows .mark {
 	flex: none;
 	max-width: 110px;
 	color: var(--muted);
 	font-size: 11px;
 	text-align: right;
 }
-#listed .mark.saved,
-#listed .mark.known {
+.rows .mark.saved,
+.rows .mark.known {
 	color: #1e7a3e;
 }
-#listed .mark.failed {
+.rows .mark.failed {
 	color: var(--danger);
 }
-#listed .mark.too-large {
+.rows .mark.too-large {
 	color: #b26a00;
 }
-#listed .mark button {
+.rows .mark button {
 	display: block;
 	margin: 2px 0 0 auto;
 	font-size: 11px;

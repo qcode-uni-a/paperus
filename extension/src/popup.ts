@@ -19,8 +19,19 @@ type Result =
 			link: string;
 			warning?: boolean;
 			item?: { id: string; libraryId: string | null; title: string; added: boolean };
+			supplements?: SupplementOutcome[];
 	  }
 	| { ok: false; text: string };
+/** A supplementary file the paper's page links; ``inPaperus``: the paper
+ * has a file of its name. */
+type Supplement = { url: string; name: string; inPaperus?: boolean };
+type SupplementOutcome = Supplement & {
+	state: 'saved' | 'failed' | 'too-large';
+	text: string;
+	size?: number;
+};
+/** The paper, in paperus with the PDF of the page's version. */
+type Known = { id: string; libraryId: string; title: string; link: string };
 
 $('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
 $('settings').addEventListener('click', async (event) => {
@@ -81,7 +92,13 @@ function show(result: Result, owners: Owner[]): void {
 		$('title').hidden = false;
 	}
 	// What follows the title: the PDF's fate.
-	const rest = result.text.replace(/^[^“]*“[^”]*”[.,]?\s*/, '').replace(/^without its PDF\.\s*/, '');
+	let rest = result.text.replace(/^[^“]*“[^”]*”[.,]?\s*/, '').replace(/^without its PDF\.\s*/, '');
+	// The supplementary files have their own list below.
+	if (result.supplements?.length)
+		rest = rest.replace(
+			/\s*Also (?:a supplementary file|\d+ supplementary files)(?: and (.+?))?\./,
+			(_, links?: string) => (links ? ` Also ${links}.` : '')
+		);
 	$('detail').textContent = rest || (known ? '' : 'With its PDF.');
 	$('detail').hidden = !$('detail').textContent;
 	const open = $<HTMLAnchorElement>('open');
@@ -162,7 +179,7 @@ document.addEventListener('focusin', pause);
 document.addEventListener('focusout', go);
 
 type Survey =
-	| { mode: 'paper'; listed: Listed[] }
+	| { mode: 'paper'; listed: Listed[]; supplements: Supplement[]; known: Known | null }
 	| { mode: 'list'; source: 'page' | 'scholar'; title: string; listed: Listed[] };
 type ListedState = 'saving' | 'saved' | 'known' | 'failed' | 'too-large';
 
@@ -182,7 +199,17 @@ function showList(
 	ownerId: string | undefined
 ): void {
 	stay();
-	for (const id of ['flow', 'state', 'title', 'detail', 'open', 'show-list', 'owner-field'])
+	for (const id of [
+		'flow',
+		'state',
+		'title',
+		'detail',
+		'open',
+		'show-list',
+		'again',
+		'owner-field',
+		'supplements'
+	])
 		$(id).hidden = true;
 	$('list').hidden = false;
 	$('list-title').textContent = title;
@@ -299,12 +326,155 @@ function showList(
 	count();
 }
 
-async function save(tabId: number, owners: Owner[]): Promise<void> {
+/** The paper's supplementary files under it, each with how it went: to
+ * choose and add to a paper paperus has (``choose``), or as they are saved
+ * with the paper (marked as the background tells, ``supplementState``). */
+function showSupplements(itemId: string | null, files: Supplement[], choose: boolean): void {
+	$('supplements').hidden = files.length === 0;
+	if (!files.length) return;
+	$('supplements-head').textContent =
+		`Supplementary material: ${files.length} ${files.length === 1 ? 'file' : 'files'}`;
+	const boxes = new Map<string, HTMLInputElement>();
+	const marks = new Map<string, HTMLElement>();
+	const button = $<HTMLButtonElement>('add-supplements');
+	button.hidden = !choose;
+	const count = () => {
+		const chosen = [...boxes.values()].filter((box) => box.checked).length;
+		button.textContent = `Add ${chosen === 1 ? 'it' : chosen} to this paper`;
+		button.disabled = chosen === 0;
+	};
+	const mark = (url: string, state: ListedState, text = '', size?: number) => {
+		const shown = marks.get(url);
+		if (!shown) return;
+		shown.className = `mark ${state}`;
+		shown.title = state === 'too-large' ? 'Over 100 MB: added only when you ask' : text;
+		const words: Record<ListedState, string> = {
+			saving: 'Saving…',
+			saved: '✓ Saved',
+			known: 'In paperus',
+			failed: '✕ Not saved',
+			'too-large': megabytes(size ?? 0)
+		};
+		shown.replaceChildren(words[state]);
+		const file = files.find((f) => f.url === url);
+		if (state === 'too-large' && itemId && file) {
+			const anyway = document.createElement('button');
+			anyway.className = 'text';
+			anyway.textContent = 'Add anyway';
+			anyway.addEventListener('click', () => void add([file], true));
+			shown.append(anyway);
+		}
+	};
+	const add = async (chosen: Supplement[], large = false) => {
+		stay();
+		button.disabled = true;
+		for (const box of boxes.values()) box.disabled = true;
+		for (const file of chosen) mark(file.url, 'saving');
+		const outcomes = (await chrome.runtime.sendMessage({
+			type: 'popupAddSupplements',
+			itemId,
+			files: chosen,
+			large
+		})) as SupplementOutcome[];
+		for (const o of outcomes) mark(o.url, o.state, o.text, o.size);
+		button.hidden = true;
+		const added = outcomes.filter((o) => o.state === 'saved').length;
+		state(
+			added
+				? `${added === 1 ? 'A supplementary file' : `${added} supplementary files`} added`
+				: 'No supplementary file added',
+			added === chosen.length ? 'ok' : 'warning'
+		);
+	};
+	$('supplement-list').replaceChildren(
+		...files.map((file) => {
+			const item = document.createElement('li');
+			const label = document.createElement('label');
+			if (choose) {
+				const box = document.createElement('input');
+				box.type = 'checkbox';
+				box.checked = !file.inPaperus;
+				box.addEventListener('change', count);
+				boxes.set(file.url, box);
+				label.append(box);
+			}
+			const name = document.createElement('span');
+			name.className = 'name';
+			const words = document.createElement('span');
+			words.textContent = file.name;
+			words.title = file.name;
+			const detail = document.createElement('small');
+			let host = '';
+			try {
+				host = new URL(file.url).hostname.replace(/^www\./, '');
+			} catch {
+				// No address to show.
+			}
+			const type = /\.([a-z0-9]{2,5})$/i.exec(new URL(file.url, location.href).pathname)?.[1];
+			detail.textContent = [type?.toUpperCase(), host].filter(Boolean).join(' · ');
+			name.append(words, detail);
+			label.append(name);
+			const shown = document.createElement('span');
+			shown.className = 'mark';
+			marks.set(file.url, shown);
+			item.append(label, shown);
+			return item;
+		})
+	);
+	for (const file of files) {
+		const outcome = file as Partial<SupplementOutcome>;
+		if (outcome.state) mark(file.url, outcome.state, outcome.text, outcome.size);
+		else if (file.inPaperus) mark(file.url, 'known');
+		else if (!choose) mark(file.url, 'saving');
+	}
+	if (choose) {
+		count();
+		button.onclick = () =>
+			void add(files.filter((file) => boxes.get(file.url)?.checked));
+	}
+	// Saved with the paper: each as it goes.
+	chrome.runtime.onMessage.addListener((message) => {
+		if (message?.type === 'supplementState' && (!itemId || message.itemId === itemId))
+			mark(message.url, message.state, message.text, message.size);
+	});
+}
+
+/** The paper is in paperus with its PDF: nothing saved again unless asked
+ * ("Save again"); its supplementary files to add, if the page has some. */
+function showKnown(tabId: number, known: Known, supplements: Supplement[], owners: Owner[]): void {
+	stage('done');
+	state('In paperus', 'ok');
+	$('title').textContent = known.title;
+	$('title').hidden = false;
+	$('detail').textContent = 'With its PDF; nothing saved again.';
+	$('detail').hidden = false;
+	const open = $<HTMLAnchorElement>('open');
+	open.href = known.link;
+	open.hidden = false;
+	showSupplements(known.id, supplements, true);
+	const again = $<HTMLButtonElement>('again');
+	again.hidden = false;
+	again.onclick = () => {
+		for (const id of ['again', 'supplements', 'title', 'detail', 'open']) $(id).hidden = true;
+		void save(tabId, owners, supplements);
+	};
+	// Supplements to choose: open until one goes elsewhere.
+	if (supplements.some((file) => !file.inPaperus)) stay();
+	else closeIn(CLOSE_MS.warning);
+}
+
+async function save(tabId: number, owners: Owner[], supplements: Supplement[] = []): Promise<void> {
 	state('Reading the page…');
 	stage('reading');
+	showSupplements(null, supplements, false);
 	const result = (await chrome.runtime.sendMessage({ type: 'popupSave', tabId })) as Result;
 	show(result, owners);
-	closeIn(!result.ok ? CLOSE_MS.error : result.warning ? CLOSE_MS.warning : CLOSE_MS.ok);
+	if (result.ok && result.item) showSupplements(result.item.id, result.supplements ?? [], false);
+	else $('supplements').hidden = true;
+	const missed = result.ok && result.supplements?.some((s) => s.state !== 'saved');
+	closeIn(
+		!result.ok ? CLOSE_MS.error : result.warning || missed ? CLOSE_MS.warning : CLOSE_MS.ok
+	);
 }
 
 (async () => {
@@ -367,7 +537,9 @@ async function save(tabId: number, owners: Owner[]): Promise<void> {
 		showList(tab.id, found.title, found.source, found.listed, owners, config?.owner);
 		return;
 	}
-	await save(tab.id, owners);
+	const paper = 'mode' in found ? found : null;
+	if (paper?.known) showKnown(tab.id, paper.known, paper.supplements, owners);
+	else await save(tab.id, owners, paper?.supplements ?? []);
 	// A paper's page that links more papers or files: those on a click.
 	const listed = 'listed' in found ? found.listed : [];
 	if (listed.length >= 2) {

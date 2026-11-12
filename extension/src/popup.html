@@ -37,7 +37,19 @@
 				>Saved to
 				<select id="owner"></select>
 			</label>
-			<button id="show-list" class="text small" hidden></button>
+			<section id="supplements" hidden>
+				<p class="list-head small">
+					<span id="supplements-head" class="muted">Supplementary material</span>
+				</p>
+				<ul id="supplement-list" class="rows"></ul>
+				<button id="add-supplements" class="primary" hidden>Add to this paper</button>
+			</section>
+			<p class="more small">
+				<button id="show-list" class="text" hidden></button>
+				<button id="again" class="text" hidden title="Fetch its PDF and supplements again">
+					Save again
+				</button>
+			</p>
 			<section id="list" hidden>
 				<p id="list-title" class="title"></p>
 				<p class="list-head small">
@@ -45,7 +57,7 @@
 					<button id="all" class="text">All</button>
 					<button id="none" class="text">None</button>
 				</p>
-				<ul id="listed"></ul>
+				<ul id="listed" class="rows"></ul>
 				<label id="list-owner-field" hidden
 					>Save to
 					<select id="list-owner"></select>

@@ -8,7 +8,10 @@ does the same; a full one with a check means you have it already.
   Zotero's does) and saves at once, to the owner chosen in the settings:
   it shows each step, then the paper, its PDF or why not, and a link to it
   in paperus. A paper just added moves to another owner (a group) by
-  choosing it there.
+  choosing it there. A paper paperus has already, with its PDF, is not
+  saved again: the popup says so and offers its supplementary files that
+  are not in paperus yet ("Add to this paper"), and "Save again" to fetch
+  it all anyway.
 - **On arXiv and Google Scholar**: a small button next to each paper; a
   full one with a check means you have it, a click on a dimmed one saves
   it (on Scholar from its page, opened out of sight, with its PDF).
@@ -22,7 +25,8 @@ does the same; a full one with a check means you have it already.
 - **Supplementary material, code and data** come along: the supplementary
   files the article links (Nature's, Elsevier's, Wiley's, ACS's, APS's,
   arXiv's ancillary files, …; up to 10, 100 MB each) are saved with the
-  paper, and links to its code and data (GitHub, Zenodo, Figshare, …,
+  paper, listed in the popup under it with how each went (never as papers
+  of their own), and links to its code and data (GitHub, Zenodo, Figshare, …,
   where the article says they are its own: in its abstract, a "Code
   availability" section, "the data are available at …") are shown on its
   page. Not the references' links, nor the site's own.

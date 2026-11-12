@@ -68,6 +68,18 @@ type Saved = {
     title: string;
     added: boolean;
   };
+  /** Its supplementary files from the page, each as it went. */
+  supplements?: SupplementOutcome[];
+};
+
+/** A supplementary file the paper's page links (``inPaperus``: the paper
+ * has a file of that name), for the popup. */
+type Supplement = { url: string; name: string; inPaperus?: boolean };
+/** How saving one went. */
+type SupplementOutcome = Supplement & {
+  state: "saved" | "failed" | "too-large";
+  text: string;
+  size?: number;
 };
 
 /** What the popup shows while a tab is saved. */
@@ -175,6 +187,19 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
         return { ok: false };
       return survey(await chrome.tabs.get(message.tabId));
+    },
+    popupAddSupplements: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
+        return { ok: false };
+      trace("Supplementary files added from the popup", {
+        item: message.itemId,
+        files: (message.files as Supplement[]).map((f) => f.url).join(" "),
+      });
+      return saveSupplements(
+        message.itemId,
+        message.files as Supplement[],
+        message.large === true,
+      );
     },
     popupSaveListed: async () => {
       if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
@@ -296,39 +321,12 @@ async function markPage(tabId: number, url: string): Promise<void> {
       inUrl.doi || inUrl.arxiv
         ? null
         : await within(5_000, inPage(tabId, pageIds)).catch(() => null);
-    const doi = inUrl.doi ?? page?.doi;
-    const arxiv = inUrl.arxiv ?? page?.arxiv;
-    const keys = [
-      ...(doi ? [`doi:${doi}`] : []),
-      ...(arxiv ? [`arxiv:${arxiv}`] : []),
-    ];
-    if (!keys.length) return;
-    const found = await lookupKeys(keys);
-    const itemId = keys.map((key) => found[key]).find(Boolean);
-    if (!itemId) return;
-    const { data: item } = await call<Api.GetItemData, Api.GetItemResponse>(
-      "/api/items/{item_id}",
-      { path: { item_id: itemId } },
+    const here = await paperHere(
+      inUrl.doi ?? page?.doi,
+      inUrl.arxiv ?? page?.arxiv,
     );
-    if (!item?.id || marking.get(tabId) !== mark) return;
-    // The page's version (the journal's, the preprint): its PDF; else any.
-    const hasPdf = (version: Api.VersionOut) =>
-      version.files.some(
-        (file) =>
-          file.role === "main" &&
-          file.media_type === "application/pdf" &&
-          !file.deleted_at,
-      );
-    const same = (key: string) => key.toLowerCase().replace(/v\d+$/, "");
-    const wanted = keys.map(same);
-    const shown = item.versions.find((version) =>
-      version.identifiers.some((id) =>
-        wanted.includes(same(`${id.scheme}:${id.value}`)),
-      ),
-    );
-    const own = shown ? hasPdf(shown) : item.versions.some(hasPdf);
-    const other = !own && item.versions.find(hasPdf);
-    const title = item.title.replace(/<[^>]+>/g, "");
+    if (!here || marking.get(tabId) !== mark) return;
+    const { own, other, title } = here;
     await badge(tabId, own ? "✓" : "!", own ? GREEN : ORANGE);
     await chrome.action.setTitle({
       tabId,
@@ -341,6 +339,55 @@ async function markPage(tabId: number, url: string): Promise<void> {
   } catch {
     // Not connected, paperus not there, the tab gone: no mark, no word.
   }
+}
+
+/** The paper with this DOI or arXiv ID in paperus, if any: whether the
+ * version they name (the journal's, the preprint) has its PDF, else which
+ * other version has one. */
+async function paperHere(
+  doi: string | null | undefined,
+  arxiv: string | null | undefined,
+): Promise<{
+  item: Api.GetItemResponse;
+  title: string;
+  own: boolean;
+  other: Api.VersionOut | undefined;
+} | null> {
+  const keys = [
+    ...(doi ? [`doi:${doi}`] : []),
+    ...(arxiv ? [`arxiv:${arxiv}`] : []),
+  ];
+  if (!keys.length) return null;
+  const found = await lookupKeys(keys);
+  const itemId = keys.map((key) => found[key]).find(Boolean);
+  if (!itemId) return null;
+  const { data: item } = await call<Api.GetItemData, Api.GetItemResponse>(
+    "/api/items/{item_id}",
+    { path: { item_id: itemId } },
+  );
+  if (!item?.id) return null;
+  const hasPdf = (version: Api.VersionOut) =>
+    version.files.some(
+      (file) =>
+        file.role === "main" &&
+        file.media_type === "application/pdf" &&
+        !file.deleted_at,
+    );
+  const same = (key: string) => key.toLowerCase().replace(/v\d+$/, "");
+  const wanted = keys.map(same);
+  const shown = item.versions.find((version) =>
+    version.identifiers.some((id) =>
+      wanted.includes(same(`${id.scheme}:${id.value}`)),
+    ),
+  );
+  const own = shown ? hasPdf(shown) : item.versions.some(hasPdf);
+  return {
+    item,
+    // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
+    title: item.title.replace(/<[^>]+>/g, ""),
+    own,
+    other: own ? undefined : item.versions.find(hasPdf),
+  };
 }
 
 async function inPage<A extends unknown[], R>(
@@ -799,7 +846,8 @@ async function save(
       if (!missing) fileNote = " With its PDF.";
     }
   }
-  const extrasNote = await saveExtras(item.id, await extrasComing);
+  const extras = await saveExtras(item.id, await extrasComing);
+  const extrasNote = extras.note;
   const where = owner ? owner.name : "paperus";
   // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
   const title = item.title.replace(/<\/?(i|b|em|strong|sub|sup|scp)>/gi, "");
@@ -817,12 +865,14 @@ async function save(
         text: `${saved}, without its PDF. ${missing}${extrasNote}`,
         link: await itemLink(item.id),
         item: paper,
+        supplements: extras.supplements,
       }
     : {
         ok: true,
         text: `${saved}.${fileNote}${extrasNote}`,
         link: await itemLink(item.id),
         item: paper,
+        supplements: extras.supplements,
       };
 }
 
@@ -838,8 +888,9 @@ const MAX_SUPPLEMENT_BYTES = 100 * 1024 * 1024;
 async function saveExtras(
   itemId: string,
   extras: Extras | null,
-): Promise<string> {
-  if (!extras || (!extras.files.length && !extras.links.length)) return "";
+): Promise<{ note: string; supplements: SupplementOutcome[] }> {
+  if (!extras || (!extras.files.length && !extras.links.length))
+    return { note: "", supplements: [] };
   trace("Supplementary material, code and data on the page", {
     files: extras.files.map((f) => f.url).join(" "),
     links: extras.links.map((l) => `${l.kind}: ${l.url}`).join(" "),
@@ -860,16 +911,8 @@ async function saveExtras(
       trace("A link not added", { url: link.url, reason: String(error) });
     }
   }
-  const queue = [...extras.files];
-  let saved = 0;
-  const worker = async () => {
-    for (let file = queue.shift(); file; file = queue.shift())
-      if (await saveSupplement(itemId, file)) saved++;
-  };
-  await within(
-    EXTRAS_MS,
-    Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker)),
-  ).catch(() => trace("Supplementary files: out of time", { item: itemId }));
+  const supplements = await saveSupplements(itemId, extras.files);
+  const saved = supplements.filter((s) => s.state === "saved").length;
   const parts: string[] = [];
   if (saved)
     parts.push(
@@ -878,7 +921,43 @@ async function saveExtras(
   const to = (["code", "data"] as const).filter((kind) => kinds.has(kind));
   if (to.length) parts.push(`the link to its ${to.join(" and ")}`);
   else if (kinds.has("other")) parts.push("a link");
-  return parts.length ? ` Also ${parts.join(" and ")}.` : "";
+  return {
+    note: parts.length ? ` Also ${parts.join(" and ")}.` : "",
+    supplements,
+  };
+}
+
+/** Supplementary files added to the paper, a few at a time, each telling
+ * the popup how it went (``supplementState``); out of time after
+ * EXTRAS_MS, as not saved. */
+async function saveSupplements(
+  itemId: string,
+  files: Supplement[],
+  large = false,
+): Promise<SupplementOutcome[]> {
+  const queue = [...files];
+  const outcomes = new Map<string, SupplementOutcome>();
+  const worker = async () => {
+    for (let file = queue.shift(); file; file = queue.shift()) {
+      const outcome = await saveSupplement(itemId, file, large);
+      outcomes.set(file.url, outcome);
+      chrome.runtime
+        .sendMessage({ type: "supplementState", itemId, ...outcome })
+        .catch(() => undefined); // no popup open
+    }
+  };
+  await within(
+    EXTRAS_MS,
+    Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker)),
+  ).catch(() => trace("Supplementary files: out of time", { item: itemId }));
+  return files.map(
+    (file) =>
+      outcomes.get(file.url) ?? {
+        ...file,
+        state: "failed",
+        text: "Out of time.",
+      },
+  );
 }
 
 /** A file fetched from here, with the reader's access to its site (the
@@ -944,20 +1023,27 @@ async function fetchFile(
 }
 
 /** One supplementary file, fetched from here (with the reader's access to
- * the publisher's site) and added to the paper; whether it was. */
+ * the publisher's site) and added to the paper as such; how it went. */
 async function saveSupplement(
   itemId: string,
-  file: { url: string; name: string },
-): Promise<boolean> {
-  const why = (reason: string) => {
+  file: Supplement,
+  large = false,
+): Promise<SupplementOutcome> {
+  const why = (reason: string, size?: number): SupplementOutcome => {
     trace("A supplementary file not saved", { url: file.url, reason });
-    return false;
+    return size
+      ? { ...file, state: "too-large", text: reason, size }
+      : { ...file, state: "failed", text: reason };
   };
-  const fetched = await fetchFile(file.url, file.name, MAX_SUPPLEMENT_BYTES);
+  const fetched = await fetchFile(
+    file.url,
+    file.name,
+    large ? MAX_BYTES : MAX_SUPPLEMENT_BYTES,
+  );
   if ("error" in fetched)
-    return why(
-      fetched.size ? `too large (${fetched.size} bytes)` : fetched.error,
-    );
+    return fetched.size
+      ? why(`Over ${MAX_SUPPLEMENT_BYTES / 1024 / 1024} MB.`, fetched.size)
+      : why(fetched.error);
   try {
     const form = new FormData();
     form.append("upload", fetched.blob, fetched.name);
@@ -966,7 +1052,9 @@ async function saveSupplement(
       "/api/items/{item_id}/files",
       { method: "POST", path: { item_id: itemId }, form },
     );
-    return status < 400 || why(`paperus answered ${status}`);
+    return status < 400
+      ? { ...file, state: "saved", text: "" }
+      : why(`paperus answered ${status}`);
   } catch (error) {
     return why(String(error));
   }
@@ -1289,7 +1377,20 @@ async function lookupKeys(
 
 /** What the popup offers for a tab. */
 type Survey =
-  | { mode: "paper"; listed: Listed[] }
+  | {
+      mode: "paper";
+      listed: Listed[];
+      /** The supplementary files the paper's page links (not in ``listed``). */
+      supplements: Supplement[];
+      /** The paper, if paperus has it with the PDF of the page's version:
+       * then the popup saves nothing unless asked. */
+      known: {
+        id: string;
+        libraryId: string;
+        title: string;
+        link: string;
+      } | null;
+    }
   | {
       mode: "list";
       source: "page" | "scholar";
@@ -1332,14 +1433,52 @@ async function survey(tab: chrome.tabs.Tab): Promise<Survey> {
     within(READ_MS, inPage(tab.id!, pageLinks)).catch(() => [] as PageLink[]),
   ]);
   const at = page?.url ?? url;
+  // The paper's supplementary files: its own, not papers of their own.
+  const extras = page?.isPdf ? null : extrasOf(links, [at, page?.pdfUrl]);
+  const supplementUrls = new Set(extras?.files.map((file) => file.url));
   const listed = listedOn(links, at, paperOfLink).filter(
-    (entry) => entry.url !== page?.pdfUrl,
+    (entry) => entry.url !== page?.pdfUrl && !supplementUrls.has(entry.url),
   );
-  if (namesPaper(page, at) || listed.length === 0)
+  if (namesPaper(page, at) || listed.length === 0) {
+    const inUrl = idsInUrl(at);
+    const here = await paperHere(
+      page?.doi ?? inUrl.doi,
+      page?.arxiv ?? inUrl.arxiv,
+    ).catch(() => null);
+    // Its files' names, to mark the supplements it has already.
+    const names = new Set(
+      here?.item.versions.flatMap((version) =>
+        version.files
+          .filter((file) => !file.deleted_at)
+          .map((file) => file.filename.toLowerCase()),
+      ),
+    );
+    const named = (file: Supplement) => {
+      let last = new URL(file.url).pathname.split("/").pop() ?? "";
+      try {
+        last = decodeURIComponent(last);
+      } catch {
+        // A malformed address: as it is.
+      }
+      return [file.name, last].some((name) => names.has(name.toLowerCase()));
+    };
     return {
       mode: "paper",
       listed: listed.length >= 2 ? await known(listed) : listed,
+      supplements: (extras?.files ?? []).map((file) => ({
+        ...file,
+        inPaperus: named(file),
+      })),
+      known: here?.own
+        ? {
+            id: here.item.id,
+            libraryId: here.item.library_id,
+            title: here.title,
+            link: await itemLink(here.item.id),
+          }
+        : null,
     };
+  }
   trace("A page that lists files and papers", {
     page: at,
     files: listed.filter((entry) => entry.kind === "file").length,
