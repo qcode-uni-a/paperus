@@ -13,7 +13,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
 
-from paperus import abstracts, changes, library, merge, metadata
+from paperus import abstracts, changes, duplicates, library, merge, metadata
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
@@ -1030,6 +1030,24 @@ def list_duplicates(item_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[I
     item = get_readable_item(db, access, item_id)
     return [
         item_out(other, access) for other in merge.likely_duplicates(db, access, item)
+    ]
+
+
+@router.get("/api/items/{item_id}/alike")
+def titled_alike(
+    item_id: uuid.UUID,
+    db: DB,
+    access: CurrentAccess,
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> list[ItemOut]:
+    """Papers the person can see whose titles share words with this one's,
+    the most alike first (``duplicates.titled_alike``): the paper a piece of
+    code belongs to ("Code of Spin qubits": "Spin qubits"), or the same
+    paper without a shared identifier."""
+    item = get_readable_item(db, access, item_id)
+    return [
+        item_out(other, access)
+        for other in duplicates.titled_alike(db, access, item, limit)
     ]
 
 

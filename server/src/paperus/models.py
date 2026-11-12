@@ -400,6 +400,15 @@ class Item(Record, Trashable, Base):
     """
 
     __tablename__ = "items"
+    __table_args__ = (
+        # The words of titles (stems, without stop words), to find papers
+        # whose titles share words (``duplicates.titled_alike``).
+        Index(
+            "ix_items_title_words",
+            text("tsvector_to_array(to_tsvector('english'::regconfig, title))"),
+            postgresql_using="gin",
+        ),
+    )
 
     library_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("libraries.id", ondelete="RESTRICT"), index=True

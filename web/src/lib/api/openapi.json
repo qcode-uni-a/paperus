@@ -1885,6 +1885,66 @@
         }
       }
     },
+    "/api/items/{item_id}/alike": {
+      "get": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Titled Alike",
+        "description": "Papers the person can see whose titles share words with this one's,\nthe most alike first (``duplicates.titled_alike``): the paper a piece of\ncode belongs to (\"Code of Spin qubits\": \"Spin qubits\"), or the same\npaper without a shared identifier.",
+        "operationId": "titled_alike",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 8,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ItemOut"
+                  },
+                  "title": "Response Titled Alike"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/similar": {
       "get": {
         "tags": [

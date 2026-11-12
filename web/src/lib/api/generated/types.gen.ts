@@ -6338,6 +6338,43 @@ export type ListDuplicatesResponses = {
 
 export type ListDuplicatesResponse = ListDuplicatesResponses[keyof ListDuplicatesResponses];
 
+export type TitledAlikeData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/items/{item_id}/alike';
+};
+
+export type TitledAlikeErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TitledAlikeError = TitledAlikeErrors[keyof TitledAlikeErrors];
+
+export type TitledAlikeResponses = {
+    /**
+     * Response Titled Alike
+     *
+     * Successful Response
+     */
+    200: Array<ItemOut>;
+};
+
+export type TitledAlikeResponse = TitledAlikeResponses[keyof TitledAlikeResponses];
+
 export type ListSimilarData = {
     body?: never;
     path: {

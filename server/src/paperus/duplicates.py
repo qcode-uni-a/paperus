@@ -6,9 +6,18 @@ import unicodedata
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import func, select, text
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy import (
+    ColumnElement,
+    Text,
+    cast,
+    func,
+    literal,
+    literal_column,
+    select,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, insert
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from paperus import library
 from paperus.access import Access
@@ -202,3 +211,48 @@ def dismiss(db: Session, a: uuid.UUID, b: uuid.UUID, user_id: uuid.UUID) -> None
         .values(item_a=first, item_b=second, decided_by=user_id)
         .on_conflict_do_nothing()
     )
+
+
+# Titles less alike than this (two words shared of seven and three) are
+# not suggested.
+ALIKE = 0.5
+
+
+def _title_words(
+    title: ColumnElement[str] | InstrumentedAttribute[str],
+) -> ColumnElement[list[str]]:
+    """A title's words as Postgres reads English: stems, without stop words
+    or markup (as the index ``ix_items_title_words`` has them)."""
+    english = literal_column("'english'::regconfig")
+    return func.tsvector_to_array(func.to_tsvector(english, title))
+
+
+def titled_alike(db: Session, access: Access, item: Item, limit: int = 8) -> list[Item]:
+    """Papers the person can see whose titles share words with this one's,
+    the most alike first: at least two words shared (all, for a shorter
+    title), scored by how many of both titles' words are shared (Dice), at
+    least ALIKE.
+    "Code of Spin qubits" finds "Spin qubits"."""
+    mine = set(db.scalar(select(_title_words(literal(item.title)))) or [])
+    if not mine:
+        return []
+    theirs = _title_words(Item.title)
+    rows = db.execute(
+        select(Item.id, theirs).where(
+            Item.id != item.id,
+            Item.deleted_at.is_(None),
+            access.item_filter(),
+            theirs.op("&&")(cast(sorted(mine), ARRAY(Text))),
+        )
+    ).all()
+    scored = []
+    for other_id, words in rows:
+        other = set(words)
+        shared = len(mine & other)
+        score = 2 * shared / (len(mine) + len(other))
+        if shared >= min(2, len(mine), len(other)) and score >= ALIKE:
+            scored.append((score, other_id))
+    scored.sort(key=lambda pair: (-pair[0], pair[1]))
+    best = [other_id for _, other_id in scored[:limit]]
+    items = {i.id: i for i in db.scalars(select(Item).where(Item.id.in_(best)))}
+    return [items[i] for i in best]

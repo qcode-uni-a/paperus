@@ -8,6 +8,7 @@
 		listDuplicates,
 		listItems,
 		mergeItem,
+		titledAlike,
 		previewMerge,
 		type Item,
 		type ItemDetail
@@ -34,7 +35,7 @@
 
 	let dialog = $state<HTMLDialogElement>();
 	let likely = $state<Item[]>([]);
-	/** For code or data: papers whose titles have the rest of its title. */
+	/** For code or data: papers whose titles share its words. */
 	let related = $state<Item[]>([]);
 	let words = $state('');
 	let found = $state<Item[]>([]);
@@ -68,30 +69,16 @@
 			await choose(into);
 			return;
 		}
-		const [duplicates, named] = await Promise.all([
+		const [duplicates, alike] = await Promise.all([
 			listDuplicates({ path: { item_id: item.id } }),
-			work ? papersNamedIn(item.title) : Promise.resolve([])
+			titledAlike({ path: { item_id: item.id } })
 		]);
-		likely = duplicates.data ?? [];
-		related = named;
-	}
-
-	/** Words that say what code or data is, not which paper's it is. */
-	const ABOUT =
-		/^(code|codes|source|software|scripts?|data|datasets?|repository|replication|package|supplementary|supplemental|materials?|accompanying|for|of|the|a|an|and|to|from|in|on|with|v?\d+(\.\d+)*)$/i;
-
-	/** Papers whose titles have all the words of this one's that are not
-	 * about it being code or data ("Code of Spin qubits": "Spin qubits"). */
-	async function papersNamedIn(title: string): Promise<Item[]> {
-		const words = title
-			.replace(/<[^>]+>/g, ' ')
-			.split(/[^\p{L}\p{N}]+/u)
-			.filter((word) => word && !ABOUT.test(word));
-		if (words.length < 2) return [];
-		const { data } = await listItems({ query: { title: words.join(' '), limit: 10 } });
-		return (data ?? []).filter(
-			(other) => other.id !== item.id && other.type !== 'software' && other.type !== 'dataset'
-		);
+		// The same paper: sharing an identifier or a file, then by title.
+		const sharing = duplicates.data ?? [];
+		const titled = alike.data ?? [];
+		likely = [...sharing, ...titled.filter((t) => !sharing.some((s) => s.id === t.id))];
+		// Its paper, for code or data: by title, papers only.
+		related = titled.filter((other) => other.type !== 'software' && other.type !== 'dataset');
 	}
 
 	$effect(() => {
