@@ -1,7 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.0.28 (2026-11-12)
 
+*Six publishers walk into a test suite: EEEK, Seance, APES, ScienceIndirect, Nurture and the American Comical Society. Only their PDFs come out.*
+
+- **A PDF open in Firefox's viewer, where the site turns the extension
+  away**: Firefox lets no extension read its viewer, so the extension
+  fetched the PDF's address itself, and some sites answered that with a
+  web page (a check for robots, a login). The address is now loaded again
+  in a tab out of sight and a copy of the PDF kept as Firefox receives it
+  (new permissions in Firefox: webRequest, webRequestBlocking,
+  webRequestFilterResponse). An expired signed address says so.
 - **The extension saves IEEE Xplore's papers**: their pages have no
   `citation_*` tags, so the popup took one for a page listing papers (its
   references) and offered those. Their details (DOI, authors, venue,
