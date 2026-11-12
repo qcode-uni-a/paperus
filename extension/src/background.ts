@@ -82,6 +82,8 @@ type Outcome = "ok" | "warning" | "error";
 interface Owner {
   id: string;
   name: string;
+  /** New papers' owner as set in paperus (unless the settings name one). */
+  default?: boolean;
 }
 
 chrome.action.onClicked.addListener(async (tab) => {
@@ -1239,6 +1241,7 @@ async function updateMenu(): Promise<void> {
           library.kind === "personal"
             ? "my library"
             : [...library.path, library.name].join(" › "),
+        default: library.default,
       }));
     await chrome.storage.local.set({ owners });
     if (owners.length < 2) return;

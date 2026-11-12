@@ -10,6 +10,7 @@ const ALL_SITES = { origins: ['https://*/*', 'http://*/*'] };
 interface Owner {
 	id: string;
 	name: string;
+	default?: boolean;
 }
 type Result =
 	| {
@@ -263,8 +264,10 @@ function showList(
 	};
 	const select = $<HTMLSelectElement>('list-owner');
 	if (owners.length > 1) {
+		// The settings' owner, else the default set in paperus (not the first).
+		const chosen = ownerId ?? owners.find((owner) => owner.default)?.id;
 		select.replaceChildren(
-			...owners.map((owner) => new Option(owner.name, owner.id, false, owner.id === ownerId))
+			...owners.map((owner) => new Option(owner.name, owner.id, false, owner.id === chosen))
 		);
 		$('list-owner-field').hidden = false;
 	}
