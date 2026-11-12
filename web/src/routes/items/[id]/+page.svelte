@@ -487,6 +487,9 @@
 		{#if !item.deleted_at}<ItemLinks
 				item={item.id}
 				links={item.links ?? []}
+				files={item.versions
+					.flatMap((v) => v.files)
+					.filter((f) => !f.deleted_at && f.role !== 'main')}
 				{writable}
 				onchange={load}
 			/>{/if}

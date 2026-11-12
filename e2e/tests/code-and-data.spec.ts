@@ -5,7 +5,7 @@ import { itemAction, unique, uploadPaper } from './helpers.ts';
 // the address), opened in a tab of their own, and removed again.
 test("a paper's links to its code and data", async ({ page }) => {
 	await uploadPaper(page, 'Coded');
-	await page.getByRole('button', { name: '+ Code or data' }).click();
+	await page.getByRole('button', { name: '+ Attachment' }).click();
 	await page.getByRole('textbox', { name: 'Address' }).fill('github.com/ada/qubits');
 	await expect(page.getByRole('combobox', { name: 'Kind' })).toHaveValue('code');
 	await page.getByRole('button', { name: 'Add link' }).click();
@@ -14,13 +14,30 @@ test("a paper's links to its code and data", async ({ page }) => {
 	await expect(code).toHaveAttribute('href', 'https://github.com/ada/qubits');
 	await expect(code).toHaveAttribute('target', '_blank');
 
-	await page.getByRole('button', { name: '+ Code or data' }).click();
+	await page.getByRole('button', { name: '+ Attachment' }).click();
 	await page.getByRole('textbox', { name: 'Address' }).fill('https://doi.org/10.5281/zenodo.1234');
 	await expect(page.getByRole('combobox', { name: 'Kind' })).toHaveValue('data');
 	await page.getByRole('textbox', { name: 'Name' }).fill('Measured spectra');
 	await page.getByRole('button', { name: 'Add link' }).click();
 	await expect(page.getByRole('link', { name: /Measured spectra/ })).toBeVisible();
 	await page.locator('.links').screenshot({ path: 'test-results/code-and-data.png' });
+
+	// Each chip says what it is; its name and address in the tooltip.
+	await expect(code).toHaveText('Code');
+	await expect(code).toHaveAttribute('title', /github\.com\/ada\/qubits/);
+
+	// A file attached: listed the same way, as what it is.
+	await page.getByRole('button', { name: '+ Attachment' }).click();
+	await page.getByRole('combobox', { name: 'Kind' }).selectOption('Data');
+	await page.getByLabel('Or a file').setInputFiles({
+		name: 'spectra.csv',
+		mimeType: 'text/csv',
+		buffer: Buffer.from('energy,counts\n1,2\n')
+	});
+	await page.getByRole('button', { name: 'Upload', exact: true }).click();
+	const file = page.getByRole('link', { name: 'Data: spectra.csv' });
+	await expect(file).toHaveText('Data');
+	await expect(file).toHaveAttribute('href', /\/api\/files\/.+\/content$/);
 
 	await page.getByRole('button', { name: 'Remove the link to github.com/ada/qubits' }).click();
 	await expect(code).toHaveCount(0);
