@@ -37,6 +37,21 @@
 				>Saved to
 				<select id="owner"></select>
 			</label>
+			<button id="show-list" class="text small" hidden></button>
+			<section id="list" hidden>
+				<p id="list-title" class="title"></p>
+				<p class="list-head small">
+					<span id="list-count" class="muted"></span>
+					<button id="all" class="text">All</button>
+					<button id="none" class="text">None</button>
+				</p>
+				<ul id="listed"></ul>
+				<label id="list-owner-field" hidden
+					>Save to
+					<select id="list-owner"></select>
+				</label>
+				<button id="save-listed" class="primary">Save</button>
+			</section>
 			<button id="allow" class="primary" hidden>Allow paperus on all websites</button>
 			<button id="connect" class="primary" hidden>Connect paperus</button>
 			<p class="links small">

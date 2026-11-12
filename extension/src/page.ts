@@ -3,7 +3,7 @@
  * network, publisher login). Each must stand alone: no imports, no
  * closures. */
 
-import type { PageLink } from './extras';
+import type { PageLink, ScholarRow } from './extras';
 
 export interface PageInfo {
 	url: string;
@@ -252,6 +252,47 @@ export function pageLinks(): PageLink[] {
 		});
 	}
 	return found;
+}
+
+/** A Google Scholar profile's papers, all of them: those shown, then the
+ * rest a hundred at a time (as "Show more" does), a second apart, at most
+ * a thousand. */
+export async function scholarProfile(): Promise<{ name: string; rows: ScholarRow[] }> {
+	const rowsOf = (page: Document): ScholarRow[] =>
+		[...page.querySelectorAll('tr.gsc_a_tr')].map((row) => {
+			const link = row.querySelector<HTMLAnchorElement>('a.gsc_a_at');
+			const gray = row.querySelectorAll('.gs_gray');
+			let url = '';
+			try {
+				url = new URL(link?.getAttribute('href') ?? '', location.href).href;
+			} catch {
+				// No link.
+			}
+			return {
+				title: (link?.textContent ?? '').trim(),
+				authors: (gray[0]?.textContent ?? '').trim(),
+				venue: (gray[1]?.firstChild?.textContent ?? gray[1]?.textContent ?? '').trim(),
+				year: (row.querySelector('.gsc_a_y span, .gsc_a_h')?.textContent ?? '').trim(),
+				url
+			};
+		});
+	const rows = rowsOf(document);
+	const name = (document.querySelector('#gsc_prf_in')?.textContent ?? '').trim();
+	const more = document.querySelector<HTMLButtonElement>('#gsc_bpf_more');
+	if (!more || more.disabled) return { name, rows };
+	for (let start = rows.length; start < 1000; start += 100) {
+		await new Promise((done) => setTimeout(done, 1000));
+		const next = new URL(location.href);
+		next.searchParams.set('cstart', String(start));
+		next.searchParams.set('pagesize', '100');
+		const response = await fetch(next, { credentials: 'include' });
+		if (!response.ok) break;
+		const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+		const found = rowsOf(page);
+		rows.push(...found);
+		if (found.length < 100) break;
+	}
+	return { name, rows };
 }
 
 /** What the page shows, for telling why it gave no PDF (see causes.ts). */

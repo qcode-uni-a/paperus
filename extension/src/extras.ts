@@ -159,3 +159,201 @@ export function extrasOf(
   }
   return extras;
 }
+
+/** One thing a page lists that can be saved as a paper of its own: a file
+ * it links (saved as it is, paperus reads its details), a paper it links
+ * by DOI or arXiv ID, or a paper it names (Google Scholar's profiles: by
+ * title, paperus looks its DOI up). */
+export interface Listed {
+  key: string;
+  kind: "file" | "paper";
+  name: string;
+  /** What it is and where: "PDF · example.org", "arXiv 2101.00001". */
+  detail: string;
+  url: string;
+  doi?: string;
+  arxiv?: string;
+  /** Details as listed, for a paper without an identifier. */
+  csl?: Record<string, unknown>;
+  /** Ticked at first: papers and documents, not archives or videos. */
+  chosen: boolean;
+  /** The paper one has already, if so. */
+  itemId?: string;
+}
+
+const MAX_LISTED = 300;
+/** Documents one saves as papers; archives, data and media at one's wish. */
+const DOCUMENT = /\.(pdf|ps|djvu|epub|docx?|odt|pptx?|odp|md|tex)$/i;
+const OTHER_FILE =
+  /\.(zip|gz|tgz|tar|7z|xlsx?|ods|csv|ipynb|mp4|mov|webm|mkv|mp3|m4a|wav)$/i;
+/** Links that are PDFs without saying so: arXiv's, OpenReview's,
+ * publishers' /doi/pdf/. */
+const PDF_ADDRESS = [
+  /(^|\.)arxiv\.org\/pdf\//i,
+  /openreview\.net\/pdf\b/i,
+  /\/doi\/(pdf|pdfdirect|epdf)\//i,
+  /\/pdfft\b/i,
+];
+/** Link texts that say nothing of what they lead to. */
+const GENERIC_TEXT =
+  /^\W*(pdf|ps|download|slides?|paper|preprint|here|link|full ?text|view|open|file|arxiv|doi|journal|publisher|video|code|data|poster|abstract|html|bib(tex)?|\[.*\])\W*$/i;
+
+function plainPath(url: URL): string {
+  try {
+    return decodeURIComponent(url.pathname);
+  } catch {
+    return url.pathname;
+  }
+}
+
+/** A name to show: the link's text, or its line's when the text is only
+ * "[pdf]", or the file's name. */
+function shownName(link: PageLink, url: URL): string {
+  const text = link.text.replace(/\s+/g, " ").trim();
+  if (text.length > 3 && !GENERIC_TEXT.test(text)) return text.slice(0, 160);
+  let line = link.context.replace(/\s+/g, " ").replace(text, "").trim();
+  // What is left of "[pdf]", "(zip)", "— Slides" at its end.
+  for (let before = ""; before !== line;) {
+    before = line;
+    line = line
+      .replace(/[[(]\s*[\w .-]{0,12}\s*[\])]?\s*$/, (end) =>
+        GENERIC_TEXT.test(end) ||
+        /^\W*$/.test(end) ||
+        /^[[(]\s*\w{1,5}\s*[\])]?$/.test(end.trim())
+          ? ""
+          : end,
+      )
+      .replace(/[\s\-–—:|·,;/]+$/, "")
+      .trim();
+  }
+  if (line.length > 10) return line.slice(0, 160);
+  return plainPath(url).split("/").filter(Boolean).at(-1) ?? url.host;
+}
+
+function fileType(url: URL): string {
+  const extension = /\.([a-z0-9]+)$/i.exec(plainPath(url))?.[1];
+  return extension ? extension.toUpperCase() : "PDF";
+}
+
+/** What a page lists that can each be saved as a paper: files and links
+ * to papers (by DOI or arXiv ID), in the page's order, without the
+ * reference list's (a paper's own page) or the page's own. ``paperOf``:
+ * links.ts's paperOfLink (a link's DOI or arXiv ID). */
+export function listedOn(
+  links: PageLink[],
+  pageUrl: string,
+  paperOf: (url: string) => string | null,
+): Listed[] {
+  const listed: Listed[] = [];
+  const keys = new Set<string>();
+  const page = address(pageUrl);
+  const ownPaper = paperOf(pageUrl);
+  for (const link of links) {
+    if (listed.length >= MAX_LISTED) break;
+    const url = address(link.url);
+    if (!url || url.href === page?.href || ELSEWHERE.test(link.heading))
+      continue;
+    const path = plainPath(url);
+    const paper = paperOf(url.href);
+    const document = DOCUMENT.test(path);
+    const other = OTHER_FILE.test(path);
+    const pdf = PDF_ADDRESS.some((pattern) => pattern.test(url.href));
+    let entry: Listed | null = null;
+    if (paper && paper !== ownPaper && !(document || other)) {
+      const [scheme, value] = [
+        paper.slice(0, paper.indexOf(":")),
+        paper.slice(paper.indexOf(":") + 1),
+      ];
+      // Datasets' DOIs (Zenodo, …) are no papers.
+      if (scheme === "doi" && DATA_DOI.test(value)) continue;
+      // arXiv's PDF link is its paper: saved with its details.
+      entry = {
+        key: paper,
+        kind: "paper",
+        name: shownName(link, url),
+        detail: scheme === "arxiv" ? `arXiv ${value}` : `DOI ${value}`,
+        url: url.href,
+        ...(scheme === "arxiv" ? { arxiv: value } : { doi: value }),
+        chosen: true,
+      };
+    } else if (document || other || pdf) {
+      const host =
+        page && url.hostname !== page.hostname
+          ? ` · ${url.hostname.replace(/^www\./, "")}`
+          : "";
+      entry = {
+        key: `file:${url.href}`,
+        kind: "file",
+        name: shownName(link, url),
+        detail: `${fileType(url)}${host}`,
+        url: url.href,
+        chosen: !other,
+      };
+    }
+    if (entry && !keys.has(entry.key)) {
+      keys.add(entry.key);
+      listed.push(entry);
+    }
+  }
+  return listed;
+}
+
+/** A paper as a Google Scholar profile lists it. */
+export interface ScholarRow {
+  title: string;
+  /** "PY Mai, M Benito, …" (Scholar shortens long lists). */
+  authors: string;
+  /** "Physical Review B 101 (4), 045002" or "arXiv preprint arXiv:…". */
+  venue: string;
+  year: string;
+  url: string;
+}
+
+/** A profile's papers to choose from: by arXiv ID where the venue names
+ * one, else by their details (paperus looks the DOI up by title). */
+export function scholarListed(rows: ScholarRow[]): Listed[] {
+  const listed: Listed[] = [];
+  const keys = new Set<string>();
+  for (const row of rows) {
+    const title = row.title.replace(/\s+/g, " ").trim();
+    if (!title) continue;
+    const arxiv = /arXiv:(\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})/i.exec(
+      row.venue,
+    )?.[1];
+    const key = arxiv ? `arxiv:${arxiv}` : `title:${title}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    const authors = row.authors
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name && name !== "..." && name !== "…")
+      .map((name) => {
+        const words = name.split(/\s+/);
+        const family = words.pop() ?? name;
+        return words.length
+          ? { family, given: words.join(" ") }
+          : { literal: family };
+      });
+    const year = Number.parseInt(row.year, 10);
+    const venue = row.venue.replace(/,\s*(19|20)\d{2}\s*$/, "").trim();
+    listed.push({
+      key,
+      kind: "paper",
+      name: title,
+      detail: [venue, row.year].filter(Boolean).join(", ") || "Google Scholar",
+      url: row.url,
+      ...(arxiv ? { arxiv } : {}),
+      csl: {
+        type: "article-journal",
+        title,
+        author: authors,
+        ...(venue && !arxiv
+          ? { "container-title": venue.replace(/\s+\d.*$/, "") }
+          : {}),
+        ...(year ? { issued: { "date-parts": [[year]] } } : {}),
+      },
+      chosen: true,
+    });
+  }
+  return listed;
+}

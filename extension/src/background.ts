@@ -10,8 +10,15 @@ import {
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
-import { type Extras, extrasOf } from "./extras";
-import { directPdf, readerPdf } from "./links";
+import {
+  type Extras,
+  extrasOf,
+  type Listed,
+  listedOn,
+  type PageLink,
+  scholarListed,
+} from "./extras";
+import { directPdf, paperOfLink, readerPdf } from "./links";
 import { logIssue, trace } from "./log";
 import {
   fetchPdf,
@@ -20,6 +27,7 @@ import {
   pageLinks,
   pageSignals,
   readPage,
+  scholarProfile,
   showNote,
 } from "./page";
 import {
@@ -156,6 +164,26 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
         return { ok: false };
       return saveTab(await chrome.tabs.get(message.tabId), undefined, true);
+    },
+    // What the popup offers for its tab: the paper, or a list to choose
+    // from; then the chosen ones saved, each telling the popup how it went.
+    popupSurvey: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
+        return { ok: false };
+      return survey(await chrome.tabs.get(message.tabId));
+    },
+    popupSaveListed: async () => {
+      if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
+        return { ok: false };
+      const { owners = [] } = (await chrome.storage.local.get("owners")) as {
+        owners?: Owner[];
+      };
+      return saveListed(
+        message.tabId,
+        message.listed as Listed[],
+        owners.find((o) => o.id === message.ownerId),
+        message.large === true,
+      );
     },
     moveItem: async () => {
       if (!sender.url?.startsWith(chrome.runtime.getURL("popup.html")))
@@ -732,6 +760,68 @@ async function saveExtras(
   return parts.length ? ` Also ${parts.join(" and ")}.` : "";
 }
 
+/** A file fetched from here, with the reader's access to its site (the
+ * extension's own fetch: cookies go along). Larger than ``maxBytes``: not
+ * fetched further, its size said. */
+async function fetchFile(
+  url: string,
+  name: string,
+  maxBytes: number,
+): Promise<{ blob: Blob; name: string } | { error: string; size?: number }> {
+  if (!(await chrome.permissions.contains({ origins: [site(url)] })))
+    return { error: "no access to its site" };
+  try {
+    const response = await fetch(url, {
+      credentials: "include",
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!response.ok) return { error: `the site answered ${response.status}` };
+    const type = response.headers.get("content-type") ?? "";
+    // A page instead of the file: a login, or a list of files.
+    if (/text\/html|application\/xhtml/i.test(type))
+      return { error: "a web page, not a file (a login?)" };
+    const length = Number(response.headers.get("content-length") ?? 0);
+    if (length > maxBytes) {
+      void response.body?.cancel();
+      return { error: "too large", size: length };
+    }
+    // Counted as it comes: a size the site does not say is no way round.
+    const parts: Uint8Array[] = [];
+    let size = 0;
+    const reader = response.body?.getReader();
+    for (
+      let part = await reader?.read();
+      part && !part.done;
+      part = await reader?.read()
+    ) {
+      size += part.value.byteLength;
+      if (size > maxBytes) {
+        void reader?.cancel();
+        return { error: "too large", size: length || size };
+      }
+      parts.push(part.value);
+    }
+    const named =
+      /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+        response.headers.get("content-disposition") ?? "",
+      )?.[1] ?? name;
+    let shown = named;
+    try {
+      shown = decodeURIComponent(named);
+    } catch {
+      // As it is.
+    }
+    return {
+      blob: new Blob(parts as BlobPart[], {
+        type: type || "application/octet-stream",
+      }),
+      name: shown.slice(0, 200),
+    };
+  } catch (error) {
+    return { error: String(error) };
+  }
+}
+
 /** One supplementary file, fetched from here (with the reader's access to
  * the publisher's site) and added to the paper; whether it was. */
 async function saveSupplement(
@@ -742,35 +832,14 @@ async function saveSupplement(
     trace("A supplementary file not saved", { url: file.url, reason });
     return false;
   };
-  if (!(await chrome.permissions.contains({ origins: [site(file.url)] })))
-    return why("no access to its site");
+  const fetched = await fetchFile(file.url, file.name, MAX_SUPPLEMENT_BYTES);
+  if ("error" in fetched)
+    return why(
+      fetched.size ? `too large (${fetched.size} bytes)` : fetched.error,
+    );
   try {
-    const response = await fetch(file.url, {
-      credentials: "include",
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!response.ok) return why(`answered ${response.status}`);
-    const type = response.headers.get("content-type") ?? "";
-    // A page instead of the file: a login, or a list of files.
-    if (/text\/html|application\/xhtml/i.test(type)) return why("a web page");
-    const length = Number(response.headers.get("content-length") ?? 0);
-    if (length > MAX_SUPPLEMENT_BYTES)
-      return why(`too large (${length} bytes)`);
-    const blob = await response.blob();
-    if (blob.size > MAX_SUPPLEMENT_BYTES)
-      return why(`too large (${blob.size} bytes)`);
-    const named =
-      /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
-        response.headers.get("content-disposition") ?? "",
-      )?.[1] ?? file.name;
-    let name = named;
-    try {
-      name = decodeURIComponent(named);
-    } catch {
-      // As it is.
-    }
     const form = new FormData();
-    form.append("upload", blob, name.slice(0, 200));
+    form.append("upload", fetched.blob, fetched.name);
     form.append("role", "supplementary");
     const { status } = await call<Api.UploadToItemData>(
       "/api/items/{item_id}/files",
@@ -981,6 +1050,221 @@ async function lookupKeys(
     { query: { id: keys.slice(0, 200) } },
   );
   return data ?? {};
+}
+
+/** What the popup offers for a tab. */
+type Survey =
+  | { mode: "paper"; listed: Listed[] }
+  | {
+      mode: "list";
+      source: "page" | "scholar";
+      title: string;
+      listed: Listed[];
+    };
+
+const SCHOLAR_PROFILE =
+  /^https:\/\/scholar\.google\.[a-z.]+\/citations\?(?:[^#]*&)?user=/;
+/** A file of a list larger than this is saved only when asked again. */
+const MAX_LISTED_BYTES = 100 * 1024 * 1024;
+
+/** A paper's page (its details in the page's tags), or a PDF: the paper,
+ * saved at once as the button does. A page that lists files or papers
+ * instead (a course's, a publication list, a journal's contents), or a
+ * Google Scholar profile: the list, to choose from. */
+async function survey(tab: chrome.tabs.Tab): Promise<Survey> {
+  const url = tab.url ?? "";
+  if (SCHOLAR_PROFILE.test(url)) {
+    const profile = await within(
+      120_000,
+      inPage(tab.id!, scholarProfile),
+    ).catch(() => null);
+    trace("A Google Scholar profile", {
+      page: url,
+      papers: profile?.rows.length ?? null,
+    });
+    if (profile?.rows.length)
+      return {
+        mode: "list",
+        source: "scholar",
+        title: profile.name
+          ? `${profile.name}: papers`
+          : "Papers on this profile",
+        listed: await known(scholarListed(profile.rows)),
+      };
+  }
+  const [page, links] = await Promise.all([
+    within(READ_MS, inPage(tab.id!, readPage)).catch(() => null),
+    within(READ_MS, inPage(tab.id!, pageLinks)).catch(() => [] as PageLink[]),
+  ]);
+  const at = page?.url ?? url;
+  const listed = listedOn(links, at, paperOfLink).filter(
+    (entry) => entry.url !== page?.pdfUrl,
+  );
+  const inUrl = idsInUrl(at);
+  const paper =
+    !page ||
+    page.isPdf ||
+    page.doi ||
+    page.arxiv ||
+    page.pdfUrl ||
+    page.authors.length > 0 ||
+    inUrl.doi ||
+    inUrl.arxiv;
+  if (paper || listed.length === 0)
+    return {
+      mode: "paper",
+      listed: listed.length >= 2 ? await known(listed) : listed,
+    };
+  trace("A page that lists files and papers", {
+    page: at,
+    files: listed.filter((entry) => entry.kind === "file").length,
+    papers: listed.filter((entry) => entry.kind === "paper").length,
+  });
+  return {
+    mode: "list",
+    source: "page",
+    title: page?.title ?? "This page",
+    listed: await known(listed),
+  };
+}
+
+/** Which of the listed papers one has (by DOI, arXiv ID or title): marked,
+ * and not ticked. */
+async function known(listed: Listed[]): Promise<Listed[]> {
+  const keys = listed.filter((l) => l.kind === "paper").map((l) => l.key);
+  const found: Record<string, string | null> = {};
+  // Titles are long: a few at a time, for the address's length.
+  for (let start = 0; start < keys.length; start += 40)
+    Object.assign(
+      found,
+      await lookupKeys(keys.slice(start, start + 40)).catch(() => ({})),
+    );
+  return listed.map((entry) =>
+    found[entry.key]
+      ? { ...entry, itemId: found[entry.key]!, chosen: false }
+      : entry,
+  );
+}
+
+type ListedOutcome = {
+  state: "saved" | "known" | "failed" | "too-large";
+  text: string;
+  link?: string;
+  size?: number;
+};
+
+/** The chosen ones of a list, three at a time, each its own paper; the
+ * popup hears how each went (it may close meanwhile: the saving goes on). */
+async function saveListed(
+  tabId: number,
+  listed: Listed[],
+  owner: Owner | undefined,
+  large: boolean,
+): Promise<Record<ListedOutcome["state"], number>> {
+  const target = owner ?? defaultOwner(await settings());
+  const counts = { saved: 0, known: 0, failed: 0, "too-large": 0 };
+  const queue = [...listed];
+  const tell = (key: string, state: string, outcome?: ListedOutcome) =>
+    chrome.runtime
+      .sendMessage({ type: "listedState", tabId, key, state, ...outcome })
+      .catch(() => undefined); // the popup closed
+  trace("Saving from a list", { entries: listed.length, large });
+  const worker = async () => {
+    for (let entry = queue.shift(); entry; entry = queue.shift()) {
+      void tell(entry.key, "saving");
+      const outcome: ListedOutcome = await within(
+        PAPER_MS,
+        saveOne(entry, target, large),
+      ).catch((error) => ({
+        state: "failed",
+        text: error instanceof Error ? error.message : String(error),
+      }));
+      counts[outcome.state]++;
+      trace("Saved from a list", {
+        entry: entry.kind === "file" ? entry.url : entry.key,
+        state: outcome.state,
+        reason: outcome.text || null,
+      });
+      void tell(entry.key, outcome.state, outcome);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(AT_ONCE, listed.length) }, worker),
+  );
+  return counts;
+}
+
+async function saveOne(
+  entry: Listed,
+  owner: Owner | undefined,
+  large: boolean,
+): Promise<ListedOutcome> {
+  const library = owner ? { library_id: owner.id } : {};
+  if (entry.kind === "paper" && entry.arxiv) {
+    const saved = await save(
+      {
+        arxiv: entry.arxiv,
+        doi: null,
+        title: entry.name,
+        url: `https://arxiv.org/abs/${entry.arxiv}`,
+      },
+      arxivPdf(entry.arxiv),
+      owner,
+    );
+    return {
+      state: saved.item?.added === false ? "known" : "saved",
+      text: saved.warning ? "Without its PDF." : "",
+      link: saved.link,
+    };
+  }
+  if (entry.kind === "paper") {
+    const { status, data } = await call<Api.AddItemData, Api.AddItemResponse>(
+      "/api/items",
+      {
+        method: "POST",
+        json: entry.doi
+          ? { doi: entry.doi, ...library }
+          : {
+              metadata: entry.csl ?? { title: entry.name },
+              find_doi: true,
+              ...library,
+            },
+      },
+    );
+    if (status === 404) return { state: "failed", text: "Its DOI is unknown." };
+    const byDoi = data.identifiers.some((i) => i.scheme === "doi");
+    return {
+      state: status === 200 ? "known" : "saved",
+      text:
+        status === 200 || byDoi
+          ? ""
+          : "By its details as listed: no DOI found for it.",
+      link: await itemLink(data.id),
+    };
+  }
+  const file = await fetchFile(
+    entry.url,
+    entry.name,
+    large ? MAX_BYTES : MAX_LISTED_BYTES,
+  );
+  if ("error" in file)
+    return file.size
+      ? { state: "too-large", text: "", size: file.size }
+      : { state: "failed", text: `Not fetched: ${file.error}.` };
+  const form = new FormData();
+  form.append("upload", file.blob, file.name);
+  if (owner) form.append("library_id", owner.id);
+  const { status, data } = await call<
+    Api.UploadNewItemData,
+    Api.UploadNewItemResponse
+  >("/api/uploads", { method: "POST", form });
+  if (status >= 400)
+    return { state: "failed", text: `paperus answered ${status}.` };
+  return {
+    state: data.existing ? "known" : "saved",
+    text: "",
+    link: await itemLink(data.item_id),
+  };
 }
 
 /** A paper from its page, opened in a tab out of sight and saved as a

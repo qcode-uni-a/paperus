@@ -22,6 +22,18 @@ does the same; a full one with a check means you have it already.
   where the article says they are its own: in its abstract, a "Code
   availability" section, "the data are available at …") are shown on its
   page. Not the references' links, nor the site's own.
+- **Pages that list papers or files** (a course's lecture notes, a
+  publication list, a journal's contents): the popup lists the files the
+  page links (PDFs, slides, …) and the papers it links by DOI or arXiv ID,
+  marks those in paperus, and saves the ticked ones, each as a paper of its
+  own. Files over 100 MB are left out until you click "Save anyway". On a
+  paper's own page, "… more papers and files linked here" opens the same
+  list.
+- **Someone's Google Scholar profile**: the popup lists all their papers
+  (Scholar's further pages read too, at most 1,000), marks those you have
+  (by title), and adds the ticked ones: by arXiv ID where Scholar names
+  one, else by title, with the DOI paperus finds at Crossref (same title,
+  first author and year), else as listed.
 - **Another owner** at once: right-click the button, "Save to …".
 - **The settings** (address, owner, the version installed): "Settings" in
   the popup, or right-click the button, "paperus settings".

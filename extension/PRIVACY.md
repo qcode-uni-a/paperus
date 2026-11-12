@@ -13,6 +13,10 @@ What it sends to your paperus, and when:
   it to). Also the paper's supplementary files the page links (downloaded
   the same way, up to 100 MB each) and the links to its code and data
   (GitHub, Zenodo, …) named in the article.
+- **When the page lists papers or files** (or is a Google Scholar
+  profile): the list's DOIs, arXiv IDs or titles, to mark those you have;
+  on saving, the ticked files (downloaded with your access) or the papers'
+  details.
 - **On arXiv pages**: the arXiv IDs of the papers listed there, to show
   which ones are already in your library.
 - **On Google Scholar's results**: the DOIs and arXiv IDs found in the
