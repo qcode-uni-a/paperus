@@ -9,3 +9,6 @@ data/
 .coverage.*
 coverage.xml
 htmlcov/
+
+# Publishers' pages as saved, for page twins: never checked in.
+extension/twins/raw/

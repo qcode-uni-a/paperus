@@ -1,0 +1,16 @@
+{
+	"about": "Phys. Rev. Lol. (APES): its citation_pdf_url on another site (link.apes.org), which the page may not fetch from: the page's own /prl/pdf/<DOI> link instead; supplemental material linked too. Saved 2026-11-12.",
+	"url": "https://journals.apes.org/prl/abstract/10.5555/PhysRevLol.117.000001",
+	"expect": {
+		"mode": "paper",
+		"title": "Spontaneous Symmetry Breaking in Office Kitchens",
+		"doi": "10.5555/PhysRevLol.117.000001",
+		"pdfUrl": "https://journals.apes.org/prl/pdf/10.5555/PhysRevLol.117.000001",
+		"authors": ["Skip Connor", "Ida Entity", "Res Netson", "Batch Norman"],
+		"journal": "Physical Review Lols",
+		"volume": "117",
+		"issue": "4",
+		"firstPage": "000001",
+		"date": "2016/07/21"
+	}
+}

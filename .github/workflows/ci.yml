@@ -211,7 +211,7 @@ jobs:
       - run: npm pack --dry-run
 
   extension:
-    name: Browser extension (tsc, build)
+    name: Browser extension (tsc, test, build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -226,6 +226,7 @@ jobs:
           cache-dependency-path: extension/package-lock.json
       - run: npm ci
       - run: npm run check
+      - run: npm test
       - run: npm run build
 
   app:

@@ -1,0 +1,44 @@
+{
+	"about": "ScienceIndirect: no citation_pdf_url nor authors in tags; its PDF link (…/pii/<PII>/pdfft?…) named by the article's PII, among other papers' pdfft links (recommended articles) to pass over. Saved 2026-11-12.",
+	"url": "https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z",
+	"expect": {
+		"mode": "paper",
+		"title": "Quantum Tunneling of Deadlines Through Weekends",
+		"doi": "10.5555/j.physeh.2015.08.001",
+		"pdfUrl": "https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z/pdfft?md5=x&pid=1-s2.0-S1234X5678Y9012Z-main.pdf",
+		"authors": [],
+		"journal": "Physica Eh: Low-key Systems and Nanostructures",
+		"volume": "74",
+		"firstPage": "608",
+		"lastPage": "613"
+	},
+	"chainFrom": "The extension's log, 2026-11-12: a fetch of the PDF link is bounced to the article (a check for robots for clients without scripts); a page load goes on to the PDF's signed address, whose fetch gets \"Security verification\". In the page the PDF link gives a web page; the tab (in the browser) does the rest.",
+	"chain": {
+		"https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z/pdfft?md5=x&pid=1-s2.0-S1234X5678Y9012Z-main.pdf": {
+			"fetch": {
+				"redirect": "https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z?ref=cra_js_challenge&fr=njs"
+			},
+			"load": {
+				"redirect": "https://pdf.scienceindirectassets.com/1/S1234X5678Y9012Z/main.pdf?X-Amz-Security-Token=x"
+			}
+		},
+		"https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z?ref=cra_js_challenge&fr=njs": {
+			"fetch": {
+				"html": "<!doctype html><html><head><title>Quantum Tunneling of Deadlines Through Weekends - ScienceIndirect</title></head><body><h1>Quantum Tunneling of Deadlines Through Weekends</h1></body></html>"
+			}
+		},
+		"https://pdf.scienceindirectassets.com/1/S1234X5678Y9012Z/main.pdf?X-Amz-Security-Token=x": {
+			"fetch": { "redirect": "https://pdf.scienceindirectassets.com/craft/capi/cfts/init?p=x" },
+			"load": "pdf",
+			"cors": true
+		},
+		"https://pdf.scienceindirectassets.com/craft/capi/cfts/init?p=x": {
+			"fetch": "robot-check",
+			"cors": true
+		}
+	},
+	"expectPdf": {
+		"error": "The PDF link gave a web page, not a PDF.",
+		"at": "https://www.scienceindirect.com/science/article/pii/S1234X5678Y9012Z?ref=cra_js_challenge&fr=njs"
+	}
+}

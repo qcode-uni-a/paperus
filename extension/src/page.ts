@@ -42,6 +42,23 @@ export function idsInUrl(url: string): { doi: string | null; arxiv: string | nul
 	};
 }
 
+/** A paper's page (or a PDF), saved at once; else, if it links papers or
+ * files, a page that lists them (the popup's choice). A page the
+ * extension could not read counts as a paper's: saved from its address. */
+export function namesPaper(page: PageInfo | null, url: string): boolean {
+	const inUrl = idsInUrl(page?.url ?? url);
+	return (
+		!page ||
+		page.isPdf ||
+		!!page.doi ||
+		!!page.arxiv ||
+		!!page.pdfUrl ||
+		page.authors.length > 0 ||
+		!!inUrl.doi ||
+		!!inUrl.arxiv
+	);
+}
+
 /** The paper's details from the page: Highwire/Google Scholar tags
  * (citation_*) and Dublin Core (the address: see idsInUrl). */
 export async function readPage(): Promise<PageInfo> {

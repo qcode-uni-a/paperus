@@ -1,0 +1,28 @@
+{
+	"about": "EEEK Xplore, a conference paper's page: no citation_* tags, its details in a script (xplGlobal.document.metadata), its PDF link a page with the PDF in a frame (stamp.jsp). Saved 2026-11-12.",
+	"url": "https://eeekxplore.eeek.org/document/1234567",
+	"expect": {
+		"mode": "paper",
+		"title": "Skipping Layers Considered Helpful",
+		"doi": "10.5555/eeek.2016.90",
+		"pdfUrl": "https://eeekxplore.eeek.org/stamp/stamp.jsp?tp=&arnumber=1234567",
+		"authors": ["Skip Connor", "Ida Entity", "Res Netson", "Batch Norman"],
+		"journal": "2016 EEEK Conference on Computers Vaguely Perceiving Reality (CVPR)",
+		"firstPage": "770",
+		"lastPage": "778",
+		"date": "June 2016"
+	},
+	"chainFrom": "EEEK's stamp page: a frame with getPDF.jsp, which gives the PDF (a paper saved so with its PDF in Firefox, 2026-11-12).",
+	"chain": {
+		"https://eeekxplore.eeek.org/stamp/stamp.jsp?tp=&arnumber=1234567": {
+			"fetch": {
+				"html": "<!doctype html><html><head><title>EEEK Xplore Full-Text PDF:</title></head><body><iframe src=\"https://eeekxplore.eeek.org/stampPDF/getPDF.jsp?tp=&amp;arnumber=1234567&amp;ref=\" frameborder=0></iframe></body></html>"
+			}
+		},
+		"https://eeekxplore.eeek.org/stampPDF/getPDF.jsp?tp=&arnumber=1234567&ref=": {
+			"fetch": "pdf",
+			"load": "pdf"
+		}
+	},
+	"expectPdf": { "pdf": true }
+}

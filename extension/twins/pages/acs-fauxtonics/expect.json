@@ -1,0 +1,27 @@
+{
+	"about": "ACS Fauxtonics (American Comical Society): its citation_title broken across lines in the tag; the PDF at /…/article-pdf/…, supplements at /…/article-supplement/…; ten authors. Saved 2026-11-12.",
+	"url": "https://pubs.acz.org/doi/10.5555/acsfauxtonics.0c00001",
+	"expect": {
+		"mode": "paper",
+		"title": "Nanoscale Origami for Very Small Swans",
+		"doi": "10.5555/acsfauxtonics.0c00001",
+		"pdfUrl": "https://pubs.acz.org/apchd5/article-pdf/7/9/2413/9000001/ph0c00001.pdf",
+		"authors": [
+			"Skip Connor",
+			"Ida Entity",
+			"Res Netson",
+			"Batch Norman",
+			"Al Gorithm",
+			"Max Likelihood",
+			"Sue Perposition",
+			"Bo Sonn",
+			"Fermi Onn",
+			"Ella Vator"
+		],
+		"journal": "ACS Fauxtonics",
+		"volume": "7",
+		"issue": "9",
+		"firstPage": "2413",
+		"lastPage": "2422"
+	}
+}

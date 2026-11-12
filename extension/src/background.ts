@@ -23,6 +23,7 @@ import { logIssue, trace } from "./log";
 import {
   fetchPdf,
   idsInUrl,
+  namesPaper,
   type PageInfo,
   pageLinks,
   pageSignals,
@@ -1201,17 +1202,7 @@ async function survey(tab: chrome.tabs.Tab): Promise<Survey> {
   const listed = listedOn(links, at, paperOfLink).filter(
     (entry) => entry.url !== page?.pdfUrl,
   );
-  const inUrl = idsInUrl(at);
-  const paper =
-    !page ||
-    page.isPdf ||
-    page.doi ||
-    page.arxiv ||
-    page.pdfUrl ||
-    page.authors.length > 0 ||
-    inUrl.doi ||
-    inUrl.arxiv;
-  if (paper || listed.length === 0)
+  if (namesPaper(page, at) || listed.length === 0)
     return {
       mode: "paper",
       listed: listed.length >= 2 ? await known(listed) : listed,

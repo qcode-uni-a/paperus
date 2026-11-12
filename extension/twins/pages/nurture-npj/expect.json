@@ -1,0 +1,24 @@
+{
+	"about": "npj Quantum Misinformation (Nurture): complete citation_* and Dublin Core tags, eight authors; the PDF at <article>.pdf, its supplement on another site (static-content.sprinkler.com). Saved 2026-11-12.",
+	"url": "https://www.nurture.com/articles/s1234-025-0001-0",
+	"expect": {
+		"mode": "paper",
+		"title": "On the Thermodynamics of Cold Coffee",
+		"doi": "10.5555/s1234-025-0001-0",
+		"pdfUrl": "https://www.nurture.com/articles/s1234-025-0001-0.pdf",
+		"authors": [
+			"Skip Connor",
+			"Ida Entity",
+			"Res Netson",
+			"Batch Norman",
+			"Al Gorithm",
+			"Max Likelihood",
+			"Sue Perposition",
+			"Bo Sonn"
+		],
+		"journal": "npj Quantum Misinformation",
+		"volume": "11",
+		"firstPage": "155",
+		"date": "2025/10/02"
+	}
+}

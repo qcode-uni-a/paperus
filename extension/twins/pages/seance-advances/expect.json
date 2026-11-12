@@ -1,0 +1,19 @@
+{
+	"about": "Seance Advances (Atypon): no citation_doi, its DOI in the second dc.Identifier (the first is its own ID); no citation_pdf_url, and the supplement's link (/doi/suppl/…_sm.pdf) names the DOI too, before the article's PDF. Saved 2026-11-12.",
+	"url": "https://www.seance.org/doi/10.5555/seadv.zzz0001",
+	"expect": {
+		"mode": "paper",
+		"title": "A Unified Theory of Lost Socks",
+		"doi": "10.5555/seadv.zzz0001",
+		"pdfUrl": "https://www.seance.org/doi/pdf/10.5555/seadv.zzz0001?download=true",
+		"authors": ["Skip Connor", "Ida Entity", "Res Netson", "Batch Norman"],
+		"journal": "Seance Advances",
+		"publisher": "American Association for the Advancement of Seance",
+		"date": "2019-07"
+	},
+	"chainFrom": "The extension's log, 2026-11-12: the PDF link gives the PDF.",
+	"chain": {
+		"https://www.seance.org/doi/pdf/10.5555/seadv.zzz0001?download=true": { "fetch": "pdf", "load": "pdf" }
+	},
+	"expectPdf": { "pdf": true }
+}

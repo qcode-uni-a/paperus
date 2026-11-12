@@ -11,6 +11,15 @@
   page's `dc.Identifier` tags the extension read only the first, on
   Science's pages its own ID, not the DOI (saving worked by the DOI in
   the address); ACS's titles kept the line break inside their tag.
+- **Page twins for the extension**: publishers' pages as the extension
+  sees them, without their content, with unrelated titles, invented
+  authors and parody names, checked in `extension/twins/pages/`; `npm
+  test` there (and in CI) reads each as the extension does. The first six:
+  EEEK Xplore, Seance Advances, Phys. Rev. Lol., ScienceIndirect, npj
+  Quantum Misinformation and ACS Fauxtonics. They catch this release's
+  page bugs (IEEE, Science's DOI, ACS's title). Where a PDF link forwards
+  (ScienceIndirect's page in between and check for robots, EEEK's frame),
+  a twin's chain plays the network and the PDF is fetched as in the page.
 - **ScienceDirect's PDFs in Firefox, saved from the article's page**: its
   PDF link, opened in a tab out of sight, reaches the PDF; the extension's
   own fetch of that address gets a check for robots ("Security
