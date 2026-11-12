@@ -6,6 +6,18 @@
 		return total ? Math.min(100, Math.round((done / total) * 100)) : 100;
 	}
 	const running = $derived(tasks.list.some((t) => !t.finished));
+
+	// All done: it closes by itself, later when some failed (Missing keeps
+	// why), never while the pointer or the focus is on it.
+	let resting = $state(false);
+	$effect(() => {
+		if (!tasks.list.length || running || resting) return;
+		const timer = setTimeout(
+			() => (tasks.list = tasks.list.filter((t) => !t.finished)),
+			tasks.list.some((t) => t.failed) ? 30_000 : 10_000
+		);
+		return () => clearTimeout(timer);
+	});
 </script>
 
 <!-- Moving around the website keeps them going; leaving it would end
@@ -22,6 +34,10 @@
 		aria-live="polite"
 		aria-label="Tasks"
 		transition:fade={{ duration: 200 }}
+		onpointerenter={() => (resting = true)}
+		onpointerleave={() => (resting = false)}
+		onfocusin={() => (resting = true)}
+		onfocusout={() => (resting = false)}
 	>
 		<ul>
 			{#each tasks.list as task (task.id)}

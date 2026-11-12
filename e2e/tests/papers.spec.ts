@@ -3,6 +3,11 @@ import { itemAction, uploadPaper } from './helpers.ts';
 
 test('an uploaded PDF is read by the worker and found by its words', async ({ page }) => {
 	const paper = await uploadPaper(page, 'Upload');
+	// Its upload done, the tray closes by itself once the pointer is off it.
+	await page.mouse.move(0, 0);
+	await expect(page.getByRole('complementary', { name: 'Uploads' })).toBeHidden({
+		timeout: 15_000
+	});
 
 	// Its file, read: the text is searchable.
 	await itemAction(page, 'Details and files');

@@ -17,6 +17,15 @@
 				: `${uploads.list.length} uploaded`
 	);
 
+	// All uploaded: it closes by itself (not while the pointer or the focus
+	// is on it); a failed one stays until closed, as nothing else says so.
+	let resting = $state(false);
+	$effect(() => {
+		if (!uploads.list.length || active || failed || resting) return;
+		const timer = setTimeout(clearFinished, 10_000);
+		return () => clearTimeout(timer);
+	});
+
 	function percent(loaded: number, size: number): number {
 		return size ? Math.min(100, Math.round((loaded / size) * 100)) : 100;
 	}
@@ -35,6 +44,10 @@
 		aria-live="polite"
 		aria-label="Uploads"
 		transition:fade={{ duration: 200 }}
+		onpointerenter={() => (resting = true)}
+		onpointerleave={() => (resting = false)}
+		onfocusin={() => (resting = true)}
+		onfocusout={() => (resting = false)}
 	>
 		<div class="head">
 			<strong>{summary}</strong>
