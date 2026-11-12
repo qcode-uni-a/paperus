@@ -87,8 +87,9 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 		asBob.page.getByRole('button', { name: 'Notifications', exact: true })
 	).toBeVisible();
 	await asBob.page.goto(`/?q=${paper.word}`);
-	await expect(asBob.page.getByRole('link', { name: paper.title })).toBeVisible();
-	await asBob.page.getByRole('link', { name: paper.title }).click();
+	const found = asBob.page.locator('.results').getByRole('link', { name: paper.title });
+	await expect(found).toBeVisible();
+	await found.click();
 	await expect(asBob.page.getByText(/Added by admin/)).toBeVisible();
 	await asBob.page.goto(`/?q=${privatePaper.word}`);
 	await expect(asBob.page.getByText(`Nothing found for “${privatePaper.word}”.`)).toBeVisible();

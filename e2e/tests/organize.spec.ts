@@ -70,7 +70,7 @@ test('trash and restore', async ({ page }) => {
 	await openLibrary(page);
 	await expect(page.getByRole('link', { name: paper.title })).toBeVisible();
 	await page.goto(`/?q=${paper.word}`);
-	await expect(page.getByRole('link', { name: paper.title })).toBeVisible();
+	await expect(page.locator('.results').getByRole('link', { name: paper.title })).toBeVisible();
 });
 
 test('a trashed paper can be restored from its own page', async ({ page }) => {

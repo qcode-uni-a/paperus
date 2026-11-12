@@ -49,7 +49,7 @@ test.describe('on a phone', () => {
 		await expect(menu).toBeHidden();
 
 		await page.goto(`/?q=${paper.word}`);
-		await expect(page.getByRole('link', { name: paper.title })).toBeVisible();
+		await expect(page.locator('.results').getByRole('link', { name: paper.title })).toBeVisible();
 		await expectNoHorizontalScroll(page);
 
 		await page.goto(`/items/${paper.id}`);
