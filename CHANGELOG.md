@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.26 (2026-11-12)
+
+*Same extension, shorter cover letter: Firefox's reviewers get the short version, and slow pages get twenty seconds.*
+
+- **Extension 0.0.25's changes reach Firefox**: its upload to
+  addons.mozilla.org was refused, as the notes for Mozilla's reviewers had
+  grown too long. They are short again, and the build refuses long ones.
+- **Saving never waits for ever at "Reading the page…"**: a page busy with
+  its own scripts (Science Advances) could keep the browser from running
+  the extension's. The page's details are read after ten seconds at most;
+  with no answer after twenty, the save goes on from the page's address.
+- **CI**: the browser tests give the worker's reading of an upload its own
+  minute (WebKit ran out of time).
+
 ## 0.0.25 (2026-11-11)
 
 *The extension learned to read Wiley's mind, ScienceDirect's scripts and Google Scholar's links, and now leaves the room on its own.*
