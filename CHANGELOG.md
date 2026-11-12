@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **The extension saves IEEE Xplore's papers**: their pages have no
+  `citation_*` tags, so the popup took one for a page listing papers (its
+  references) and offered those. Their details (DOI, authors, venue,
+  pages, PDF link) are read from the page's own data now, and the PDF from
+  the frame that IEEE's PDF link (`stamp.jsp`) shows it in.
+- **Science's DOIs and ACS's titles, as the pages give them**: of a
+  page's `dc.Identifier` tags the extension read only the first, on
+  Science's pages its own ID, not the DOI (saving worked by the DOI in
+  the address); ACS's titles kept the line break inside their tag.
 - **ScienceDirect's PDFs in Firefox, saved from the article's page**: its
   PDF link, opened in a tab out of sight, reaches the PDF; the extension's
   own fetch of that address gets a check for robots ("Security

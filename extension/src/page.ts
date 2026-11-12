@@ -132,37 +132,86 @@ export async function readPage(): Promise<PageInfo> {
 			const tag = document.querySelector<HTMLMetaElement>(
 				`meta[name="${name}" i], meta[property="${name}" i]`
 			);
-			const value = tag?.content?.trim();
+			// One line (ACS's titles break inside the tag).
+			const value = tag?.content?.replace(/\s+/g, ' ').trim();
 			if (value) return value;
 		}
 		return null;
 	};
 	const metas = (name: string): string[] =>
 		[...document.querySelectorAll<HTMLMetaElement>(`meta[name="${name}" i]`)]
-			.map((tag) => tag.content.trim())
+			.map((tag) => tag.content.replace(/\s+/g, ' ').trim())
 			.filter(Boolean);
 	const doiIn = (text: string | null): string | null =>
 		text?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
+	/** IEEE Xplore's details, which it has in no citation_* tags: in a
+	 * script, as one line "xplGlobal.document.metadata={…};". Only the
+	 * paper's fields are read (it also names the reader's institution). */
+	const xpl = ((): Record<string, unknown> | null => {
+		for (const script of document.querySelectorAll('script:not([src])')) {
+			const text = script.textContent ?? '';
+			const at = text.search(/xplGlobal\.document\.metadata\s*=\s*\{/);
+			if (at < 0) continue;
+			const line = text.slice(text.indexOf('{', at)).split('\n')[0].trim();
+			try {
+				const data: unknown = JSON.parse(line.replace(/;$/, ''));
+				return data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+			} catch {
+				return null;
+			}
+		}
+		return null;
+	})();
+	const field = (name: string): string | null => {
+		const value = xpl?.[name];
+		return typeof value === 'string' && value.trim()
+			? value.trim()
+			: typeof value === 'number'
+				? String(value)
+				: null;
+	};
+	const listedAuthors = xpl?.authors;
+	const xplAuthors = Array.isArray(listedAuthors)
+		? listedAuthors
+				.map((author: unknown) =>
+					author && typeof author === 'object' && 'name' in author ? String(author.name) : ''
+				)
+				.filter(Boolean)
+		: [];
 	const url = location.href;
 	const isPdf = document.contentType === 'application/pdf';
-	const doi = doiIn(meta('citation_doi', 'dc.identifier', 'prism.doi', 'bepress_citation_doi'));
+	// Of all dc.Identifier tags, the DOI (Science's first is its own ID).
+	const doi =
+		doiIn(meta('citation_doi', 'prism.doi', 'bepress_citation_doi', 'publication_doi')) ??
+		metas('dc.identifier').map(doiIn).find(Boolean) ??
+		doiIn(field('doi'));
+	const authors = metas('citation_author').length ? metas('citation_author') : metas('dc.creator');
 	return {
 		url,
 		isPdf,
 		// A PDF's title is its file name: none, paperus reads the PDF instead.
-		title: meta('citation_title', 'dc.title', 'og:title') ?? (isPdf ? null : document.title || null),
+		title:
+			meta('citation_title', 'dc.title') ??
+			field('title') ??
+			meta('og:title') ??
+			(isPdf ? null : document.title || null),
 		doi,
 		arxiv: meta('citation_arxiv_id'),
-		pdfUrl: pdfOf(meta('citation_pdf_url'), doi),
-		authors: metas('citation_author').length ? metas('citation_author') : metas('dc.creator'),
-		date: meta('citation_publication_date', 'citation_date', 'citation_online_date', 'dc.date'),
-		journal: meta('citation_journal_title', 'citation_conference_title', 'prism.publicationName'),
-		volume: meta('citation_volume', 'prism.volume'),
-		issue: meta('citation_issue', 'prism.number'),
-		firstPage: meta('citation_firstpage', 'prism.startingPage'),
-		lastPage: meta('citation_lastpage', 'prism.endingPage'),
-		publisher: meta('citation_publisher', 'dc.publisher'),
-		abstract: meta('citation_abstract', 'dc.description', 'description')
+		// IEEE's: /stamp/stamp.jsp?…, a page with the PDF in a frame (fetchPdf).
+		pdfUrl: pdfOf(meta('citation_pdf_url') ?? field('pdfUrl'), doi),
+		authors: authors.length ? authors : xplAuthors,
+		date:
+			meta('citation_publication_date', 'citation_date', 'citation_online_date', 'dc.date') ??
+			field('publicationDate'),
+		journal:
+			meta('citation_journal_title', 'citation_conference_title', 'prism.publicationName') ??
+			field('publicationTitle'),
+		volume: meta('citation_volume', 'prism.volume') ?? field('volume'),
+		issue: meta('citation_issue', 'prism.number') ?? field('issue'),
+		firstPage: meta('citation_firstpage', 'prism.startingPage') ?? field('startPage'),
+		lastPage: meta('citation_lastpage', 'prism.endingPage') ?? field('endPage'),
+		publisher: meta('citation_publisher', 'dc.publisher') ?? field('publisher'),
+		abstract: meta('citation_abstract', 'dc.description') ?? field('abstract') ?? meta('description')
 	};
 }
 
@@ -188,7 +237,7 @@ export async function fetchPdf(
 		}
 		// A page in between that sends the browser on to the PDF
 		// (ScienceDirect's "pdfft": a refresh to its PDF's signed address, or
-		// a link in its message): followed once.
+		// a link in its message; IEEE's: a frame): followed once.
 		if ((response.headers.get('content-type') ?? '').includes('text/html')) {
 			const html = await response.clone().text();
 			const refresh =
@@ -196,7 +245,9 @@ export async function fetchPdf(
 				html.match(/<meta[^>]+content=["']?\s*\d+\s*;\s*url=([^"'>]+)["']?[^>]*http-equiv=["']?refresh/i) ??
 				html.match(/id=["']redirect-message["'][\s\S]{0,500}?href=["']([^"']+)/i) ??
 				html.match(/(?:window\.)?location(?:\.href)?\s*=\s*["']([^"']+\.pdf[^"']*)["']/i) ??
-				html.match(/location\.replace\(\s*["']([^"']+)["']\s*\)/i);
+				html.match(/location\.replace\(\s*["']([^"']+)["']\s*\)/i) ??
+				// The PDF in a frame (IEEE's stamp.jsp: …/stampPDF/getPDF.jsp?…).
+				html.match(/<(?:iframe|embed)\b[^>]*\bsrc=["']([^"']*(?:\.pdf\b|getPDF\.jsp)[^"']*)["']/i);
 			if (refresh) {
 				const next = new URL(refresh[1].replace(/&amp;/g, '&').trim(), response.url).href;
 				try {
