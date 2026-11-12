@@ -1,5 +1,6 @@
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +8,7 @@ import numpy as np
 import pytest
 
 from paperus_ml.encoder import Encoder, batches, pool
-from tests.tiny_model import DIMENSIONS, write_tiny_model
+from tests.tiny_model import DIMENSIONS, TABLE, WORDS, write_tiny_model
 
 
 def test_pool_cls_and_mean() -> None:
@@ -86,3 +87,38 @@ def test_models_taking_token_types(tmp_path: Path) -> None:
     with_types = Encoder(write_tiny_model(tmp_path, token_types=True), tmp_path)
     assert "token_type_ids" in with_types.input_names
     assert np.allclose(with_types.embed(["drought rivers", "rain"], "passage"), vectors)
+
+
+def test_pool_last_and_output() -> None:
+    hidden = np.array(
+        [[[3.0, 4.0], [0.0, 2.0], [9.0, 9.0]], [[1.0, 0.0], [5.0, 5.0], [9.0, 9.0]]],
+        dtype=np.float32,
+    )
+    mask = np.array([[1, 1, 0], [1, 0, 0]], dtype=np.int64)
+    # Padding on the right: each text's last real token.
+    assert np.allclose(pool(hidden, mask, "last"), [[0.0, 1.0], [1.0, 0.0]])
+    # The model's own sentence vectors, normalized.
+    own = np.array([[3.0, 4.0]], dtype=np.float32)
+    assert np.allclose(pool(own, mask[:1], "output"), [[0.6, 0.8]])
+
+
+def test_decoder_models(tmp_path: Path) -> None:
+    """A decoder exported for generating text (Qwen3-Embedding): token
+    positions and an empty past; its last token's vector."""
+    spec = replace(write_tiny_model(tmp_path, decoder=True), pooling="last")
+    encoder = Encoder(spec, tmp_path)
+    assert {"position_ids", "past_key_values.0.key"} <= encoder.input_names
+    vectors = encoder.embed(["drought rivers", "rain"], "passage")
+    for row, word in enumerate(["rivers", "rain"]):
+        expected = TABLE[WORDS.index(word)]
+        assert np.allclose(vectors[row], expected / np.linalg.norm(expected))
+
+
+def test_models_with_their_own_sentence_vectors(tmp_path: Path) -> None:
+    """EmbeddingGemma: its pooling inside the model (``sentence_embedding``)."""
+    spec = replace(write_tiny_model(tmp_path, sentence_output=True), pooling="output")
+    own = Encoder(spec, tmp_path).embed(["drought rivers"], "passage")
+    mean = Encoder(replace(spec, pooling="mean"), tmp_path).embed(
+        ["drought rivers"], "passage"
+    )
+    assert np.allclose(own, mean)

@@ -2469,6 +2469,20 @@ export type Mlgpu = {
 };
 
 /**
+ * MLMemory
+ */
+export type MlMemory = {
+    /**
+     * Total
+     */
+    total: number;
+    /**
+     * Free
+     */
+    free: number;
+};
+
+/**
  * MLModel
  */
 export type MlModel = {
@@ -2520,6 +2534,10 @@ export type MlModel = {
     benchmarks?: {
         [key: string]: string;
     };
+    /**
+     * Memory Bytes
+     */
+    memory_bytes?: number | null;
 };
 
 /**
@@ -2592,6 +2610,14 @@ export type MlServiceState = {
      * Driver Needed
      */
     driver_needed?: number;
+    ram?: MlMemory | null;
+    gpu_memory?: MlMemory | null;
+    /**
+     * On Cpu
+     */
+    on_cpu?: {
+        [key: string]: string;
+    };
 };
 
 /**

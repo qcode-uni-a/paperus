@@ -21,7 +21,7 @@ import onnxruntime
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from paperus_ml import metrics
+from paperus_ml import memory, metrics
 from paperus_ml.config import Settings
 from paperus_ml.device import CUDA, DRIVER_NEEDED, driver_version, host_cards
 from paperus_ml.encoder import Encoder
@@ -108,6 +108,10 @@ class ModelInfo(BaseModel):
     download_mb: int
     scores: dict[str, float]
     """Published retrieval scores (nDCG@10, out of 100) by benchmark."""
+    memory_bytes: int | None = None
+    """What it took once loaded on this service (RAM, or GPU memory on the
+    GPU), as measured when it last loaded; None if never loaded here. Runs
+    need some more for a moment."""
     benchmarks: dict[str, str] = Field(default_factory=lambda: dict(SCORES))
     """What the score keys mean."""
 
@@ -118,6 +122,12 @@ class ServiceConfig(BaseModel):
     setting (``PAPERUS_ML_INTRA_OP_THREADS``)."""
     keep: list[str]
     """Models to keep loaded (paperus sends the one in use)."""
+
+
+class MemoryOut(BaseModel):
+    total: int
+    free: int
+    """Bytes; free: available for new use."""
 
 
 class GPU(BaseModel):
@@ -147,6 +157,13 @@ class ServiceState(BaseModel):
     """The NVIDIA driver's major version, if one is loaded."""
     driver_needed: int = DRIVER_NEEDED
     """The oldest driver the GPU image runs with."""
+    ram: MemoryOut | None = None
+    """The machine's RAM, if the system says."""
+    gpu_memory: MemoryOut | None = None
+    """The GPU's memory (all programs' use counted), on the GPU."""
+    on_cpu: dict[str, str] = Field(default_factory=dict)
+    """Models running on the CPU although the service runs on the GPU,
+    with why (not enough GPU memory)."""
 
 
 class Speed(BaseModel):
@@ -154,6 +171,10 @@ class Speed(BaseModel):
     passages: int
     seconds: float
     passages_per_second: float
+
+
+def _memory(found: memory.Memory | None) -> MemoryOut | None:
+    return None if found is None else MemoryOut(total=found.total, free=found.free)
 
 
 def usable_cores() -> int:
@@ -231,6 +252,7 @@ def create_app(
                 licence=s.licence,
                 download_mb=s.download_mb,
                 scores=dict(s.scores),
+                memory_bytes=models.measured.get(s.vectors(models.device)),
             )
             for s in MODELS.values()
         ]
@@ -257,6 +279,9 @@ def create_app(
             gpu_problem=models.gpu_problem,
             gpus=[GPU(name=c.name, supported=c.supported) for c in host_cards()],
             driver=driver_version(),
+            ram=_memory(memory.ram()),
+            gpu_memory=_memory(memory.gpu()) if models.device == "cuda" else None,
+            on_cpu=dict(models.on_cpu),
         )
 
     @app.put("/config", dependencies=[Depends(check_token)])

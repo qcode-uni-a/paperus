@@ -15,8 +15,9 @@ export PAPERUS_WEB_PATH=$ROOT/web/build
 # Plain HTTP on localhost.
 export PAPERUS_COOKIE_SECURE=false
 # No ML service: search falls back to keywords. A closed port, so a dev
-# ML service on its default port is never used.
-export PAPERUS_ML_URLS='["http://127.0.0.1:9"]'
+# ML service on its default port is never used (PAPERUS_E2E_ML_URLS: one to
+# try the ML settings against).
+export PAPERUS_ML_URLS=${PAPERUS_E2E_ML_URLS:-'["http://127.0.0.1:9"]'}
 
 if [ ! -f "$PAPERUS_WEB_PATH/200.html" ]; then
   echo "web/build is missing: run 'npm --prefix web run build' first" >&2

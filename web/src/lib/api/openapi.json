@@ -13213,6 +13213,24 @@
         ],
         "title": "MLGPU"
       },
+      "MLMemory": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "free": {
+            "type": "integer",
+            "title": "Free"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "free"
+        ],
+        "title": "MLMemory"
+      },
       "MLModel": {
         "properties": {
           "name": {
@@ -13276,6 +13294,17 @@
             "type": "object",
             "title": "Benchmarks",
             "default": {}
+          },
+          "memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Bytes"
           }
         },
         "type": "object",
@@ -13399,6 +13428,34 @@
             "type": "integer",
             "title": "Driver Needed",
             "default": 580
+          },
+          "ram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MLMemory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gpu_memory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MLMemory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "on_cpu": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "On Cpu",
+            "default": {}
           }
         },
         "type": "object",

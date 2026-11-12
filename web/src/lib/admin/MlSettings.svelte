@@ -88,6 +88,50 @@
 		Object.entries(models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {})
 	);
 
+	/** What a model takes once loaded: as measured on this server, else a
+	 * guess from its download (twice that: its working memory). */
+	function needs(model: MlModel): { bytes: number; measured: boolean } | null {
+		if (model.memory_bytes != null) return { bytes: model.memory_bytes, measured: true };
+		if (model.download_mb) return { bytes: model.download_mb * 2 * 1024 ** 2, measured: false };
+		return null;
+	}
+	/** The models in use together (the choices on this page, saved or not),
+	 * and whether they fit in the GPU's memory (or the RAM) at once. */
+	const together = $derived.by(() => {
+		const service = admin.ml?.service;
+		const space = onGpu ? service?.gpu_memory : service?.ram;
+		const chosen = [
+			{ what: 'search', model: models.find((m) => m.name === current) },
+			{ what: 'reranker', model: reranking ? rerankers.find((m) => m.name === rerankModel) : null },
+			{ what: 'OCR', model: ocr ? ocrModels.find((m) => m.name === ocrModel) : null }
+		].flatMap(({ what, model }) => {
+			const need = model ? needs(model) : null;
+			return model && need ? [{ what, model, need }] : [];
+		});
+		if (!space || !chosen.length) return null;
+		// Those loaded already are in the memory used now.
+		const loaded = new Set(service?.loaded ?? []);
+		const more = chosen
+			.filter((c) => !loaded.has(c.model.name))
+			.reduce((sum, c) => sum + c.need.bytes, 0);
+		// Their runs need about a quarter more for a moment.
+		const left = space.free - more * 1.25;
+		return {
+			chosen,
+			total: chosen.reduce((sum, c) => sum + c.need.bytes, 0),
+			space,
+			fits: left > 0,
+			tight: left > 0 && left < space.total * 0.1,
+			guessed: chosen.some((c) => !c.need.measured)
+		};
+	});
+
+	/** "Retrieval, multilingual (MMTEB v2)" → "Multilingual". */
+	function shortLabel(label: string): string {
+		const name = label.replace(/^Retrieval, /, '').replace(/\s*\(.*\)$/, '');
+		return name.charAt(0).toUpperCase() + name.slice(1);
+	}
+
 	function duration(seconds: number): string {
 		if (seconds < 90) return 'about a minute';
 		if (seconds < 3600 * 1.5) return `about ${Math.round(seconds / 60)} minutes`;
@@ -221,75 +265,95 @@
 		so switching back is immediate. Measure a model's speed first to see how long it would take.
 	</p>
 
-	<div class="models">
-		{#each models as model (model.name)}
-			{@const inUse = model.name === current}
-			<article class:in-use={inUse}>
-				<div class="head">
-					<strong>{model.name}</strong>
-					{#if inUse}<span class="badge current">In use</span>{/if}
-					{#if model.loaded}<span class="badge">In memory</span>{/if}
-				</div>
-				{#if model.description}<p>{model.description}</p>{/if}
-				{#if Object.keys(model.scores ?? {}).length}
-					<dl class="scores">
-						{#each benchmarks as [key, label] (key)}
-							<div>
-								<dt>{label.replace(/^Retrieval, /, '')}</dt>
-								<dd>
-									{#if model.scores?.[key] != null}
-										<span class="bar" style:--score="{model.scores[key]}%"></span>
-										{model.scores[key].toFixed(1)}
-									{:else}
-										<span class="muted">not published</span>
-									{/if}
-								</dd>
-							</div>
-						{/each}
-					</dl>
-				{/if}
-				<p class="facts muted">
-					{model.dimensions} dimensions · inputs up to {model.max_tokens.toLocaleString()} tokens ·
-					{model.licence || 'licence: see the model'} ·
-					{model.cached_bytes != null
-						? `downloaded, ${formatSize(model.cached_bytes)}`
-						: `${model.download_mb ? `${model.download_mb} MB to download` : 'not downloaded'}`}
-				</p>
-				{#if speeds[model.name]}
+	<div class="table">
+		<table class="models">
+			<thead>
+				<tr>
+					<th scope="col">Model</th>
+					{#each benchmarks as [key, label] (key)}
+						<th scope="col" class="num" title="{label}, nDCG@10">{shortLabel(label)}</th>
+					{/each}
+					<th scope="col">Size</th>
+					<th scope="col" class="num">Speed here</th>
+					<th scope="col" class="num" title="Once loaded, as measured on this server">
+						Memory here
+					</th>
+					<th scope="col"><span class="visually-hidden">Actions</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each models as model (model.name)}
+					{@const inUse = model.name === current}
 					{@const speed = speeds[model.name]}
-					<p class="speed">
-						{speed.passages_per_second} passages per second on this server{estimate(model.name)
-							? `: the library in ${estimate(model.name)}`
-							: ''}.
-					</p>
-				{/if}
-				<div class="buttons">
-					<button onclick={() => measure(model)} disabled={measuring !== null}>
-						{measuring === model.name
-							? admin.ml?.service?.loading?.includes(model.name) || model.cached_bytes == null
-								? 'Downloading and loading…'
-								: 'Measuring…'
-							: 'Measure speed'}
-					</button>
-					{#if !inUse}
-						<button class="primary" onclick={() => use(model)} disabled={saving || !config}
-							>Use this model</button
-						>
-						{#if model.cached_bytes != null}
-							<button class="link danger" onclick={() => remove(model.name)}>Delete download</button
+					<tr class:in-use={inUse}>
+						<th scope="row">
+							<span class="name">{model.name}</span>
+							{#if inUse}<span class="badge current">In use</span>{/if}
+							<small>{[model.description, model.licence].filter(Boolean).join(' ')}</small>
+						</th>
+						{#each benchmarks as [key, label] (key)}
+							<td class="num" data-label={shortLabel(label)}>
+								{model.scores?.[key] != null ? model.scores[key].toFixed(1) : '–'}
+							</td>
+						{/each}
+						<td data-label="Size">
+							{model.cached_bytes != null
+								? formatSize(model.cached_bytes)
+								: model.download_mb
+									? `${model.download_mb} MB`
+									: '–'}
+							<small
+								>{model.dimensions}-dim.{model.cached_bytes == null
+									? ', not downloaded'
+									: ''}</small
 							>
-						{/if}
-					{/if}
-				</div>
-			</article>
-		{:else}
-			<p class="muted">The ML service is not reachable; using {current}.</p>
-		{/each}
+						</td>
+						<td class="num" data-label="Speed here">
+							{#if speed}
+								{speed.passages_per_second}/s
+								{#if estimate(model.name)}<small>library: {estimate(model.name)}</small>{/if}
+							{:else}
+								<button class="link" onclick={() => measure(model)} disabled={measuring !== null}
+									>{measuring === model.name
+										? admin.ml?.service?.loading?.includes(model.name) || model.cached_bytes == null
+											? 'Loading…'
+											: 'Measuring…'
+										: 'Measure'}</button
+								>
+							{/if}
+						</td>
+						<td class="num" data-label="Memory here">
+							{model.memory_bytes != null ? formatSize(model.memory_bytes) : '–'}
+						</td>
+						<td class="actions">
+							{#if !inUse}
+								<button class="small" onclick={() => use(model)} disabled={saving || !config}
+									>Use</button
+								>
+								{#if model.cached_bytes != null}
+									<button
+										class="link danger"
+										title="Delete the downloaded files; they download again when used"
+										onclick={() => remove(model.name)}>Delete</button
+									>
+								{/if}
+							{/if}
+						</td>
+					</tr>
+				{:else}
+					<tr
+						><td colspan="9" class="muted">The ML service is not reachable; using {current}.</td
+						></tr
+					>
+				{/each}
+			</tbody>
+		</table>
 	</div>
 	<p class="muted small">
 		Scores: published retrieval results (nDCG@10, out of 100) of the full-precision models from the
 		MTEB leaderboard and the MMTEB paper; int8 versions lose about a point. They compare models on
-		general search tasks, not on your library.
+		general search tasks, not on your library. Speed and memory: measured on this server (“Measure”;
+		memory once a model has loaded).
 	</p>
 	<div><button onclick={embedMissing}>Embed missing now</button></div>
 </section>
@@ -334,6 +398,9 @@
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}
+				{#if chosen.memory_bytes != null}
+					{formatSize(chosen.memory_bytes)} in memory here.
+				{/if}
 				{#if perSearch(chosen.name)}
 					About {perSearch(chosen.name)} per search on this server.
 				{/if}
@@ -386,6 +453,9 @@
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}
+				{#if chosen.memory_bytes != null}
+					{formatSize(chosen.memory_bytes)} in memory here.
+				{/if}
 				{#if perPage(chosen.name)}
 					About {perPage(chosen.name)} per page on this server.
 				{/if}
@@ -405,6 +475,49 @@
 	{:else}
 		<p class="muted">The ML service is not reachable or offers no OCR model.</p>
 	{/if}
+</section>
+
+<section class="part">
+	<h3>Memory</h3>
+	{#if together}
+		<p>
+			The models in use together take about <strong>{formatSize(together.total)}</strong>
+			{onGpu ? 'of the GPU’s memory' : 'of RAM'}:
+			{together.chosen
+				.map(
+					(c) =>
+						`${c.model.name} (${c.what}) ${c.need.measured ? '' : '≈'}${formatSize(c.need.bytes)}`
+				)
+				.join(', ')}.
+			{formatSize(together.space.free)} of {formatSize(together.space.total)} are free now.
+		</p>
+		{#if !together.fits}
+			<p class="warning" role="note">
+				<strong>They do not all fit at once.</strong> The ML service then unloads the idle ones and
+				loads them again when needed{onGpu ? ', and runs the reranker or OCR on the CPU' : ''}:
+				searches and reading scans get slower. A smaller model helps, or {onGpu
+					? 'a GPU with more memory'
+					: 'more RAM'}.
+			</p>
+		{:else if together.tight}
+			<p class="warning" role="note">
+				They fit, but only just: other programs on this machine may take the rest.
+			</p>
+		{/if}
+		{#if together.guessed}
+			<p class="muted small">
+				≈: guessed from the download; measured once the model has loaded on this server.
+			</p>
+		{/if}
+	{:else}
+		<p class="muted">
+			The ML service does not say how much memory there is (an older version), or no model is
+			chosen.
+		</p>
+	{/if}
+	{#each Object.entries(admin.ml?.service?.on_cpu ?? {}) as [name, why] (name)}
+		<p class="warning" role="note">{name} runs on the CPU: {why}.</p>
+	{/each}
 </section>
 
 <section class="part">
@@ -536,63 +649,90 @@
 		border-radius: 8px;
 		background: color-mix(in srgb, var(--highlighter) 18%, var(--surface));
 	}
-	.models {
-		display: grid;
-		gap: 10px;
+	/* The models in a table: one line each, what decides at a glance. */
+	.table {
+		overflow-x: auto;
 	}
-	article {
-		display: grid;
-		gap: 6px;
-		padding: 12px 14px;
-		border: 1px solid var(--rule);
-		border-radius: 10px;
+	table.models {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--step--1);
 	}
-	article.in-use {
-		border-color: var(--royal);
+	.models th,
+	.models td {
+		padding: 7px 10px;
+		border-bottom: 1px solid var(--rule);
+		text-align: left;
+		vertical-align: top;
 	}
-	.head {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px;
+	.models thead th {
+		color: var(--muted);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.models tbody th {
+		font-weight: 400;
+		min-width: 18em;
+	}
+	.models .name {
+		font-weight: 600;
+		margin-right: 6px;
+	}
+	.models small {
+		display: block;
+		color: var(--muted);
+	}
+	.models .num {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.models tr.in-use {
+		background: color-mix(in srgb, var(--royal) 6%, transparent);
+	}
+	.models .actions {
+		white-space: nowrap;
+		text-align: right;
+	}
+	.models button.small {
+		padding: 3px 12px;
 	}
 	.current {
 		color: var(--royal);
 	}
-	.scores {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 4px 16px;
-		margin: 2px 0;
+	/* On a phone: each model a block, its values labelled. */
+	@media (max-width: 720px) {
+		.models thead {
+			display: none;
+		}
+		.models tr {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 4px 12px;
+			padding: 10px 0;
+			border-bottom: 1px solid var(--rule);
+		}
+		.models th,
+		.models td {
+			padding: 0;
+			border: none;
+		}
+		.models tbody th,
+		.models .actions {
+			grid-column: 1 / -1;
+			text-align: left;
+		}
+		.models td.num {
+			text-align: left;
+		}
+		.models td[data-label]::before {
+			content: attr(data-label);
+			display: block;
+			color: var(--muted);
+		}
 	}
-	.scores dt {
-		color: var(--muted);
-		font-size: var(--step--1);
-	}
-	.scores dd {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin: 0;
-		font-variant-numeric: tabular-nums;
-	}
-	/* Scores are drawn from 40 to 65, where these models differ. */
-	.bar {
-		width: 80px;
-		height: 6px;
-		border-radius: 3px;
-		background: linear-gradient(
-			to right,
-			var(--royal) clamp(0%, calc((var(--score) - 40%) * 4), 100%),
-			var(--rail) 0
-		);
-	}
-	.facts,
 	.small {
 		font-size: var(--step--1);
-	}
-	.speed {
-		color: var(--ink);
 	}
 	.buttons {
 		display: flex;

@@ -20,7 +20,11 @@ SCORES = {
     "de": "Retrieval, German (MTEB deu v1)",
     "multilingual": "Retrieval, multilingual (MMTEB v2)",
 }
-Pooling = Literal["cls", "mean"]
+Pooling = Literal["cls", "mean", "last", "output"]
+"""How token vectors become a text's vector: the first token's, their mean,
+the last token's (decoder models: Qwen3-Embedding), or the model's own
+``sentence_embedding`` output (EmbeddingGemma: its pooling and dense layers
+are in the ONNX file)."""
 Kind = Literal["query", "passage"]
 
 
@@ -229,6 +233,46 @@ MODELS = {
                 ("de", 50.0),
                 ("multilingual", 54.1),
             ),
+        ),
+        # Qwen3-Embedding 0.6B (Apache-2.0): a decoder (last token's vector),
+        # queries with an instruction; many languages, long texts. On trial
+        # (docs/search.md).
+        ModelSpec(
+            name="qwen3-embedding-0.6b",
+            repo="onnx-community/Qwen3-Embedding-0.6B-ONNX",
+            revision="c25a394dd583836952667c12f008335071b3f43d",
+            onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
+            tokenizer_file="tokenizer.json",
+            pooling="last",
+            dimensions=1024,
+            max_tokens=1024,
+            query_prefix=(
+                "Instruct: Given a web search query, retrieve relevant passages"
+                " that answer the query\nQuery:"
+            ),
+            description="Qwen3-Embedding 0.6B: many languages, long texts.",
+            licence="Apache-2.0",
+            download_mb=620,
+        ),
+        # EmbeddingGemma 2 (Apache-2.0): text, images, video and sound in
+        # one space; here its text model (the others' features empty), its
+        # pooling in the ONNX file. On trial (docs/search.md).
+        ModelSpec(
+            name="embeddinggemma-2",
+            repo="onnx-community/embeddinggemma-2-ONNX",
+            revision="daa72c51243991dfcaf9f9137d2c573d8f7790c0",
+            onnx_file="onnx/model_quantized.onnx",
+            gpu_onnx_file="onnx/model_fp16.onnx",
+            tokenizer_file="tokenizer.json",
+            pooling="output",
+            dimensions=768,
+            max_tokens=1024,
+            query_prefix="task: search result | query: ",
+            passage_prefix="title: none | text: ",
+            description="EmbeddingGemma 2: text and images in one space.",
+            licence="Apache-2.0",
+            download_mb=330,
         ),
         # Small and fast (int8, 118 MB); for development and small machines.
         ModelSpec(

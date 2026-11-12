@@ -61,6 +61,9 @@ class MLModel(BaseModel):
     """Published retrieval scores (nDCG@10, out of 100), by benchmark."""
     benchmarks: dict[str, str] = {}
     """What the keys of ``scores`` mean."""
+    memory_bytes: int | None = None
+    """What it took once loaded on the ML service (RAM, or GPU memory there),
+    as measured when it last loaded; None if never loaded there."""
 
 
 class MLSpeed(BaseModel):
@@ -78,6 +81,12 @@ class MLGPU(BaseModel):
     name: str
     supported: bool
     """New enough for the GPU image (RTX 20xx generation or newer)."""
+
+
+class MLMemory(BaseModel):
+    total: int
+    free: int
+    """Bytes; free: available for new use."""
 
 
 class MLServiceState(BaseModel):
@@ -100,6 +109,12 @@ class MLServiceState(BaseModel):
     """The NVIDIA driver's major version there, if one is loaded."""
     driver_needed: int = 580
     """The oldest driver the GPU image runs with."""
+    ram: MLMemory | None = None
+    """Its machine's RAM (older services do not say)."""
+    gpu_memory: MLMemory | None = None
+    """Its GPU's memory, on the GPU (all programs' use counted)."""
+    on_cpu: dict[str, str] = {}
+    """Models it runs on the CPU although it runs on the GPU, with why."""
 
 
 class MLStatus(BaseModel):

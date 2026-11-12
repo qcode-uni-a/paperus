@@ -16,6 +16,7 @@ from prometheus_client import REGISTRY
 
 from paperus_ml import cli, main, manager, metrics
 from paperus_ml.config import Settings
+from paperus_ml.device import Device
 from paperus_ml.encoder import Encoder
 from paperus_ml.main import create_app, usable_cores
 from paperus_ml.manager import Model, ModelManager
@@ -46,7 +47,7 @@ class TinyModels:
         self.reader = Reader(write_tiny_ocr(directory / "ocr"), directory / "ocr")
         self.loads: list[str] = []
 
-    def __call__(self, spec: ModelSpec) -> Model:
+    def __call__(self, spec: ModelSpec, device: Device = "cpu") -> Model:
         self.loads.append(spec.name)
         return {"embedding": self.encoder, "rerank": self.reranker}.get(
             spec.task, self.reader
@@ -109,7 +110,7 @@ def test_ocr(client: TestClient) -> None:
 def test_ocr_while_loading(tiny_models: TinyModels) -> None:
     release = threading.Event()
 
-    def slow(spec: ModelSpec) -> Model:
+    def slow(spec: ModelSpec, device: Device = "cpu") -> Model:
         release.wait(5)
         return tiny_models(spec)
 
@@ -213,7 +214,7 @@ def test_without_a_usable_gpu_models_run_on_the_cpu(
 def test_simultaneous_requests_load_a_model_once(tiny_models: TinyModels) -> None:
     release = threading.Event()
 
-    def slow(spec: ModelSpec) -> Model:
+    def slow(spec: ModelSpec, device: Device = "cpu") -> Model:
         release.wait(5)
         return tiny_models(spec)
 

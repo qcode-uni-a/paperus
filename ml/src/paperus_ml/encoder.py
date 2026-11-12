@@ -4,6 +4,7 @@ import threading
 import time
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -65,6 +66,8 @@ def model_inputs(
     feed = {"input_ids": ids, "attention_mask": mask}
     if "token_type_ids" in input_names:
         feed["token_type_ids"] = types
+    if "position_ids" in input_names:
+        feed["position_ids"] = np.broadcast_to(np.arange(width), ids.shape).copy()
     return feed
 
 
@@ -76,6 +79,12 @@ def pool(
     """Sentence vectors from token vectors, L2-normalized."""
     if how == "cls":
         vectors = hidden[:, 0]
+    elif how == "last":
+        # Padding on the right: each text's last real token.
+        last = np.maximum(mask.sum(axis=1) - 1, 0)
+        vectors = hidden[np.arange(len(hidden)), last]
+    elif how == "output":
+        vectors = hidden  # the model's own sentence vectors
     else:
         weights = mask[..., None].astype(np.float32)
         vectors = (hidden * weights).sum(axis=1) / np.maximum(weights.sum(axis=1), 1e-9)
@@ -120,6 +129,29 @@ class Encoder:
             model_dir / spec.onnx_file_for(device), intra_op_threads, device
         )
         self.input_names = {i.name for i in self.session.get_inputs()}
+        # Inputs besides the text's, given empty: what came before, for
+        # decoders exported for generating text (past_key_values.*), and
+        # the features of images, video and sound for models that take them
+        # with the text (EmbeddingGemma 2): none, for a text alone.
+        self.empty = {
+            i.name: (
+                [
+                    "batch" if "batch" in str(d) else d if isinstance(d, int) else 0
+                    for d in i.shape
+                ],
+                np.float16 if "float16" in i.type else np.float32,
+            )
+            for i in self.session.get_inputs()
+            if "float" in i.type
+        }
+        # The model's own sentence vectors (pooling "output"), else the
+        # token vectors (its first output).
+        outputs = [o.name for o in self.session.get_outputs()]
+        self.output = (
+            "sentence_embedding"
+            if spec.pooling == "output" and "sentence_embedding" in outputs
+            else outputs[0]
+        )
         self.run_options = run_options(self.device)
         # One batch at a time: each already uses all cores, so batches of
         # simultaneous requests would only compete for them. Per batch, not
@@ -139,10 +171,15 @@ class Encoder:
         return result
 
     def _run(self, encodings: list[Encoding]) -> Vectors:
-        feed = model_inputs(encodings, self.input_names)
+        feed: dict[str, npt.NDArray[Any]] = dict(
+            model_inputs(encodings, self.input_names)
+        )
+        for name, (shape, dtype) in self.empty.items():
+            size = [len(encodings) if d == "batch" else int(d) for d in shape]
+            feed[name] = np.zeros(size, dtype=dtype)
         with self.running:
             started = time.perf_counter()
-            hidden = self.session.run(None, feed, self.run_options)[0]
+            hidden = self.session.run([self.output], feed, self.run_options)[0]
             metrics.BATCH_SECONDS.labels(self.spec.name).observe(
                 time.perf_counter() - started
             )

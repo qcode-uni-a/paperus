@@ -49,24 +49,70 @@ def write_tokenizer(path: Path) -> None:
     tokenizer.save(str(path))
 
 
-def write_tiny_model(directory: Path, *, token_types: bool = False) -> ModelSpec:
+TABLE = (
+    np.random.default_rng(0).normal(size=(len(WORDS), DIMENSIONS)).astype(np.float32)
+)
+
+
+def write_tiny_model(
+    directory: Path,
+    *,
+    token_types: bool = False,
+    decoder: bool = False,
+    sentence_output: bool = False,
+) -> ModelSpec:
     """``token_types``: the model also takes token types (and ignores them),
-    as BERT-like models do."""
-    rng = np.random.default_rng(0)
-    table = rng.normal(size=(len(WORDS), DIMENSIONS)).astype(np.float32)
+    as BERT-like models do; ``decoder``: token positions and what came
+    before (``past_key_values.0.*``, ignored), as decoders exported for
+    generating text do; ``sentence_output``: also its own sentence vectors
+    (``sentence_embedding``: the mean of the token vectors)."""
     inputs = [ids_input("input_ids"), ids_input("attention_mask")]
     if token_types:
         inputs.append(ids_input("token_type_ids"))
+    if decoder:
+        inputs.append(ids_input("position_ids"))
+        inputs += [
+            helper.make_tensor_value_info(
+                f"past_key_values.0.{part}",
+                TensorProto.FLOAT,
+                ["batch_size", 2, "p", 4],
+            )
+            for part in ("key", "value")
+        ]
+    if sentence_output:
+        # As EmbeddingGemma 2: an image's features, empty for a text alone.
+        inputs.append(
+            helper.make_tensor_value_info(
+                "image_features", TensorProto.FLOAT, ["num_image_tokens", 4]
+            )
+        )
+    nodes = [helper.make_node("Gather", ["table", "input_ids"], ["last_hidden_state"])]
+    outputs = [
+        helper.make_tensor_value_info(
+            "last_hidden_state", TensorProto.FLOAT, ["b", "s", DIMENSIONS]
+        )
+    ]
+    if sentence_output:
+        nodes.append(
+            helper.make_node(
+                "ReduceMean",
+                ["last_hidden_state"],
+                ["sentence_embedding"],
+                axes=[1],
+                keepdims=0,
+            )
+        )
+        outputs.append(
+            helper.make_tensor_value_info(
+                "sentence_embedding", TensorProto.FLOAT, ["b", DIMENSIONS]
+            )
+        )
     graph = helper.make_graph(
-        [helper.make_node("Gather", ["table", "input_ids"], ["last_hidden_state"])],
+        nodes,
         "tiny",
         inputs=inputs,
-        outputs=[
-            helper.make_tensor_value_info(
-                "last_hidden_state", TensorProto.FLOAT, ["b", "s", DIMENSIONS]
-            )
-        ],
-        initializer=[numpy_helper.from_array(table, "table")],
+        outputs=outputs,
+        initializer=[numpy_helper.from_array(TABLE, "table")],
     )
     save(graph, directory / "model.onnx")
     write_tokenizer(directory / "tokenizer.json")

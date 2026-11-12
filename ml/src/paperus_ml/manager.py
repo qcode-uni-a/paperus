@@ -1,5 +1,6 @@
 """Loading models on first use, sharing them, and unloading idle ones."""
 
+import gc
 import logging
 import shutil
 import threading
@@ -9,6 +10,7 @@ from pathlib import Path
 
 from huggingface_hub import snapshot_download
 
+from paperus_ml import memory
 from paperus_ml.config import Settings
 from paperus_ml.device import Device, choose, gpu_problem
 from paperus_ml.encoder import Encoder
@@ -19,7 +21,7 @@ from paperus_ml.rerank import Reranker
 log = logging.getLogger(__name__)
 
 Model = Encoder | Reranker | Reader
-Loader = Callable[[ModelSpec], Model]
+Loader = Callable[[ModelSpec, Device], Model]
 
 
 class UnknownModel(KeyError):
@@ -34,10 +36,29 @@ class ModelFailed(Exception):
     """Loading the model failed (e.g. the download); the message says why."""
 
 
+def out_of_memory(error: BaseException) -> bool:
+    """Whether loading failed for lack of memory (ONNX Runtime's arena on
+    the GPU, or the process's)."""
+    text = str(error).lower()
+    return isinstance(error, MemoryError) or any(
+        sign in text
+        for sign in (
+            "failed to allocate memory",
+            "out of memory",
+            "cudaerrormemoryallocation",
+        )
+    )
+
+
 class ModelManager:
     def __init__(self, settings: Settings, loader: Loader | None = None) -> None:
         self.settings = settings
         self._load = loader or self._download_and_load
+        self.measured = memory.Measured(settings.cache_path / "memory.json")
+        """What each model took once loaded (per file), across restarts."""
+        self.on_cpu: dict[str, str] = {}
+        """Models loaded on the CPU although the service runs on the GPU,
+        with why (not enough GPU memory)."""
         # name → (encoder, last used, threads it was loaded with)
         self._models: dict[str, tuple[Model, float, int]] = {}
         self._loading: dict[str, threading.Event] = {}
@@ -83,14 +104,14 @@ class ModelManager:
             self._errors.pop(name, None)
             shutil.rmtree(self.model_dir(spec), ignore_errors=True)
 
-    def _download_and_load(self, spec: ModelSpec) -> Model:
+    def _download_and_load(self, spec: ModelSpec, device: Device) -> Model:
         model_dir = self.model_dir(spec)
         # Revision changes download the changed files into the same folder.
         snapshot_download(
             spec.repo,
             revision=spec.revision,
             local_dir=model_dir,
-            allow_patterns=[f"{spec.onnx_file_for(self.device)}*", spec.tokenizer_file],
+            allow_patterns=[f"{spec.onnx_file_for(device)}*", spec.tokenizer_file],
         )
         if spec.detector is not None:
             snapshot_download(
@@ -106,9 +127,9 @@ class ModelManager:
             intra_op_threads=self.threads,
             max_batch_texts=self.settings.max_batch_texts,
             max_batch_tokens=self.settings.max_batch_tokens,
-            device=self.device,
+            device=device,
         )
-        if encoder.device != self.device:
+        if encoder.device != device:
             log.warning("%s: no usable GPU, running on the CPU", spec.name)
         return encoder
 
@@ -153,15 +174,67 @@ class ModelManager:
             threads = self.threads
             log.info("loading model %s", name)
             started = time.monotonic()
+            before = memory.in_use(self.device)
             try:
-                encoder = self._load(spec)
+                try:
+                    encoder = self._load(spec, self.device)
+                    self.on_cpu.pop(name, None)
+                except Exception as error:
+                    encoder = self._load_after_all(name, spec, error)
             except Exception as error:
                 self._errors[name] = str(error) or type(error).__name__
                 raise
             self._errors.pop(name, None)
             log.info("loaded %s in %.1f s", name, time.monotonic() - started)
+            # What it took: measured where it runs (a fallback to the CPU
+            # is not the GPU's).
+            after = memory.in_use(encoder.device)
+            size = after - before if before is not None and after else 0
+            if encoder.device == self.device and size > 0:
+                self.measured.record(spec.vectors(encoder.device), size)
             self._models[name] = (encoder, time.monotonic(), threads)
             return encoder
+
+    def _load_after_all(self, name: str, spec: ModelSpec, error: Exception) -> Model:
+        """Loading failed: if for lack of memory, unload the idle models (not
+        those kept loaded) and try again; on the GPU, a reranker or OCR
+        model then runs on the CPU. Not a search model: its vectors there
+        differ, and paperus would compute the library's again."""
+        if not out_of_memory(error):
+            raise error
+        freed = self._make_room(name)
+        log.warning("not enough memory for %s; unloaded %s", name, freed or "nothing")
+        if freed:
+            try:
+                return self._load(spec, self.device)
+            except Exception as again:
+                if not out_of_memory(again):
+                    raise
+                error = again
+        if self.device == "cuda" and spec.task != "embedding":
+            log.warning("%s: not enough GPU memory, running on the CPU", name)
+            model = self._load(spec, "cpu")
+            self.on_cpu[name] = "not enough GPU memory"
+            return model
+        raise error
+
+    def _make_room(self, name: str) -> list[str]:
+        """Unload the loaded models other than ``name`` that are neither kept
+        loaded nor busy; their memory goes back."""
+        freed = []
+        for other in list(self._models):
+            if other == name or other in self._keep:
+                continue
+            lock = self._locks[other]
+            if not lock.acquire(blocking=False):
+                continue  # loading or measuring now
+            try:
+                if self._models.pop(other, None) is not None:
+                    freed.append(other)
+            finally:
+                lock.release()
+        gc.collect()  # the sessions' memory, now
+        return freed
 
     def _load_in_background(self, name: str) -> threading.Event:
         with self._guard:

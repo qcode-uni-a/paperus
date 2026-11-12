@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from paperus_ml import device, main
 from paperus_ml.config import Settings
+from paperus_ml.device import Device
 from paperus_ml.encoder import Encoder
 from paperus_ml.main import create_app
 from paperus_ml.manager import ModelManager, UnknownModel
@@ -25,7 +26,7 @@ class CountingLoader:
         self.encoder = encoder
         self.loads: list[str] = []
 
-    def __call__(self, spec: ModelSpec) -> Encoder:
+    def __call__(self, spec: ModelSpec, device: Device = "cpu") -> Encoder:
         self.loads.append(spec.name)
         return self.encoder
 
@@ -169,6 +170,11 @@ def test_config_from_paperus(tiny: Encoder, monkeypatch: pytest.MonkeyPatch) -> 
         assert state["device"] == "cpu"
         assert state["gpu_problem"] == "set to the CPU (PAPERUS_ML_DEVICE=cpu)"
         assert state["gpus"] == [{"name": "NVIDIA GeForce RTX 4090", "supported": True}]
+        # The machine's memory; nothing moved off a GPU (none here).
+        assert state["ram"]["total"] >= state["ram"]["free"] > 0
+        assert state["gpu_memory"] is None and state["on_cpu"] == {}
+        listed = client.get("/models").json()
+        assert all("memory_bytes" in m for m in listed)
         assert (state["driver"], state["driver_needed"]) == (570, 580)
         assert state["cuda_image"] in (True, False)
         # The model in use is kept and loads in the background.
@@ -195,7 +201,7 @@ class SlowLoader(CountingLoader):
         super().__init__(encoder)
         self.release = threading.Event()
 
-    def __call__(self, spec: ModelSpec) -> Encoder:
+    def __call__(self, spec: ModelSpec, device: Device = "cpu") -> Encoder:
         self.release.wait(5)
         return super().__call__(spec)
 
@@ -220,7 +226,7 @@ def test_requests_do_not_wait_for_a_download(tiny: Encoder) -> None:
 
 
 def test_failed_loads_are_reported(tiny: Encoder) -> None:
-    def failing(spec: ModelSpec) -> Encoder:
+    def failing(spec: ModelSpec, device: Device = "cpu") -> Encoder:
         raise OSError("disk full")
 
     manager = ModelManager(Settings(load_wait=1), failing)
