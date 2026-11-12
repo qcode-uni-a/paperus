@@ -61,6 +61,9 @@
 	const types = $derived(page.url.searchParams.getAll('type'));
 	const archived = $derived(page.url.searchParams.has('archived'));
 	let passages = $state<Passage[] | null>(null);
+	/** Papers with all the searched words in their titles: first, apart. */
+	const IN_TITLES = 5;
+	let titled = $state<{ items: Item[]; total: number } | null>(null);
 	/** The search under way (for Back to the results' place). */
 	let searching: Promise<unknown> = Promise.resolve();
 
@@ -203,9 +206,20 @@
 		allOf = {};
 		if (!q) {
 			passages = null;
+			titled = null;
 			return;
 		}
 		const key = page.url.search;
+		titled = null;
+		listItems({
+			query: { title_words: q, limit: IN_TITLES, type: options.type, archived: options.archived }
+		}).then(({ data, response }) => {
+			if (key !== untrack(() => page.url.search) || !data) return;
+			titled = {
+				items: data,
+				total: Number(response?.headers.get('X-Total-Count') ?? data.length)
+			};
+		});
 		searching = search({
 			query: { q, limit: SEARCH_PASSAGES, per_item: PER_PAPER, ...options }
 		}).then(({ data }) => {
@@ -237,6 +251,27 @@
 					: `${groups.length} ${groups.length === 1 ? 'item' : 'items'} for “${searched}”`}
 			</h1>
 		</div>
+	{/if}
+
+	{#if searched && titled?.items.length}
+		<section class="titled" aria-labelledby="in-titles">
+			<h2 id="in-titles">
+				In titles{#if titled.total > titled.items.length}<span class="muted"
+						>, {titled.items.length} of {titled.total}</span
+					>{/if}
+			</h2>
+			<ul>
+				{#each titled.items as item (item.id)}
+					{@const byline = [shortAuthors(item.authors), item.year ? `(${item.year})` : '']
+						.filter(Boolean)
+						.join(' ')}
+					<li>
+						<a href={resolve('/items/[id]', { id: item.id })}><Title text={item.title} /></a>
+						{#if byline}<span class="muted">{byline}</span>{/if}
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 
 	{#if passages !== null}
@@ -340,6 +375,37 @@
 	.library {
 		display: grid;
 		gap: 20px;
+	}
+	/* Titles with all the words: a short list above the passages. */
+	.titled {
+		display: grid;
+		gap: 6px;
+		padding-left: 14px;
+		border-left: 3px solid var(--accent-soft);
+	}
+	.titled h2 {
+		margin: 0;
+		font-family: var(--sans);
+		font-size: var(--step--1);
+		font-weight: 600;
+		color: var(--muted);
+		letter-spacing: 0;
+	}
+	.titled ul {
+		display: grid;
+		gap: 4px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.titled li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px 10px;
+	}
+	.titled li .muted {
+		font-size: var(--step--1);
 	}
 	.results-head {
 		justify-content: space-between;

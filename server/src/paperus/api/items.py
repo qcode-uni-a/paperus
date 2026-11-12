@@ -8,8 +8,8 @@ from typing import Annotated, Any, Literal, Self
 import httpx2
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import TextClause, Uuid, delete, func, select, text
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Text, TextClause, Uuid, cast, delete, func, literal, select, text
+from sqlalchemy.dialects.postgresql import ARRAY, insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -679,6 +679,7 @@ def list_items(
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
+    title_words: Annotated[str | None, Query(max_length=200)] = None,
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
     sort: Literal[
         "added", "recent", "opened", "title", "author", "year", "published", "journal"
@@ -713,7 +714,9 @@ def list_items(
     one is given), ``author_id`` (repeatable: by one of these people,
     ``paperus.authors``) and ``collection`` (with its
     subcollections unless ``nested=false``) filter the list, and ``title``
-    to items with all of its words in their title (any case).
+    to items with all of its words in their title (any case, as parts of
+    words too); ``title_words`` too, as words (stems: "qubits" finds
+    "qubit", "spin" not "inspiring"; stop words left out), by an index.
     ``X-Total-Count`` is the number of matching items, for showing the total
     while paging.
     ``since=N`` is for syncing:
@@ -763,6 +766,12 @@ def list_items(
         conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
     for word in (title or "").split():
         conditions.append(Item.title.icontains(word, autoescape=True))
+    if title_words and title_words.strip():
+        words = db.scalar(select(duplicates.title_words(literal(title_words))))
+        if words:
+            conditions.append(
+                duplicates.title_words(Item.title).op("@>")(cast(words, ARRAY(Text)))
+            )
     if id:
         conditions.append(Item.id.in_(id))
     if favourite:

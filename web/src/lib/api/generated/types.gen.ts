@@ -5698,6 +5698,10 @@ export type ListItemsData = {
          */
         title?: string | null;
         /**
+         * Title Words
+         */
+        title_words?: string | null;
+        /**
          * Library
          */
         library?: string | null;

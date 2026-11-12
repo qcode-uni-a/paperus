@@ -218,7 +218,7 @@ def dismiss(db: Session, a: uuid.UUID, b: uuid.UUID, user_id: uuid.UUID) -> None
 ALIKE = 0.5
 
 
-def _title_words(
+def title_words(
     title: ColumnElement[str] | InstrumentedAttribute[str],
 ) -> ColumnElement[list[str]]:
     """A title's words as Postgres reads English: stems, without stop words
@@ -233,10 +233,10 @@ def titled_alike(db: Session, access: Access, item: Item, limit: int = 8) -> lis
     title), scored by how many of both titles' words are shared (Dice), at
     least ALIKE.
     "Code of Spin qubits" finds "Spin qubits"."""
-    mine = set(db.scalar(select(_title_words(literal(item.title)))) or [])
+    mine = set(db.scalar(select(title_words(literal(item.title)))) or [])
     if not mine:
         return []
-    theirs = _title_words(Item.title)
+    theirs = title_words(Item.title)
     rows = db.execute(
         select(Item.id, theirs).where(
             Item.id != item.id,

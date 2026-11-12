@@ -27,7 +27,11 @@ test('an uploaded PDF is read by the worker and found by its words', async ({ pa
 	await page.getByRole('searchbox', { name: 'Search the library' }).fill(paper.word);
 	await expect(page).toHaveURL(new RegExp(`[?&]q=${paper.word}`));
 	await expect(page.getByRole('heading', { name: `1 item for “${paper.word}”` })).toBeVisible();
-	const result = page.getByRole('link', { name: paper.title });
+	// Its title has the word: listed first, apart from the passages.
+	await expect(
+		page.getByRole('region', { name: 'In titles' }).getByRole('link', { name: paper.title })
+	).toBeVisible();
+	const result = page.locator('.results').getByRole('link', { name: paper.title });
 	await expect(result).toBeVisible();
 	await expect(page.locator('mark').first()).toHaveText(new RegExp(paper.word, 'i'));
 	await result.click();

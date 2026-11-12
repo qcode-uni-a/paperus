@@ -187,7 +187,9 @@ export const getAvatar = <ThrowOnError extends boolean = false>(options: Options
  * one is given), ``author_id`` (repeatable: by one of these people,
  * ``paperus.authors``) and ``collection`` (with its
  * subcollections unless ``nested=false``) filter the list, and ``title``
- * to items with all of its words in their title (any case).
+ * to items with all of its words in their title (any case, as parts of
+ * words too); ``title_words`` too, as words (stems: "qubits" finds
+ * "qubit", "spin" not "inspiring"; stop words left out), by an index.
  * ``X-Total-Count`` is the number of matching items, for showing the total
  * while paging.
  * ``since=N`` is for syncing:
