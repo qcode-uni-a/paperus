@@ -127,7 +127,11 @@ function closeIn(ms: number): void {
 	left = ms;
 	if (!resting && !staying) {
 		since = Date.now();
-		closing = setTimeout(() => window.close(), left);
+		closing = setTimeout(() => {
+			// The pointer on it after all (no event told): ask again shortly.
+			if (document.documentElement.matches(':hover')) closeIn(1_500);
+			else window.close();
+		}, left);
 	}
 }
 function pause(): void {
@@ -147,8 +151,12 @@ function stay(): void {
 	clearTimeout(closing);
 	closing = undefined;
 }
-document.addEventListener('pointerenter', pause);
-document.addEventListener('pointerleave', go);
+// Over and out bubble (enter and leave do not, and Firefox's popup
+// never sent them to the document): out to nothing is out of the popup.
+document.addEventListener('pointerover', () => resting || pause());
+document.addEventListener('pointerout', (event) => {
+	if (!event.relatedTarget) go();
+});
 document.addEventListener('focusin', pause);
 document.addEventListener('focusout', go);
 

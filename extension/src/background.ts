@@ -1557,6 +1557,10 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
             ),
           ),
         ]);
+      } catch (error) {
+        // Any failure is this paper's: the others, and the word that all
+        // are done, still come.
+        problem = { cause: "error", reason: String(error) };
       } finally {
         busy.delete(publisher);
       }
