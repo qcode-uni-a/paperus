@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **"Probably the same person" without collaborations' namesakes**: two
+  names that fit ("A. Huber" and "Anna Huber") on one paper's author list
+  were suggested as one person, with all the paper's other authors as
+  co-authors in common (2919 on a big collaboration's paper). Two names on
+  one author list are two people: no longer suggested.
+
 ## 0.0.29 (2026-11-12)
 
 *Your papers can now line up by author, year, journal or title, which is more than can be said for your desk.*

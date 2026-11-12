@@ -506,7 +506,8 @@ def likely_the_same(
 ) -> list[Likely]:
     """Pairs of people, among the authors of the papers ``visible`` finds,
     with the same family name and given names that fit, not said to be
-    different and without two ORCID iDs; most co-authors in common first."""
+    different, never on one paper together and without two ORCID iDs; most
+    co-authors in common first."""
     rows = db.execute(
         select(Authorship.author_id, Authorship.written, Authorship.item_id)
         .join(Item, Item.id == Authorship.item_id)
@@ -558,6 +559,11 @@ def likely_the_same(
                 if (one, other) in kept_apart or (one, other) in found:
                     continue
                 if one in orcids and other in orcids and orcids[one] != orcids[other]:
+                    continue
+                # On one paper's author list together: two people (two
+                # namesakes among a collaboration's thousands of authors share
+                # all of them as co-authors).
+                if other in with_others.get(one, set()):
                     continue
                 if not any(
                     _given_fits(g1, g2)

@@ -597,6 +597,21 @@ def test_probably_the_same(client: TestClient, db: Session) -> None:
     assert platero
 
 
+def test_namesakes_on_one_paper_are_two(client: TestClient, db: Session) -> None:
+    """Two names that fit on one author list (a collaboration's thousands):
+    two people, not suggested, however many co-authors they share."""
+    ada = Person(client, db, "ada")
+    big = paper(ada, "Big", "Huber, Anna", "Huber, A.", "Koren, Lea", "Platero, G.")
+    paper(ada, "Small", "Huber, A.", "Koren, Lea")
+    authors.link_waiting(db)
+    [anna, a, _, _] = people(db, big)
+    assert anna != a
+    response = ada.get("/api/authors-suggestions")
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+    assert ada.get("/api/manage/counts").json()["authors_likely"] == 0
+
+
 def test_smart_collections_by_author(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     qubits = paper(ada, "Qubits", "Benito, Mónica", "Platero, Gloria")
