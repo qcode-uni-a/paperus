@@ -7,6 +7,13 @@
   were suggested as one person, with all the paper's other authors as
   co-authors in common (2919 on a big collaboration's paper). Two names on
   one author list are two people: no longer suggested.
+- **arXiv papers' authors by their journal version**: arXiv's records
+  give names only, no ORCID iDs, and OpenAlex mostly files a preprint
+  under its journal version's DOI, so asking it by the arXiv DOI often
+  found nothing and the authors were linked by name alone. A preprint
+  whose journal version is found later is now asked about again, by the
+  journal's DOI (papers that have one already, once, after the update);
+  a journal's DOI is asked before arXiv's.
 
 ## 0.0.29 (2026-11-12)
 

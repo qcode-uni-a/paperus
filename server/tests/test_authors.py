@@ -10,9 +10,17 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import authors, jobs
+from paperus import authors, jobs, library
 from paperus.config import Settings
-from paperus.models import Author, AuthorChange, Authorship, Item
+from paperus.identifiers import Scheme
+from paperus.models import (
+    Author,
+    AuthorChange,
+    Authorship,
+    Item,
+    MetadataSource,
+    VersionKind,
+)
 from paperus.system import load_config, save_config
 from tests.people import Person, group
 from tests.test_jobs import worker  # noqa: F401 (fixture)
@@ -500,6 +508,58 @@ def test_who_they_are_from_openalex(client: TestClient, db: Session) -> None:
     # Two OpenAlex profiles of one person may be merged; two ORCIDs not.
     merged = ada.post(f"/api/authors/{biologist}/merge", {"other_id": str(benito)})
     assert merged.status_code == 200, merged.text
+
+
+def test_preprints_looked_up_again_when_published(
+    client: TestClient, db: Session
+) -> None:
+    """OpenAlex files a preprint under its journal version's DOI: a paper
+    that gets one later (``paperus.published``) is looked up again by it."""
+    ada = Person(client, db, "ada")
+    openalex = FakeOpenAlex()
+    http = httpx2.Client(transport=httpx2.MockTransport(openalex))
+    orcid = "0000-0001-2345-6789"
+    preprint = paper(
+        ada,
+        "Qubits",
+        "Benito, Mónica",
+        identifiers=[{"scheme": "arxiv", "value": "2101.00001"}],
+    )
+    with_doi(ada, "Old style", "10.48550/arXiv.2101.00002", "Platero, Gloria")
+    openalex.works["10.1000/journal"] = [("Mónica Benito", "A1", orcid, None)]
+    authors.link_waiting(db)
+    assert authors.check_waiting(db, http) == 0
+    assert sorted(openalex.asked) == [
+        "10.48550/arxiv.2101.00001",
+        "10.48550/arxiv.2101.00002",
+    ]
+    # Nothing new: not asked again.
+    openalex.asked.clear()
+    assert authors.check_waiting(db, http) == 0
+    assert openalex.asked == []
+    # The journal version found: asked by its DOI, once.
+    item = db.get(Item, uuid.UUID(preprint))
+    assert item is not None
+    library.add_version(
+        db,
+        item,
+        kind=VersionKind.PUBLISHED,
+        label=None,
+        csl={"title": "Qubits", "author": [{"family": "Benito", "given": "Mónica"}]},
+        source=MetadataSource.LOOKUP,
+        identifiers=[(Scheme.DOI, "10.1000/journal")],
+        created_by=None,
+    )
+    db.commit()
+    authors.link_waiting(db)
+    assert authors.check_waiting(db, http) == 1
+    assert openalex.asked == ["10.1000/journal"]
+    [person] = people(db, preprint)
+    record = db.get(Author, person)
+    assert record is not None and record.orcid == orcid
+    openalex.asked.clear()
+    assert authors.check_waiting(db, http) == 0
+    assert openalex.asked == []
 
 
 def test_openalex_unreachable(client: TestClient, db: Session) -> None:

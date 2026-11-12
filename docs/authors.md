@@ -84,7 +84,12 @@ own ORCID iD (`GET /api/me/works`). Only the iD or id is sent to OpenAlex.
 
 For papers with a DOI (or an arXiv ID), an hourly job asks OpenAlex for the
 paper's authorships, 50 papers to a request, about a thousand papers an
-hour, each paper once (`check_waiting`). Each author on the paper gets
+hour, each paper once (`check_waiting`). A journal's DOI is asked before
+arXiv's: OpenAlex files a preprint under its journal version's DOI once it
+knows both, so an arXiv DOI often finds nothing. A preprint whose journal
+version turns up later (`paperus.published`) is asked again, by the
+journal's DOI; arXiv's own records have names only, no ORCID iDs. Each
+author on the paper gets
 OpenAlex's author id, the ORCID iD, and the affiliation on that paper
 (institutions, else the raw affiliation string); then the paper's authors
 are linked again, so ids take effect: "M. Benito" with Mónica Benito's id

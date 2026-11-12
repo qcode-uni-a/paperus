@@ -34,7 +34,7 @@ from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from paperus import abstracts, library
-from paperus.identifiers import Scheme
+from paperus.identifiers import Scheme, is_arxiv_doi
 from paperus.importing.references import Pacer
 from paperus.models import (
     Author,
@@ -325,16 +325,25 @@ LOOKUPS = 1000
 
 
 def _doi(item: Item) -> str | None:
-    """The DOI OpenAlex knows the paper by: the shown version's first."""
+    """The DOI OpenAlex knows the paper by: a journal's (OpenAlex files a
+    preprint under its journal version's DOI once it knows both), the shown
+    version's first; else arXiv's."""
     shown = library.preferred_version(item)
     versions = [shown] if shown else []
     versions += [v for v in item.versions if v is not shown]
-    for scheme in (Scheme.DOI, Scheme.ARXIV):
-        for version in versions:
-            for identifier in version.identifiers:
-                if identifier.scheme == scheme:
-                    value = identifier.value.lower()
-                    return value if scheme == Scheme.DOI else f"10.48550/arxiv.{value}"
+    found = [
+        (identifier.scheme, identifier.value.lower())
+        for version in versions
+        for identifier in version.identifiers
+    ]
+    for scheme, value in found:
+        if scheme == Scheme.DOI and not is_arxiv_doi(value):
+            return value
+    for scheme, value in found:
+        if scheme == Scheme.DOI:
+            return value
+        if scheme == Scheme.ARXIV:
+            return f"10.48550/arxiv.{value}"
     return None
 
 
@@ -435,8 +444,10 @@ def check_waiting(
     limit: int = LOOKUPS,
 ) -> int:
     """Look up the authors of papers never looked up (with a DOI or arXiv
-    ID, linked already), up to ``limit``, committing after each request's
-    worth. Returns how many papers OpenAlex knew."""
+    ID, linked already), and again those that got a journal's DOI since
+    (a preprint's published version, found later), up to ``limit``,
+    committing after each request's worth. Returns how many papers OpenAlex
+    knew."""
     has_id = (
         select(Identifier.id)
         .join(Version, Version.id == Identifier.version_id)
@@ -446,15 +457,26 @@ def check_waiting(
         )
         .exists()
     )
+    new_doi = (
+        select(Identifier.id)
+        .join(Version, Version.id == Identifier.version_id)
+        .where(
+            Version.item_id == Item.id,
+            Identifier.scheme == Scheme.DOI,
+            Identifier.value.not_like("10.48550/%"),
+            Identifier.created_at > Item.authors_checked_at,
+        )
+        .exists()
+    )
     items = list(
         db.scalars(
             select(Item)
             .where(
-                Item.authors_checked_at.is_(None),
+                or_(Item.authors_checked_at.is_(None), new_doi),
                 Item.authors_linked.is_not(None),
                 has_id,
             )
-            .order_by(Item.id)
+            .order_by(Item.authors_checked_at.asc().nulls_first(), Item.id)
             .limit(limit)
         )
     )
