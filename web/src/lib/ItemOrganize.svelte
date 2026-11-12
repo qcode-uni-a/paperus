@@ -232,7 +232,9 @@
 				<option value={NEW}>New collection…</option>
 			</select>
 		{:else}
-			{@render plus('Add to a collection', () => {
+			{@render plus('Add to a collection', async () => {
+				// Clicked while the collections still load: none is not known yet.
+				if (!organize.loaded) await loadOrganize();
 				// None to choose from: straight to naming a new one.
 				if (choices.length) adding = true;
 				else {

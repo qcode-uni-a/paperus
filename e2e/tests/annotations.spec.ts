@@ -63,6 +63,9 @@ test('highlight, comment, draw, erase and gather into a note', async ({ page }) 
 	// The pen draws; the eraser takes the stroke away again.
 	const tools = page.getByRole('toolbar', { name: 'Annotate' }).first();
 	await tools.getByRole('button', { name: 'Pen', exact: true }).click();
+	// The page's top in sight (the paper's details above may push it down),
+	// so the stroke is drawn within the window.
+	await pdf.evaluate((sheet) => sheet.scrollIntoView({ block: 'start' }));
 	const sheet = (await pdf.boundingBox())!;
 	const y = Math.max(sheet.y, 0) + 300;
 	await page.mouse.move(sheet.x + 100, y);

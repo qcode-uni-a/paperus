@@ -10,10 +10,17 @@ export type Library = LibraryOut;
 
 /** Owners (the person and their groups; "libraries" in the API), tags and
  * collections for pickers; reload after changes. */
-export const organize = $state<{ libraries: Library[]; tags: Tag[]; collections: Collection[] }>({
+export const organize = $state<{
+	libraries: Library[];
+	tags: Tag[];
+	collections: Collection[];
+	/** Loaded once at least: until then, none is not known to be none. */
+	loaded: boolean;
+}>({
 	libraries: [],
 	tags: [],
-	collections: []
+	collections: [],
+	loaded: false
 });
 
 export async function loadOrganize(): Promise<void> {
@@ -25,6 +32,7 @@ export async function loadOrganize(): Promise<void> {
 	organize.libraries = libraries.data ?? [];
 	organize.tags = tags.data ?? [];
 	organize.collections = collections.data ?? [];
+	organize.loaded = true;
 }
 
 /** Whether the person reads more than their own library (then lists show
