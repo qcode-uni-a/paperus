@@ -360,6 +360,8 @@ def test_open_access_copies_and_published_versions(
     jobs.queue_published_check(worker)
     assert run_jobs(worker) == {
         "find_published_versions succeeded": 1,
+        # Its authors by the journal's DOI, at once.
+        "look_up_authors succeeded": 1,
         "fetch_open_access succeeded": 1,
         "extract_text succeeded": 1,
         "page_layout succeeded": 1,
@@ -424,6 +426,8 @@ def test_new_preprints_checked_soon(
     assert ran["find_new_published_versions succeeded"] == 1
     versions = ada.get(f"/api/items/{qubits}").json()["versions"]
     assert {v["kind"] for v in versions} == {"preprint", "published"}
+    # Found: its authors looked up by the journal's DOI at once.
+    assert ran["look_up_authors succeeded"] == 1
 
     # An import; more waiting than a run takes: another run, until none.
     monkeypatch.setattr(jobs, "NEW_PUBLISHED_PER_RUN", 1)

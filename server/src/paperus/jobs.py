@@ -463,6 +463,10 @@ def _find_published(job: JobContext, *, new: bool) -> None:
     if config.open_access_auto:
         for item_id, added_by in found:
             queue_open_access(job.app, item_id, added_by, "journal")
+    if found and config.find_authors:
+        # Their authors at OpenAlex by the journal's DOI (ORCID iDs) now,
+        # not at the next hour.
+        _queue(job.app, "look_up_authors", "look-up-authors", timestamp=0)
     if new and len(items) == NEW_PUBLISHED_PER_RUN:
         queue_new_published_check(job.app)  # more waiting: the next few hundred
 

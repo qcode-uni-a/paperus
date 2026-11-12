@@ -19,7 +19,9 @@
   day. Now they are checked soon after an import or a file is read
   (otherwise within five minutes, e.g. from the browser extension), up to
   500 a run, 50 to a request to arXiv with its pause between, OpenAlex a
-  moment apart; the hourly job is left for the monthly rechecks.
+  moment apart; the hourly job is left for the monthly rechecks. A journal
+  version found has its authors looked up at OpenAlex by its DOI at once
+  (ORCID iDs), not at the next hour.
 
 ## 0.0.29 (2026-11-12)
 
