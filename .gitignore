@@ -12,3 +12,6 @@ htmlcov/
 
 # Publishers' pages as saved, for page twins: never checked in.
 extension/twins/raw/
+
+# An access token for the local paperus (pc01qcode): never checked in.
+.paperus_token
