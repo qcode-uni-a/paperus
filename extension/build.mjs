@@ -77,8 +77,16 @@ const browsers = {
 		// A PDF open in Firefox's viewer, which no extension may read, whose
 		// site gives the extension's own fetch a web page: loaded again in a
 		// tab out of sight and a copy of its bytes kept as they arrive
-		// (loadedCopy in background.ts). Only then.
-		permissions: [...base.permissions, 'webRequest', 'webRequestBlocking', 'webRequestFilterResponse'],
+		// (loadedCopy in background.ts). Only then. tabHide: the tabs the
+		// extension opens for its work (publishers' pages, PDF links) are
+		// hidden from the tab bar (hiddenTab).
+		permissions: [
+			...base.permissions,
+			'webRequest',
+			'webRequestBlocking',
+			'webRequestFilterResponse',
+			'tabHide'
+		],
 		browser_specific_settings: {
 			gecko: {
 				id: 'paperus@qcode-uni-a.github.io',

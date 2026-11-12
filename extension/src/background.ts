@@ -343,6 +343,54 @@ async function markPage(tabId: number, url: string): Promise<void> {
   }
 }
 
+/** A tab for the extension's own work (a publisher's page to read, a PDF
+ * link to follow) kept out of the person's way: in Firefox hidden from the
+ * tab bar (tabHide); in Chrome, which cannot hide tabs, in a window of its
+ * own, minimised, which Chrome closes with its last tab. */
+async function hiddenTab(url: string): Promise<chrome.tabs.Tab> {
+  if (FIREFOX) {
+    const tab = await chrome.tabs.create({ url, active: false });
+    const tabs = chrome.tabs as unknown as {
+      hide?: (ids: number[]) => Promise<number[]>;
+    };
+    await tabs.hide?.([tab.id!]).catch(() => undefined);
+    return tab;
+  }
+  const windowId = await outOfSight();
+  if (windowId !== null) {
+    const tab = await chrome.tabs
+      .create({ url, active: false, windowId })
+      .catch(() => null);
+    if (tab) return tab;
+  }
+  return chrome.tabs.create({ url, active: false });
+}
+
+/** The minimised window for such tabs (Chrome), made once and shared. */
+let hiddenWindow: Promise<number | null> | null = null;
+async function outOfSight(): Promise<number | null> {
+  const existing = await hiddenWindow;
+  if (existing !== null && existing !== undefined) {
+    const there = await chrome.windows.get(existing).catch(() => null);
+    if (there) return existing;
+  }
+  hiddenWindow = chrome.windows
+    .create({ state: "minimized", focused: false })
+    .then((made) => made?.id ?? null)
+    .catch(() => null);
+  const made = await hiddenWindow;
+  // Its own first tab (a new tab page): closed once ours are in.
+  if (made !== null) {
+    const [blank] = await chrome.tabs.query({ windowId: made });
+    if (blank?.id !== undefined)
+      setTimeout(
+        () => void chrome.tabs.remove(blank.id!).catch(() => undefined),
+        1_000,
+      );
+  }
+  return made;
+}
+
 /** The paper with this DOI or arXiv ID in paperus, if any: whether the
  * version they name (the journal's, the preprint) has its PDF, else which
  * other version has one. */
@@ -1264,7 +1312,7 @@ async function loadedCopy(
     globalThis as { browser?: { webRequest?: Partial<FirefoxWebRequest> } }
   ).browser?.webRequest as FirefoxWebRequest | undefined;
   if (!FIREFOX || !webRequest?.filterResponseData) return null;
-  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+  const tab = await hiddenTab("about:blank");
   const tabId = tab.id!;
   let listener: RequestListener | undefined;
   let resting: ReturnType<typeof setTimeout> | undefined;
@@ -1688,7 +1736,7 @@ async function saveLink(
   if (!/^https?:\/\//.test(url))
     return { ok: false, text: "No address to open." };
   trace("Saving a paper from its link", { url });
-  const tab = await chrome.tabs.create({ url, active: false });
+  const tab = await hiddenTab(url);
   try {
     await loaded(tab.id!);
     return await saveTab(await chrome.tabs.get(tab.id!), undefined, true);
@@ -1991,7 +2039,7 @@ async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
     });
     return copied.pdf ?? failed;
   }
-  const tab = await chrome.tabs.create({ url, active: false });
+  const tab = await hiddenTab(url);
   try {
     await loaded(tab.id!);
     const landed = (await chrome.tabs.get(tab.id!)).url ?? "";
@@ -2090,7 +2138,9 @@ async function getOne(
   }
   if (!/^https?:\/\//.test(paper.url))
     return because("error", "No address to open.");
-  const tab = await chrome.tabs.create({ url: paper.url, active: inSight });
+  const tab = inSight
+    ? await chrome.tabs.create({ url: paper.url, active: true })
+    : await hiddenTab(paper.url);
   const tabId = tab.id!;
   if (inSight)
     await chrome.windows

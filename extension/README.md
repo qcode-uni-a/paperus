@@ -64,6 +64,11 @@ does the same; a full one with a check means you have it already.
   paywall), or no PDF on the page. The result shows in paperus.
 - **A paper's page in paperus** offers "Get the PDF with the extension"
   for a version without one, the same way.
+- **Tabs out of sight**: the tabs the extension opens for its work (Missing,
+  Scholar's buttons, PDF links that lead through other pages) are hidden
+  from the tab bar in Firefox (its `tabHide` permission; Firefox says once
+  that an extension hides tabs) and, in Chrome, which cannot hide tabs, open
+  in a minimised window of their own.
 
 - **Access to websites** is asked for once, when installing (as Zotero's
   extension does): to read the page you click on, fetch its PDF (also where
