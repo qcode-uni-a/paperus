@@ -105,3 +105,45 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 	await expect(asCarol.page.getByText('This item does not exist.')).toBeVisible();
 	await asCarol.context.close();
 });
+
+test("whose papers: all, only one's own, a group's", async ({ page, browser }) => {
+	// A person of their own, in a group of their own.
+	const dana = { username: unique('dana'), password: 'dana-password-e2e' };
+	expect((await page.request.post('/api/admin/users', { data: dana })).status()).toBe(201);
+	const { context, page: own } = await logIn(browser, dana.username, dana.password);
+	const me = await (await own.request.get('/api/auth/me')).json();
+	const name = unique('Owners lab ');
+	const made = await page.request.post('/api/groups', { data: { name, admin_id: me.id } });
+	expect(made.status()).toBe(201);
+	const libraries = await (await own.request.get('/api/libraries')).json();
+	const lab = libraries.find((l: { name: string }) => l.name === name);
+	const word = unique('owned');
+	for (const [title, library] of [
+		[`Mine ${word}`, null],
+		[`Ours ${word}`, lab.id]
+	]) {
+		const added = await own.request.post('/api/items', {
+			data: { metadata: { title }, library_id: library }
+		});
+		expect(added.status()).toBe(201);
+	}
+	const mine = own.getByRole('link', { name: `Mine ${word}` });
+	const ours = own.getByRole('link', { name: `Ours ${word}` });
+
+	await own.goto('/');
+	const whose = own.getByRole('combobox', { name: 'Whose papers' });
+	await expect(whose).toHaveValue('');
+	await expect(mine).toBeVisible();
+	await expect(ours).toBeVisible();
+	await whose.selectOption({ label: 'Only mine' });
+	await expect(ours).toBeHidden();
+	await expect(mine).toBeVisible();
+	await whose.selectOption({ label: name });
+	await expect(own).toHaveURL(new RegExp(`owner=${lab.id}`));
+	await expect(mine).toBeHidden();
+	await expect(ours).toBeVisible();
+	await whose.selectOption({ label: 'All' });
+	await expect(mine).toBeVisible();
+	expect(new URL(own.url()).searchParams.has('owner')).toBe(false);
+	await context.close();
+});

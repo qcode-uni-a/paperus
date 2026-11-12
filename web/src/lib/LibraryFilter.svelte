@@ -9,6 +9,7 @@
 	import { fromAddress, isEmpty, toAddress, type Filter } from '#lib/libraryFilter.ts';
 	import { describeRules } from '#lib/organize.svelte.ts';
 	import RulesEditor from '#lib/RulesEditor.svelte';
+	import OwnerControl from '#lib/OwnerControl.svelte';
 	import SortControl from '#lib/SortControl.svelte';
 	import { writtenName } from '#lib/names.svelte.ts';
 
@@ -70,7 +71,7 @@
 	<div class="head">
 		{@render count()}
 		<div class="tools">
-			<span class="sorting"><SortControl /></span>
+			<span class="sorting"><OwnerControl /><SortControl /></span>
 			<button class="toggle" class:active={!isEmpty(filter)} aria-expanded={open} onclick={toggle}
 				><Icon path={mdiFilterVariant} size={18} />Filter</button
 			>
@@ -112,7 +113,8 @@
 		display: grid;
 		gap: 10px;
 	}
-	/* Filter beside the number; on a narrow screen Sort below, on its own line. */
+	/* Filter beside the number; on a narrow screen whose papers and the
+	   order below, on a line of their own. */
 	.head {
 		display: flex;
 		flex-wrap: wrap;
@@ -120,9 +122,12 @@
 		align-items: center;
 		gap: 10px 12px;
 	}
-	.tools {
+	.tools,
+	.sorting {
 		display: flex;
 		gap: 8px;
+	}
+	.tools {
 		margin-left: auto;
 	}
 	@media (max-width: 560px) {
