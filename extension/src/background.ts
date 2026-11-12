@@ -590,11 +590,17 @@ function detailsOfHtml(
         ).test(t),
       );
     const value = tag?.match(/content=["']([^"']*)["']/i)?.[1]?.trim();
-    return value ? value.replace(/&amp;/g, "&").replace(/&quot;/g, '"') : null;
+    return value
+      ? value
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, "&")
+      : null;
   };
   const doiText =
     meta("citation_doi") ?? meta("dc.identifier") ?? meta("prism.doi");
-  const doi = doiText?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1] ?? null;
+  const doi = doiText?.match(/\b(10\.\d{4,9}\/[^\s"']+)/)?.[1] ?? null;
   // The page's own link to its PDF (ScienceDirect's …/pdfft?…).
   const own = html.match(/href=["']([^"']*\/pdfft[^"']*)["']/i)?.[1];
   const link =

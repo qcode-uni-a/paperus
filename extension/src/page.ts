@@ -34,7 +34,7 @@ export function idsInUrl(url: string): { doi: string | null; arxiv: string | nul
 	}
 	const arxiv = text.match(/arxiv\.org\/(?:abs|pdf|html)\/([^?#/]+?)(?:v\d+)?(?:\.pdf)?(?:[?#]|$)/);
 	const doi = text.match(
-		/(?:doi\.org|\/doi(?:\/(?:abs|full|pdf|epdf|pdfdirect|reader))?)\/(10\.\d{4,9}\/[^\s?#"'<>]+)/
+		/(?:doi\.org|\/doi(?:\/(?:abs|full|pdf|epdf|pdfdirect|reader))?)\/(10\.\d{4,9}\/[^\s?#"']+)/
 	);
 	return {
 		doi: doi?.[1].replace(/\.pdf$/i, '').replace(/[.,;)]+$/, '') ?? null,
@@ -160,7 +160,7 @@ export async function readPage(): Promise<PageInfo> {
 			.map((tag) => tag.content.replace(/\s+/g, ' ').trim())
 			.filter(Boolean);
 	const doiIn = (text: string | null): string | null =>
-		text?.match(/\b(10\.\d{4,9}\/[^\s"'<>]+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
+		text?.match(/\b(10\.\d{4,9}\/[^\s"']+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
 	/** IEEE Xplore's details, which it has in no citation_* tags: in a
 	 * script, as one line "xplGlobal.document.metadata={…};". Only the
 	 * paper's fields are read (it also names the reader's institution). */

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Old Wiley DOIs, whole**: DOIs in the old SICI form carry angle
+  brackets (`10.1002/1521-3978(200009)48:9/11<965::AID-PROP965>3.0.CO;2-V`);
+  the extension cut them before the `<`, so the DOI was not found and
+  the paper saved with the page's details and the cut DOI. Whole now, from
+  the page's tags, its address and its links.
+
 ## 0.0.28 (2026-11-12)
 
 *Six publishers walk into a test suite: EEEK, Seance, APES, ScienceIndirect, Nurture and the American Comical Society. Only their PDFs come out.*

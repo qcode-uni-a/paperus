@@ -60,7 +60,7 @@ export function paperOfLink(url: string): string | null {
   } catch {
     // As it is.
   }
-  const doi = `${path} ${query}`.match(/(10\.\d{4,9}\/[^\s?#&"'<>]+)/)?.[1];
+  const doi = `${path} ${query}`.match(/(10\.\d{4,9}\/[^\s?#&"']+)/)?.[1];
   if (!doi) return null;
   // What publishers put after the DOI in their addresses (IOP's /meta).
   const clean = doi
