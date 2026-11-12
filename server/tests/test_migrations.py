@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from paperus.models import Base, Chunk, Item, ItemChunk
+from paperus.models import Base, Chunk, Item, ItemChunk, Version
 from tests.conftest import SERVER_DIR
 
 
@@ -147,3 +147,37 @@ def test_0012_gives_papers_their_first_author_and_journal(
     assert rows[preprint] == ("Benito, Mónica", "Physical Review B")
     assert rows[edited] == ("The Lab", "Notes")
     assert rows[bare] == (None, None)
+
+
+def test_0014_labels_preprints_by_their_pdfs_arxiv_version(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """An installation of 0.1.0 updated: a preprint whose PDF arXiv named
+    with its version ("2401.12345v2.pdf") is that version ("v2")."""
+    made = logged_in.post(
+        "/api/items",
+        json={
+            "metadata": {"title": "Spin qubits"},
+            "identifiers": [{"scheme": "arxiv", "value": "2401.12345"}],
+        },
+    )
+    item_id = made.json()["id"]
+    logged_in.post(
+        f"/api/items/{item_id}/files",
+        files={
+            "upload": ("2401.12345v2.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")
+        },
+    )
+    version = db.scalars(select(Version).where(Version.item_id == item_id)).one()
+    version.label = None  # as before 0.1.1
+    db.commit()
+    db.close()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.downgrade(config, "0013")
+    command.upgrade(config, "head")
+
+    assert (
+        db.scalars(select(Version.label).where(Version.item_id == item_id)).one()
+        == "v2"
+    )

@@ -10,8 +10,8 @@ def make_engine(database_url: str) -> Engine:
 
 def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
     # Hooks on every session: change numbers, papers' details for search,
-    # notifications of papers added to groups.
-    from paperus import changes, details, notifications  # noqa: F401
+    # notifications of papers added to groups, arXiv's versions of files.
+    from paperus import arxiv_versions, changes, details, notifications  # noqa: F401
 
     return sessionmaker(engine, expire_on_commit=False)
 

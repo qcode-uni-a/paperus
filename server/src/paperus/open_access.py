@@ -83,6 +83,10 @@ def arxiv_id_for(
     return None
 
 
+# The file name a site gives a download.
+_CONTENT_NAME = re.compile(r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', re.IGNORECASE)
+
+
 def arxiv_id_of(url: str) -> str | None:
     """The arXiv ID in an arXiv address (abs or pdf)."""
     match = _ARXIV_URL.search(url)
@@ -96,10 +100,11 @@ def fetch(
     *,
     contact_email: str | None,
     max_bytes: int,
-) -> tuple[StoredBlob, str]:
+) -> tuple[StoredBlob, str, str | None]:
     """Download the paper's PDF from the first source that gives a whole,
-    readable PDF, and store it; returns it with the address it came from.
-    NoSource if none does."""
+    readable PDF, and store it; returns it with the address it came from and
+    the name the site gave it (arXiv's names its version: "2401.12345v3.pdf"),
+    if any. NoSource if none does."""
     tried: list[str] = []
     for source in sources(item, contact_email):
         urls = [source]
@@ -110,7 +115,8 @@ def fetch(
                 continue
         for url in urls:
             try:
-                return _download(http, blobs, url, max_bytes), url
+                stored, name = _download(http, blobs, url, max_bytes)
+                return stored, url, name
             except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
                 log.info("no PDF from %s: %s", url, error)
                 tried.append(
@@ -215,7 +221,7 @@ def fetch_journal_copy(
         if not url.startswith("https://"):
             continue
         try:
-            return _download(http, blobs, url, max_bytes)
+            return _download(http, blobs, url, max_bytes)[0]
         except (httpx2.HTTPError, pdf.PdfError, TooLarge, ValueError) as error:
             log.info("no PDF from %s: %s", url, error)
             tried.append(
@@ -231,13 +237,17 @@ def fetch_journal_copy(
 
 def _download(
     http: httpx2.Client, blobs: BlobStore, url: str, max_bytes: int
-) -> StoredBlob:
-    """Into a temporary file first: only a whole PDF that opens is stored."""
+) -> tuple[StoredBlob, str | None]:
+    """Into a temporary file first: only a whole PDF that opens is stored;
+    with the name the site gives it (Content-Disposition), if any."""
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "download.pdf"
         size = 0
         with http.stream("GET", url, timeout=60, follow_redirects=True) as response:
             response.raise_for_status()
+            named = _CONTENT_NAME.search(
+                response.headers.get("content-disposition", "")
+            )
             with path.open("wb") as out:
                 for chunk in response.iter_bytes():
                     size += len(chunk)
@@ -249,6 +259,8 @@ def _download(
                 raise ValueError("not a PDF (probably a web page)")
         pdf.pages(path)  # opens completely, or raises PdfError
         with path.open("rb") as stream:
-            return blobs.put(
+            stored = blobs.put(
                 iter(lambda: stream.read(1024 * 1024), b""), max_size=max_bytes
             )
+        name = Path(named.group(1)).name if named else None
+        return stored, (name or None)

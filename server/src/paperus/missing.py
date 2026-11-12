@@ -253,7 +253,7 @@ def add_open_access(
         else:
             return _attach(db, item, journal, stored, _safe(doi) + ".pdf", user_id)
     try:
-        stored, url = open_access.fetch(
+        stored, url, name = open_access.fetch(
             http, blobs, item, contact_email=contact_email, max_bytes=max_bytes
         )
     except open_access.NoSource as error:
@@ -266,7 +266,9 @@ def add_open_access(
         item.open_access_error = "the paper has no version"
         db.commit()
         return None
-    return _attach(db, item, version, stored, _filename(item), user_id)
+    # arXiv's name says its version ("2401.12345v3.pdf": paperus.arxiv_versions).
+    named = name if name and name.lower().endswith(".pdf") else None
+    return _attach(db, item, version, stored, named or _filename(item), user_id)
 
 
 def _attach(

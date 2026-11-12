@@ -59,14 +59,24 @@ def preferred_version(item: Item) -> Version | None:
 
 def preferred_of(versions: Sequence[Version]) -> Version | None:
     """The version whose details are shown: the pinned one (the first if
-    several), else published before preprint before others, newest first."""
+    several), else published before preprint before others; within a kind
+    arXiv's newest version first (labels "v1", "v2", …,
+    ``paperus.arxiv_versions``), then the newest added."""
     for version in versions:
         if version.pinned:
             return version
     if not versions:
         return None
-    newest_first = sorted(versions, key=lambda v: v.id, reverse=True)
+    newest_first = sorted(
+        versions, key=lambda v: (arxiv_number(v.label), v.id), reverse=True
+    )
     return min(newest_first, key=lambda v: _RANK[v.kind])
+
+
+def arxiv_number(label: str | None) -> int:
+    """3 for arXiv's version "v3", else 0."""
+    match = re.fullmatch(r"v(\d+)", (label or "").strip().lower())
+    return int(match.group(1)) if match else 0
 
 
 def citation_csl(item: Item) -> dict[str, Any]:

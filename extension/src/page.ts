@@ -272,7 +272,7 @@ export async function fetchPdf(
 	url: string,
 	maxBytes: number
 ): Promise<
-	| { base64: string; size: number }
+	| { base64: string; size: number; name?: string }
 	| { error: string; status?: number; html?: string; next?: string; at?: string }
 > {
 	try {
@@ -331,7 +331,11 @@ export async function fetchPdf(
 		for (let i = 0; i < buffer.byteLength; i += 0x8000) {
 			binary += String.fromCharCode.apply(null, Array.from(part(i, 0x8000)));
 		}
-		return { base64: btoa(binary), size: buffer.byteLength };
+		// The name the site gives it (arXiv's says its version: "2401.12345v3.pdf").
+		const name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+			response.headers.get('content-disposition') ?? ''
+		)?.[1];
+		return { base64: btoa(binary), size: buffer.byteLength, ...(name ? { name } : {}) };
 	} catch (error) {
 		return { error: `The PDF could not be fetched: ${String(error)}` };
 	}

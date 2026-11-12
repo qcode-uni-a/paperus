@@ -47,7 +47,8 @@ const MAX_BYTES = 512 * 1024 * 1024;
 const FIREFOX = chrome.runtime.getURL("").startsWith("moz-extension:");
 
 type Pdf =
-  | { base64: string; size: number }
+  /** ``name``: as the site gave it ("2401.12345v3.pdf": arXiv's version). */
+  | { base64: string; size: number; name?: string }
   | {
       error: string;
       status?: number;
@@ -920,7 +921,12 @@ async function save(
     if (await holder(bytes)) {
       fileNote = " The PDF is there already.";
     } else {
-      missing = await upload(item.id, bytes, filename(page), version?.id);
+      missing = await upload(
+        item.id,
+        bytes,
+        pdf.name ?? filename(page),
+        version?.id,
+      );
       if (!missing) fileNote = " With its PDF.";
     }
   }
@@ -1380,12 +1386,17 @@ async function loadedCopy(
 /** arXiv's PDFs are open: fetched here directly. */
 async function arxivPdf(id: string): Promise<Pdf> {
   try {
+    // The latest version; its name says which ("2401.12345v3.pdf"), so
+    // paperus files it as that version.
     const response = await fetch(`https://arxiv.org/pdf/${id}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (!response.ok || String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") {
       return { error: "arXiv gave no PDF." };
     }
-    return encoded(bytes);
+    const name = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+      response.headers.get("content-disposition") ?? "",
+    )?.[1];
+    return { ...encoded(bytes), ...(name ? { name } : {}) };
   } catch (error) {
     return { error: `arXiv could not be reached: ${String(error)}` };
   }
@@ -2179,7 +2190,7 @@ async function getOne(
     return await saveInto(
       paper,
       decode(pdf),
-      filename({ url: pdfUrl, pdfUrl }),
+      pdf.name ?? filename({ url: pdfUrl, pdfUrl }),
     );
   } catch (error) {
     return because(

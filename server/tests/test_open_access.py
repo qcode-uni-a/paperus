@@ -250,7 +250,7 @@ def test_every_open_copy_is_tried(blobs: BlobStore) -> None:
         "https://csic.example/x.pdf",
         "https://journal.example/x.pdf",
     ]
-    _, url = open_access.fetch(
+    _, url, _ = open_access.fetch(
         web(answer),
         blobs,
         paper(Scheme.DOI, doi),
@@ -288,7 +288,7 @@ def test_too_large_is_not_stored(blobs: BlobStore) -> None:
             contact_email=None,
             max_bytes=len(GOOD) - 1,
         )
-    stored, url = open_access.fetch(
+    stored, url, _ = open_access.fetch(
         arxiv,
         blobs,
         paper(Scheme.ARXIV, "2401.00001"),

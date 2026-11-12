@@ -173,8 +173,9 @@ def _store_upload(
         raise HTTPException(409, "item is in the trash")
     stored = _put_upload(upload, request, db)
     # The same file again in the same role (a paper saved twice with its
-    # supplementary material): the one it has.
-    for file in version.files:
+    # supplementary material), in any of the paper's versions (arXiv's
+    # versions have their own: paperus.arxiv_versions): the one it has.
+    for file in (f for v in version.item.versions for f in v.files):
         if (
             file.blob_sha256 == stored.sha256
             and file.role == role
@@ -535,7 +536,7 @@ def replace_with_open_access(db: Session, state: Any, file: File) -> None:  # no
     """The file's contents replaced by a fresh open-access copy of its paper
     (``open_access.NoSource`` if none), to be read again. Commits."""
     settings = state.settings
-    stored, _ = open_access.fetch(
+    stored, _, _ = open_access.fetch(
         state.http,
         state.blobs,
         file.version.item,
