@@ -1839,6 +1839,35 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
     const index = waiting.findIndex((paper) => !busy.has(publisherOf(paper)));
     return index < 0 ? undefined : waiting.splice(index, 1)[0];
   };
+  type Problem = { cause: Cause; reason: string } | null;
+  /** One paper tried: out of time after ``ms``; any failure is this
+   * paper's (the others, and the word that all are done, still come). */
+  const attempt = async (
+    paper: Wanted,
+    inSight: boolean,
+    ms: number,
+  ): Promise<Problem> => {
+    try {
+      return await Promise.race([
+        getOne(paper, inSight),
+        new Promise<{ cause: Cause; reason: string }>((give) =>
+          setTimeout(
+            () =>
+              give({
+                cause: "error",
+                reason: `The publisher took longer than ${ms / 1000} seconds.`,
+              }),
+            ms,
+          ),
+        ),
+      ]);
+    } catch (error) {
+      return { cause: "error", reason: String(error) };
+    }
+  };
+  // Stopped by a check for robots in a tab out of sight (where such a
+  // check's script may never finish): tried again in sight, at the end.
+  const checked: Wanted[] = [];
   const worker = async () => {
     while (waiting.length) {
       const paper = take();
@@ -1853,55 +1882,68 @@ async function getPdfs(papers: Wanted[], tabId: number): Promise<void> {
         page: paper.url,
         publisher,
       });
-      let problem: { cause: Cause; reason: string } | null;
-      try {
-        problem = await Promise.race([
-          getOne(paper),
-          new Promise<{ cause: Cause; reason: string }>((give) =>
-            setTimeout(
-              () =>
-                give({
-                  cause: "error",
-                  reason: `The publisher took longer than ${PAPER_MS / 1000} seconds.`,
-                }),
-              PAPER_MS,
-            ),
-          ),
-        ]);
-      } catch (error) {
-        // Any failure is this paper's: the others, and the word that all
-        // are done, still come.
-        problem = { cause: "error", reason: String(error) };
-      } finally {
-        busy.delete(publisher);
-      }
-      if (problem) {
-        failed.push({ item_id: paper.item_id, ...problem });
-        logIssue("warning", `No PDF for “${paper.title}”: ${problem.reason}`, {
-          page: paper.url,
-          cause: problem.cause,
-          item: paper.item_id,
+      const problem = await attempt(paper, false, PAPER_MS);
+      busy.delete(publisher);
+      if (problem?.cause === "robot-check") {
+        trace("A check for robots: to try again in sight", {
+          paper: paper.title,
         });
-      } else saved++;
-      trace(problem ? "No PDF for it (Missing)" : "PDF saved (Missing)", {
-        paper: paper.title,
-        reason: problem?.reason ?? null,
-      });
-      done++;
-      await report({
-        type: "getPdfsProgress",
-        done,
-        total: papers.length,
-        saved,
-        item_id: paper.item_id,
-        ok: problem === null,
-        ...(problem ?? {}),
-      });
+        checked.push(paper);
+        continue;
+      }
+      await settle(paper, problem);
     }
+  };
+  const settle = async (paper: Wanted, problem: Problem) => {
+    if (problem) {
+      failed.push({ item_id: paper.item_id, ...problem });
+      logIssue("warning", `No PDF for “${paper.title}”: ${problem.reason}`, {
+        page: paper.url,
+        cause: problem.cause,
+        item: paper.item_id,
+      });
+    } else saved++;
+    trace(problem ? "No PDF for it (Missing)" : "PDF saved (Missing)", {
+      paper: paper.title,
+      reason: problem?.reason ?? null,
+    });
+    done++;
+    await report({
+      type: "getPdfsProgress",
+      done,
+      total: papers.length,
+      saved,
+      item_id: paper.item_id,
+      ok: problem === null,
+      ...(problem ?? {}),
+    });
   };
   await Promise.all(
     Array.from({ length: Math.min(AT_ONCE, papers.length) }, worker),
   );
+  for (const paper of checked) {
+    trace("Getting a PDF in sight, past its check for robots (Missing)", {
+      paper: paper.title,
+      page: paper.url,
+    });
+    // The page hears from the extension while it waits (else it gives up
+    // on it after three minutes), and says why.
+    const waiting = () =>
+      report({
+        type: "getPdfsProgress",
+        done,
+        total: papers.length,
+        saved,
+        note: `Waiting for a check for robots in the tab that opened (“${paper.title}”); answer it if it asks you.`,
+      });
+    void waiting();
+    const heartbeat = setInterval(waiting, 30_000);
+    try {
+      await settle(paper, await attempt(paper, true, CHECK_MS + PAPER_MS));
+    } finally {
+      clearInterval(heartbeat);
+    }
+  }
   await report({ type: "getPdfsDone", total: papers.length, saved, failed });
 }
 
@@ -2025,8 +2067,16 @@ async function saveInto(
     : { cause: "error", reason: "paperus no longer has this paper." };
 }
 
+/** How long a tab in sight waits for its check for robots to pass, by its
+ * script or by the person solving it. */
+const CHECK_MS = 180_000;
+
+/** One paper's PDF, from its open copies or its publisher's page (in a tab
+ * out of sight; ``inSight``: in front, waiting for a check for robots to
+ * pass, which a person may solve). */
 async function getOne(
   paper: Wanted,
+  inSight = false,
 ): Promise<{ cause: Cause; reason: string } | null> {
   const because = (cause: Cause, detail?: string) => ({
     cause,
@@ -2040,10 +2090,15 @@ async function getOne(
   }
   if (!/^https?:\/\//.test(paper.url))
     return because("error", "No address to open.");
-  const tab = await chrome.tabs.create({ url: paper.url, active: false });
+  const tab = await chrome.tabs.create({ url: paper.url, active: inSight });
   const tabId = tab.id!;
+  if (inSight)
+    await chrome.windows
+      .update(tab.windowId, { focused: true })
+      .catch(() => undefined);
   try {
     await loaded(tabId);
+    if (inSight && !(await pastCheck(tabId))) return because("robot-check");
     const page = await within(READ_MS, inPage(tabId, readPage));
     const pdfUrl = page.isPdf
       ? page.url
@@ -2084,6 +2139,34 @@ async function getOne(
   } finally {
     await chrome.tabs.remove(tabId).catch(() => undefined);
   }
+}
+
+/** Whether the tab's check for robots passes within CHECK_MS (it goes on
+ * to the article, by its script or solved by the person, who is told). */
+async function pastCheck(tabId: number): Promise<boolean> {
+  const until = Date.now() + CHECK_MS;
+  let told = false;
+  while (Date.now() < until) {
+    // While the check sends it on, the page may not be read: again.
+    const signals = await within(5_000, inPage(tabId, pageSignals)).catch(
+      () => null,
+    );
+    if (signals && !isRobotCheck(signals)) {
+      await loaded(tabId).catch(() => undefined);
+      return true;
+    }
+    if (signals && !told) {
+      told = true;
+      await tell(
+        tabId,
+        "paperus waits for this check to pass, to save the paper's PDF. If it asks you something, answer it; the tab closes by itself once the PDF is saved.",
+        null,
+        "warning",
+      ).catch(() => undefined);
+    }
+    await new Promise((wait) => setTimeout(wait, 2_000));
+  }
+  return false;
 }
 
 /** Until the tab has loaded (and a moment more: pages fill in their

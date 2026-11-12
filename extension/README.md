@@ -56,9 +56,14 @@ does the same; a full one with a check means you have it already.
 - **Many PDFs at once**: paperus' Manage → Missing page asks the extension
   to get the PDFs of papers it lacks: each opened at its publisher in a
   background tab, its PDF saved into the paper. Open copies whose sites
-  refused paperus' server are fetched first. A
-  paper that fails says why: a check for robots (a captcha), no access (a
-  login or paywall), or no PDF on the page. The result shows in paperus.
+  refused paperus' server are fetched first. A paper stopped by a check
+  for robots is tried again at the end in a tab in front, where such a
+  check often passes by itself (or you answer it); paperus waits up to
+  three minutes, then saves the PDF and closes the tab. A paper that fails
+  says why: a check for robots (a captcha), no access (a login or
+  paywall), or no PDF on the page. The result shows in paperus.
+- **A paper's page in paperus** offers "Get the PDF with the extension"
+  for a version without one, the same way.
 
 - **Access to websites** is asked for once, when installing (as Zotero's
   extension does): to read the page you click on, fetch its PDF (also where

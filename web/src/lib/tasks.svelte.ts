@@ -73,6 +73,8 @@ if (typeof window !== 'undefined') {
 			total?: number;
 			ok?: boolean;
 			saved?: number;
+			/** What it waits for (a check for robots in a tab it opened). */
+			note?: string;
 		} | null;
 		const running = task(fromExtension);
 		if (!running || running.finished) return;
@@ -81,6 +83,7 @@ if (typeof window !== 'undefined') {
 			running.done = data.done ?? running.done;
 			running.total = data.total ?? running.total;
 			if (data.ok === false) running.failed += 1;
+			running.note = data.note;
 		} else if (data?.type === 'paperus:getPdfsDone') {
 			const saved = data.saved ?? 0;
 			finishTask(
