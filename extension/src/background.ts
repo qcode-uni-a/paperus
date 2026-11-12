@@ -263,13 +263,14 @@ async function saveTab(
   step(tabId, "Reading the page…");
   trace("Saving a page", {
     page: tab.url ?? null,
-    owner: owner?.name ?? null,
+    owner: owner?.id ?? null, // not its name: one's own
     popup: inPopup,
   });
   try {
     const result = await saveFrom(tab, owner);
     if (result.warning)
-      logIssue("warning", result.text, {
+      // Not the library's name (often one's own): which one is in "owner".
+      logIssue("warning", unnamed(result.text, owner), {
         page: tab.url ?? null,
         item: result.link,
       });
@@ -419,6 +420,11 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   return page.isPdf && !info.doi && !info.arxiv
     ? saveFile(await pdfComing, url, owner)
     : save(info, pdfComing, owner);
+}
+
+/** A message for the log, without the library's name. */
+function unnamed(text: string, owner?: Owner): string {
+  return owner ? text.replaceAll(owner.name, "the library") : text;
 }
 
 /** A PDF's fetch, for the log: its size, or what came back instead. */

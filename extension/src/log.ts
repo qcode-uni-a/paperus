@@ -8,8 +8,10 @@
  *   (to copy).
  *
  * Sent in small batches; an older paperus without the log, or none
- * connected, lets them go. */
+ * connected, lets them go. Web addresses in them lose what may stand for
+ * the person (redact): kept and sent alike. */
 import { type Api, call } from "./paperus";
+import { redact } from "./redact";
 
 type Level = "info" | "warning" | "error";
 export type Context = Record<
@@ -45,14 +47,14 @@ export function logIssue(
       : level === "warning"
         ? console.warn
         : console.info;
-  write("paperus:", message, context ?? "");
+  write("paperus:", redact(message), clean(context) ?? "");
   keep(level, message, context);
   queue(level, message, context);
 }
 
 /** A step on the way (the page read, a fetch and its answer, a tab). */
 export function trace(message: string, context?: Context): void {
-  console.info("paperus:", message, context ?? "");
+  console.info("paperus:", redact(message), clean(context) ?? "");
   keep("info", message, context);
   queue("info", message, context);
 }
@@ -64,7 +66,9 @@ function clean(context?: Context): Api.ExtensionReport["context"] {
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => [
         key,
-        typeof value === "string" ? value.slice(0, 1000) : (value ?? null),
+        typeof value === "string"
+          ? redact(value).slice(0, 1000)
+          : (value ?? null),
       ]),
   ) as Api.ExtensionReport["context"];
 }
@@ -73,7 +77,7 @@ function keep(level: Level, message: string, context?: Context): void {
   const entry: Entry = {
     at: new Date().toISOString(),
     level,
-    message: message.slice(0, 2000),
+    message: redact(message).slice(0, 2000),
     context: clean(context) ?? undefined,
   };
   // One after another: two steps at once must not lose each other.
@@ -91,7 +95,7 @@ function keep(level: Level, message: string, context?: Context): void {
 function queue(level: Level, message: string, context?: Context): void {
   pending.push({
     level,
-    message: message.slice(0, 4000),
+    message: redact(message).slice(0, 4000),
     at: new Date().toISOString(),
     context: clean(context),
   });

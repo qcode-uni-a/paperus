@@ -24,10 +24,16 @@ What it sends to your paperus, and when:
 - **When something goes wrong** (a paper saved without its PDF, a PDF it
   could not get, an error): what happened, with the page's address and
   the extension's version, for the administrators of your paperus
-  (Administration → Logs). Papers saved without trouble are not reported.
+  (Administration → Logs).
 - **The steps of a save** (the page's address and details, each address
   it fetched from and the answer), to your paperus's log too, for
   finding out what goes wrong.
+
+The log leaves out what may stand for you: addresses keep their site and
+path, and the names of their parameters, but not their values (a signed
+PDF address's signature, a session, a proxy's ticket, a search's words)
+nor a name and password in them; libraries appear by their id, not their
+name.
 
 On your paperus' own pages, a small script tells paperus that the
 extension is installed and passes on such requests; it reads nothing
