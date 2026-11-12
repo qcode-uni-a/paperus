@@ -83,9 +83,13 @@
 		ocrChoice = ocrModelChoice = null;
 	}
 
-	/** The score columns, from what the service says they mean. */
+	/** The score columns, from what the service says they mean: English
+	 * and multilingual (German ones are published for few models). */
+	const SHOWN_SCORES = ['en', 'multilingual'];
 	const benchmarks = $derived(
-		Object.entries(models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {})
+		Object.entries(
+			models.find((m) => Object.keys(m.benchmarks ?? {}).length)?.benchmarks ?? {}
+		).filter(([key]) => SHOWN_SCORES.includes(key))
 	);
 
 	/** What a model takes once loaded: as measured on this server, else a
@@ -342,7 +346,7 @@
 					</tr>
 				{:else}
 					<tr
-						><td colspan="9" class="muted">The ML service is not reachable; using {current}.</td
+						><td colspan="7" class="muted">The ML service is not reachable; using {current}.</td
 						></tr
 					>
 				{/each}
