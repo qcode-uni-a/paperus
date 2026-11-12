@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **ScienceDirect's PDFs in Firefox, saved from the article's page**: its
+  PDF link, opened in a tab out of sight, reaches the PDF; the extension's
+  own fetch of that address gets a check for robots ("Security
+  verification") instead. The PDF is now loaded again there and a copy
+  kept as Firefox receives it, as for a PDF open in Firefox's viewer.
 - **The paper's PDF, not its supplement**: on a page without a
   `citation_pdf_url` (Science Advances) the extension took the first PDF
   link naming the paper's DOI, which could be the supplementary material

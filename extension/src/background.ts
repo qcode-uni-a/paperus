@@ -1631,7 +1631,17 @@ async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
       return failed;
     const pdf = await fetchPdf(landed, MAX_BYTES);
     trace("Fetched where the tab landed", { url: landed, ...fetched(pdf) });
-    return "error" in pdf ? failed : pdf;
+    if (!("error" in pdf)) return pdf;
+    // The tab got the PDF, the extension's fetch a web page (ScienceDirect's
+    // "Security verification" at pdf.sciencedirectassets.com): in Firefox,
+    // the PDF as Firefox loads it there. Its signed address, not the link,
+    // whose first answer is the page in between.
+    const copy = await loadedCopy(landed);
+    trace("Loaded again in a tab out of sight, a copy kept", {
+      url: landed,
+      ...(copy ? fetched(copy) : { pdf: "none" }),
+    });
+    return copy ?? failed;
   } catch (error) {
     trace("The tab for the PDF link failed", {
       link: url,
