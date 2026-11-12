@@ -10,7 +10,7 @@ test('an uploaded PDF is read by the worker and found by its words', async ({ pa
 	});
 
 	// Its file, read: the text is searchable.
-	await itemAction(page, 'Details and files');
+	await page.getByRole('button', { name: /^Details and files/ }).click();
 	const file = page
 		.getByRole('main')
 		.getByRole('listitem')

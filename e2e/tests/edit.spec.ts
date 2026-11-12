@@ -86,3 +86,32 @@ test("a paper's details by hand: authors from the library's, year, journal", asy
 	expect(restored.overrides['container-title']).toBe('Phys. Rev. B');
 	expect(restored.csl.issued).toEqual({ 'date-parts': [[2020, 5]] });
 });
+
+test('saved over a change by paperus, not over one to its edits', async ({ page }) => {
+	const id = await add(page, { title: unique('Changed meanwhile ') });
+	await page.goto(`/items/${id}`);
+	await itemAction(page, 'Edit');
+	const dialog = page.getByRole('dialog', { name: 'Edit' });
+	await dialog.getByLabel('Journal or venue').fill('Physical Review B');
+	// Meanwhile the paper changes, its edits do not (as when paperus links
+	// its authors): saved all the same.
+	const link = await page.request.post(`/api/items/${id}/links`, {
+		data: { url: 'https://github.com/example/code', kind: 'code' }
+	});
+	expect(link.status()).toBe(200);
+	await dialog.getByRole('button', { name: 'Save' }).click();
+	await expect(dialog).toBeHidden();
+	await expect(page.getByText('Physical Review B')).toBeVisible();
+
+	// Someone else's edit meanwhile: not overwritten.
+	await itemAction(page, 'Edit');
+	await dialog.getByLabel('Journal or venue').fill('Phys. Rev. B');
+	const item = await page.request.get(`/api/items/${id}`);
+	const theirs = await page.request.put(`/api/items/${id}/overrides`, {
+		data: { ...(await item.json()).overrides, 'container-title': 'PRB' },
+		headers: { 'if-match': item.headers()['etag'] }
+	});
+	expect(theirs.status()).toBe(200);
+	await dialog.getByRole('button', { name: 'Save' }).click();
+	await expect(dialog.getByText('Someone changed this paper in the meantime')).toBeVisible();
+});

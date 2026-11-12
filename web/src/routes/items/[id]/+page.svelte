@@ -433,6 +433,23 @@
 			</details>
 		{/if}
 		{#if !item.deleted_at}<SimilarPapers item={item.id} /><PaperReferences item={item.id} />{/if}
+		{#if viewed}
+			{@const files = item.versions.flatMap((v) => v.files).filter((f) => !f.deleted_at).length}
+			<button
+				class="disclosure"
+				aria-expanded={showDetails}
+				aria-controls="item-details"
+				onclick={() => (showDetails = !showDetails)}
+			>
+				<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 0.8 7 4 1.5 7.2z" /></svg>
+				Details and files
+				<span class="count"
+					>{item.versions.length}
+					{item.versions.length === 1 ? 'version' : 'versions'}, {files}
+					{files === 1 ? 'file' : 'files'}</span
+				>
+			</button>
+		{/if}
 		{#if writable}
 			<ItemEditDialog bind:this={editDialog} {item} {etag} onsaved={load} />
 			<MergeDialog bind:this={mergeDialog} {item} />
@@ -442,7 +459,7 @@
 	</header>
 
 	{#if showDetails || !viewed}
-		<section>
+		<section id="item-details">
 			<div class="row">
 				<span class="badge">{item.type}</span>
 				{#each item.identifiers as identifier (identifier.scheme + identifier.value)}
@@ -720,6 +737,40 @@
 		display: inline-flex;
 		margin-left: 10px;
 		vertical-align: 0.05em;
+	}
+	/* As "Similar papers" and "References" above it (their summaries). */
+	.disclosure {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-top: 10px;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--muted);
+		font: inherit;
+		font-size: var(--step--1);
+		cursor: pointer;
+	}
+	.disclosure:hover {
+		color: var(--ink);
+	}
+	.disclosure svg {
+		width: 9px;
+		height: 9px;
+		fill: currentColor;
+		transition: rotate 0.15s;
+	}
+	.disclosure[aria-expanded='true'] svg {
+		rotate: 90deg;
+	}
+	.disclosure .count {
+		color: var(--faint, var(--muted));
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.disclosure svg {
+			transition: none;
+		}
 	}
 	.title {
 		display: flex;
