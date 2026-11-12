@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { itemAction, uploadPaper } from './helpers.ts';
+import { itemAction, unique, uploadPaper } from './helpers.ts';
 
 test('an uploaded PDF is read by the worker and found by its words', async ({ page }) => {
 	const paper = await uploadPaper(page, 'Upload');
@@ -75,4 +75,20 @@ test('edit the title and the tags', async ({ page }) => {
 	await expect(page.getByText(`Papers tagged ${tag}.`)).toBeVisible();
 	await expect(page.getByRole('link', { name: newTitle })).toBeVisible();
 	await expect(page.getByRole('heading', { name: '1 item' })).toBeVisible();
+});
+
+test('a paper shows its DOI, a link to its publisher, under its authors', async ({ page }) => {
+	const title = unique('With a DOI');
+	const doi = `10.5555/${title.toLowerCase().replace(/\W+/g, '-')}`;
+	const made = await page.request.post('/api/items', {
+		data: { metadata: { title }, identifiers: [{ scheme: 'doi', value: doi }] }
+	});
+	expect(made.ok()).toBeTruthy();
+	const { id } = (await made.json()) as { id: string };
+
+	await page.goto(`/items/${id}`);
+	const link = page.locator('header').getByRole('link', { name: `DOI ${doi}` });
+	await expect(link).toBeVisible();
+	await expect(link).toHaveAttribute('href', `https://doi.org/${doi}`);
+	await expect(link).toHaveAttribute('target', '_blank');
 });

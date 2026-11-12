@@ -141,6 +141,9 @@
 		return images.find((f) => f.role === 'main') ?? images[0] ?? null;
 	});
 	const viewed = $derived(pdfFile ?? textFile ?? webFile ?? imageFile);
+	/** Its DOI, shown under the authors even while its PDF is read: doi.org
+	 * leads to the publisher's page. */
+	const doi = $derived(item?.identifiers.find((i) => i.scheme === 'doi')?.value);
 	// Readers of a group see its papers but change nothing of them.
 	const writable = $derived(libraryById(item?.library_id)?.writable ?? false);
 
@@ -390,6 +393,16 @@
 					title="Papers by {writtenName(author)} in the library">{writtenName(author)}</a
 				>{/each}
 		</p>
+		{#if doi}
+			<p class="doi">
+				<a
+					href="https://doi.org/{doi}"
+					target="_blank"
+					rel="noreferrer"
+					title="The paper at its publisher (opens a new tab)">DOI {doi}</a
+				>
+			</p>
+		{/if}
 		{#if item.added_by && isShared(item.library_id)}
 			<p class="added-by">
 				<Avatar
@@ -681,6 +694,11 @@
 		flex-basis: 100%;
 		color: var(--danger);
 		font-size: var(--step--1);
+	}
+	.doi {
+		margin: -4px 0 12px;
+		font-size: var(--step--1);
+		overflow-wrap: anywhere;
 	}
 	.added-by {
 		display: flex;

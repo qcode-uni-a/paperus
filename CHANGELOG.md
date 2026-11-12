@@ -13,6 +13,9 @@
   copies there now (as the browser still lets a click), or says to copy
   by hand; the same for the OIDC redirect address and a note's text that
   could not be saved.
+- **A paper's DOI under its authors**: with its PDF open, a paper's page
+  showed its DOI only under "Details and files". It is under the authors
+  now, always, a link to the paper at its publisher (via doi.org).
 
 ## 0.0.28 (2026-11-12)
 
