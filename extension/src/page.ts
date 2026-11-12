@@ -43,11 +43,14 @@ export function idsInUrl(url: string): { doi: string | null; arxiv: string | nul
 /** The paper's details from the page: Highwire/Google Scholar tags
  * (citation_*) and Dublin Core (the address: see idsInUrl). */
 export async function readPage(): Promise<PageInfo> {
-	// The page's HTML read (not its images and scripts loaded).
+	// The page's HTML read (not its images and scripts loaded); a page whose
+	// scripts hold that up for long has its head (the citation_* tags) read
+	// by then all the same.
 	if (document.readyState === 'loading')
-		await new Promise((done) =>
-			document.addEventListener('DOMContentLoaded', () => done(undefined), { once: true })
-		);
+		await new Promise((done) => {
+			document.addEventListener('DOMContentLoaded', () => done(undefined), { once: true });
+			setTimeout(done, 10_000);
+		});
 	/** Where to fetch the PDF from within the page: its citation_pdf_url,
 	 * over HTTPS on an HTTPS page (else the browser blocks it); if that is
 	 * another site (APS: link.aps.org, which the page may not fetch from),

@@ -232,6 +232,27 @@ async function inPage<A extends unknown[], R>(
   return result.result as Awaited<R>;
 }
 
+/** How long reading a page in its tab may take. */
+const READ_MS = 20_000;
+
+/** A step in the page, given up after a while: a page busy with its own
+ * scripts can keep the browser from running ours (Science Advances), and
+ * the save would wait for ever. */
+async function within<T>(ms: number, step: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`no answer from the page in ${ms / 1000} s`)),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([step, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function saveTab(
   tab: chrome.tabs.Tab,
   owner?: Owner,
@@ -312,10 +333,12 @@ async function tell(
 
 async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   let unread = "";
-  const page = await inPage(tab.id!, readPage).catch((error) => {
-    unread = String(error?.message ?? error);
-    return null;
-  });
+  const page = await within(READ_MS, inPage(tab.id!, readPage)).catch(
+    (error) => {
+      unread = String(error?.message ?? error);
+      return null;
+    },
+  );
   const url = page?.url ?? tab.url ?? "";
   const inUrl = idsInUrl(url);
   if (!page) {
@@ -342,7 +365,9 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
   // paper is saved still, without its PDF, and the check says why; without
   // one the page's title would name the paper: not that of the check, nor
   // of a page that did not load.
-  const signals = page.isPdf ? null : await inPage(tab.id!, pageSignals);
+  const signals = page.isPdf
+    ? null
+    : await within(READ_MS, inPage(tab.id!, pageSignals)).catch(() => null);
   const robot = signals !== null && isRobotCheck(signals);
   if (robot)
     trace("A check for robots on the page", {
@@ -1180,7 +1205,7 @@ async function getOne(
   const tabId = tab.id!;
   try {
     await loaded(tabId);
-    const page = await inPage(tabId, readPage);
+    const page = await within(READ_MS, inPage(tabId, readPage));
     const pdfUrl = page.isPdf
       ? page.url
       : page.pdfUrl
@@ -1191,7 +1216,10 @@ async function getOne(
       landed: (await chrome.tabs.get(tabId)).url ?? null,
       pdfLink: pdfUrl,
     });
-    if (!pdfUrl) return because(causeOf(await inPage(tabId, pageSignals)));
+    if (!pdfUrl)
+      return because(
+        causeOf(await within(READ_MS, inPage(tabId, pageSignals))),
+      );
     const pdf = await orInTab(
       await onwards(await inPage(tabId, fetchPdf, pdfUrl, MAX_BYTES)),
       pdfUrl,
