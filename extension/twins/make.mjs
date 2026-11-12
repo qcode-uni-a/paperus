@@ -81,9 +81,7 @@ for (const author of authors)
 const replacements = Object.entries(replace).sort(([a], [b]) => b.length - a.length);
 /** The words of the real authors' names (three letters or more). */
 const nameWords = new Set(
-	[...authors, ...(spec.forbid ?? [])]
-		.flatMap((name) => name.toLowerCase().split(/[^\p{L}]+/u))
-		.filter((word) => word.length >= 3)
+	authors.flatMap((name) => name.toLowerCase().split(/[^\p{L}]+/u)).filter((word) => word.length >= 3)
 );
 /** Names left as they are (a title, a journal, a publisher): refused. */
 const unchanged = [];

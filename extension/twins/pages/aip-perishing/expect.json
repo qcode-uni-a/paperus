@@ -1,0 +1,36 @@
+{
+	"about": "The Journal of Comical Physics (AIP Perishing, Silverchair's platform): complete citation_* tags, one author; its citation_pdf_url (article-pdf) sends a fetch on to a signed address on another site (watermark.silverchair.com). Saved 2026-11-12.",
+	"url": "https://pubs.aip-perishing.org/aip/jcp/article/98/7/5648/123456/a-page",
+	"expect": {
+		"mode": "paper",
+		"title": "On the Entropy of Office Plants",
+		"doi": "10.5555/1.000001",
+		"pdfUrl": "https://pubs.aip-perishing.org/aip/jcp/article-pdf/98/7/5648/12345678/5648_1_online.pdf",
+		"authors": ["Skip Connor"],
+		"journal": "The Journal of Comical Physics",
+		"publisher": "AIP Perishing",
+		"volume": "98",
+		"issue": "7",
+		"firstPage": "5648",
+		"lastPage": "5652",
+		"date": "1993/04/01"
+	},
+	"chainFrom": "The extension's log, 2026-11-12: the page's fetch of the PDF link fails (\"NetworkError\": sent on to another site), so the extension fetches it itself and gets Cloudflare's \"Just a moment…\" (403); a page load in a tab gets the PDF (saved so in Firefox).",
+	"chain": {
+		"https://pubs.aip-perishing.org/aip/jcp/article-pdf/98/7/5648/12345678/5648_1_online.pdf": {
+			"fetch": {
+				"redirect": "https://watermark.silverchair.com/5648_1_online.pdf?token=x"
+			},
+			"load": {
+				"redirect": "https://watermark.silverchair.com/5648_1_online.pdf?token=x"
+			}
+		},
+		"https://watermark.silverchair.com/5648_1_online.pdf?token=x": {
+			"fetch": "pdf",
+			"load": "pdf"
+		}
+	},
+	"expectPdf": {
+		"next": "https://pubs.aip-perishing.org/aip/jcp/article-pdf/98/7/5648/12345678/5648_1_online.pdf"
+	}
+}

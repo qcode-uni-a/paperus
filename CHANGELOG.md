@@ -17,6 +17,10 @@
   the reader), so the PDF link is opened in a tab out of sight there too;
   a check that wants a person still says so, after 15 seconds. Tried in
   Firefox on AIP and ACS.
+- **A seventh page twin, The Journal of Comical Physics** (AIP Perishing):
+  its PDF link sends the page's fetch on to another site, which the
+  extension then fetches itself. Making twins no longer takes a site's own
+  name in an address for a person's (AIP's `/aip/` became "someone").
 - **Old Wiley DOIs, whole**: DOIs in the old SICI form carry angle
   brackets (`10.1002/1521-3978(200009)48:9/11<965::AID-PROP965>3.0.CO;2-V`);
   the extension cut them before the `<`, so the DOI was not found and
