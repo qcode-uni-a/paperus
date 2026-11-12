@@ -36,6 +36,7 @@
 	} from '#lib/api/client.ts';
 	import type { Reading } from '#lib/api/generated/types.gen.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
+	import { extension, getPdfsWithExtension } from '#lib/extension.svelte.ts';
 	import MenuButton from '#lib/MenuButton.svelte';
 	import StarButton from '#lib/StarButton.svelte';
 	import { canKeep, keep, keeping } from '#lib/offline.svelte.ts';
@@ -240,6 +241,43 @@
 			error = errorMessage(failure);
 		}
 		await load();
+	}
+
+	/** The version's page at its publisher (by DOI, arXiv ID or address),
+	 * where the browser extension gets its PDF with one's own access. */
+	function publisherPage(version: Version): string | null {
+		const doi = version.identifiers.find(
+			(i) => i.scheme === 'doi' && !i.value.startsWith('10.48550/')
+		);
+		if (doi) return `https://doi.org/${doi.value}`;
+		const arxiv = version.identifiers.find((i) => i.scheme === 'arxiv');
+		if (arxiv) return `https://arxiv.org/abs/${arxiv.value}`;
+		return version.identifiers.find((i) => i.scheme === 'url')?.value ?? null;
+	}
+	const hasPdf = (version: Version) =>
+		version.files.some(
+			(f) => f.role === 'main' && f.media_type === 'application/pdf' && !f.deleted_at
+		);
+	let getting = $state<string | null>(null);
+
+	function getWithExtension(version: Version, url: string) {
+		if (!item) return;
+		getting = version.id;
+		getPdfsWithExtension(
+			[
+				{
+					item_id: item.id,
+					version_id: version.id,
+					title: plainTitle(item.title),
+					url,
+					copies: []
+				}
+			],
+			async () => {
+				getting = null;
+				await load();
+			}
+		);
 	}
 
 	/** A version that is not this paper (merged in by mistake, another
@@ -621,6 +659,18 @@
 								/>
 								<span>Upload files</span>
 							</label>
+							{#if extension.getPdfs && publisherPage(version) && !hasPdf(version)}
+								<button
+									disabled={getting === version.id}
+									title="The browser extension opens {publisherPage(
+										version
+									)} and saves its PDF here, with your access to the publisher"
+									onclick={() => getWithExtension(version, publisherPage(version)!)}
+									>{getting === version.id
+										? 'Getting the PDF…'
+										: 'Get the PDF with the extension'}</button
+								>
+							{/if}
 						</div>
 					{/if}
 				</article>
