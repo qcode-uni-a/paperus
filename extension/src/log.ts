@@ -4,7 +4,7 @@
  * - sent to paperus, where its administrators read them (Administration →
  *   Logs): the page read, each fetch and its answer, which publisher
  *   refused a PDF, and why;
- * - kept in the browser too, the last few hundred, for the settings page
+ * - kept in the browser too, the last twenty, for the settings page
  *   (to copy).
  *
  * Sent in small batches; an older paperus without the log, or none
@@ -26,8 +26,9 @@ export interface Entry {
 
 const KEEP = 200;
 const BATCH = 50;
-/** Entries kept in the browser for the settings page. */
-const KEEP_HERE = 400;
+/** Entries kept in the browser for the settings page: enough for one save
+ * or two, to copy into an issue or for an AI agent. */
+const KEEP_HERE = 20;
 const pending: Api.ExtensionReport[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let written: Promise<void> = Promise.resolve();

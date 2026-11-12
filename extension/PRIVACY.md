@@ -33,7 +33,7 @@ On your paperus' own pages, a small script tells paperus that the
 extension is installed and passes on such requests; it reads nothing
 there.
 
-It also keeps a log of its last 400 steps in your browser, shown in its
+It also keeps a log of its last 20 steps in your browser, shown in its
 settings (to copy and pass on, or clear).
 
 What it keeps in your browser: your paperus address, an access token that
