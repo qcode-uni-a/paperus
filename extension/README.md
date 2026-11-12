@@ -38,6 +38,12 @@ does the same; a full one with a check means you have it already.
   (by title), and adds the ticked ones: by arXiv ID where Scholar names
   one, else by title, with the DOI paperus finds at Crossref (same title,
   first author and year), else as listed.
+- **Papers you have, on the button**: when a paper's page (or its PDF)
+  opens, the button shows a green check if the paper is in paperus with
+  the PDF of the version the page shows (journal or preprint), an orange
+  "!" if that PDF is missing (a click saves it); its tooltip names the
+  paper, and another version's PDF if there is one. Only the page's DOI or arXiv ID is looked up;
+  the settings turn it off.
 - **Another owner** at once: right-click the button, "Save to …".
 - **The settings** (address, owner, the version installed): "Settings" in
   the popup, or right-click the button, "paperus settings".
@@ -53,7 +59,9 @@ does the same; a full one with a check means you have it already.
 - **Access to websites** is asked for once, when installing (as Zotero's
   extension does): to read the page you click on, fetch its PDF (also where
   a publisher sends it on to another site, as ScienceDirect does), reach
-  your paperus, and get PDFs for Manage → Missing. It is used only then.
+  your paperus, and get PDFs for Manage → Missing. It is used only then,
+  and to read a page's DOI or arXiv ID when it opens (to mark a paper you
+  have; can be turned off).
 - The PDF is downloaded in your browser, with your own access (campus
   network, publisher login), and sent to paperus; one paperus has already
   (same SHA-256) is not sent again.

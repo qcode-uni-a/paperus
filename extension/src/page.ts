@@ -59,6 +59,39 @@ export function namesPaper(page: PageInfo | null, url: string): boolean {
 	);
 }
 
+/** Only the page's DOI and arXiv ID, from its tags (as readPage reads
+ * them, without the rest): to mark a paper one has when its page opens. */
+export function pageIds(): { doi: string | null; arxiv: string | null } {
+	const tags = (selector: string): string[] =>
+		[...document.querySelectorAll<HTMLMetaElement>(selector)].map((tag) => tag.content ?? '');
+	const doiIn = (text: string): string | null =>
+		text.match(/\b(10\.\d{4,9}\/[^\s"']+)/)?.[1]?.replace(/[.,;)]+$/, '') ?? null;
+	const named = (...names: string[]): string[] =>
+		tags(names.map((name) => `meta[name="${name}" i], meta[property="${name}" i]`).join(', '));
+	/** IEEE Xplore's, in no tag: in its script's "xplGlobal.document.metadata={…}". */
+	const xplDoi = (): string | null => {
+		for (const script of document.querySelectorAll('script:not([src])')) {
+			const text = script.textContent ?? '';
+			const at = text.search(/xplGlobal\.document\.metadata\s*=\s*\{/);
+			if (at < 0) continue;
+			return text.slice(at).split('\n')[0].match(/"doi"\s*:\s*"([^"]+)"/)?.[1] ?? null;
+		}
+		return null;
+	};
+	return {
+		doi:
+			[
+				...named('citation_doi', 'prism.doi', 'bepress_citation_doi', 'publication_doi'),
+				...named('dc.identifier')
+			]
+				.map(doiIn)
+				.find(Boolean) ??
+			xplDoi() ??
+			null,
+		arxiv: named('citation_arxiv_id')[0]?.replace(/\s+/g, ' ').trim() || null
+	};
+}
+
 /** The paper's details from the page: Highwire/Google Scholar tags
  * (citation_*) and Dublin Core (the address: see idsInUrl). */
 export async function readPage(): Promise<PageInfo> {

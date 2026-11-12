@@ -25,6 +25,7 @@ import {
   idsInUrl,
   namesPaper,
   type PageInfo,
+  pageIds,
   pageLinks,
   pageSignals,
   readPage,
@@ -246,6 +247,100 @@ async function badge(
   await chrome.action.setBadgeText({ tabId, text });
 }
 
+// Whether one has the paper of a page one opens, on the button: a check
+// when it is in paperus with its PDF, an orange "!" when without (a click
+// saves the PDF to it). Only the page's DOI or arXiv ID goes to paperus,
+// read from its address and its tags in the page; never on paperus's own
+// pages; not at all when turned off in the settings ("markPapers").
+const GREEN = "#1e7a3e";
+const ORANGE = "#b26a00";
+/** Per tab, a count that a save or a new page raises: a look-up begun
+ * before marks nothing after it. */
+const marking = new Map<number, number>();
+
+function newMark(tabId: number): number {
+  const next = (marking.get(tabId) ?? 0) + 1;
+  marking.set(tabId, next);
+  return next;
+}
+
+chrome.tabs.onUpdated.addListener((tabId, change, tab) => {
+  if (change.status === "loading" && (change.url || !marking.has(tabId))) {
+    newMark(tabId);
+    void chrome.action.setBadgeText({ tabId, text: "" }).catch(() => {});
+    void chrome.action
+      .setTitle({ tabId, title: "Save to paperus" })
+      .catch(() => {});
+  }
+  // Loaded, or another address in the same page (a site's own navigation).
+  if (tab.status === "complete" && (change.status === "complete" || change.url))
+    void markPage(tabId, tab.url ?? "");
+});
+chrome.tabs.onRemoved.addListener((tabId) => marking.delete(tabId));
+
+async function markPage(tabId: number, url: string): Promise<void> {
+  if (!/^https?:/.test(url)) return;
+  const config = await settings();
+  if (!config || new URL(url).origin === new URL(config.server).origin) return;
+  const { markPapers = true } = (await chrome.storage.local.get(
+    "markPapers",
+  )) as { markPapers?: boolean };
+  if (!markPapers) return;
+  const mark = newMark(tabId);
+  try {
+    const inUrl = idsInUrl(url);
+    // The page's tags, if the extension may read it (else its address alone).
+    const page =
+      inUrl.doi || inUrl.arxiv
+        ? null
+        : await within(5_000, inPage(tabId, pageIds)).catch(() => null);
+    const doi = inUrl.doi ?? page?.doi;
+    const arxiv = inUrl.arxiv ?? page?.arxiv;
+    const keys = [
+      ...(doi ? [`doi:${doi}`] : []),
+      ...(arxiv ? [`arxiv:${arxiv}`] : []),
+    ];
+    if (!keys.length) return;
+    const found = await lookupKeys(keys);
+    const itemId = keys.map((key) => found[key]).find(Boolean);
+    if (!itemId) return;
+    const { data: item } = await call<Api.GetItemData, Api.GetItemResponse>(
+      "/api/items/{item_id}",
+      { path: { item_id: itemId } },
+    );
+    if (!item?.id || marking.get(tabId) !== mark) return;
+    // The page's version (the journal's, the preprint): its PDF; else any.
+    const hasPdf = (version: Api.VersionOut) =>
+      version.files.some(
+        (file) =>
+          file.role === "main" &&
+          file.media_type === "application/pdf" &&
+          !file.deleted_at,
+      );
+    const same = (key: string) => key.toLowerCase().replace(/v\d+$/, "");
+    const wanted = keys.map(same);
+    const shown = item.versions.find((version) =>
+      version.identifiers.some((id) =>
+        wanted.includes(same(`${id.scheme}:${id.value}`)),
+      ),
+    );
+    const own = shown ? hasPdf(shown) : item.versions.some(hasPdf);
+    const other = !own && item.versions.find(hasPdf);
+    const title = item.title.replace(/<[^>]+>/g, "");
+    await badge(tabId, own ? "✓" : "!", own ? GREEN : ORANGE);
+    await chrome.action.setTitle({
+      tabId,
+      title: own
+        ? `In paperus: “${title}”`
+        : other
+          ? `In paperus with the ${other.kind} version's PDF, not this one's: “${title}”. Click to save this one.`
+          : `In paperus without its PDF: “${title}”. Click to save the PDF.`,
+    });
+  } catch {
+    // Not connected, paperus not there, the tab gone: no mark, no word.
+  }
+}
+
 async function inPage<A extends unknown[], R>(
   tabId: number,
   func: (...args: A) => R,
@@ -290,6 +385,7 @@ async function saveTab(
   inPopup = false,
 ): Promise<Saved | { ok: false; text: string }> {
   const tabId = tab.id!;
+  newMark(tabId); // a look-up under way marks nothing now
   await badge(tabId, "…");
   step(tabId, "Reading the page…");
   trace("Saving a page", {
@@ -305,8 +401,8 @@ async function saveTab(
         page: tab.url ?? null,
         item: result.link,
       });
-    if (result.warning) await badge(tabId, "!", "#b26a00");
-    else await badge(tabId, "✓", "#1e7a3e");
+    if (result.warning) await badge(tabId, "!", ORANGE);
+    else await badge(tabId, "✓", GREEN);
     if (!inPopup)
       await tell(
         tabId,

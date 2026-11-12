@@ -17,6 +17,11 @@ What it sends to your paperus, and when:
   profile): the list's DOIs, arXiv IDs or titles, to mark those you have;
   on saving, the ticked files (downloaded with your access) or the papers'
   details.
+- **When a page opens**: its DOI or arXiv ID, if it names one (in its
+  address or its tags), to show on the button whether the paper is in
+  your library and has its PDF; nothing else of the page, and nothing for
+  pages without one. Turn it off in the settings ("Show on the button
+  whether you have the paper …").
 - **On arXiv pages**: the arXiv IDs of the papers listed there, to show
   which ones are already in your library.
 - **On Google Scholar's results**: the DOIs and arXiv IDs found in the
@@ -26,7 +31,8 @@ What it sends to your paperus, and when:
   the extension opens its publisher's page in a background tab (with your
   access), downloads the PDF the page links and sends it to your paperus.
   It uses its access to websites (asked for once, when installing) only
-  for these requests and for the paperus button.
+  for these requests, for the paperus button, and to read a page's DOI or
+  arXiv ID when it opens (above).
 - **When something goes wrong** (a paper saved without its PDF, a PDF it
   could not get, an error): what happened, with the page's address and
   the extension's version, for the administrators of your paperus

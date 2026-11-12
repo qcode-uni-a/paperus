@@ -52,6 +52,15 @@ label {
 	gap: 6px;
 	font-weight: 600;
 }
+label.check {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	margin-top: 16px;
+}
+label.check input {
+	padding: 0;
+}
 input,
 select {
 	padding: 8px 10px;

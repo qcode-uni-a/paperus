@@ -145,6 +145,19 @@ $('owner').addEventListener('change', async () => {
 	message(select.value ? `New papers belong to ${select.selectedOptions[0].text}.` : 'New papers go to your default owner.');
 });
 
+const markPapers = $<HTMLInputElement>('mark-papers');
+void chrome.storage.local
+	.get('markPapers')
+	.then(({ markPapers: on }) => (markPapers.checked = on !== false));
+markPapers.addEventListener('change', async () => {
+	await chrome.storage.local.set({ markPapers: markPapers.checked });
+	message(
+		markPapers.checked
+			? 'The button shows whether you have the paper of a page you open.'
+			: 'The button no longer looks up the papers of pages you open.'
+	);
+});
+
 $('disconnect').addEventListener('click', async () => {
 	await saveSettings(null);
 	message('Disconnected. You can remove the extension’s access token in paperus (Settings → Access tokens).');

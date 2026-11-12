@@ -1,7 +1,8 @@
 // Each page twin (pages/NAME/page.html, made by make.mjs) read as the
 // extension reads a page in its tab (readPage, in jsdom at the page's own
 // address), against what pages/NAME/expect.json expects: "mode" (the
-// popup's choice: "paper" or "list") and any of readPage's fields.
+// popup's choice: "paper" or "list") and any of readPage's fields; pageIds
+// (the IDs alone) finds the same DOI and arXiv ID.
 //
 // A twin with a "chain" also has its PDF fetched as the extension does in
 // the page (fetchPdf), the network played by the chain: what each address
@@ -15,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { JSDOM } from 'jsdom';
-import { fetchPdf, namesPaper, readPage } from '../src/page.ts';
+import { fetchPdf, namesPaper, pageIds, readPage } from '../src/page.ts';
 
 const pages = new URL('pages/', import.meta.url);
 const PDF = '%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n';
@@ -70,6 +71,10 @@ for (const name of readdirSync(pages).sort()) {
 			const found = key === 'mode' ? (namesPaper(page, spec.url) ? 'paper' : 'list') : page[key];
 			assert.deepEqual(found, expected, key);
 		}
+		// What marks a paper one has when its page opens: the same IDs.
+		const ids = pageIds();
+		assert.equal(ids.doi, page.doi, 'pageIds: doi');
+		assert.equal(ids.arxiv, page.arxiv, 'pageIds: arxiv');
 	});
 
 	if (spec.chain)
