@@ -1,5 +1,6 @@
 """Items and their versions: adding by identifier or by hand, reading."""
 
+import re
 import uuid
 from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal, Self
@@ -17,8 +18,10 @@ from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
+from paperus.authors import fold
 from paperus.avatars import avatar_url
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
+from paperus.importing import by_title
 from paperus.models import (
     Collection,
     Favourite,
@@ -73,6 +76,11 @@ class ItemIn(VersionIn):
     library_id: uuid.UUID | None = None
     """The owner (a person's or a group's library); the person's default if
     not given. A paper the person can already see is not added again."""
+    find_doi: bool = False
+    """With ``metadata`` and no DOI or arXiv ID: look for the paper's DOI by
+    its title, first author and year at Crossref (as imports do) and add it
+    by that DOI if one surely matches; else as given. For papers listed
+    without identifiers (a Google Scholar profile)."""
 
 
 class IdentifierOut(BaseModel):
@@ -340,6 +348,15 @@ def add_or_find(
     among the items the person can see; and whether it is new."""
     library_id = access.target_library(body.library_id)
     identifiers = _normalized_identifiers(body)
+    given = body
+    if (
+        body.find_doi
+        and body.metadata is not None
+        and not {Scheme.DOI, Scheme.ARXIV} & {scheme for scheme, _ in identifiers}
+        and (doi := by_title.find_doi(http, body.metadata)) is not None
+    ):
+        body = body.model_copy(update={"doi": doi, "metadata": None})
+        identifiers = _normalized_identifiers(body)
     known = library.find_identifier(db, access.readable, identifiers)
     if known is not None:
         existing = known.version.item
@@ -348,7 +365,14 @@ def add_or_find(
             db.commit()
         return existing, False
 
-    resolved = _resolve(body, identifiers, http)
+    try:
+        resolved = _resolve(body, identifiers, http)
+    except HTTPException:
+        if body is given:
+            raise
+        # The DOI found is not known to its registry after all: as given.
+        body, identifiers = given, _normalized_identifiers(given)
+        resolved = _resolve(body, identifiers, http)
     try:
         item = library.create_item(
             db,
@@ -908,6 +932,17 @@ def set_reading(
     return Response(status_code=204)
 
 
+def _titles(db: Session, access: Access) -> dict[str, uuid.UUID]:
+    """The titles of the papers the person can see, folded (see ``fold``;
+    markup such as <i> left out)."""
+    rows = db.execute(
+        select(Item.id, Item.title).where(
+            Item.library_id.in_(access.readable), Item.deleted_at.is_(None)
+        )
+    )
+    return {fold(re.sub(r"<[^>]+>", " ", title)): item_id for item_id, title in rows}
+
+
 @router.get("/api/items/lookup")
 def lookup_items(
     db: DB,
@@ -916,10 +951,20 @@ def lookup_items(
 ) -> dict[str, uuid.UUID | None]:
     """For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the
     person can see that has it, else null; e.g. to mark the papers one has
-    on a web page (the browser extension on arXiv)."""
+    on a web page (the browser extension on arXiv). ``title:…``: a paper
+    with that title (case, accents and punctuation aside; at least four
+    words), for pages that list papers without identifiers (Google
+    Scholar's profiles)."""
     found: dict[str, uuid.UUID | None] = {}
+    titles: dict[str, uuid.UUID] | None = None
     for key in id:
         name, _, value = key.partition(":")
+        if name == "title":
+            if titles is None:
+                titles = _titles(db, access)
+            folded = fold(value)
+            found[key] = titles.get(folded) if len(folded.split()) >= 4 else None
+            continue
         try:
             scheme = Scheme(name.lower())
             known = library.find_identifier(

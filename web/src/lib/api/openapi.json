@@ -1759,7 +1759,7 @@
           "items"
         ],
         "summary": "Lookup Items",
-        "description": "For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the\nperson can see that has it, else null; e.g. to mark the papers one has\non a web page (the browser extension on arXiv).",
+        "description": "For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the\nperson can see that has it, else null; e.g. to mark the papers one has\non a web page (the browser extension on arXiv). ``title:\u2026``: a paper\nwith that title (case, accents and punctuation aside; at least four\nwords), for pages that list papers without identifiers (Google\nScholar's profiles).",
         "operationId": "lookup_items",
         "parameters": [
           {
@@ -12354,6 +12354,11 @@
               }
             ],
             "title": "Library Id"
+          },
+          "find_doi": {
+            "type": "boolean",
+            "title": "Find Doi",
+            "default": false
           }
         },
         "type": "object",

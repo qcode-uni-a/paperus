@@ -362,7 +362,10 @@ export const setReading = <ThrowOnError extends boolean = false>(options: Option
  *
  * For each ``scheme:value`` (doi, arxiv, isbn, pmid), the paper the
  * person can see that has it, else null; e.g. to mark the papers one has
- * on a web page (the browser extension on arXiv).
+ * on a web page (the browser extension on arXiv). ``title:…``: a paper
+ * with that title (case, accents and punctuation aside; at least four
+ * words), for pages that list papers without identifiers (Google
+ * Scholar's profiles).
  */
 export const lookupItems = <ThrowOnError extends boolean = false>(options: Options<LookupItemsData, ThrowOnError>): RequestResult<LookupItemsResponses, LookupItemsErrors, ThrowOnError> => (options.client ?? client).get<LookupItemsResponses, LookupItemsErrors, ThrowOnError>({ url: '/api/items/lookup', ...options });
 

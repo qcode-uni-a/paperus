@@ -2087,6 +2087,10 @@ export type ItemIn = {
      * Library Id
      */
     library_id?: string | null;
+    /**
+     * Find Doi
+     */
+    find_doi?: boolean;
 };
 
 /**
