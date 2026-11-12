@@ -1,7 +1,47 @@
 # Changelog
 
-## Unreleased
+## 0.0.29 (2026-11-12)
 
+*Your papers can now line up by author, year, journal or title, which is more than can be said for your desk.*
+
+- **Sort the library and collections**: by date added, title, first
+  author, year, publication date or journal, either way (a button beside
+  the choice turns the order round); dates start newest first, words A to
+  Z. Papers without the value come last either way; an author's papers go
+  by year, a year's by first author. Kept in the address and remembered
+  on the device; in the API as `sort` and `order`. Papers keep their
+  first author and journal as cited for this (migration 0012 fills them
+  in for the papers there are).
+- **Edit a paper's details**: Edit had only the title and owner; now also
+  its authors (rows to reorder, with suggestions from the library's
+  authors as one types; a picked one keeps their ORCID iD), year, type,
+  journal and abstract. Each change is kept over later lookups;
+  "Restore original" takes it back. Saving no longer fails when paperus
+  itself changed the paper meanwhile (its authors linked, an abstract
+  found); only someone else's edits are not overwritten.
+- **"Details and files" in sight**: a row under "Similar papers" and
+  "References" on a paper's page (with how many versions and files), not
+  only in its menu.
+- **The corner trays close by themselves**: uploads and tasks (getting
+  PDFs with the extension, adding papers) after 10 seconds once done, 30
+  when some PDFs were not got; a failed upload stays until closed; never
+  while the pointer or the focus is on them.
+- **The extension's button shows whether you have the paper**: when a
+  paper's page (or its PDF) opens, a green check if it is in paperus with
+  the PDF of the version the page shows, an orange "!" if that PDF is
+  missing (a click saves it; the tooltip names another version's PDF if
+  there is one). Only the page's DOI or arXiv ID is looked up in your
+  paperus; the extension's settings turn it off.
+- **The extension's popup waits while the pointer is on it**: it closed
+  under the mouse in Firefox (its wait listened for events Firefox's popup
+  does not send).
+- **A page's list saves to the default owner set in paperus**: with "My
+  default owner" in the extension's settings, the list's owner menu
+  started at one's own library and saved there.
+- **Getting PDFs for Missing always ends**: a paper that failed
+  unexpectedly stopped the run's report, and its task hung at "x of y".
+- **"Add to a collection" waits for one's collections**: clicked while
+  the page still loaded them, it asked for a new collection's name.
 - **ScienceDirect's PDFs through its check for scripts**: its PDF link
   now shows a check that needs scripts (`pdfft?crasolve…`) before the PDF,
   in a tab too; the extension looked at its tab out of sight while that

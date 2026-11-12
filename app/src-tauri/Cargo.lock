@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "paperus-app"
-version = "0.0.28"
+version = "0.0.29"
 dependencies = [
  "base64 0.23.1",
  "flate2",
