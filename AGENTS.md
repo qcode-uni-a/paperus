@@ -33,4 +33,6 @@ close them from commits with "Fixes #n".
   (Immich, Zotero); ideas are fine. Note other borrowed code and its licence
   in `THIRD_PARTY.md`.
 - When creating commits, include a co-authorship trailer for the tool.
+- Releases: only on the maintainer's go; `scripts/release.sh` and the steps
+  in `.claude/skills/release/SKILL.md`.
 - Don't register domains or package names without being asked.

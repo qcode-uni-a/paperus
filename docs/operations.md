@@ -449,6 +449,11 @@ then the container images on ghcr.io (tags `vX.Y.Z`, `X.Y.Z` and
 `release`), then a GitHub release with the notes from `CHANGELOG.md` and the
 browser extension's zips (for Chrome and Firefox).
 
+`scripts/release.sh X.Y.Z` sets all those versions (and their lock files
+and the README's) and `scripts/release.sh --check X.Y.Z` checks them and
+the changelog before the release commit; the steps from "is it ready?" to
+watching the workflow publish are in `.claude/skills/release/SKILL.md`.
+
 The packages are published only once their setup is done and switched on
 with repository variables (Settings → Secrets and variables → Actions →
 Variables):
