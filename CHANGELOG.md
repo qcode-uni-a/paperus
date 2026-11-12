@@ -10,6 +10,13 @@
   signed address), and keeps the first PDF that arrives; it gives up when
   the tab rests on a web page (a login) for 15 seconds, or after a minute.
   The same for a PDF open in Firefox's viewer. Tried in Firefox.
+- **AIP's and ACS's PDFs past Cloudflare's "Just a moment…"**: when the
+  extension's own fetch of a PDF met a check for robots, it gave up
+  without trying a tab, as a tab could not get past one. In Firefox it can
+  now (a check that needs only scripts lets the tab through, as it lets
+  the reader), so the PDF link is opened in a tab out of sight there too;
+  a check that wants a person still says so, after 15 seconds. Tried in
+  Firefox on AIP and ACS.
 - **Old Wiley DOIs, whole**: DOIs in the old SICI form carry angle
   brackets (`10.1002/1521-3978(200009)48:9/11<965::AID-PROP965>3.0.CO;2-V`);
   the extension cut them before the `<`, so the DOI was not found and

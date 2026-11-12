@@ -1787,11 +1787,16 @@ async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
   }
 }
 
-/** A web page where the PDF should be, and no check for robots: try the
- * link in a tab (``viaTab``). */
+/** A web page where the PDF should be: try the link in a tab (``viaTab``).
+ * A check for robots too in Firefox: one that needs only scripts
+ * (Cloudflare's "Just a moment…" at AIP, ScienceDirect's) lets the tab
+ * through as it lets the reader, and the tab's PDF is kept (one that wants
+ * a person gives up after RESTING_MS). Not in Chrome, which keeps nothing
+ * from a tab. */
 async function orInTab(pdf: Pdf, url: string | null): Promise<Pdf> {
   if (!url || !("error" in pdf) || pdf.html === undefined) return pdf;
-  if (isRobotCheck(signalsOfHtml(pdf.html, pdf.status ?? 200))) return pdf;
+  if (!FIREFOX && isRobotCheck(signalsOfHtml(pdf.html, pdf.status ?? 200)))
+    return pdf;
   return viaTab(url, pdf);
 }
 
