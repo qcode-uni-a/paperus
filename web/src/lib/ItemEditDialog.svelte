@@ -235,13 +235,14 @@
 					headers: { 'if-match': version }
 				});
 			let { error: failure, response } = await put(etag);
-			if (response?.status === 412) {
-				// Changed since it was read: by paperus itself, most often (its
-				// authors linked, an abstract found). Its edits as they were: these
-				// replace them all the same; someone else's: not over theirs.
+			// Changed since it was read: by paperus itself, most often (its
+			// authors linked, an abstract found; a new paper's several times in
+			// a row). Its edits as they were: these replace them all the same;
+			// someone else's: not over theirs.
+			for (let again = 0; again < 3 && response?.status === 412; again++) {
 				const { data: now, response: read } = await getItem({ path: { item_id: item.id } });
-				if (now && !changed(now.overrides, item.overrides))
-					({ error: failure, response } = await put(etagOf(read)));
+				if (!now || changed(now.overrides, item.overrides)) break;
+				({ error: failure, response } = await put(etagOf(read)));
 			}
 			if (response?.status === 412) {
 				error = 'Someone changed this paper in the meantime; close and try again.';
