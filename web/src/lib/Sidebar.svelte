@@ -24,7 +24,7 @@
 		mdiTextBoxSearchOutline,
 		mdiTrashCanOutline
 	} from '@mdi/js';
-	import { manageCounts } from '#lib/api/client.ts';
+	import { CHANGED, manageCounts } from '#lib/api/client.ts';
 	import type { ManageCounts } from '#lib/api/generated/types.gen.ts';
 	import Icon from '#lib/Icon.svelte';
 	import { menu } from '#lib/menu.svelte.ts';
@@ -78,8 +78,8 @@
 
 	// How many duplicates, unsorted papers (or unreadable files), papers
 	// without a file and authors to look at wait:
-	// after each change of page (one may just have resolved some) and every
-	// minute.
+	// after each change of page (one may just have resolved some), every
+	// minute…
 	let counts = $state<ManageCounts | null>(null);
 	const refreshCounts = () => manageCounts().then(({ data }) => (counts = data ?? counts));
 	$effect(() => {
@@ -90,6 +90,21 @@
 		if (!session.user) return;
 		const timer = setInterval(refreshCounts, 60_000);
 		return () => clearInterval(timer);
+	});
+	// …and soon after a change made here (a merge on a Manage page), once
+	// a run of them is over.
+	$effect(() => {
+		if (!session.user || inAdmin) return;
+		let soon: ReturnType<typeof setTimeout> | undefined;
+		const changed = () => {
+			clearTimeout(soon);
+			soon = setTimeout(refreshCounts, 500);
+		};
+		window.addEventListener(CHANGED, changed);
+		return () => {
+			clearTimeout(soon);
+			window.removeEventListener(CHANGED, changed);
+		};
 	});
 	const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 	const badges = $derived<Record<string, { count: number; title: string }>>({

@@ -44,6 +44,14 @@ client.interceptors.response.use(async (response) => {
 	return response;
 });
 
+/** Sent on the window after each change the website made (a merge, a paper
+ * sorted, an author kept apart): what counts what waits refreshes then. */
+export const CHANGED = 'paperus:changed';
+client.interceptors.response.use((response, request) => {
+	if (response.ok && request.method !== 'GET') window.dispatchEvent(new Event(CHANGED));
+	return response;
+});
+
 /** A readable message from an API error body. */
 export function errorMessage(error: unknown): string {
 	if (error && typeof error === 'object' && 'detail' in error) {

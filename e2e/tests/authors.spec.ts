@@ -71,8 +71,12 @@ test('authors as people: their page, split, to check, merge', async ({ page }) =
 	await page.goto('/manage/authors');
 	const entry = page.getByRole('listitem').filter({ hasText: `${word} alone` });
 	await expect(entry).toBeVisible();
+	// The menu's count of authors to check follows at once (not on the next
+	// page or minute).
+	const counted = page.waitForRequest(/\/api\/manage\/counts$/);
 	await entry.getByRole('button', { name: /: 2 papers$/ }).click();
 	await expect(entry).toBeHidden();
+	await counted;
 	expect((await (await page.request.get(`/api/items/${alone}`)).json()).author_ids[0]).toBe(
 		physicist.split('/').pop()
 	);
