@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **ScienceDirect's PDFs through its check for scripts**: its PDF link
+  now shows a check that needs scripts (`pdfft?crasolve…`) before the PDF,
+  in a tab too; the extension looked at its tab out of sight while that
+  check still ran, and got nothing. In Firefox it now follows the tab from
+  the start, wherever the site sends it (redirects, checks, the PDF's
+  signed address), and keeps the first PDF that arrives; it gives up when
+  the tab rests on a web page (a login) for 15 seconds, or after a minute.
+  The same for a PDF open in Firefox's viewer. Tried in Firefox.
 - **Old Wiley DOIs, whole**: DOIs in the old SICI form carry angle
   brackets (`10.1002/1521-3978(200009)48:9/11<965::AID-PROP965>3.0.CO;2-V`);
   the extension cut them before the `<`, so the DOI was not found and

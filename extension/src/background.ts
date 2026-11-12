@@ -606,9 +606,11 @@ async function saveClosedTab(
   // PDF as Firefox loads it for the reader.
   if ("error" in pdf && unread && FIREFOX) {
     step(tab.id!, "Loading the PDF again…");
-    const copy = await loadedCopy(url);
+    const inTab = await loadedCopy(url);
+    const copy = inTab?.pdf ?? null;
     trace("Loaded again in a tab out of sight, a copy kept", {
       url,
+      landed: inTab?.landed ?? null,
       ...(copy ? fetched(copy) : { pdf: "none" }),
     });
     if (copy) pdf = copy;
@@ -1107,14 +1109,24 @@ interface FirefoxWebRequest {
   };
 }
 
-/** A PDF as Firefox itself loads it, for a PDF open in Firefox's viewer
- * (which no extension may read) whose site answers the extension's own
- * fetch with a web page (a check for robots, a login): its address opened
- * again in a tab out of sight, as one's own visit, and a copy of the bytes
- * kept as they arrive (they go on to the tab unchanged). Null if what
- * arrives is no PDF, in Chrome (which lets the extension read PDF tabs), or
- * after a minute. */
-async function loadedCopy(url: string): Promise<Pdf | null> {
+/** How long a tab out of sight may rest on a web page (a login, a paywall)
+ * before no PDF is coming: a script's check for robots sends it on within
+ * seconds. */
+const RESTING_MS = 15_000;
+
+/** A PDF as Firefox itself loads it, as one's own visit: the address
+ * opened in a tab out of sight, the browser following wherever the site
+ * sends it (redirects, a page in between, a script's check for robots, as
+ * ScienceDirect's "crasolve"), and a copy kept of the first PDF to arrive
+ * (its bytes go on to the tab unchanged; web pages pass, uncopied). For a
+ * PDF open in Firefox's viewer (which no extension may read) and for PDF
+ * links whose site turns the extension's own fetch away. ``pdf``: null if
+ * none came within a minute, or the tab rested on a web page; ``landed``:
+ * where the tab was last. Null in Chrome (which has no such filter, and
+ * lets the extension read PDF tabs). */
+async function loadedCopy(
+  url: string,
+): Promise<{ pdf: Pdf | null; landed: string } | null> {
   const webRequest = (
     globalThis as { browser?: { webRequest?: Partial<FirefoxWebRequest> } }
   ).browser?.webRequest as FirefoxWebRequest | undefined;
@@ -1122,36 +1134,49 @@ async function loadedCopy(url: string): Promise<Pdf | null> {
   const tab = await chrome.tabs.create({ url: "about:blank", active: false });
   const tabId = tab.id!;
   let listener: RequestListener | undefined;
+  let resting: ReturnType<typeof setTimeout> | undefined;
   try {
     const bytes = await within(
       60_000,
       new Promise<Uint8Array | null>((resolve) => {
+        /** On a web page: no PDF, unless the tab moves on. */
+        const rest = () => {
+          clearTimeout(resting);
+          resting = setTimeout(() => resolve(null), RESTING_MS);
+        };
         listener = ({ requestId }) => {
+          // The tab moves on.
+          clearTimeout(resting);
           const filter = webRequest.filterResponseData(requestId);
           const parts: Uint8Array[] = [];
           let size = 0;
+          /** Whether this answer is a PDF, by its first bytes. */
+          let pdf: boolean | undefined;
           filter.ondata = ({ data }) => {
             filter.write(data);
+            if (pdf === undefined)
+              pdf =
+                String.fromCharCode(
+                  ...new Uint8Array(data, 0, Math.min(5, data.byteLength)),
+                ) === "%PDF-";
             size += data.byteLength;
-            if (size <= MAX_BYTES) parts.push(new Uint8Array(data));
+            if (pdf && size <= MAX_BYTES) parts.push(new Uint8Array(data));
           };
           filter.onstop = () => {
             filter.close();
             // A redirect has nothing: the next answer is the one.
             if (size === 0) return;
-            const all = new Uint8Array(size <= MAX_BYTES ? size : 0);
+            if (!pdf) return rest();
+            if (size > MAX_BYTES) return resolve(null);
+            const all = new Uint8Array(size);
             let at = 0;
-            for (const part of size <= MAX_BYTES ? parts : []) {
+            for (const part of parts) {
               all.set(part, at);
               at += part.byteLength;
             }
-            resolve(
-              String.fromCharCode(...all.subarray(0, 5)) === "%PDF-"
-                ? all
-                : null,
-            );
+            resolve(all);
           };
-          filter.onerror = () => resolve(null);
+          filter.onerror = () => rest();
         };
         webRequest.onBeforeRequest.addListener(
           listener,
@@ -1161,8 +1186,11 @@ async function loadedCopy(url: string): Promise<Pdf | null> {
         void chrome.tabs.update(tabId, { url });
       }),
     ).catch(() => null);
-    return bytes ? encoded(bytes) : null;
+    const landed =
+      (await chrome.tabs.get(tabId).catch(() => undefined))?.url ?? url;
+    return { pdf: bytes ? encoded(bytes) : null, landed };
   } finally {
+    clearTimeout(resting);
     if (listener) webRequest.onBeforeRequest.removeListener(listener);
     await chrome.tabs.remove(tabId).catch(() => undefined);
   }
@@ -1714,10 +1742,26 @@ function pdfProblem(pdf: {
 }
 
 /** The PDF link opened in a tab of its own, out of sight, as a person's
- * click opens it: the browser follows what sends it on (scripts, refreshes)
- * to the PDF, whose address the extension then fetches; the tab closes.
- * For links that give a web page to a fetch (ScienceDirect's, at times). */
+ * click opens it: the browser follows what sends it on (scripts, refreshes,
+ * a check for robots) to the PDF. In Firefox, the PDF as the tab receives
+ * it (loadedCopy); in Chrome, fetched where the tab landed. The tab closes.
+ * For links that give a web page to a fetch (ScienceDirect's). */
 async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
+  const copied = await loadedCopy(url).catch((error) => {
+    trace("The tab for the PDF link failed", {
+      link: url,
+      reason: String(error),
+    });
+    return { pdf: null, landed: "" };
+  });
+  if (copied) {
+    trace("The PDF link opened in a tab out of sight", {
+      link: url,
+      landed: copied.landed,
+      ...(copied.pdf ? fetched(copied.pdf) : { pdf: "none" }),
+    });
+    return copied.pdf ?? failed;
+  }
   const tab = await chrome.tabs.create({ url, active: false });
   try {
     await loaded(tab.id!);
@@ -1728,17 +1772,7 @@ async function viaTab(url: string, failed: Pdf): Promise<Pdf> {
       return failed;
     const pdf = await fetchPdf(landed, MAX_BYTES);
     trace("Fetched where the tab landed", { url: landed, ...fetched(pdf) });
-    if (!("error" in pdf)) return pdf;
-    // The tab got the PDF, the extension's fetch a web page (ScienceDirect's
-    // "Security verification" at pdf.sciencedirectassets.com): in Firefox,
-    // the PDF as Firefox loads it there. Its signed address, not the link,
-    // whose first answer is the page in between.
-    const copy = await loadedCopy(landed);
-    trace("Loaded again in a tab out of sight, a copy kept", {
-      url: landed,
-      ...(copy ? fetched(copy) : { pdf: "none" }),
-    });
-    return copy ?? failed;
+    return "error" in pdf ? failed : pdf;
   } catch (error) {
     trace("The tab for the PDF link failed", {
       link: url,
