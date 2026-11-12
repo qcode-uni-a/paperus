@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.0.27 (2026-11-12)
+
+*A paper rarely travels alone: now its supplements, its code, its data and the rest of its author's oeuvre come along for the ride.*
+
+- **Links to a paper's code and data**: on its page, next to its notes
+  ("+ Code or data"; GitHub is guessed as code, Zenodo or Figshare as
+  data), kept through merges and exports, shown to AI assistants. Files
+  get the roles "code" and "data"; the same file uploaded again to a
+  paper in the same role is not stored twice.
+- **The extension brings a paper's supplementary material**: the
+  supplementary files its page links (Nature, Elsevier, Wiley, ACS,
+  Science, PNAS, PLOS, IOP, bioRxiv, arXiv's ancillary files; up to 10,
+  100 MB each) are saved with it, and links to its code and data where the
+  article says they are its own (its abstract, a "Code availability"
+  section, "the data are available at …"), never the reference list's.
+- **Pages that list papers or files**: on a course page, a publication
+  list or a journal's contents, the extension's popup lists the files and
+  papers it links, marks those you have, and saves the ticked ones, each
+  as a paper of its own. Files over 100 MB only when you ask ("Save
+  anyway").
+- **Someone's Google Scholar profile**: the popup lists all their papers
+  (at most 1,000) and adds the ticked ones, by arXiv ID or by the DOI
+  paperus finds for the title at Crossref (same title, first author and
+  year), else as listed. The library lookup and adding a paper by its
+  title are in the API too (`title:…`, `find_doi`).
+- **The extension's log keeps nothing of one's own**: web addresses keep
+  their site, path and parameter names, not the values (signed PDF
+  addresses, sessions, proxy tickets, search words); libraries appear by
+  id. Its settings page keeps the last 20 steps (to copy into an issue),
+  not 400.
+
 ## 0.0.26 (2026-11-12)
 
 *Same extension, shorter cover letter: Firefox's reviewers get the short version, and slow pages get twenty seconds.*
