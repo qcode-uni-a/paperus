@@ -26,6 +26,7 @@ from paperus.models import (
     FileRole,
     Item,
     ItemView,
+    LinkKind,
     MetadataSource,
     Tag,
     TextStatus,
@@ -135,6 +136,15 @@ class ItemOut(BaseModel):
     before others); empty without files."""
 
 
+class ItemLink(BaseModel):
+    """Where a paper's code, data or more are."""
+
+    url: str = Field(pattern=r"^https?://\S+$", max_length=2000)
+    kind: LinkKind = LinkKind.OTHER
+    label: str | None = Field(default=None, max_length=200)
+    """What it is, if the address does not say ("Simulation code")."""
+
+
 class Person(BaseModel):
     id: uuid.UUID
     username: str
@@ -153,6 +163,8 @@ class ItemDetail(ItemOut):
     overrides: dict[str, Any]
     preferred_version_id: uuid.UUID | None
     versions: list[VersionOut]
+    links: list[ItemLink] = []
+    """Where its code, data and more are, in the order they were added."""
 
 
 def _container_title(csl: dict[str, Any]) -> str | None:
@@ -258,6 +270,7 @@ def item_detail(
         overrides=item.overrides,
         preferred_version_id=preferred.id if preferred else None,
         versions=[version_out(v) for v in item.versions],
+        links=[ItemLink(**link) for link in item.links],
     )
 
 
@@ -477,6 +490,44 @@ def set_overrides(
     if item.change != expected:
         raise HTTPException(412, "item changed since it was read")
     library.set_overrides(item, overrides)
+    db.commit()
+    return item_detail(item, access, response)
+
+
+class LinkIn(ItemLink):
+    replace: bool = True
+    """Whether a link the paper has already takes this kind and label
+    (false: the browser extension's guess leaves a person's choice)."""
+
+
+@router.post("/api/items/{item_id}/links")
+def add_link(
+    item_id: uuid.UUID,
+    body: LinkIn,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> ItemDetail:
+    """Add a link to the paper's code, data or more; one it has already
+    (the same address) is updated."""
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    library.add_links(item, [body.model_dump()])
+    db.commit()
+    return item_detail(item, access, response)
+
+
+@router.delete("/api/items/{item_id}/links")
+def remove_link(
+    item_id: uuid.UUID,
+    url: str,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> ItemDetail:
+    """Take the link with this address off the paper."""
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    if not library.remove_link(item, url):
+        raise HTTPException(404, "the paper has no such link")
     db.commit()
     return item_detail(item, access, response)
 

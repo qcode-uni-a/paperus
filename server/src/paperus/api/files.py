@@ -172,6 +172,15 @@ def _store_upload(
     if version.item.deleted_at is not None:
         raise HTTPException(409, "item is in the trash")
     stored = _put_upload(upload, request, db)
+    # The same file again in the same role (a paper saved twice with its
+    # supplementary material): the one it has.
+    for file in version.files:
+        if (
+            file.blob_sha256 == stored.sha256
+            and file.role == role
+            and file.deleted_at is None
+        ):
+            return file_out(file)
     return _add_file(version, stored, role, request, db, user_id)
 
 

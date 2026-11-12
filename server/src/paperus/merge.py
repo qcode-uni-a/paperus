@@ -380,6 +380,7 @@ def merge_items(
             if file.id in left and file.deleted_at is None:
                 library.trash(file, access.user.id)
     _move_notes_and_stars(db, source, target, left)
+    library.add_links(target, source.links)
     db.flush()
     library.refresh_item(target)
     library.trash(source, access.user.id)

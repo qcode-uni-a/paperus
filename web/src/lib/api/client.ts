@@ -77,6 +77,8 @@ export const VERSION_KINDS: VersionKind[] = [
 export const FILE_ROLES: FileRole[] = [
 	'main',
 	'supplementary',
+	'code',
+	'data',
 	'slides',
 	'transcript',
 	'recording',

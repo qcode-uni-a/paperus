@@ -1196,6 +1196,111 @@
         }
       }
     },
+    "/api/items/{item_id}/links": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Add Link",
+        "description": "Add a link to the paper's code, data or more; one it has already\n(the same address) is updated.",
+        "operationId": "add_link",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/paperus__api__items__LinkIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Remove Link",
+        "description": "Take the link with this address off the paper.",
+        "operationId": "remove_link",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}": {
       "delete": {
         "tags": [
@@ -11152,6 +11257,8 @@
         "enum": [
           "main",
           "supplementary",
+          "code",
+          "data",
           "slides",
           "transcript",
           "recording",
@@ -12130,6 +12237,14 @@
             },
             "type": "array",
             "title": "Versions"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/ItemLink"
+            },
+            "type": "array",
+            "title": "Links",
+            "default": []
           }
         },
         "type": "object",
@@ -12243,6 +12358,38 @@
         },
         "type": "object",
         "title": "ItemIn"
+      },
+      "ItemLink": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^https?://\\S+$",
+            "title": "Url"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LinkKind",
+            "default": "other"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ItemLink",
+        "description": "Where a paper's code, data or more are."
       },
       "ItemOut": {
         "properties": {
@@ -12667,31 +12814,15 @@
         "type": "object",
         "title": "LinkChange"
       },
-      "LinkIn": {
-        "properties": {
-          "item_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Item Id"
-          },
-          "page": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page"
-          }
-        },
-        "type": "object",
-        "required": [
-          "item_id"
+      "LinkKind": {
+        "type": "string",
+        "enum": [
+          "code",
+          "data",
+          "other"
         ],
-        "title": "LinkIn"
+        "title": "LinkKind",
+        "description": "What a paper's link leads to."
       },
       "LogEntryOut": {
         "properties": {
@@ -14017,7 +14148,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/LinkIn"
+              "$ref": "#/components/schemas/paperus__api__notes__LinkIn"
             },
             "type": "array",
             "title": "Items",
@@ -17803,6 +17934,68 @@
           "item_id"
         ],
         "title": "WorkOut"
+      },
+      "paperus__api__items__LinkIn": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "pattern": "^https?://\\S+$",
+            "title": "Url"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LinkKind",
+            "default": "other"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "replace": {
+            "type": "boolean",
+            "title": "Replace",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "LinkIn"
+      },
+      "paperus__api__notes__LinkIn": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Item Id"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id"
+        ],
+        "title": "LinkIn"
       }
     }
   }

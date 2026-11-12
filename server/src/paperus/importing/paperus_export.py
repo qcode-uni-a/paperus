@@ -74,6 +74,7 @@ from paperus.models import (
     Item,
     ItemReference,
     ItemTag,
+    LinkKind,
     MetadataSource,
     Note,
     NoteItem,
@@ -467,6 +468,27 @@ def _object(value: object) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError("not a JSON object")
     return parsed
+
+
+def _links(row: sqlite3.Row) -> list[dict[str, Any]]:
+    """The paper's links to its code, data and more (none in exports made
+    before paperus had them)."""
+    if "links" not in row.keys():  # noqa: SIM118 (a Row's "in" looks at its values)
+        return []
+    parsed = json.loads(_text(row["links"]))
+    if not isinstance(parsed, list):
+        return []
+    return [
+        {
+            "url": link["url"][:2000],
+            "kind": _choice(link.get("kind"), LinkKind, LinkKind.OTHER).value,
+            "label": _optional_text(link.get("label"), 200),
+        }
+        for link in parsed
+        if isinstance(link, dict)
+        and isinstance(link.get("url"), str)
+        and link["url"].startswith(("https://", "http://"))
+    ]
 
 
 def _choice[E: StrEnum](value: object, kind: type[E], default: E) -> E:
@@ -890,6 +912,7 @@ def _item(run: _Run, row: sqlite3.Row) -> None:
             file_wanted=bool(row["file_wanted"]),
             archived_at=_optional_time(row["archived_at"]),
             overrides=_object(row["overrides"]),
+            links=_links(row),
             added_by=run.user(row["added_by"]),
             deleted_at=_optional_time(row["deleted_at"]),
             deleted_by=run.user(row["deleted_by"]),
@@ -915,6 +938,8 @@ def _item(run: _Run, row: sqlite3.Row) -> None:
     run.items[str(row["id"])] = item.id
     if writable:
         _files(run, item, file_rows, version_map)
+        if not new:
+            library.add_links(item, _links(row))
     _item_tags(run, item, row["id"])
     _item_collections(run, item, row["id"])
     holding = run.holding(row["library_id"])

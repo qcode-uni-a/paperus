@@ -127,6 +127,7 @@ def build(client: TestClient, db: Session) -> Rich:
         created_by=ada_id,
     )
     library.set_overrides(radar, {"title-short": "Radar", "note": None})
+    library.add_links(radar, [{"url": "https://github.com/ada/radar", "kind": "code"}])
     radar.file_wanted = True
     db.add(
         ItemReference(

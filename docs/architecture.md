@@ -64,7 +64,9 @@ Item: the work; notes, tags, collections, citation metadata
   follow CSL (e.g. meeting notes: `document` with `genre`). The metadata for
   citing is the preferred version's metadata plus the item's manual edits
   (per field, never overwritten by a lookup). Notes, tags and collections
-  belong to the item.
+  belong to the item, and its links: where its code, data and more are
+  (kind code, data or other; added by hand or by the browser extension
+  from the publisher's page).
 - **Version**: one edition of the work. Kind: draft, submitted, preprint,
   accepted, published, edition (with a label such as "WS 2025/26" or
   "2nd edition"), other. Own metadata (CSL-JSON) and where it came from
@@ -76,7 +78,8 @@ Item: the work; notes, tags, collections, citation metadata
   ISBN, PMID, URL, git (repo + path). Unique across the library, so adding a
   known identifier finds the existing item, whatever the scheme.
 - **File**: a record with its own UUID, belongs to a version, points to a
-  blob. Role: main, supplementary, slides, transcript, recording, other.
+  blob. Role: main, supplementary, code, data, slides, transcript,
+  recording, other.
   The same blob can back several files, each with its own permissions,
   provenance and annotations.
 - **Blob**: the bytes of a file, stored once by SHA-256;

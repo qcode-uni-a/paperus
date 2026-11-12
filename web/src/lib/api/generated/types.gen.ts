@@ -1493,7 +1493,7 @@ export type FileOut = {
 /**
  * FileRole
  */
-export type FileRole = 'main' | 'supplementary' | 'slides' | 'transcript' | 'recording' | 'other';
+export type FileRole = 'main' | 'supplementary' | 'code' | 'data' | 'slides' | 'transcript' | 'recording' | 'other';
 
 /**
  * FileSource
@@ -2044,6 +2044,10 @@ export type ItemDetail = {
      * Versions
      */
     versions: Array<VersionOut>;
+    /**
+     * Links
+     */
+    links?: Array<ItemLink>;
 };
 
 /**
@@ -2083,6 +2087,23 @@ export type ItemIn = {
      * Library Id
      */
     library_id?: string | null;
+};
+
+/**
+ * ItemLink
+ *
+ * Where a paper's code, data or more are.
+ */
+export type ItemLink = {
+    /**
+     * Url
+     */
+    url: string;
+    kind?: LinkKind;
+    /**
+     * Label
+     */
+    label?: string | null;
 };
 
 /**
@@ -2316,18 +2337,11 @@ export type LinkChange = {
 };
 
 /**
- * LinkIn
+ * LinkKind
+ *
+ * What a paper's link leads to.
  */
-export type LinkIn = {
-    /**
-     * Item Id
-     */
-    item_id: string;
-    /**
-     * Page
-     */
-    page?: number | null;
-};
+export type LinkKind = 'code' | 'data' | 'other';
 
 /**
  * LogEntryOut
@@ -3095,7 +3109,7 @@ export type NoteIn = {
     /**
      * Items
      */
-    items?: Array<LinkIn>;
+    items?: Array<PaperusApiNotesLinkIn>;
     /**
      * Collection Id
      */
@@ -5181,6 +5195,39 @@ export type WorkOut = {
     item_id: string | null;
 };
 
+/**
+ * LinkIn
+ */
+export type PaperusApiItemsLinkIn = {
+    /**
+     * Url
+     */
+    url: string;
+    kind?: LinkKind;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Replace
+     */
+    replace?: boolean;
+};
+
+/**
+ * LinkIn
+ */
+export type PaperusApiNotesLinkIn = {
+    /**
+     * Item Id
+     */
+    item_id: string;
+    /**
+     * Page
+     */
+    page?: number | null;
+};
+
 export type HealthData = {
     body?: never;
     path?: never;
@@ -5805,6 +5852,71 @@ export type SetOverridesResponses = {
 };
 
 export type SetOverridesResponse = SetOverridesResponses[keyof SetOverridesResponses];
+
+export type RemoveLinkData = {
+    body?: never;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query: {
+        /**
+         * Url
+         */
+        url: string;
+    };
+    url: '/api/items/{item_id}/links';
+};
+
+export type RemoveLinkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RemoveLinkError = RemoveLinkErrors[keyof RemoveLinkErrors];
+
+export type RemoveLinkResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemDetail;
+};
+
+export type RemoveLinkResponse = RemoveLinkResponses[keyof RemoveLinkResponses];
+
+export type AddLinkData = {
+    body: PaperusApiItemsLinkIn;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/links';
+};
+
+export type AddLinkErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AddLinkError = AddLinkErrors[keyof AddLinkErrors];
+
+export type AddLinkResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemDetail;
+};
+
+export type AddLinkResponse = AddLinkResponses[keyof AddLinkResponses];
 
 export type TrashItemData = {
     body?: never;

@@ -41,6 +41,7 @@
 	import ItemEditDialog from '#lib/ItemEditDialog.svelte';
 	import ItemOrganize from '#lib/ItemOrganize.svelte';
 	import ItemNotes from '#lib/ItemNotes.svelte';
+	import ItemLinks from '#lib/ItemLinks.svelte';
 	import SimilarPapers from '#lib/SimilarPapers.svelte';
 	import PaperReferences from '#lib/PaperReferences.svelte';
 	import MergeDialog from '#lib/MergeDialog.svelte';
@@ -406,6 +407,12 @@
 		{#if copied}<p class="copied" role="status">BibTeX copied.</p>{/if}
 		<ItemOrganize {item} onchange={load} />
 		{#if !item.deleted_at}<ItemNotes item={item.id} />{/if}
+		{#if !item.deleted_at}<ItemLinks
+				item={item.id}
+				links={item.links ?? []}
+				{writable}
+				onchange={load}
+			/>{/if}
 		{#if item.abstract}
 			<details class="abstract">
 				<summary>Abstract</summary>

@@ -310,9 +310,19 @@ class MetadataSource(StrEnum):
 class FileRole(StrEnum):
     MAIN = "main"
     SUPPLEMENTARY = "supplementary"
+    CODE = "code"
+    DATA = "data"
     SLIDES = "slides"
     TRANSCRIPT = "transcript"
     RECORDING = "recording"
+    OTHER = "other"
+
+
+class LinkKind(StrEnum):
+    """What a paper's link leads to."""
+
+    CODE = "code"
+    DATA = "data"
     OTHER = "other"
 
 
@@ -437,6 +447,12 @@ class Item(Record, Trashable, Base):
     overrides: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb")
     )
+    links: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """Where its code, data and more are: ``{"url", "kind", "label"}`` each
+    (``LinkKind``), from a person or the publisher's page (the browser
+    extension); see ``library.add_links``."""
     added_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )

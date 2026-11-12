@@ -18,6 +18,7 @@ from paperus.models import (
     Identifier,
     Item,
     Library,
+    LinkKind,
     MetadataSource,
     Trashable,
     Version,
@@ -255,6 +256,48 @@ def pin_version(db: Session, item: Item, version: Version) -> None:
     db.flush()
     version.pinned = True
     refresh_item(item)
+
+
+def _link_key(url: str) -> str:
+    """The same address, written a little differently, is the same link."""
+    return url.strip().rstrip("/").removeprefix("https://").removeprefix("http://")
+
+
+def add_links(item: Item, links: Sequence[dict[str, Any]]) -> bool:
+    """Add links (``{"url", "kind", "label"}``) the item has not got yet; one
+    it has keeps its kind and label unless the new one names them (a
+    person's choice over a guess: ``replace``). Returns whether any was
+    new."""
+    current = [dict(link) for link in item.links]
+    known = {_link_key(link["url"]): link for link in current}
+    added = False
+    for link in links:
+        url = str(link["url"]).strip()
+        if (same := known.get(_link_key(url))) is None:
+            entry = {
+                "url": url,
+                "kind": str(link.get("kind") or LinkKind.OTHER),
+                "label": link.get("label") or None,
+            }
+            current.append(entry)
+            known[_link_key(url)] = entry
+            added = True
+        elif link.get("replace"):
+            same["kind"] = str(link.get("kind") or same["kind"])
+            same["label"] = link.get("label") or None
+    if current != item.links:
+        # A new list: SQLAlchemy does not see changes inside JSON.
+        item.links = current
+    return added
+
+
+def remove_link(item: Item, url: str) -> bool:
+    """Take a link off; whether it was there."""
+    kept = [link for link in item.links if _link_key(link["url"]) != _link_key(url)]
+    if len(kept) == len(item.links):
+        return False
+    item.links = kept
+    return True
 
 
 def set_overrides(item: Item, overrides: dict[str, Any]) -> None:
