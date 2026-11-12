@@ -139,9 +139,12 @@ def test_in_batches_with_a_pause(
     assert (
         published.check(db, http, published.waiting(db, 10), contact_email=None) == []
     )
-    # One request to arXiv per batch, a pause between them.
+    # One request to arXiv per batch, a pause between them; OpenAlex, asked
+    # about each (arXiv knew no DOIs), a moment apart.
     assert sources.asked.count("export.arxiv.org") == 2
-    assert paused == [published.ARXIV_PAUSE]
+    assert sources.asked.count("api.openalex.org") == 2
+    assert paused[0] == published.ARXIV_PAUSE
+    assert len(paused) == 2 and 0 <= paused[1] <= published.OPENALEX_PAUSE
 
 
 def down(request: httpx2.Request) -> httpx2.Response:

@@ -54,7 +54,8 @@ class SystemConfig(BaseModel):
     """Sent to Crossref and other metadata services, which ask for one."""
     find_published: bool = True
     """Look for the published versions of preprints (by their arXiv IDs, at
-    arXiv and OpenAlex) and add those found; a few dozen papers an hour."""
+    arXiv and OpenAlex) and add those found; new ones within minutes, in
+    batches with pauses, then again each month."""
     find_references: bool = True
     """Look for papers' reference lists (arXiv's LaTeX sources, Crossref,
     the PDF's own list); a few dozen papers an hour."""

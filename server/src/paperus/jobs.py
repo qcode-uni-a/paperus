@@ -157,7 +157,12 @@ def extract_text(job: JobContext, file_id: str) -> None:
                 ),
             )
         )
+        # Its paper, known by its text, may be a preprint: its journal
+        # version is looked for soon.
+        preprints = new_preprints(db, context.settings)
     queue_embedding(job.app, uuid.UUID(file_id))
+    if preprints:
+        queue_new_published_check(job.app)
     if sha256 is not None:
         queue_layout(job.app, sha256)
     if scans:
@@ -399,14 +404,21 @@ def queue_open_access(
     )
 
 
-# Preprints' published versions (Administration → Settings → Server).
+# Preprints' published versions (Administration → Settings → Server). One
+# job at a time (the lock), so the pauses between requests to arXiv hold.
+PUBLISHED_LOCK = "published-versions"
+# Checked again (each at most once a month), per hour.
 PUBLISHED_PER_HOUR = 40
+# New preprints (never checked), per run: a large import's go through in a
+# few runs, 50 to a request to arXiv with its pause between.
+NEW_PUBLISHED_PER_RUN = 500
 
 
 @tasks.periodic(cron="20 * * * *")
 @tasks.task(
     name="find_published_versions",
     queue="text",
+    lock=PUBLISHED_LOCK,
     queueing_lock="find-published",
     pass_context=True,
 )
@@ -414,12 +426,35 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
     """A few dozen preprints an hour, each at most once a month: arXiv and
     OpenAlex are asked for their journal versions. Found ones are added;
     with open-access copies on, the journal's PDF is tried too."""
+    _find_published(job, new=False)
+
+
+@tasks.periodic(cron="*/5 * * * *")
+@tasks.task(
+    name="find_new_published_versions",
+    queue="text",
+    lock=PUBLISHED_LOCK,
+    queueing_lock="find-new-published",
+    pass_context=True,
+)
+def find_new_published_versions(job: JobContext, timestamp: int) -> None:
+    """Preprints never checked, soon after they came (queued after an
+    import or a file read; otherwise within five minutes, e.g. from the
+    browser extension): a few hundred a run, in batches with pauses."""
+    _find_published(job, new=True)
+
+
+def _find_published(job: JobContext, *, new: bool) -> None:
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
         if not config.find_published:
             return
-        items = published.waiting(db, PUBLISHED_PER_HOUR)
+        items = published.waiting(
+            db, NEW_PUBLISHED_PER_RUN if new else PUBLISHED_PER_HOUR, new=new
+        )
+        if not items:
+            return
         upgraded = published.check(
             db, context.http, items, contact_email=config.contact_email
         )
@@ -428,10 +463,23 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
     if config.open_access_auto:
         for item_id, added_by in found:
             queue_open_access(job.app, item_id, added_by, "journal")
+    if new and len(items) == NEW_PUBLISHED_PER_RUN:
+        queue_new_published_check(job.app)  # more waiting: the next few hundred
 
 
 def queue_published_check(app: App) -> None:
     _queue(app, "find_published_versions", "find-published", timestamp=0)
+
+
+def queue_new_published_check(app: App) -> None:
+    _queue(app, "find_new_published_versions", "find-new-published", timestamp=0)
+
+
+def new_preprints(db: Session, settings: Settings) -> bool:
+    """Preprints never checked for their journal versions, if that is on."""
+    return load_config(db, settings).find_published and bool(
+        published.waiting(db, 1, new=True)
+    )
 
 
 @tasks.periodic(cron="*/5 * * * *")
@@ -938,7 +986,17 @@ def uploaded_folder(blobs: BlobStore, record: Import) -> Generator[Path]:
 
 @tasks.task(name="import_library", queue="import", pass_context=True)
 def import_library(job: JobContext, import_id: str) -> None:
-    """Run an import someone uploaded (see ``paperus.importing``)."""
+    """Run an import someone uploaded (see ``paperus.importing``); then its
+    preprints' journal versions are looked for."""
+    _import_library(job, import_id)
+    context = _worker_context()
+    with context.sessions() as db:
+        preprints = new_preprints(db, context.settings)
+    if preprints:
+        queue_new_published_check(job.app)
+
+
+def _import_library(job: JobContext, import_id: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
         record = db.get(Import, uuid.UUID(import_id))

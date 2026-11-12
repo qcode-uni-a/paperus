@@ -99,10 +99,12 @@ Details:
 ### Finding published versions of preprints
 
 **Built** (`server/src/paperus/published.py`, Administration → Server →
-Published versions, on by default): every hour up to 40 preprints (with an
-arXiv ID, without a journal version), each at most once a month, are looked
-up: arXiv's API first (the DOI the authors entered, 50 papers per request,
-3 s apart), else OpenAlex (the DOI of the work it links the preprint to).
+Published versions, on by default): new preprints (with an arXiv ID,
+without a journal version) within minutes of being added (queued after an
+import or a file read, else every five minutes; up to 500 a run), and every
+hour up to 40 again, each at most once a month, are looked up: arXiv's API
+first (the DOI the authors entered, 50 papers per request, 3 s apart), else
+OpenAlex (the DOI of the work it links the preprint to; 0.2 s apart).
 The version is added only if its title matches (nearly the same text, or
 at least half of the longer words: papers are often renamed on
 publication). On one physicist's library (130 preprints, checked

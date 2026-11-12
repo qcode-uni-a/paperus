@@ -568,7 +568,7 @@ these services ask; nothing about people or their notes is sent.
 | Service | What it gets | When | Off with |
 | --- | --- | --- | --- |
 | doi.org (Crossref, DataCite) | A DOI | Adding a paper by DOI, a DOI found in a file, published versions found | (needed for details) |
-| arXiv: `export.arxiv.org` | arXiv IDs, 50 at a time | Looking for preprints' published versions (hourly, each paper monthly) | Server → Published versions |
+| arXiv: `export.arxiv.org` | arXiv IDs, 50 at a time | Looking for preprints' published versions (new ones within minutes, each paper again monthly) | Server → Published versions |
 | arXiv: `arxiv.org/pdf` | An arXiv ID | Downloading an open copy (Missing, Download again, open-access copies) | (on request) / Server → Open-access copies |
 | OpenAlex: `api.openalex.org` | A DOI or arXiv ID | Published versions; a paper's arXiv version and the journal's open copy | Server → Published versions / Open-access copies |
 | Unpaywall: `api.unpaywall.org` | A DOI | Open copies, only with a contact email | No contact email |

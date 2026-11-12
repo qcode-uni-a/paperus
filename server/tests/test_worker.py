@@ -374,6 +374,81 @@ def test_open_access_copies_and_published_versions(
     assert run_jobs(worker) == {"find_published_versions succeeded": 1}
 
 
+def test_new_preprints_checked_soon(
+    client: TestClient,
+    db: Session,
+    worker: App,
+    settings: Settings,
+    doi_registry: FakeDOIRegistry,
+    web: FakeWeb,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A preprint's journal version is looked for right after a file of it
+    is read or an import ran, not at the next hour; a few hundred a run."""
+    title = "Phonon-coupled hole-spin qubits in germanium"
+    doi_registry.records[f"10.48550/arxiv.{ARXIV}"] = {
+        "type": "article",
+        "title": title,
+    }
+    doi_registry.records[JOURNAL_DOI] = {"type": "article-journal", "title": title}
+    for paper in ("2504.00001", "2504.00002", "2504.00003"):
+        doi_registry.records[f"10.48550/arxiv.{paper}"] = {
+            "type": "article",
+            "title": f"Unpublished {paper}",
+        }
+    web.published[ARXIV] = JOURNAL_DOI
+    ada = Person(client, db, "ada")
+
+    def preprint(paper: str) -> str:
+        added = ada.post("/api/items", json={"doi": f"10.48550/arXiv.{paper}"})
+        assert added.status_code == 201, added.text
+        return str(added.json()["id"])
+
+    def bib_import(key: str) -> None:
+        bib = f"@article{{{key}, title={{Radar gaps {key}}}, year={{2020}}}}\n"
+        started = client.post(
+            "/api/imports",
+            headers=ada.headers,
+            files={"upload": ("library.bib", bib.encode(), "text/plain")},
+        )
+        assert started.status_code == 201, started.text
+
+    # A file read.
+    qubits = preprint(ARXIV)
+    ada.post(
+        f"/api/items/{qubits}/files",
+        files={"upload": ("p.pdf", PREPRINT, "application/pdf")},
+    )
+    ran = run_jobs(worker)
+    assert ran["extract_text succeeded"] == 1
+    assert ran["find_new_published_versions succeeded"] == 1
+    versions = ada.get(f"/api/items/{qubits}").json()["versions"]
+    assert {v["kind"] for v in versions} == {"preprint", "published"}
+
+    # An import; more waiting than a run takes: another run, until none.
+    monkeypatch.setattr(jobs, "NEW_PUBLISHED_PER_RUN", 1)
+    waiting = [preprint("2504.00001"), preprint("2504.00002")]
+    bib_import("a")
+    assert run_jobs(worker) == {
+        "import_library succeeded": 1,
+        "find_new_published_versions succeeded": 3,
+    }
+    db.expire_all()
+    for item_id in waiting:
+        item = db.get(Item, uuid.UUID(item_id))
+        assert item is not None and item.published_checked_at is not None
+
+    # Nothing new, or switched off: no check queued.
+    bib_import("b")
+    assert run_jobs(worker) == {"import_library succeeded": 1}
+    configure(db, settings, find_published=False)
+    preprint("2504.00003")
+    bib_import("c")
+    assert run_jobs(worker) == {"import_library succeeded": 1}
+    jobs.queue_new_published_check(worker)
+    assert run_jobs(worker) == {"find_new_published_versions succeeded": 1}
+
+
 def at(hour: int) -> int:
     """A time at ten to the end of the hour (UTC), as a job's timestamp."""
     return int(datetime(2026, 11, 8, hour, 50, tzinfo=UTC).timestamp())

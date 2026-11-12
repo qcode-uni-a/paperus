@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from paperus import library, metadata, notifications
 from paperus.identifiers import Scheme, implied_by_doi, is_arxiv_doi, normalize
+from paperus.importing.references import Pacer
 from paperus.models import (
     Identifier,
     Item,
@@ -37,6 +38,8 @@ OPENALEX = "https://api.openalex.org/works/doi:"
 # arXiv asks for at most one request every three seconds.
 ARXIV_PAUSE = 3.0
 ARXIV_BATCH = 50
+# Between requests to OpenAlex (it allows ten a second).
+OPENALEX_PAUSE = 0.2
 RECHECK = timedelta(days=30)
 # Titles at least this alike (0-1) count as the same paper.
 SAME_TITLE = 0.8
@@ -48,9 +51,12 @@ _ENTRY_ID = re.compile(r"<id>https?://arxiv\.org/abs/([^<]+?)(?:v\d+)?</id>")
 _ENTRY_DOI = re.compile(r"<arxiv:doi[^>]*>([^<]+)</arxiv:doi>")
 
 
-def waiting(db: Session, limit: int, now: datetime | None = None) -> list[Item]:
+def waiting(
+    db: Session, limit: int, now: datetime | None = None, *, new: bool = False
+) -> list[Item]:
     """Preprints (with an arXiv ID, without a journal version) not checked
-    in the last month, never checked first."""
+    in the last month, never checked first; ``new``: only those never
+    checked (just added)."""
     now = now or datetime.now(UTC)
     with_arxiv = (
         select(Version.item_id)
@@ -58,6 +64,7 @@ def waiting(db: Session, limit: int, now: datetime | None = None) -> list[Item]:
         .where(Identifier.scheme == Scheme.ARXIV)
     )
     journal = select(Version.item_id).where(Version.kind.in_(JOURNAL))
+    never = Item.published_checked_at.is_(None)
     return list(
         db.scalars(
             select(Item)
@@ -65,10 +72,7 @@ def waiting(db: Session, limit: int, now: datetime | None = None) -> list[Item]:
                 Item.deleted_at.is_(None),
                 Item.id.in_(with_arxiv),
                 Item.id.not_in(journal),
-                or_(
-                    Item.published_checked_at.is_(None),
-                    Item.published_checked_at < now - RECHECK,
-                ),
+                never if new else or_(never, Item.published_checked_at < now - RECHECK),
             )
             .order_by(Item.published_checked_at.asc().nulls_first(), Item.id)
             .limit(limit)
@@ -183,8 +187,10 @@ def check(
     pause: float = ARXIV_PAUSE,
 ) -> list[Item]:
     """Look for these preprints' published versions and add those found;
-    every paper is marked as checked. Commits; returns the papers that got
-    one."""
+    every paper is marked as checked. arXiv is asked 50 papers at a time,
+    with its pause between; OpenAlex one paper at a time, a moment apart.
+    Commits; returns the papers that got one."""
+    openalex_pacer = Pacer(OPENALEX_PAUSE)
     upgraded = []
     for start in range(0, len(items), ARXIV_BATCH):
         batch = items[start : start + ARXIV_BATCH]
@@ -196,6 +202,7 @@ def check(
             paper = ids[item.id]
             doi, source = known.get(paper or ""), "arXiv"
             if doi is None and paper:
+                openalex_pacer()
                 doi, source = openalex_doi(http, paper, contact_email), "OpenAlex"
             if doi and add_published(db, http, item, doi, source):
                 upgraded.append(item)

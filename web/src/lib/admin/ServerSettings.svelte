@@ -103,7 +103,7 @@
 <SettingRow
 	id="find-published"
 	title="Published versions"
-	description="Preprints get their published version by themselves: paperus asks arXiv (the DOI the authors entered) and OpenAlex, a few dozen papers an hour, each at most once a month, and adds a version only if its title matches. It is then the one shown and cited; its PDF comes with the open-access copies below, or under Manage → Missing."
+	description="Preprints get their published version by themselves: paperus asks arXiv (the DOI the authors entered) and OpenAlex, new preprints within minutes of being added (in batches, with pauses), then again each month, and adds a version only if its title matches. It is then the one shown and cited; its PDF comes with the open-access copies below, or under Manage → Missing."
 >
 	<label class="check"
 		><input id="find-published" type="checkbox" bind:checked={findPublished} /> Look for them</label
