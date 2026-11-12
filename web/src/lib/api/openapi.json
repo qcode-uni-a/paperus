@@ -13295,6 +13295,16 @@
             "title": "Benchmarks",
             "default": {}
           },
+          "parameters": {
+            "type": "integer",
+            "title": "Parameters",
+            "default": 0
+          },
+          "released": {
+            "type": "string",
+            "title": "Released",
+            "default": ""
+          },
           "memory_bytes": {
             "anyOf": [
               {

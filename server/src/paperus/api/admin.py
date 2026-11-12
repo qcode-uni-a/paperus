@@ -61,6 +61,10 @@ class MLModel(BaseModel):
     """Published retrieval scores (nDCG@10, out of 100), by benchmark."""
     benchmarks: dict[str, str] = {}
     """What the keys of ``scores`` mean."""
+    parameters: int = 0
+    """Its size: how many weights (0: not published)."""
+    released: str = ""
+    """When it was published ("2024-01")."""
     memory_bytes: int | None = None
     """What it took once loaded on the ML service (RAM, or GPU memory there),
     as measured when it last loaded; None if never loaded there."""

@@ -130,6 +130,21 @@
 		};
 	});
 
+	/** "568M parameters · January 2024 · MIT": what is known of it. */
+	function facts(model: MlModel): string {
+		const size = model.parameters
+			? model.parameters >= 1e9
+				? `${(model.parameters / 1e9).toFixed(1)}B parameters`
+				: `${Number((model.parameters / 1e6).toPrecision(3))}M parameters`
+			: '';
+		const [year, month] = (model.released ?? '').split('-').map(Number);
+		const released =
+			year && month
+				? new Date(year, month - 1).toLocaleDateString('en', { month: 'long', year: 'numeric' })
+				: '';
+		return [size, released, model.licence].filter(Boolean).join(' · ');
+	}
+
 	/** "Retrieval, multilingual (MMTEB v2)" → "Multilingual". */
 	function shortLabel(label: string): string {
 		const name = label.replace(/^Retrieval, /, '').replace(/\s*\(.*\)$/, '');
@@ -293,7 +308,8 @@
 						<th scope="row">
 							<span class="name">{model.name}</span>
 							{#if inUse}<span class="badge current">In use</span>{/if}
-							<small>{[model.description, model.licence].filter(Boolean).join(' ')}</small>
+							<small>{facts(model)}</small>
+							{#if model.description}<small>{model.description}</small>{/if}
 						</th>
 						{#each benchmarks as [key, label] (key)}
 							<td class="num" data-label={shortLabel(label)}>
@@ -396,7 +412,7 @@
 		{#if chosen}
 			<p class="muted">
 				{chosen.description}
-				{chosen.licence ? `${chosen.licence}.` : ''}
+				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
 					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb
@@ -451,7 +467,7 @@
 		{#if chosen}
 			<p class="muted">
 				{chosen.description}
-				{chosen.licence ? `${chosen.licence}.` : ''}
+				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
 					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb

@@ -108,6 +108,10 @@ class ModelInfo(BaseModel):
     download_mb: int
     scores: dict[str, float]
     """Published retrieval scores (nDCG@10, out of 100) by benchmark."""
+    parameters: int = 0
+    """Its size: how many weights (0: not published)."""
+    released: str = ""
+    """When it was published ("2024-01")."""
     memory_bytes: int | None = None
     """What it took once loaded on this service (RAM, or GPU memory on the
     GPU), as measured when it last loaded; None if never loaded here. Runs
@@ -252,6 +256,8 @@ def create_app(
                 licence=s.licence,
                 download_mb=s.download_mb,
                 scores=dict(s.scores),
+                parameters=s.parameters,
+                released=s.released,
                 memory_bytes=models.measured.get(s.vectors(models.device)),
             )
             for s in MODELS.values()

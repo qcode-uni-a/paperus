@@ -62,6 +62,11 @@ class ModelSpec:
     download_mb: int = 0
     scores: tuple[tuple[str, float], ...] = ()
     """Published retrieval scores (nDCG@10, out of 100) by benchmark, see SCORES."""
+    parameters: int = 0
+    """Its size: how many weights (0: not published)."""
+    released: str = ""
+    """When it was published ("2024-01"), from its first version on Hugging
+    Face."""
 
     def onnx_file_for(self, device: str) -> str:
         return (
@@ -93,6 +98,8 @@ MODELS = {
         # Multilingual, 1024 dimensions, long inputs; ONNX from the authors.
         ModelSpec(
             name="bge-m3",
+            parameters=568_000_000,
+            released="2024-01",
             repo="BAAI/bge-m3",
             revision="5617a9f61b028005a4858fdac845db406aefb181",
             onnx_file="onnx/model.onnx",
@@ -111,6 +118,8 @@ MODELS = {
         # nearly the same quality; vectors differ, so it counts as its own.
         ModelSpec(
             name="bge-m3-int8",
+            parameters=568_000_000,
+            released="2024-01",
             repo="Xenova/bge-m3",
             revision="4de13258303883538bd53b696b452bf8099f0858",
             onnx_file="onnx/model_int8.onnx",
@@ -131,6 +140,8 @@ MODELS = {
         # retrieval, long inputs; int8.
         ModelSpec(
             name="arctic-embed-m-v2",
+            parameters=305_000_000,
+            released="2024-11",
             repo="Snowflake/snowflake-arctic-embed-m-v2.0",
             revision="95c2741480856aa9666782eb4afe11959938017f",
             onnx_file="onnx/model_quantized.onnx",
@@ -154,6 +165,8 @@ MODELS = {
         ),
         ModelSpec(
             name="arctic-embed-l-v2",
+            parameters=568_000_000,
+            released="2024-11",
             repo="Snowflake/snowflake-arctic-embed-l-v2.0",
             revision="ac6544c8a46e00af67e330e85a9028c66b8cfd9a",
             onnx_file="onnx/model_quantized.onnx",
@@ -178,6 +191,8 @@ MODELS = {
         # Alibaba GTE multilingual (Apache-2.0): long inputs, int8.
         ModelSpec(
             name="gte-multilingual-base",
+            parameters=305_000_000,
+            released="2024-07",
             repo="onnx-community/gte-multilingual-base",
             revision="2edbf5e672aab465f9ed4c154a8b61791c082c69",
             onnx_file="onnx/model_quantized.onnx",
@@ -194,6 +209,8 @@ MODELS = {
         # E5 (MIT), int8: base and large; inputs up to 512 tokens.
         ModelSpec(
             name="multilingual-e5-base",
+            parameters=278_000_000,
+            released="2023-05",
             repo="Xenova/multilingual-e5-base",
             revision="1ec9243030a27d1a115d5c340572074c125b58b2",
             onnx_file="onnx/model_quantized.onnx",
@@ -215,6 +232,8 @@ MODELS = {
         ),
         ModelSpec(
             name="multilingual-e5-large",
+            parameters=560_000_000,
+            released="2023-06",
             repo="Xenova/multilingual-e5-large",
             revision="00fc3aeb3dbb95842de2ac1961d33c6319acf57b",
             onnx_file="onnx/model_quantized.onnx",
@@ -239,6 +258,8 @@ MODELS = {
         # (docs/search.md).
         ModelSpec(
             name="qwen3-embedding-0.6b",
+            parameters=596_000_000,
+            released="2025-06",
             repo="onnx-community/Qwen3-Embedding-0.6B-ONNX",
             revision="c25a394dd583836952667c12f008335071b3f43d",
             onnx_file="onnx/model_quantized.onnx",
@@ -260,6 +281,8 @@ MODELS = {
         # pooling in the ONNX file. On trial (docs/search.md).
         ModelSpec(
             name="embeddinggemma-2",
+            parameters=744_000_000,
+            released="2026-09",
             repo="onnx-community/embeddinggemma-2-ONNX",
             revision="daa72c51243991dfcaf9f9137d2c573d8f7790c0",
             onnx_file="onnx/model_quantized.onnx",
@@ -277,6 +300,8 @@ MODELS = {
         # Small and fast (int8, 118 MB); for development and small machines.
         ModelSpec(
             name="multilingual-e5-small",
+            parameters=118_000_000,
+            released="2023-06",
             repo="Xenova/multilingual-e5-small",
             revision="761b726dd34fb83930e26aab4e9ac3899aa1fa78",
             onnx_file="onnx/model_quantized.onnx",
@@ -329,6 +354,8 @@ MODELS = {
         # English only.
         ModelSpec(
             name="bge-reranker-v2-m3",
+            parameters=568_000_000,
+            released="2024-03",
             repo="onnx-community/bge-reranker-v2-m3-ONNX",
             revision="6f5ff65298512715a1e669753bc754d2bc8f367b",
             onnx_file="onnx/model_int8.onnx",
@@ -347,6 +374,8 @@ MODELS = {
         ),
         ModelSpec(
             name="gte-multilingual-reranker-base",
+            parameters=306_000_000,
+            released="2024-07",
             repo="onnx-community/gte-multilingual-reranker-base",
             revision="ee64367e35a2db0da46bb6497e13a18f8bd585cb",
             onnx_file="onnx/model_int8.onnx",
@@ -364,6 +393,8 @@ MODELS = {
         ),
         ModelSpec(
             name="ms-marco-minilm-l6",
+            parameters=22_700_000,
+            released="2021-04",
             repo="cross-encoder/ms-marco-MiniLM-L-6-v2",
             revision="233902d25c440f23af6f7d6e94d2946bac0bee0a",
             onnx_file="onnx/model_quint8_avx2.onnx",

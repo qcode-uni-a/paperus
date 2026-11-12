@@ -2535,6 +2535,14 @@ export type MlModel = {
         [key: string]: string;
     };
     /**
+     * Parameters
+     */
+    parameters?: number;
+    /**
+     * Released
+     */
+    released?: string;
+    /**
      * Memory Bytes
      */
     memory_bytes?: number | null;
