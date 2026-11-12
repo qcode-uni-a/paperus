@@ -270,6 +270,20 @@ export type Assign = {
 };
 
 /**
+ * AttachTo
+ */
+export type AttachTo = {
+    /**
+     * Paper
+     */
+    paper: string;
+    /**
+     * Kind
+     */
+    kind?: 'code' | 'data';
+};
+
+/**
  * Authentication
  */
 export type Authentication = {
@@ -6360,6 +6374,66 @@ export type ListSimilarResponses = {
 };
 
 export type ListSimilarResponse = ListSimilarResponses[keyof ListSimilarResponses];
+
+export type AttachToPaperData = {
+    body: AttachTo;
+    path: {
+        /**
+         * Item Id
+         */
+        item_id: string;
+    };
+    query?: never;
+    url: '/api/items/{item_id}/attach';
+};
+
+export type AttachToPaperErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AttachToPaperError = AttachToPaperErrors[keyof AttachToPaperErrors];
+
+export type AttachToPaperResponses = {
+    /**
+     * Successful Response
+     */
+    200: ItemDetail;
+};
+
+export type AttachToPaperResponse = AttachToPaperResponses[keyof AttachToPaperResponses];
+
+export type SplitVersionData = {
+    body?: never;
+    path: {
+        /**
+         * Version Id
+         */
+        version_id: string;
+    };
+    query?: never;
+    url: '/api/versions/{version_id}/split';
+};
+
+export type SplitVersionErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SplitVersionError = SplitVersionErrors[keyof SplitVersionErrors];
+
+export type SplitVersionResponses = {
+    /**
+     * Successful Response
+     */
+    201: ItemDetail;
+};
+
+export type SplitVersionResponse = SplitVersionResponses[keyof SplitVersionResponses];
 
 export type PreviewMergeData = {
     body?: never;

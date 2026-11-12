@@ -3,6 +3,7 @@
 import calendar
 import hashlib
 import json
+import re
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
@@ -15,6 +16,7 @@ from paperus import changes  # noqa: F401  (registers the change stamping)
 from paperus.identifiers import Scheme
 from paperus.metadata import csl_title, csl_type
 from paperus.models import (
+    FileRole,
     Identifier,
     Item,
     Library,
@@ -257,6 +259,62 @@ def create_item(
         created_by=added_by,
     )
     return item
+
+
+def split_version(db: Session, version: Version, added_by: uuid.UUID) -> Item:
+    """The version as an item of its own, with its files, in the same
+    library (merged in by mistake, or a DOI that is another work's); the
+    item it leaves keeps the rest. Its notes, tags and collections stay
+    with that item."""
+    source = version.item
+    item = Item(
+        library_id=source.library_id,
+        type="",
+        title="",
+        overrides={},
+        links=[],
+        added_by=added_by,
+        change=0,
+    )
+    db.add(item)
+    version.pinned = False
+    version.item = item
+    db.flush()
+    refresh_item(item)
+    refresh_item(source)
+    return item
+
+
+def attach_as(item: Item, paper: Item, kind: LinkKind, user_id: uuid.UUID) -> None:
+    """An item that is a paper's code or data (software, a dataset), made
+    part of the paper instead of an item of its own: the paper links to it
+    (its DOIs and addresses), takes its files (as code or data, in the
+    version it shows) and its links; the item goes to the trash, without
+    its identifiers (the paper's links have them: adding its DOI again
+    makes a new item, not this empty one back)."""
+    title = re.sub(r"<[^>]+>", "", item.title)
+    links = [
+        {
+            "url": f"https://doi.org/{i.value}" if i.scheme == Scheme.DOI else i.value,
+            "kind": kind.value,
+            "label": title,
+        }
+        for version in item.versions
+        for i in version.identifiers
+        if i.scheme in (Scheme.DOI, Scheme.URL)
+    ]
+    add_links(paper, [*links, *item.links])
+    target = preferred_version(paper)
+    if target is not None:
+        role = FileRole.DATA if kind == LinkKind.DATA else FileRole.CODE
+        for version in item.versions:
+            for file in list(version.files):
+                if file.deleted_at is None:
+                    file.role = role
+                    file.version = target
+    for version in item.versions:
+        version.identifiers.clear()
+    trash(item, user_id)
 
 
 def pin_version(db: Session, item: Item, version: Version) -> None:

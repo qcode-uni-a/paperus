@@ -20,6 +20,7 @@
 		markViewed,
 		passageText,
 		pinVersion,
+		splitVersion,
 		readFileAgain,
 		restoreFile,
 		restoreItem,
@@ -30,6 +31,7 @@
 		unarchiveItem,
 		uploadToVersion,
 		VERSION_KINDS,
+		type Version,
 		type VersionKind
 	} from '#lib/api/client.ts';
 	import type { Reading } from '#lib/api/generated/types.gen.ts';
@@ -240,6 +242,26 @@
 		await load();
 	}
 
+	/** A version that is not this paper (merged in by mistake, another
+	 * work's DOI) as an item of its own, with its files. */
+	async function splitOff(version: Version) {
+		const name = version.csl.title ? `“${plainTitle(String(version.csl.title))}”` : 'This version';
+		if (!confirm(`${name} becomes an item of its own, with its files. This paper keeps the rest.`))
+			return;
+		error = '';
+		const { data, error: failure } = await splitVersion({ path: { version_id: version.id } });
+		if (!data) {
+			error = errorMessage(failure);
+			return;
+		}
+		await load();
+		notify({
+			kind: 'success',
+			title: `Split off: ${plainTitle(data.title)}`,
+			link: { href: resolve('/items/[id]', { id: data.id }), label: 'Open it' }
+		});
+	}
+
 	async function submitVersion(event: SubmitEvent) {
 		event.preventDefault();
 		const body = versionDoi.trim()
@@ -373,7 +395,11 @@
 							{isShared(item.library_id) ? 'Share with another group…' : 'Share with group…'}
 						</button>
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
-						<button role="menuitem" onclick={() => mergeDialog?.open()}>Merge into…</button>
+						<button role="menuitem" onclick={() => mergeDialog?.open()}
+							>{item.type === 'software' || item.type === 'dataset'
+								? 'Attach to a paper…'
+								: 'Merge into…'}</button
+						>
 						{#if !item.archived_at}
 							<button
 								role="menuitem"
@@ -523,6 +549,13 @@
 							</button>
 						{/if}
 						<span class="muted">{SOURCE[version.metadata_source]}</span>
+						{#if item.versions.length > 1 && !item.deleted_at && writable}
+							<button
+								class="split"
+								title="Not this paper (merged in by mistake, another work's DOI): an item of its own, with its files"
+								onclick={() => splitOff(version)}>Split off</button
+							>
+						{/if}
 					</div>
 					{#if version.identifiers.length}
 						<div class="row">
@@ -771,6 +804,11 @@
 		.disclosure svg {
 			transition: none;
 		}
+	}
+	.split {
+		margin-left: auto;
+		padding: 3px 12px;
+		font-size: var(--step--1);
 	}
 	.title {
 		display: flex;

@@ -1945,6 +1945,104 @@
         }
       }
     },
+    "/api/items/{item_id}/attach": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Attach To Paper",
+        "description": "This item (software, a dataset) as a paper's code or data instead\nof an item of its own: the paper links to it (its DOI or address) and\ntakes its files (as code or data) and links; this one goes to the\ntrash. Needs the right to change both. Returns the paper.",
+        "operationId": "attach_to_paper",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachTo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/versions/{version_id}/split": {
+      "post": {
+        "tags": [
+          "items"
+        ],
+        "summary": "Split Version",
+        "description": "This version (with its files) as an item of its own, in the same\nlibrary: one merged in by mistake, or another work's. The item keeps\nits other versions; it needs at least one more. Returns the new item.",
+        "operationId": "split_version",
+        "parameters": [
+          {
+            "name": "version_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/items/{item_id}/merge-preview": {
       "get": {
         "tags": [
@@ -9157,6 +9255,29 @@
           "author_id"
         ],
         "title": "Assign"
+      },
+      "AttachTo": {
+        "properties": {
+          "paper": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Paper"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "code",
+              "data"
+            ],
+            "title": "Kind",
+            "default": "code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paper"
+        ],
+        "title": "AttachTo"
       },
       "Authentication": {
         "properties": {

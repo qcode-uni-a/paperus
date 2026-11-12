@@ -1065,6 +1065,55 @@ def list_similar(
     ]
 
 
+class AttachTo(BaseModel):
+    paper: uuid.UUID
+    """The paper whose code or data this is."""
+    kind: Literal[LinkKind.CODE, LinkKind.DATA] = LinkKind.CODE
+
+
+@router.post("/api/items/{item_id}/attach")
+def attach_to_paper(
+    item_id: uuid.UUID,
+    body: AttachTo,
+    response: Response,
+    db: DB,
+    access: CurrentAccess,
+) -> ItemDetail:
+    """This item (software, a dataset) as a paper's code or data instead
+    of an item of its own: the paper links to it (its DOI or address) and
+    takes its files (as code or data) and links; this one goes to the
+    trash. Needs the right to change both. Returns the paper."""
+    item = get_readable_item(db, access, item_id, write=True, allow_trashed=False)
+    paper = get_readable_item(db, access, body.paper, write=True, allow_trashed=False)
+    if paper.id == item.id:
+        raise HTTPException(409, "an item cannot be its own code")
+    library.attach_as(item, paper, body.kind, access.user.id)
+    db.commit()
+    db.refresh(paper)
+    return item_detail(paper, access, response)
+
+
+@router.post("/api/versions/{version_id}/split", status_code=201)
+def split_version(
+    version_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
+) -> ItemDetail:
+    """This version (with its files) as an item of its own, in the same
+    library: one merged in by mistake, or another work's. The item keeps
+    its other versions; it needs at least one more. Returns the new item."""
+    version = db.get(Version, version_id)
+    if version is None or not access.can_read_item(version.item):
+        raise HTTPException(404, "version not found")
+    access.require_write_item(version.item)
+    if version.item.deleted_at is not None:
+        raise HTTPException(409, "the item is in the trash")
+    if len(version.item.versions) < 2:
+        raise HTTPException(409, "the item's only version")
+    item = library.split_version(db, version, access.user.id)
+    db.commit()
+    db.refresh(item)
+    return item_detail(item, access, response)
+
+
 class MergeInto(BaseModel):
     into: uuid.UUID
     """The paper that stays; this one goes to the trash."""
