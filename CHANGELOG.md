@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **The paper's PDF, not its supplement**: on a page without a
+  `citation_pdf_url` (Science Advances) the extension took the first PDF
+  link naming the paper's DOI, which could be the supplementary material
+  (`/doi/suppl/…/…_sm.pdf`), and saved it as the paper. Supplements are
+  passed over now, and the article's own PDF (`/doi/pdf/<DOI>`, or its
+  reader's `/doi/epdf/<DOI>`) comes first.
+
 ## 0.0.27 (2026-11-12)
 
 *A paper rarely travels alone: now its supplements, its code, its data and the rest of its author's oeuvre come along for the ride.*

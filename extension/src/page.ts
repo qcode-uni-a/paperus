@@ -75,6 +75,25 @@ export async function readPage(): Promise<PageInfo> {
 				(article.length >= 8 && path.includes(article.toLowerCase()))
 			);
 		};
+		// Never the supplementary material, which names the DOI too (Science
+		// Advances: /doi/suppl/10.1126/…/suppl_file/…_sm.pdf).
+		const supplement =
+			/\/suppl(?:[_/]|ement)|supplementa|[_/]si(?:[_/.]|$)|_sm\.pdf$|\/mmc\d+\.pdf$|_esm\.pdf$/i;
+		/** Lower is likelier the paper: the PDF at /…/pdf/<DOI> (Atypon's
+		 * sites: Science, ACS, Taylor & Francis), its reader /…/epdf/<DOI>
+		 * (as its PDF), then other links that name the paper. */
+		const rank = (href: URL): number => {
+			let path = href.pathname.toLowerCase();
+			try {
+				path = decodeURIComponent(href.pathname).toLowerCase();
+			} catch {
+				// A malformed link: as it is.
+			}
+			const id = doi?.toLowerCase();
+			if (id && path.replace(/\/$/, '').endsWith(`/pdf/${id}`)) return 0;
+			if (id && path.replace(/\/$/, '').endsWith(`/epdf/${id}`)) return 1;
+			return 2;
+		};
 		const own = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')]
 			.map((a) => {
 				try {
@@ -83,14 +102,26 @@ export async function readPage(): Promise<PageInfo> {
 					return null;
 				}
 			})
-			.filter((href): href is URL => href !== null)
-			.find(
-				(href) =>
+			.filter(
+				(href): href is URL =>
+					href !== null &&
 					href.origin === location.origin &&
 					href.pathname !== location.pathname &&
-					/\/pdf(\/|$)|\.pdf$|\/pdfft$/i.test(href.pathname) &&
+					(/\/pdf(\/|$)|\.pdf$|\/pdfft$/i.test(href.pathname) || rank(href) === 1) &&
+					!supplement.test(href.pathname) &&
 					names(href)
-			);
+			)
+			.map((href) => ({ href, place: rank(href) }))
+			// Stable: in the page's order within a rank.
+			.sort((a, b) => a.place - b.place)
+			.map(({ href, place }) => {
+				if (place !== 1) return href;
+				// The reader's PDF: /…/epdf/<DOI> → /…/pdf/<DOI> (Wiley's goes on
+				// to its download, directPdf).
+				const pdf = new URL(href.href);
+				pdf.pathname = pdf.pathname.replace(/\/epdf\//i, '/pdf/');
+				return pdf;
+			})[0];
 		if (!link) return own?.href ?? null;
 		const pdf = new URL(link, location.href);
 		if (pdf.protocol === 'http:' && location.protocol === 'https:') pdf.protocol = 'https:';
