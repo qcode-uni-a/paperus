@@ -185,6 +185,17 @@ button.text {
 .list-head span {
 	margin-right: auto;
 }
+/* Which version the PDF went to (or is in): a quiet label under the title. */
+.kind {
+	width: fit-content;
+	margin: -2px 0 6px;
+	padding: 1px 8px;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	color: var(--muted);
+	font-size: 11px;
+}
+
 /* The paper's supplementary files: its own short list, under it. */
 #supplements {
 	margin: 10px 0 0;

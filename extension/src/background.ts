@@ -67,6 +67,8 @@ type Saved = {
     libraryId: string | null;
     title: string;
     added: boolean;
+    /** The version saved to: published, preprint, … */
+    kind?: string;
   };
   /** Its supplementary files from the page, each as it went. */
   supplements?: SupplementOutcome[];
@@ -350,6 +352,8 @@ async function paperHere(
 ): Promise<{
   item: Api.GetItemResponse;
   title: string;
+  /** Of the version the page is about (else the one shown). */
+  kind: string | undefined;
   own: boolean;
   other: Api.VersionOut | undefined;
 } | null> {
@@ -366,28 +370,49 @@ async function paperHere(
     { path: { item_id: itemId } },
   );
   if (!item?.id) return null;
-  const hasPdf = (version: Api.VersionOut) =>
-    version.files.some(
-      (file) =>
-        file.role === "main" &&
-        file.media_type === "application/pdf" &&
-        !file.deleted_at,
-    );
-  const same = (key: string) => key.toLowerCase().replace(/v\d+$/, "");
-  const wanted = keys.map(same);
-  const shown = item.versions.find((version) =>
-    version.identifiers.some((id) =>
-      wanted.includes(same(`${id.scheme}:${id.value}`)),
-    ),
-  );
+  const shown = versionOf(item, doi, arxiv);
   const own = shown ? hasPdf(shown) : item.versions.some(hasPdf);
   return {
     item,
+    kind: (shown ?? preferredOf(item))?.kind,
     // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
     title: item.title.replace(/<[^>]+>/g, ""),
     own,
     other: own ? undefined : item.versions.find(hasPdf),
   };
+}
+
+/** The paper's version with this DOI or arXiv ID: the one a page is
+ * about (the journal's, the preprint). */
+function versionOf(
+  item: Api.ItemDetail,
+  doi: string | null | undefined,
+  arxiv: string | null | undefined,
+): Api.VersionOut | undefined {
+  const same = (key: string) => key.toLowerCase().replace(/v\d+$/, "");
+  const wanted = [
+    ...(doi ? [`doi:${doi}`] : []),
+    ...(arxiv ? [`arxiv:${arxiv}`] : []),
+  ].map(same);
+  return item.versions.find((version) =>
+    version.identifiers.some((id) =>
+      wanted.includes(same(`${id.scheme}:${id.value}`)),
+    ),
+  );
+}
+
+function preferredOf(item: Api.ItemDetail): Api.VersionOut | undefined {
+  return item.versions.find((v) => v.id === item.preferred_version_id);
+}
+
+/** Whether the version has its PDF (as its main file). */
+function hasPdf(version: Api.VersionOut): boolean {
+  return version.files.some(
+    (file) =>
+      file.role === "main" &&
+      file.media_type === "application/pdf" &&
+      !file.deleted_at,
+  );
 }
 
 async function inPage<A extends unknown[], R>(
@@ -830,19 +855,24 @@ async function save(
     title: item.title,
     by: doi ? "DOI" : "the page's details",
   });
-  const hasPdf = item.files?.some((f) => f.media_type === "application/pdf");
+  // The version the page is about (an arXiv page's: the preprint), where
+  // its PDF goes; else the one paperus shows.
+  const version = versionOf(item, page.doi, page.arxiv) ?? preferredOf(item);
+  const hadPdf = version
+    ? hasPdf(version)
+    : item.files?.some((f) => f.media_type === "application/pdf");
   // Why the paper is saved without its PDF, if it is.
   let missing: string | null = null;
   let fileNote = "";
   if ("error" in pdf) {
-    if (hasPdf) fileNote = " It has a PDF already.";
+    if (hadPdf) fileNote = " It has a PDF already.";
     else missing = pdfProblem(pdf);
   } else {
     const bytes = decode(pdf);
     if (await holder(bytes)) {
       fileNote = " The PDF is there already.";
     } else {
-      missing = await upload(item.id, bytes, filename(page));
+      missing = await upload(item.id, bytes, filename(page), version?.id);
       if (!missing) fileNote = " With its PDF.";
     }
   }
@@ -857,6 +887,7 @@ async function save(
     libraryId: item.library_id,
     title,
     added: !known,
+    kind: version?.kind,
   };
   return missing
     ? {
@@ -1060,19 +1091,31 @@ async function saveSupplement(
   }
 }
 
-/** Add the PDF to the paper: null if it was, else why not. */
+/** Add the PDF to the paper (to this version of it, else the one paperus
+ * shows): null if it was, else why not. */
 async function upload(
   itemId: string,
   bytes: Uint8Array<ArrayBuffer>,
   name: string,
+  versionId?: string,
 ): Promise<string | null> {
   const form = new FormData();
   form.append("upload", new Blob([bytes], { type: "application/pdf" }), name);
   try {
-    const { status } = await call<Api.UploadToItemData>(
-      "/api/items/{item_id}/files",
-      { method: "POST", path: { item_id: itemId }, form },
-    );
+    const { status } = versionId
+      ? await call<Api.UploadToVersionData>(
+          "/api/versions/{version_id}/files",
+          {
+            method: "POST",
+            path: { version_id: versionId },
+            form,
+          },
+        )
+      : await call<Api.UploadToItemData>("/api/items/{item_id}/files", {
+          method: "POST",
+          path: { item_id: itemId },
+          form,
+        });
     return status === 404
       ? "The paper was not found when its PDF was added."
       : null;
@@ -1388,6 +1431,7 @@ type Survey =
         id: string;
         libraryId: string;
         title: string;
+        kind?: string;
         link: string;
       } | null;
     }
@@ -1474,6 +1518,7 @@ async function survey(tab: chrome.tabs.Tab): Promise<Survey> {
             id: here.item.id,
             libraryId: here.item.library_id,
             title: here.title,
+            kind: here.kind,
             link: await itemLink(here.item.id),
           }
         : null,

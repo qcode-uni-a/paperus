@@ -18,7 +18,13 @@ type Result =
 			text: string;
 			link: string;
 			warning?: boolean;
-			item?: { id: string; libraryId: string | null; title: string; added: boolean };
+			item?: {
+				id: string;
+				libraryId: string | null;
+				title: string;
+				added: boolean;
+				kind?: string;
+			};
 			supplements?: SupplementOutcome[];
 	  }
 	| { ok: false; text: string };
@@ -31,7 +37,22 @@ type SupplementOutcome = Supplement & {
 	size?: number;
 };
 /** The paper, in paperus with the PDF of the page's version. */
-type Known = { id: string; libraryId: string; title: string; link: string };
+type Known = { id: string; libraryId: string; title: string; kind?: string; link: string };
+
+/** A version's kind in words, for the label under the title. */
+const KINDS: Record<string, string> = {
+	published: 'Journal version',
+	accepted: 'Accepted version',
+	submitted: 'Submitted version',
+	preprint: 'Preprint',
+	draft: 'Draft',
+	edition: 'Edition'
+};
+function showKind(kind: string | undefined): void {
+	const words = kind ? KINDS[kind] : undefined;
+	$('kind').textContent = words ?? '';
+	$('kind').hidden = !words;
+}
 
 $('version').textContent = `Version ${chrome.runtime.getManifest().version}`;
 $('settings').addEventListener('click', async (event) => {
@@ -90,6 +111,7 @@ function show(result: Result, owners: Owner[]): void {
 	if (result.item?.title) {
 		$('title').textContent = result.item.title;
 		$('title').hidden = false;
+		showKind(result.item.kind);
 	}
 	// What follows the title: the PDF's fate.
 	let rest = result.text.replace(/^[^“]*“[^”]*”[.,]?\s*/, '').replace(/^without its PDF\.\s*/, '');
@@ -203,6 +225,7 @@ function showList(
 		'flow',
 		'state',
 		'title',
+		'kind',
 		'detail',
 		'open',
 		'show-list',
@@ -446,6 +469,7 @@ function showKnown(tabId: number, known: Known, supplements: Supplement[], owner
 	state('In paperus', 'ok');
 	$('title').textContent = known.title;
 	$('title').hidden = false;
+	showKind(known.kind);
 	$('detail').textContent = 'With its PDF; nothing saved again.';
 	$('detail').hidden = false;
 	const open = $<HTMLAnchorElement>('open');
@@ -455,7 +479,8 @@ function showKnown(tabId: number, known: Known, supplements: Supplement[], owner
 	const again = $<HTMLButtonElement>('again');
 	again.hidden = false;
 	again.onclick = () => {
-		for (const id of ['again', 'supplements', 'title', 'detail', 'open']) $(id).hidden = true;
+		for (const id of ['again', 'supplements', 'title', 'kind', 'detail', 'open'])
+			$(id).hidden = true;
 		void save(tabId, owners, supplements);
 	};
 	// Supplements to choose: open until one goes elsewhere.
