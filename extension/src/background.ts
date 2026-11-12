@@ -500,11 +500,22 @@ async function saveClosedTab(
       `To save this PDF, paperus needs to fetch it from ${new URL(url).host}, and the browser asks you first.`,
     );
   }
-  const pdf = await onwards(await fetchPdf(url, MAX_BYTES));
+  let pdf = await onwards(await fetchPdf(url, MAX_BYTES));
   trace("Fetched the tab's address from the extension", {
     url,
     ...fetched(pdf),
   });
+  // Firefox's PDF viewer, and the site gave the extension a web page: the
+  // PDF as Firefox loads it for the reader.
+  if ("error" in pdf && unread && FIREFOX) {
+    step(tab.id!, "Loading the PDF again…");
+    const copy = await loadedCopy(url);
+    trace("Loaded again in a tab out of sight, a copy kept", {
+      url,
+      ...(copy ? fetched(copy) : { pdf: "none" }),
+    });
+    if (copy) pdf = copy;
+  }
   // A web page after all, which the browser did not let the extension read
   // in its tab: the paper's details from the page as fetched from here.
   if ("error" in pdf && pdf.html !== undefined && !inUrl.doi) {
@@ -524,9 +535,12 @@ async function saveClosedTab(
       reason: unread || null,
       fetched: pdf.error,
     });
+    const sent = pdf.html
+      ? signalsOfHtml(pdf.html, pdf.status ?? 200).title.trim()
+      : "";
     throw new PaperusError(
       unread
-        ? `The browser did not let the extension read this page (${unread}). Reload it and save again.`
+        ? `The browser shows this page in its own viewer (a PDF, most likely), which no extension may read, and ${new URL(url).host} sent ${sent ? `a web page (“${sent.slice(0, 80)}”)` : "no PDF"} when asked again. Open the PDF from the article's page and save there, or drop the downloaded PDF into paperus.`
         : "The browser lets no extension into this page.",
     );
   }
@@ -960,6 +974,97 @@ function filename(page: Partial<PageInfo>): string {
   return name.replace(/[\\/:*?"<>|]+/g, " ");
 }
 
+function encoded(bytes: Uint8Array): Pdf {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return { base64: btoa(binary), size: bytes.length };
+}
+
+/** Firefox's webRequest, the part for keeping a copy of a response as it
+ * arrives (not in Chrome's types). */
+interface StreamFilter {
+  ondata: ((event: { data: ArrayBuffer }) => void) | null;
+  onstop: (() => void) | null;
+  onerror: (() => void) | null;
+  write(data: ArrayBuffer): void;
+  close(): void;
+}
+type RequestListener = (details: { requestId: string }) => void;
+interface FirefoxWebRequest {
+  filterResponseData(requestId: string): StreamFilter;
+  onBeforeRequest: {
+    addListener(
+      listener: RequestListener,
+      filter: { urls: string[]; tabId: number; types: string[] },
+      extra: string[],
+    ): void;
+    removeListener(listener: RequestListener): void;
+  };
+}
+
+/** A PDF as Firefox itself loads it, for a PDF open in Firefox's viewer
+ * (which no extension may read) whose site answers the extension's own
+ * fetch with a web page (a check for robots, a login): its address opened
+ * again in a tab out of sight, as one's own visit, and a copy of the bytes
+ * kept as they arrive (they go on to the tab unchanged). Null if what
+ * arrives is no PDF, in Chrome (which lets the extension read PDF tabs), or
+ * after a minute. */
+async function loadedCopy(url: string): Promise<Pdf | null> {
+  const webRequest = (
+    globalThis as { browser?: { webRequest?: Partial<FirefoxWebRequest> } }
+  ).browser?.webRequest as FirefoxWebRequest | undefined;
+  if (!FIREFOX || !webRequest?.filterResponseData) return null;
+  const tab = await chrome.tabs.create({ url: "about:blank", active: false });
+  const tabId = tab.id!;
+  let listener: RequestListener | undefined;
+  try {
+    const bytes = await within(
+      60_000,
+      new Promise<Uint8Array | null>((resolve) => {
+        listener = ({ requestId }) => {
+          const filter = webRequest.filterResponseData(requestId);
+          const parts: Uint8Array[] = [];
+          let size = 0;
+          filter.ondata = ({ data }) => {
+            filter.write(data);
+            size += data.byteLength;
+            if (size <= MAX_BYTES) parts.push(new Uint8Array(data));
+          };
+          filter.onstop = () => {
+            filter.close();
+            // A redirect has nothing: the next answer is the one.
+            if (size === 0) return;
+            const all = new Uint8Array(size <= MAX_BYTES ? size : 0);
+            let at = 0;
+            for (const part of size <= MAX_BYTES ? parts : []) {
+              all.set(part, at);
+              at += part.byteLength;
+            }
+            resolve(
+              String.fromCharCode(...all.subarray(0, 5)) === "%PDF-"
+                ? all
+                : null,
+            );
+          };
+          filter.onerror = () => resolve(null);
+        };
+        webRequest.onBeforeRequest.addListener(
+          listener,
+          { urls: ["<all_urls>"], tabId, types: ["main_frame"] },
+          ["blocking"],
+        );
+        void chrome.tabs.update(tabId, { url });
+      }),
+    ).catch(() => null);
+    return bytes ? encoded(bytes) : null;
+  } finally {
+    if (listener) webRequest.onBeforeRequest.removeListener(listener);
+    await chrome.tabs.remove(tabId).catch(() => undefined);
+  }
+}
+
 /** arXiv's PDFs are open: fetched here directly. */
 async function arxivPdf(id: string): Promise<Pdf> {
   try {
@@ -968,11 +1073,7 @@ async function arxivPdf(id: string): Promise<Pdf> {
     if (!response.ok || String.fromCharCode(...bytes.slice(0, 5)) !== "%PDF-") {
       return { error: "arXiv gave no PDF." };
     }
-    let binary = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    }
-    return { base64: btoa(binary), size: bytes.length };
+    return encoded(bytes);
   } catch (error) {
     return { error: `arXiv could not be reached: ${String(error)}` };
   }

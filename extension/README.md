@@ -14,7 +14,11 @@ does the same; a full one with a check means you have it already.
   it (on Scholar from its page, opened out of sight, with its PDF).
 - **An open PDF** is saved as it is; paperus reads its details from the
   file (a DOI or arXiv ID in it). Firefox's PDF viewer lets no extension
-  in, so there the extension fetches the PDF itself.
+  in, so there the extension fetches the PDF itself; if the site answers
+  that with a web page (a check for robots, a login), it opens the PDF
+  again in a tab out of sight, as your own visit, and keeps a copy of what
+  Firefox receives (the reason for its `webRequest` permissions, Firefox
+  only).
 - **Supplementary material, code and data** come along: the supplementary
   files the article links (Nature's, Elsevier's, Wiley's, ACS's, APS's,
   arXiv's ancillary files, …; up to 10, 100 MB each) are saved with the

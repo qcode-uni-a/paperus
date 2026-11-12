@@ -74,6 +74,11 @@ const browsers = {
 	firefox: {
 		...base,
 		background: { scripts: ['background.js'], type: 'module' },
+		// A PDF open in Firefox's viewer, which no extension may read, whose
+		// site gives the extension's own fetch a web page: loaded again in a
+		// tab out of sight and a copy of its bytes kept as they arrive
+		// (loadedCopy in background.ts). Only then.
+		permissions: [...base.permissions, 'webRequest', 'webRequestBlocking', 'webRequestFilterResponse'],
 		browser_specific_settings: {
 			gecko: {
 				id: 'paperus@qcode-uni-a.github.io',
