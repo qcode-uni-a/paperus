@@ -136,3 +136,29 @@ test('keywords from an import are folded away on the paper', async ({ page }) =>
 	await expect(chip).toBeVisible();
 	await expect(keywords.getByRole('link', { name: 'Quantum Physics' })).toBeVisible();
 });
+
+test('a new collection, made from a paper’s page, with the paper in it', async ({ page }) => {
+	const paper = await uploadPaper(page, 'Collected anew');
+	const name = unique('Made from a paper ');
+
+	await page.goto(`/items/${paper.id}`);
+	await page.getByRole('button', { name: 'Add to a collection' }).click();
+	// With collections to choose from, the last choice; with none, its name
+	// right away.
+	const picker = page.getByRole('combobox', { name: 'Add to collection' });
+	const field = page.getByRole('textbox', { name: 'Name of a new collection' });
+	await expect(picker.or(field)).toBeVisible();
+	if (await picker.isVisible()) await picker.selectOption({ label: 'New collection…' });
+	await field.fill(name);
+	await field.press('Enter');
+	const link = page.getByRole('link', { name, exact: true });
+	await expect(link).toBeVisible();
+
+	await link.click();
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+	await expect(page.getByRole('link', { name: paper.title })).toBeVisible();
+	page.once('dialog', (confirm) => confirm.accept());
+	await page.getByRole('button', { name: 'Collection actions' }).click();
+	await page.getByRole('menuitem', { name: 'Delete' }).click();
+	await expect(page).toHaveURL(/\/collections$/);
+});

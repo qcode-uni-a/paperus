@@ -16,6 +16,10 @@
 - **A paper's DOI under its authors**: with its PDF open, a paper's page
   showed its DOI only under "Details and files". It is under the authors
   now, always, a link to the paper at its publisher (via doi.org).
+- **A new collection from a paper's page**: the collection picker's last
+  choice is "New collection…": name it, Enter, and the paper is in it (a
+  group's collection for a group's paper one may change, else one's own).
+  With none to choose from, the + asks for the name right away.
 
 ## 0.0.28 (2026-11-12)
 

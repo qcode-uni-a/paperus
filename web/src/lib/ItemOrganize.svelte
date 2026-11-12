@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import { resolve } from '$app/paths';
-	import { addItems, addTag, errorMessage, removeItem, removeTag } from '#lib/api/client.ts';
+	import {
+		addItems,
+		addTag,
+		createCollection,
+		errorMessage,
+		removeItem,
+		removeTag
+	} from '#lib/api/client.ts';
 	import type { ItemDetail } from '#lib/api/client.ts';
 	import {
 		collectionPath,
@@ -16,7 +23,12 @@
 	let tagInput = $state('');
 	let tagging = $state(false);
 	let adding = $state(false);
+	/** Naming a new collection to put the paper in. */
+	let naming = $state(false);
+	let collectionName = $state('');
 	let error = $state('');
+	/** The picker's last choice: a new collection. */
+	const NEW = 'new';
 
 	const own = $derived(organize.libraries.find((library) => library.kind === 'personal'));
 	const itemWritable = $derived(writableLibrary(item.library_id));
@@ -99,8 +111,27 @@
 
 	async function addToCollection(id: string) {
 		adding = false;
-		if (id)
+		if (id === NEW) {
+			collectionName = '';
+			naming = true;
+		} else if (id)
 			await done(await addItems({ path: { collection_id: id }, body: { item_ids: [item.id] } }));
+	}
+
+	/** A new collection with the paper in it: the group's for a group's paper
+	 * one may change (as its collections are offered), else one's own. */
+	async function submitCollection(event: SubmitEvent) {
+		event.preventDefault();
+		const name = collectionName.trim();
+		if (!name) return;
+		naming = false;
+		const made = await createCollection({
+			body: { name, library_id: itemWritable ? item.library_id : (own?.id ?? null) }
+		});
+		if (!made.data) return done(made);
+		await done(
+			await addItems({ path: { collection_id: made.data.id }, body: { item_ids: [item.id] } })
+		);
 	}
 </script>
 
@@ -170,7 +201,24 @@
 				{/if}
 			</span>
 		{/each}
-		{#if adding}
+		{#if naming}
+			<form onsubmit={submitCollection}>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					bind:value={collectionName}
+					{@attach enterSubmits}
+					placeholder="New collection"
+					aria-label="Name of a new collection"
+					autofocus
+					onblur={() => {
+						if (!collectionName.trim()) naming = false;
+					}}
+					onkeydown={(event) => {
+						if (event.key === 'Escape') naming = false;
+					}}
+				/>
+			</form>
+		{:else if adding}
 			<select
 				{@attach openPicker}
 				aria-label="Add to collection"
@@ -181,11 +229,17 @@
 				{#each choices as { collection, depth } (collection.id)}
 					<option value={collection.id}>{'  '.repeat(depth)}{collection.name}</option>
 				{/each}
+				<option value={NEW}>New collection…</option>
 			</select>
-		{:else if choices.length}
-			{@render plus('Add to a collection', () => (adding = true))}
-		{:else if organize.collections.length === 0}
-			<span class="hint">Create collections in the menu with +.</span>
+		{:else}
+			{@render plus('Add to a collection', () => {
+				// None to choose from: straight to naming a new one.
+				if (choices.length) adding = true;
+				else {
+					collectionName = '';
+					naming = true;
+				}
+			})}
 		{/if}
 	</div>
 
@@ -335,10 +389,6 @@
 		stroke: var(--muted);
 		stroke-width: 2.4;
 		stroke-linecap: round;
-	}
-	.hint {
-		color: var(--faint);
-		font-size: var(--step--1);
 	}
 	.error {
 		margin: 0;
