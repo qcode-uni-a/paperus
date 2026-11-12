@@ -13,6 +13,7 @@
 		setOidcSecret
 	} from '#lib/api/client.ts';
 	import type { Authentication, ProviderFound } from '#lib/api/generated/types.gen.ts';
+	import { copyText } from '#lib/clipboard.ts';
 	import { notify } from '#lib/toasts.svelte.ts';
 	import OidcLink from '#lib/OidcLink.svelte';
 
@@ -135,8 +136,14 @@
 
 	async function copyRedirect() {
 		if (!info) return;
-		await navigator.clipboard.writeText(info.redirect_uri);
-		notify({ kind: 'success', title: 'Redirect address copied' });
+		if (await copyText(info.redirect_uri))
+			notify({ kind: 'success', title: 'Redirect address copied' });
+		else
+			notify({
+				kind: 'warning',
+				title: 'Not copied',
+				text: `The browser would not; copy it by hand: ${info.redirect_uri}`
+			});
 	}
 
 	async function logEveryoneOut() {

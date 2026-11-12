@@ -7,6 +7,12 @@
   the extension cut them before the `<`, so the DOI was not found and
   the paper saved with the page's details and the cut DOI. Whole now, from
   the page's tags, its address and its links.
+- **Copy buttons over plain HTTP**: a paperus on the local network
+  (`http://…:8000`) has no clipboard API in the browser, so "Copy" next to
+  a new access token did nothing (it selected the token, unseen). It
+  copies there now (as the browser still lets a click), or says to copy
+  by hand; the same for the OIDC redirect address and a note's text that
+  could not be saved.
 
 ## 0.0.28 (2026-11-12)
 

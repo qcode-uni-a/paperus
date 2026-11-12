@@ -18,6 +18,7 @@
 		type Item
 	} from '#lib/api/client.ts';
 	import type { NoteDetail, RevisionOut } from '#lib/api/generated/types.gen.ts';
+	import { copyText } from '#lib/clipboard.ts';
 	import { formatDateTime } from '#lib/dates.svelte.ts';
 	import { ago, shortAuthors } from '#lib/format.ts';
 	import Markdown from '#lib/Markdown.svelte';
@@ -142,12 +143,9 @@
 			return;
 		}
 		unsaved = mine;
-		try {
-			await navigator.clipboard.writeText(mine);
-			problem = 'Your text is below and was copied to the clipboard.';
-		} catch {
-			problem = 'Your text is below.';
-		}
+		problem = (await copyText(mine))
+			? 'Your text is below and was copied to the clipboard.'
+			: 'Your text is below.';
 	}
 
 	// Leaving: save what is not saved yet; warn when it cannot be (a

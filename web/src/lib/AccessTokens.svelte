@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { createToken, errorMessage, listTokens, revokeToken } from '#lib/api/client.ts';
 	import type { CreatedToken, Scope, TokenOut } from '#lib/api/generated/types.gen.ts';
+	import { copyText } from '#lib/clipboard.ts';
 	import { formatDate } from '#lib/dates.svelte.ts';
 	import { ago } from '#lib/format.ts';
 	import { libraryName, organize } from '#lib/organize.svelte.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 
 	/** Settings → Access tokens: for scripts and AI assistants (MCP). */
 	const SCOPES: { value: Scope; label: string }[] = [
@@ -104,15 +106,19 @@
 	}
 
 	async function copy(text: string) {
-		try {
-			await navigator.clipboard.writeText(text);
+		if (await copyText(text)) {
 			copied = true;
 			setTimeout(() => (copied = false), 1500);
-		} catch {
-			// Only over HTTPS or localhost; otherwise select it for copying by hand.
-			const code = document.querySelector('.secret code');
-			if (code) getSelection()?.selectAllChildren(code);
+			return;
 		}
+		// The browser would not: selected, to copy by hand (Ctrl+C).
+		const code = document.querySelector('.secret code');
+		if (code) getSelection()?.selectAllChildren(code);
+		notify({
+			kind: 'warning',
+			title: 'Copy it by hand',
+			text: 'The token is selected: Ctrl+C (⌘C).'
+		});
 	}
 
 	const server = $derived(`${location.origin}/mcp`);
