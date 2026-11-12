@@ -15,6 +15,13 @@ does the same; a full one with a check means you have it already.
 - **An open PDF** is saved as it is; paperus reads its details from the
   file (a DOI or arXiv ID in it). Firefox's PDF viewer lets no extension
   in, so there the extension fetches the PDF itself.
+- **Supplementary material, code and data** come along: the supplementary
+  files the article links (Nature's, Elsevier's, Wiley's, ACS's, APS's,
+  arXiv's ancillary files, …; up to 10, 100 MB each) are saved with the
+  paper, and links to its code and data (GitHub, Zenodo, Figshare, …,
+  where the article says they are its own: in its abstract, a "Code
+  availability" section, "the data are available at …") are shown on its
+  page. Not the references' links, nor the site's own.
 - **Another owner** at once: right-click the button, "Save to …".
 - **The settings** (address, owner, the version installed): "Settings" in
   the popup, or right-click the button, "paperus settings".

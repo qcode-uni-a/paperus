@@ -10,7 +10,9 @@ What it sends to your paperus, and when:
   address and the paper's details from the page (title, authors, DOI, …),
   and the paper's PDF, downloaded in your browser with your own access
   (in Firefox's PDF viewer: by the extension, from the website you allowed
-  it to).
+  it to). Also the paper's supplementary files the page links (downloaded
+  the same way, up to 100 MB each) and the links to its code and data
+  (GitHub, Zenodo, …) named in the article.
 - **On arXiv pages**: the arXiv IDs of the papers listed there, to show
   which ones are already in your library.
 - **On Google Scholar's results**: the DOIs and arXiv IDs found in the

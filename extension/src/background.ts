@@ -10,12 +10,14 @@ import {
   isRobotCheck,
   signalsOfHtml,
 } from "./causes";
+import { type Extras, extrasOf } from "./extras";
 import { directPdf, readerPdf } from "./links";
 import { logIssue, trace } from "./log";
 import {
   fetchPdf,
   idsInUrl,
   type PageInfo,
+  pageLinks,
   pageSignals,
   readPage,
   showNote,
@@ -417,9 +419,15 @@ async function saveFrom(tab: chrome.tabs.Tab, owner?: Owner): Promise<Saved> {
     trace("The PDF", { page: url, ...fetched(pdf) });
     step(tab.id!, "Saving to paperus…");
   });
+  // Its supplementary files, code and data, from the article's links.
+  const extrasComing = page.isPdf
+    ? Promise.resolve(null)
+    : within(READ_MS, inPage(tab.id!, pageLinks))
+        .then((links) => extrasOf(links, [url, page.pdfUrl, pdfLink]))
+        .catch(() => null);
   return page.isPdf && !info.doi && !info.arxiv
     ? saveFile(await pdfComing, url, owner)
-    : save(info, pdfComing, owner);
+    : save(info, pdfComing, owner, extrasComing);
 }
 
 /** A message for the log, without the library's name. */
@@ -590,6 +598,7 @@ async function save(
   page: Pick<PageInfo, "doi" | "arxiv" | "title" | "url"> & Partial<PageInfo>,
   pdfComing: Pdf | Promise<Pdf>,
   owner?: Owner,
+  extrasComing: Promise<Extras | null> = Promise.resolve(null),
 ): Promise<Saved> {
   const target = owner ?? defaultOwner(await settings());
   const library = target ? { library_id: target.id } : {};
@@ -641,6 +650,7 @@ async function save(
       if (!missing) fileNote = " With its PDF.";
     }
   }
+  const extrasNote = await saveExtras(item.id, await extrasComing);
   const where = owner ? owner.name : "paperus";
   // Titles may carry their publisher's markup (Crossref's <i>, <scp>).
   const title = item.title.replace(/<\/?(i|b|em|strong|sub|sup|scp)>/gi, "");
@@ -655,16 +665,121 @@ async function save(
     ? {
         ok: true,
         warning: true,
-        text: `${saved}, without its PDF. ${missing}`,
+        text: `${saved}, without its PDF. ${missing}${extrasNote}`,
         link: await itemLink(item.id),
         item: paper,
       }
     : {
         ok: true,
-        text: `${saved}.${fileNote}`,
+        text: `${saved}.${fileNote}${extrasNote}`,
         link: await itemLink(item.id),
         item: paper,
       };
+}
+
+/** How long the supplementary files may take, all of them. */
+const EXTRAS_MS = 120_000;
+/** A supplementary file larger than this is left at the publisher's. */
+const MAX_SUPPLEMENT_BYTES = 100 * 1024 * 1024;
+
+/** The paper's supplementary files and its links to code and data, found
+ * on its page: saved with it (files a few at a time). What fails is left
+ * out, the log says why; an older paperus without links takes the files
+ * only. Returns what to tell. */
+async function saveExtras(
+  itemId: string,
+  extras: Extras | null,
+): Promise<string> {
+  if (!extras || (!extras.files.length && !extras.links.length)) return "";
+  trace("Supplementary material, code and data on the page", {
+    files: extras.files.map((f) => f.url).join(" "),
+    links: extras.links.map((l) => `${l.kind}: ${l.url}`).join(" "),
+  });
+  const kinds = new Set<string>();
+  for (const link of extras.links) {
+    try {
+      const { status } = await call<Api.AddLinkData>(
+        "/api/items/{item_id}/links",
+        {
+          method: "POST",
+          path: { item_id: itemId },
+          json: { url: link.url, kind: link.kind, replace: false },
+        },
+      );
+      if (status < 400) kinds.add(link.kind);
+    } catch (error) {
+      trace("A link not added", { url: link.url, reason: String(error) });
+    }
+  }
+  const queue = [...extras.files];
+  let saved = 0;
+  const worker = async () => {
+    for (let file = queue.shift(); file; file = queue.shift())
+      if (await saveSupplement(itemId, file)) saved++;
+  };
+  await within(
+    EXTRAS_MS,
+    Promise.all(Array.from({ length: Math.min(3, queue.length) }, worker)),
+  ).catch(() => trace("Supplementary files: out of time", { item: itemId }));
+  const parts: string[] = [];
+  if (saved)
+    parts.push(
+      saved === 1 ? "a supplementary file" : `${saved} supplementary files`,
+    );
+  const to = (["code", "data"] as const).filter((kind) => kinds.has(kind));
+  if (to.length) parts.push(`the link to its ${to.join(" and ")}`);
+  else if (kinds.has("other")) parts.push("a link");
+  return parts.length ? ` Also ${parts.join(" and ")}.` : "";
+}
+
+/** One supplementary file, fetched from here (with the reader's access to
+ * the publisher's site) and added to the paper; whether it was. */
+async function saveSupplement(
+  itemId: string,
+  file: { url: string; name: string },
+): Promise<boolean> {
+  const why = (reason: string) => {
+    trace("A supplementary file not saved", { url: file.url, reason });
+    return false;
+  };
+  if (!(await chrome.permissions.contains({ origins: [site(file.url)] })))
+    return why("no access to its site");
+  try {
+    const response = await fetch(file.url, {
+      credentials: "include",
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!response.ok) return why(`answered ${response.status}`);
+    const type = response.headers.get("content-type") ?? "";
+    // A page instead of the file: a login, or a list of files.
+    if (/text\/html|application\/xhtml/i.test(type)) return why("a web page");
+    const length = Number(response.headers.get("content-length") ?? 0);
+    if (length > MAX_SUPPLEMENT_BYTES)
+      return why(`too large (${length} bytes)`);
+    const blob = await response.blob();
+    if (blob.size > MAX_SUPPLEMENT_BYTES)
+      return why(`too large (${blob.size} bytes)`);
+    const named =
+      /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(
+        response.headers.get("content-disposition") ?? "",
+      )?.[1] ?? file.name;
+    let name = named;
+    try {
+      name = decodeURIComponent(named);
+    } catch {
+      // As it is.
+    }
+    const form = new FormData();
+    form.append("upload", blob, name.slice(0, 200));
+    form.append("role", "supplementary");
+    const { status } = await call<Api.UploadToItemData>(
+      "/api/items/{item_id}/files",
+      { method: "POST", path: { item_id: itemId }, form },
+    );
+    return status < 400 || why(`paperus answered ${status}`);
+  } catch (error) {
+    return why(String(error));
+  }
 }
 
 /** Add the PDF to the paper: null if it was, else why not. */

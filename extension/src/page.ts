@@ -3,6 +3,8 @@
  * network, publisher login). Each must stand alone: no imports, no
  * closures. */
 
+import type { PageLink } from './extras';
+
 export interface PageInfo {
 	url: string;
 	isPdf: boolean;
@@ -201,6 +203,55 @@ export async function fetchPdf(
 	} catch (error) {
 		return { error: `The PDF could not be fetched: ${String(error)}` };
 	}
+}
+
+/** Every link of the article with what is around it, for finding its
+ * supplementary material, code and data (extras.ts decides): the heading
+ * of its section (the last heading before it), the sentence or item it
+ * sits in, and whether it is in the abstract (arXiv's comments too). Not
+ * the site's header, footer and menus. */
+export function pageLinks(): PageLink[] {
+	const headings = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+	/** The last heading before the link, in the page's order. */
+	const headingOf = (link: Element): string => {
+		let low = 0;
+		let high = headings.length - 1;
+		let found = -1;
+		while (low <= high) {
+			const middle = (low + high) >> 1;
+			if (headings[middle].compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING) {
+				found = middle;
+				low = middle + 1;
+			} else high = middle - 1;
+		}
+		return found < 0 ? '' : (headings[found].textContent ?? '').trim().slice(0, 200);
+	};
+	const found: PageLink[] = [];
+	const seen = new Set<string>();
+	for (const link of [...document.querySelectorAll('a[href]')].slice(0, 5000)) {
+		if (link.closest('header, footer, nav, [role="banner"], [role="contentinfo"], [role="navigation"]'))
+			continue;
+		let url: URL;
+		try {
+			url = new URL(String(link.getAttribute('href')), location.href);
+		} catch {
+			continue;
+		}
+		if (url.protocol !== 'https:' && url.protocol !== 'http:') continue;
+		url.hash = '';
+		if (seen.has(url.href)) continue;
+		seen.add(url.href);
+		found.push({
+			url: url.href,
+			text: (link.textContent ?? '').trim().slice(0, 200),
+			heading: headingOf(link),
+			context: (link.closest('p, li, dd, td, figcaption')?.textContent ?? '').trim().slice(0, 600),
+			abstract: !!link.closest(
+				'blockquote.abstract, .abstract, #abstract, [id^="abstract" i], [class*="abstract" i], td.comments'
+			)
+		});
+	}
+	return found;
 }
 
 /** What the page shows, for telling why it gave no PDF (see causes.ts). */
