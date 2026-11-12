@@ -95,6 +95,14 @@ def author_names(csl: dict[str, Any]) -> list[str]:
     return names
 
 
+def container_title(csl: dict[str, Any]) -> str | None:
+    """The journal or venue (CSL's ``container-title``, a list in some)."""
+    value = csl.get("container-title")
+    if isinstance(value, list):
+        value = value[0] if value else None
+    return value.strip() or None if isinstance(value, str) else None
+
+
 def issued_year(csl: dict[str, Any]) -> int | None:
     """The year of publication, from the first date there is."""
     for key in ("issued", "published-print", "published-online"):
@@ -147,8 +155,8 @@ def authors_key(csl: dict[str, Any]) -> str:
 
 
 def refresh_item(item: Item) -> None:
-    """Update the cached type, title, year, dates and authors' key after
-    versions or overrides change."""
+    """Update the cached type, title, year, dates, first author, journal
+    and authors' key after versions or overrides change."""
     csl = citation_csl(item)
     item.authors_key = authors_key(csl)
     item.type = csl_type(csl)
@@ -156,6 +164,8 @@ def refresh_item(item: Item) -> None:
     item.year = issued_year(csl)
     issued = issued_range(csl)
     item.issued_from, item.issued_to = issued or (None, None)
+    item.first_author = next((name for name in author_names(csl) if name), None)
+    item.journal = container_title(csl)
 
 
 def find_identifier(

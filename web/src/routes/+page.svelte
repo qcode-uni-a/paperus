@@ -14,6 +14,7 @@
 	import { uploads } from '#lib/uploads.svelte.ts';
 	import LibraryFilter from '#lib/LibraryFilter.svelte';
 	import { fromAddress, isEmpty, toQuery } from '#lib/libraryFilter.ts';
+	import { isDefault, sortFromAddress, sortQuery } from '#lib/librarySort.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 	import BulkBar from '#lib/BulkBar.svelte';
 	import { Selection } from '#lib/selection.svelte.ts';
@@ -100,6 +101,7 @@
 	// several: all of them), an author (LibraryFilter).
 	const collectionId = $derived(page.url.searchParams.get('collection'));
 	const filter = $derived(fromAddress(page.url.searchParams));
+	const sort = $derived(sortFromAddress(page.url.searchParams));
 	const filtered = $derived(!isEmpty(filter));
 
 	// Collections have their own pages; older links still work.
@@ -122,9 +124,11 @@
 		const { data, response } = await listItems({
 			query: {
 				limit,
-				before,
+				// Newest added first: after the last item; any other order: by place.
+				...(isDefault(sort) ? { before } : { offset: before ? items.length : 0 }),
 				collection: collectionId ?? undefined,
-				...toQuery(filter)
+				...toQuery(filter),
+				...sortQuery(sort)
 			}
 		});
 		if (request !== latest) return;
@@ -181,7 +185,7 @@
 	}
 
 	// The list for the current filter (reloads when it changes).
-	const filterKey = $derived(JSON.stringify(toQuery(filter)));
+	const filterKey = $derived(JSON.stringify([toQuery(filter), sortQuery(sort)]));
 	$effect(() => {
 		void collectionId;
 		void filterKey;
@@ -355,6 +359,7 @@
 	/* Beside the Filter button. */
 	.count.listed {
 		margin: 0;
+		white-space: nowrap;
 	}
 	.select {
 		margin-left: auto;

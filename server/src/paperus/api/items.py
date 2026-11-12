@@ -10,7 +10,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import TextClause, Uuid, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session, object_session
+from sqlalchemy.orm import InstrumentedAttribute, Session, object_session
 from sqlalchemy.sql.elements import ColumnElement
 
 from paperus import abstracts, changes, library, merge, metadata
@@ -175,13 +175,6 @@ class ItemDetail(ItemOut):
     """Where its code, data and more are, in the order they were added."""
 
 
-def _container_title(csl: dict[str, Any]) -> str | None:
-    value = csl.get("container-title")
-    if isinstance(value, list):
-        value = value[0] if value else None
-    return value or None
-
-
 def _identifiers(version: Version) -> list[IdentifierOut]:
     return [
         IdentifierOut(scheme=Scheme(i.scheme), value=i.value)
@@ -201,7 +194,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
         authors=library.author_names(csl),
         author_ids=_author_ids(item, csl),
         year=library.issued_year(csl),
-        container_title=_container_title(csl),
+        container_title=library.container_title(csl),
         identifiers=[i for v in item.versions for i in _identifiers(v)],
         created_at=item.created_at,
         change=item.change,
@@ -687,7 +680,10 @@ def list_items(
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
-    sort: Literal["added", "recent", "opened"] = "added",
+    sort: Literal[
+        "added", "recent", "opened", "title", "author", "year", "published", "journal"
+    ] = "added",
+    order: Literal["asc", "desc"] | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     unsorted: bool = False,
     favourite: bool = False,
@@ -697,7 +693,12 @@ def list_items(
     the next page. ``library`` shows one library only. ``sort=recent``:
     by the latest of the item's last change and the reader's last opening,
     newest first, paged with ``offset`` instead of ``before``;
-    ``sort=opened``: only items the reader opened, by when.
+    ``sort=opened``: only items the reader opened, by when. Sorted by
+    ``title``, first ``author`` (then year), ``year`` (then first author),
+    publication date (``published``) or ``journal`` (then year), or by
+    when added in ``order=asc``: ``order`` is ``asc`` or ``desc`` (the
+    default: newest first for dates and years, A to Z for words), papers
+    without the value last either way; paged with ``offset``.
 
     ``trashed=true`` lists the trash instead, ``archived=true`` the archive
     (archived papers are otherwise left out, except when asked for by
@@ -808,10 +809,49 @@ def list_items(
             item_out(item, access).model_copy(update={"viewed_at": seen})
             for item, seen in rows
         ]
-    query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)
-    if before is not None:
-        query = query.where(Item.id < before)
+    descending = (order or ("desc" if sort in _NEWEST_FIRST else "asc")) == "desc"
+    if sort == "added" and descending:
+        query = select(Item).where(*conditions).order_by(Item.id.desc()).limit(limit)
+        if before is not None:
+            query = query.where(Item.id < before)
+        return [item_out(item, access) for item in db.scalars(query)]
+    query = (
+        select(Item)
+        .where(*conditions)
+        .order_by(*_sorted_by(sort, descending))
+        .offset(offset)
+        .limit(limit)
+    )
     return [item_out(item, access) for item in db.scalars(query)]
+
+
+_NEWEST_FIRST = ("added", "year", "published")
+
+
+def _sorted_by(sort: str, descending: bool) -> list[ColumnElement[Any]]:
+    """The list's order: the field asked for, papers without it last, then
+    what tells papers with the same value apart."""
+
+    def way(
+        column: ColumnElement[Any] | InstrumentedAttribute[Any],
+    ) -> ColumnElement[Any]:
+        return (column.desc() if descending else column.asc()).nulls_last()
+
+    # Words as read: without markup (<i>…</i>), any case.
+    title = func.lower(func.regexp_replace(Item.title, "<[^>]+>", "", "g"))
+    author = func.lower(Item.first_author)
+    keys = {
+        "title": [way(title)],
+        "author": [way(author), way(Item.year), title.asc()],
+        "year": [way(Item.year), author.asc().nulls_last(), title.asc()],
+        "published": [way(Item.issued_from), way(Item.issued_to), title.asc()],
+        "journal": [
+            way(func.lower(Item.journal)),
+            Item.year.desc().nulls_last(),
+            title.asc(),
+        ],
+    }.get(sort, [way(Item.id)])
+    return [*keys, Item.id.desc()]
 
 
 @router.put("/api/items/{item_id}/archive", status_code=204)

@@ -9,6 +9,7 @@
 	import { fromAddress, isEmpty, toAddress, type Filter } from '#lib/libraryFilter.ts';
 	import { describeRules } from '#lib/organize.svelte.ts';
 	import RulesEditor from '#lib/RulesEditor.svelte';
+	import SortControl from '#lib/SortControl.svelte';
 	import { writtenName } from '#lib/names.svelte.ts';
 
 	/** The library's filter: a button opening the rules of smart collections
@@ -68,9 +69,12 @@
 <div class="filter">
 	<div class="head">
 		{@render count()}
-		<button class="toggle" class:active={!isEmpty(filter)} aria-expanded={open} onclick={toggle}
-			><Icon path={mdiFilterVariant} size={18} />Filter</button
-		>
+		<div class="tools">
+			<span class="sorting"><SortControl /></span>
+			<button class="toggle" class:active={!isEmpty(filter)} aria-expanded={open} onclick={toggle}
+				><Icon path={mdiFilterVariant} size={18} />Filter</button
+			>
+		</div>
 	</div>
 	{#if !isEmpty(filter)}
 		<div class="row">
@@ -108,11 +112,27 @@
 		display: grid;
 		gap: 10px;
 	}
+	/* Filter beside the number; on a narrow screen Sort below, on its own line. */
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
-		gap: 12px;
+		gap: 10px 12px;
+	}
+	.tools {
+		display: flex;
+		gap: 8px;
+		margin-left: auto;
+	}
+	@media (max-width: 560px) {
+		.tools {
+			display: contents;
+		}
+		.sorting {
+			order: 1;
+			margin-left: auto;
+		}
 	}
 	.row {
 		gap: 6px 14px;

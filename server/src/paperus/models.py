@@ -413,6 +413,10 @@ class Item(Record, Trashable, Base):
     issued_to: Mapped[date | None] = mapped_column(index=True)
     """The days the publication date stands for: one day, a month (March
     2024: 1 to 31 March) or a year, as precisely as it is known."""
+    first_author: Mapped[str | None] = mapped_column(Text)
+    """As cited ("Family, Given", or a name as it stands), for sorting."""
+    journal: Mapped[str | None] = mapped_column(Text)
+    """The journal or venue as cited (``container-title``), for sorting."""
     file_wanted: Mapped[bool] = mapped_column(server_default=text("true"))
     """False: no file is needed (a web page, a book on the shelf); not
     listed under Manage → Missing."""

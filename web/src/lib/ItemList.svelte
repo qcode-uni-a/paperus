@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { listItems, type Item } from '#lib/api/client.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { uploads } from '#lib/uploads.svelte.ts';
@@ -7,6 +8,8 @@
 	import BulkBar from '#lib/BulkBar.svelte';
 	import { organize } from '#lib/organize.svelte.ts';
 	import { Selection } from '#lib/selection.svelte.ts';
+	import { isDefault, sortFromAddress, sortQuery } from '#lib/librarySort.ts';
+	import SortControl from '#lib/SortControl.svelte';
 
 	/** Items of a collection, loading more while scrolling. */
 	let { collection, nested = false }: { collection: string; nested?: boolean } = $props();
@@ -15,6 +18,8 @@
 	// The most the server lists at once.
 	const MOST = 200;
 	let items = $state<Item[]>([]);
+	const sort = $derived(sortFromAddress(page.url.searchParams));
+	const sortKey = $derived(JSON.stringify(sortQuery(sort)));
 	const selection = new Selection(() => items.map((item) => item.id));
 	let total = $state<number | null>(null);
 	let more = $state(false);
@@ -26,7 +31,14 @@
 		const request = ++latest;
 		loading = true;
 		const { data, response } = await listItems({
-			query: { limit, before, collection, nested }
+			query: {
+				limit,
+				// Newest added first: after the last item; any other order: by place.
+				...(isDefault(sort) ? { before } : { offset: before ? items.length : 0 }),
+				collection,
+				nested,
+				...sortQuery(sort)
+			}
 		});
 		if (request !== latest) return;
 		loading = false;
@@ -57,6 +69,7 @@
 	$effect(() => {
 		void collection;
 		void nested;
+		void sortKey;
 		untrack(() => load());
 	});
 
@@ -91,10 +104,13 @@
 {#if total !== null}
 	<div class="head">
 		<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
-		{#if total > 0 && !selection.active}<button
-				class="select"
-				onclick={() => (selection.active = true)}>Select</button
-			>{/if}
+		<div class="tools">
+			{#if total > 1}<SortControl />{/if}
+			{#if total > 0 && !selection.active}<button
+					class="select"
+					onclick={() => (selection.active = true)}>Select</button
+				>{/if}
+		</div>
 	</div>
 {/if}
 {#if total === 0}
@@ -118,9 +134,15 @@
 <style>
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
-		gap: 12px;
+		gap: 10px 12px;
+	}
+	.tools {
+		display: flex;
+		gap: 8px;
+		margin-left: auto;
 	}
 	.select {
 		padding: 3px 12px;
@@ -132,6 +154,7 @@
 		color: var(--muted);
 		margin: 0;
 		letter-spacing: 0;
+		white-space: nowrap;
 	}
 	ul {
 		margin: 0;

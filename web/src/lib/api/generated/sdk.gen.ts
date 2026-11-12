@@ -167,7 +167,12 @@ export const getAvatar = <ThrowOnError extends boolean = false>(options: Options
  * the next page. ``library`` shows one library only. ``sort=recent``:
  * by the latest of the item's last change and the reader's last opening,
  * newest first, paged with ``offset`` instead of ``before``;
- * ``sort=opened``: only items the reader opened, by when.
+ * ``sort=opened``: only items the reader opened, by when. Sorted by
+ * ``title``, first ``author`` (then year), ``year`` (then first author),
+ * publication date (``published``) or ``journal`` (then year), or by
+ * when added in ``order=asc``: ``order`` is ``asc`` or ``desc`` (the
+ * default: newest first for dates and years, A to Z for words), papers
+ * without the value last either way; paged with ``offset``.
  *
  * ``trashed=true`` lists the trash instead, ``archived=true`` the archive
  * (archived papers are otherwise left out, except when asked for by

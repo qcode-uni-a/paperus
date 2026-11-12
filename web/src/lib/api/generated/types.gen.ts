@@ -5690,7 +5690,11 @@ export type ListItemsData = {
         /**
          * Sort
          */
-        sort?: 'added' | 'recent' | 'opened';
+        sort?: 'added' | 'recent' | 'opened' | 'title' | 'author' | 'year' | 'published' | 'journal';
+        /**
+         * Order
+         */
+        order?: 'asc' | 'desc' | null;
         /**
          * Offset
          */

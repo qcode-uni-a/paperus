@@ -95,3 +95,55 @@ def test_0003_gives_papers_the_abstract_of_their_details(
         .where(ItemChunk.item_id == item_id)
     )
     assert text == "Glacier retreat\n\nIce loss in the Alps."
+
+
+def test_0012_gives_papers_their_first_author_and_journal(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """An installation of 0.0.28 updated: its papers sorted by first author
+    and journal, as the preferred version and the paper's edits have them."""
+
+    def add(metadata: dict[str, object], kind: str = "preprint") -> str:
+        response = logged_in.post(
+            "/api/items", json={"metadata": metadata, "kind": kind}
+        )
+        assert response.status_code == 201, response.text
+        return str(response.json()["id"])
+
+    preprint = add(
+        {"title": "Spin qubits", "author": [{"family": "Early", "given": "A."}]}
+    )
+    published = logged_in.post(
+        f"/api/items/{preprint}/versions",
+        json={
+            "kind": "published",
+            "metadata": {
+                "title": "Spin qubits",
+                "author": [{"literal": ""}, {"family": "Benito", "given": "Mónica"}],
+                "container-title": ["Physical Review B"],
+            },
+        },
+    )
+    assert published.status_code == 201, published.text
+    edited = add({"title": "Edited", "author": [{"family": "Wrong"}]})
+    item = logged_in.get(f"/api/items/{edited}")
+    response = logged_in.put(
+        f"/api/items/{edited}/overrides",
+        json={"author": [{"literal": "The Lab"}], "container-title": " Notes "},
+        headers={"If-Match": item.headers["ETag"]},
+    )
+    assert response.status_code == 200, response.text
+    bare = add({"title": "Bare"})
+    db.close()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.downgrade(config, "0011")
+    command.upgrade(config, "head")
+
+    rows = {
+        str(row.id): (row.first_author, row.journal)
+        for row in db.execute(select(Item.id, Item.first_author, Item.journal))
+    }
+    assert rows[preprint] == ("Benito, Mónica", "Physical Review B")
+    assert rows[edited] == ("The Lab", "Notes")
+    assert rows[bare] == (None, None)
