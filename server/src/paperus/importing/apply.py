@@ -31,8 +31,10 @@ from paperus.models import (
     File,
     FileRole,
     FileSource,
+    Group,
     Identifier,
     Item,
+    Library,
     MetadataSource,
     Note,
     NoteItem,
@@ -163,7 +165,14 @@ class Report:
     papers: int = 0
     added: int = 0
     found: int = 0
-    """Already in the library; what the export brought was added to them."""
+    """Already in the library imported into (or twice in the export); what
+    the export brought was added to them."""
+    found_elsewhere: dict[str, int] = field(default_factory=dict)
+    """Already in another library the person sees ("your library", a
+    group's name): what the export brought was added there, not copied."""
+    files_not_added: dict[str, int] = field(default_factory=dict)
+    """Files left out, by library: their paper is there already, and the
+    person may only read it."""
     files: int = 0
     notes: int = 0
     collections: int = 0
@@ -240,7 +249,13 @@ def apply(
 def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
     """One paper or note in its own transaction: if it fails, what it did is
     undone (also in the counts and caches) and the import goes on."""
-    counts = dataclasses.replace(run.report, missing_files=[], problems=[])
+    counts = dataclasses.replace(
+        run.report,
+        missing_files=[],
+        problems=[],
+        found_elsewhere=dict(run.report.found_elsewhere),
+        files_not_added=dict(run.report.files_not_added),
+    )
     seen = dict(run.seen)
     missing = len(run.report.missing_files)
     try:
@@ -256,6 +271,8 @@ def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
             "notes",
             "collections",
             "loose_pdfs",
+            "found_elsewhere",
+            "files_not_added",
         ):
             setattr(run.report, counter, getattr(counts, counter))
         del run.report.missing_files[missing:]
@@ -342,7 +359,7 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
         run.report.added += 1
         run.added.add(item.id)
     else:
-        run.report.found += 1
+        _found(run, item)
     for scheme, value in paper.identifiers:
         run.seen[(scheme.value, value)] = item.id
     for sha, _, _ in stored:
@@ -350,6 +367,13 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
 
     if access.can_write_item(item):
         _attach_files(run, item, stored)
+    else:
+        present = {f.blob_sha256 for v in item.versions for f in v.files}
+        if left_out := len({sha for sha, _, _ in stored} - present):
+            name = _library_name(run, item.library_id)
+            run.report.files_not_added[name] = (
+                run.report.files_not_added.get(name, 0) + left_out
+            )
     if access.may_tag(run.owner, item):
         _tag(run, item, paper)
     for path in paper.collections:
@@ -364,6 +388,27 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
         note = notes.create(db, run.owner, text, access.user.id)
         note.item_links.append(NoteItem(item_id=item.id, added_by=access.user.id))
         run.report.notes += 1
+
+
+def _found(run: _Run, item: Item) -> None:
+    """Counted as already there: in the library imported into, or where."""
+    if item.library_id == run.owner:
+        run.report.found += 1
+        return
+    name = _library_name(run, item.library_id)
+    run.report.found_elsewhere[name] = run.report.found_elsewhere.get(name, 0) + 1
+
+
+def _library_name(run: _Run, library_id: uuid.UUID) -> str:
+    """As the person knows it: "your library", or the group's name."""
+    if library_id == run.access.own_library:
+        return "your library"
+    name = run.db.scalar(
+        select(Group.name)
+        .join(Library, Library.group_id == Group.id)
+        .where(Library.id == library_id)
+    )
+    return name or "another library"
 
 
 def _loose_pdf(run: _Run, path: str) -> None:

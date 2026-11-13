@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Imports say where papers were already**: besides "already here",
+  how many are in other libraries one sees ("1 already in Lab"), and the
+  files left out because their paper is in a group one may only read
+  (before, those were dropped without a word). The bell tells when an
+  import is done (it may take long), with its counts.
 - **Select all** in the selection's bar ("Select all 1,429"): every paper
   the list's filters match, also those not loaded yet, changed by the server in one go (up to
   50,000). Before, only the rows loaded so far could be picked, and

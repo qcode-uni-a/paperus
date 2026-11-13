@@ -57,6 +57,10 @@
 		notes: number;
 		collections: number;
 		loose_pdfs?: number;
+		/** Already in other libraries one sees, by name ("your library", a group). */
+		found_elsewhere?: Record<string, number>;
+		/** Files left out, by library: the paper is there, and only to read. */
+		files_not_added?: Record<string, number>;
 		missing_files: string[];
 		problems: string[];
 	};
@@ -219,6 +223,25 @@
 	function count(n: number | undefined, one: string, many: string): string {
 		return `${n ?? 0} ${n === 1 ? one : many}`;
 	}
+
+	/** "Lab (10) and Team (5)", or just "Lab": the libraries, with how many
+	 * when more than one. */
+	function listed(by: Record<string, number>): string {
+		const entries = Object.entries(by);
+		if (entries.length === 1) return entries[0][0];
+		const parts = entries.map(([name, n]) => `${name} (${n})`);
+		return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+	}
+
+	const total = (by: Record<string, number> | undefined) =>
+		Object.values(by ?? {}).reduce((a, b) => a + b, 0);
+
+	/** "15 already in Lab (10) and Team (5)": papers found in other
+	 * libraries one sees; '' if none. */
+	function elsewhere(report: Report): string {
+		const n = total(report.found_elsewhere);
+		return n ? `${n} already in ${listed(report.found_elsewhere ?? {})}` : '';
+	}
 </script>
 
 <p class="lead muted">
@@ -352,7 +375,8 @@
 				{:else if record.report}
 					{@const report = record.report as unknown as Report}
 					<p>
-						{count(report.papers, 'paper', 'papers')}: {report.added} added, {report.found} already here.
+						{count(report.papers, 'paper', 'papers')}: {report.added} added, {report.found} already here{#if elsewhere(report)},
+							{elsewhere(report)}{/if}.
 						{count(report.files, 'file', 'files')}, {count(report.notes, 'note', 'notes')}, {count(
 							report.collections,
 							'new collection',
@@ -363,6 +387,17 @@
 							joining its paper once read (by its DOI).
 						{/if}
 					</p>
+					{#if total(report.files_not_added)}
+						{@const n = total(report.files_not_added)}
+						<p>
+							<strong>{count(n, 'file', 'files')} not added:</strong>
+							{n === 1 ? 'its paper is' : 'their papers are'} already in {listed(
+								report.files_not_added ?? {}
+							)}, which you can only read. Ask an editor of the group to add {n === 1
+								? 'it'
+								: 'them'}, or import into your own library.
+						</p>
+					{/if}
 					{#if report.missing_files?.length}
 						<details>
 							<summary>

@@ -106,6 +106,20 @@
 				reload: true
 			};
 		}
+		if (notice.kind === 'import') {
+			const href = `${resolve('/settings')}?open=import`;
+			if (d.failed) return { text: `Your import of ${d.filename} failed: see why`, href };
+			const told = [
+				`${plural(Number(d.added ?? 0))} added`,
+				d.found ? `${d.found} already in the library` : '',
+				d.found_elsewhere ? `${d.found_elsewhere} already in other libraries` : '',
+				d.files_not_added
+					? `${d.files_not_added} ${d.files_not_added === 1 ? 'file' : 'files'} not added (see why)`
+					: '',
+				d.problems ? `${d.problems} ${d.problems === 1 ? 'problem' : 'problems'}` : ''
+			].filter(Boolean);
+			return { text: `Import of ${d.filename} done: ${told.join(', ')}`, href };
+		}
 		if (notice.kind === 'export_failed') {
 			return {
 				text: 'Your export failed: see why, and start it again',

@@ -3,8 +3,9 @@ not do themselves, under the bell in the header. Papers added to one of
 their groups (by upload, DOI, the extension, an import, or given to the
 group: one notification per person who added and group, counted up while
 unread for a few hours), a published version found for one of their
-preprints, and each zip of their export as it is written (or the export
-failing). Read ones go after ``KEEP_READ``, all after ``KEEP`` (the
+preprints, each zip of their export as it is written (or the export
+failing), and the end of their imports, which may take long. Read ones go
+after ``KEEP_READ``, all after ``KEEP`` (the
 nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
@@ -22,6 +23,8 @@ from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.models import (
     Group,
+    Import,
+    ImportStatus,
     Item,
     Library,
     Membership,
@@ -40,6 +43,7 @@ ADDED = "added"
 PUBLISHED = "published"
 EXPORT = "export"
 EXPORT_FAILED = "export_failed"
+IMPORT = "import"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -147,6 +151,28 @@ def export_failed(db: Session, user_id: uuid.UUID, export_id: uuid.UUID) -> None
     db.add(
         Notification(
             user_id=user_id, kind=EXPORT_FAILED, data={"export_id": str(export_id)}
+        )
+    )
+
+
+def import_finished(db: Session, record: Import) -> None:
+    """An import has ended (it may take long): what came of it, in short."""
+    report = record.report or {}
+    db.add(
+        Notification(
+            user_id=record.user_id,
+            kind=IMPORT,
+            data={
+                "import_id": str(record.id),
+                "filename": record.filename,
+                "failed": record.status == ImportStatus.FAILED,
+                "added": report.get("added", 0),
+                "found": report.get("found", 0),
+                "found_elsewhere": sum(report.get("found_elsewhere", {}).values()),
+                "files_not_added": sum(report.get("files_not_added", {}).values()),
+                "problems": len(report.get("problems", []))
+                + len(report.get("missing_files", [])),
+            },
         )
     )
 

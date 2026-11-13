@@ -27,7 +27,7 @@ import httpx2
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from paperus import metadata
+from paperus import metadata, notifications
 from paperus.access import Access
 from paperus.identifiers import normalize_arxiv
 from paperus.importing import (
@@ -563,6 +563,7 @@ def _run(
             else (f"The import stopped: {error}")
         )
     record.finished_at = datetime.now(UTC)
+    notifications.import_finished(db, record)
     uploads = [record.blob_sha256, *(part.blob_sha256 for part in record.parts)]
     record.blob_sha256 = None
     record.parts.clear()
