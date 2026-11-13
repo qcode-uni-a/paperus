@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (2026-11-14)
+
+*paperus now carries an OpenAlex key, waits politely when the day's budget runs dry, and finds your preprints' citations even after the journal renamed them.*
 
 - **A rescued group says so**: under Groups, an account that is
   deactivated is marked as such, and when a site administrator names a
