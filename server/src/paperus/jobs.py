@@ -29,6 +29,7 @@ from paperus import (
     auth,
     authors,
     changes,
+    errata,
     integrity,
     item_references,
     layouts,
@@ -425,6 +426,35 @@ PUBLISHED_PER_HOUR = 40
 # New preprints (never checked), per run: a large import's go through in a
 # few runs, 50 to a request to arXiv with its pause between.
 NEW_PUBLISHED_PER_RUN = 500
+
+
+# Corrections to papers (paperus.errata): rarely, Sunday nights, a few
+# hundred papers at a time.
+@tasks.periodic(cron="30 3 * * 0")
+@tasks.task(
+    name="find_errata",
+    queue=CROSSREF,
+    queueing_lock="find-errata",
+    pass_context=True,
+)
+def find_errata(job: JobContext, timestamp: int) -> None:
+    """Papers with a journal's DOI, never looked at first, then those under
+    three years old every half year: Crossref is asked for corrections to
+    them, kept as their links ("Erratum")."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.find_errata:
+            return
+        items = errata.waiting(db)
+        found = errata.check(
+            db, context.http, items, contact_email=config.contact_email
+        )
+    log.info("errata: %d papers of %d have one", found, len(items))
+
+
+def queue_errata_check(app: App) -> None:
+    _queue(app, "find_errata", "find-errata", timestamp=0)
 
 
 @tasks.periodic(cron="20 * * * *")

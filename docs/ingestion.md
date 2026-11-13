@@ -155,6 +155,36 @@ suggestion with a confidence score, never added automatically.
   carried over to a newer version on request.
 - Internal drafts: private to authors or the group by default.
 
+### Errata
+
+**Built** (`server/src/paperus/errata.py`, Administration → Server →
+Errata, on by default): a correction a journal published to a paper
+becomes a version of the paper of its own kind, "erratum", with its own
+DOI, details and (if it comes) PDF; it is never the version cited or
+shown, its PDF is not the paper's (Missing, the viewer), and its DOI is
+not the paper's (reference lists). Citing the paper in BibTeX adds it,
+as journals ask: `addendum = {Erratum: Phys. Rev. A 109, 059901 (2024),
+doi:10.1103/…}` (biblatex prints it after the reference; classic BibTeX
+styles skip unknown fields).
+
+Found at Crossref, rarely: a weekly job (Sunday night, in the Crossref
+queue) looks at up to 300 papers with a journal's DOI, each once, then
+every half year while it is under three years old (errata come within a
+year or two), never after that.
+
+- Most publishers' corrections name the paper they correct (Crossref's
+  `update-to`, types erratum, correction, corrigendum; not new versions
+  or retractions): `/works?filter=updates:<DOI>`, one request a paper.
+  Checked 2026-11-13: 31 of 32 Nature errata and 36 of 37 IOP's carry it,
+  Elsevier's and Springer's too.
+- APS's do not (no `update-to`, no relation): their titles cite the paper,
+  "Erratum: <title> [Phys. Rev. A 108, 063502 (2023)]". Looked up by the
+  paper's title among APS's (from its year on), taken only when the
+  citation in brackets has the paper's volume and article number.
+- The erratum's details come from doi.org like any version's; without
+  them it keeps how it is cited ("Erratum: Phys. Rev. A 109, 059901
+  (2024)").
+
 ### Reference lists of papers
 
 **Built** (`server/src/paperus/item_references.py`, Administration →

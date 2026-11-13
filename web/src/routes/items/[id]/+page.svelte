@@ -101,16 +101,18 @@
 	let uploadRole = $state<FileRole>('main');
 	let showDetails = $state(false);
 
-	/** The PDF to show: the cited version's main PDF, else any PDF. */
+	/** The PDF to show: the cited version's main PDF, else any PDF (not an
+	 * erratum's: a correction is not the paper). */
 	const pdfFile = $derived.by(() => {
 		if (!item) return null;
 		const pdfs = (files: ItemDetail['versions'][number]['files']) =>
 			files.filter((f) => !f.deleted_at && f.media_type === 'application/pdf');
 		const preferred = item.versions.find((v) => v.id === item?.preferred_version_id);
+		const paper = item.versions.filter((v) => v.kind !== 'erratum');
 		const candidates = [
 			...pdfs(preferred?.files ?? []).filter((f) => f.role === 'main'),
-			...item.versions.flatMap((v) => pdfs(v.files).filter((f) => f.role === 'main')),
-			...item.versions.flatMap((v) => pdfs(v.files))
+			...paper.flatMap((v) => pdfs(v.files).filter((f) => f.role === 'main')),
+			...paper.flatMap((v) => pdfs(v.files))
 		];
 		return candidates[0] ?? null;
 	});

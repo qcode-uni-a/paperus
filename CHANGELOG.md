@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Errata are found by themselves**: a correction a journal published to
+  a paper becomes a version of it of its own kind ("erratum", with its
+  DOI and details), never the version cited or shown, and the paper's
+  BibTeX cites it with it (`addendum = {Erratum: Phys. Rev. A 109, 059901
+  (2024), doi:…}`), as journals ask. Looked for rarely at Crossref (a few
+  hundred papers a week, each again every half year while under three
+  years old); APS's errata, which Crossref does not link, by their titles.
+  A setting under Server turns it off.
 - **Peer review files**: a new kind of attachment, "Peer review", for
   referees' reports and the authors' replies. The browser extension
   recognises them on the page and saves them as such (Nature's "Peer

@@ -67,6 +67,7 @@ from paperus.models import (
     ItemReference,
     TextStatus,
     Version,
+    VersionKind,
 )
 
 log = logging.getLogger(__name__)
@@ -466,6 +467,8 @@ def _identifier(item: Item, scheme: Scheme) -> str | None:
     DOIs of arXiv papers do not count (Crossref has no references for them)."""
     preferred = library.preferred_version(item)
     for version in sorted(item.versions, key=lambda v: v is not preferred):
+        if version.kind == VersionKind.ERRATUM:
+            continue  # its own references, not the paper's
         for identifier in version.identifiers:
             if identifier.scheme == scheme and not (
                 scheme == Scheme.DOI and is_arxiv_doi(identifier.value)

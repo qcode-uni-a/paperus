@@ -1407,7 +1407,8 @@ export const stats = <ThrowOnError extends boolean = false>(options?: Options<St
  * (read files still pending), ``text-failed`` (try failed files again),
  * ``text-all`` (read every file again), ``ocr`` (read scans waiting
  * for OCR), ``published`` (look for preprints' published versions),
- * ``references`` (look for papers' reference lists), ``authors`` (link
+ * ``references`` (look for papers' reference lists), ``errata`` (look
+ * for corrections to papers), ``authors`` (link
  * papers' authors to people),
  * ``trash`` (delete what is older than the trash days), ``integrity``
  * (check stored contents), ``integrity-deep`` (also their SHA-256) or

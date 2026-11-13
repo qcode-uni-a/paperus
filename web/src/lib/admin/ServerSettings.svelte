@@ -18,6 +18,7 @@
 	let openAccess = $state(false);
 	let findPublished = $state(true);
 	let findReferences = $state(true);
+	let findErrata = $state(true);
 	let findAuthors = $state(true);
 	let dates = $state<DateFormat>('browser');
 	const now = new Date();
@@ -30,6 +31,7 @@
 		openAccess = config?.open_access_auto ?? false;
 		findPublished = config?.find_published ?? true;
 		findReferences = config?.find_references ?? true;
+		findErrata = config?.find_errata ?? true;
 		findAuthors = config?.find_authors ?? true;
 		dates = config?.date_format ?? 'browser';
 	}
@@ -45,6 +47,7 @@
 			config.open_access_auto,
 			config.find_published,
 			config.find_references,
+			config.find_errata,
 			config.find_authors,
 			config.date_format
 		]);
@@ -61,6 +64,7 @@
 				openAccess !== (config.open_access_auto ?? false) ||
 				findPublished !== (config.find_published ?? true) ||
 				findReferences !== (config.find_references ?? true) ||
+				findErrata !== (config.find_errata ?? true) ||
 				findAuthors !== (config.find_authors ?? true) ||
 				dates !== (config.date_format ?? 'browser'))
 	);
@@ -75,6 +79,7 @@
 				open_access_auto: openAccess,
 				find_published: findPublished,
 				find_references: findReferences,
+				find_errata: findErrata,
 				find_authors: findAuthors,
 				date_format: dates
 			},
@@ -112,10 +117,19 @@
 <SettingRow
 	id="find-references"
 	title="Reference lists"
-	description="Each paper's reference list, shown on its page with links to the papers in the library (and which papers here cite it): from arXiv's LaTeX source for arXiv papers, else from Crossref by the DOI, else read from the PDF. A few dozen papers an hour, and each paper once its file is read. Only DOIs and arXiv IDs are sent; looking a single reference up on Crossref is left to the person."
+	description="Each paper's reference list, shown on its page with links to the papers in the library (and which papers here cite it): from Crossref by a journal's DOI, else from arXiv's LaTeX source for preprints, else read from the PDF. A few dozen papers an hour, and each paper once its file is read. Only DOIs and arXiv IDs are sent; looking a single reference up on Crossref is left to the person."
 >
 	<label class="check"
 		><input id="find-references" type="checkbox" bind:checked={findReferences} /> Look for them</label
+	>
+</SettingRow>
+<SettingRow
+	id="find-errata"
+	title="Errata"
+	description="Corrections journals published to papers: found at Crossref by the papers' DOIs and added as a version of the paper (never the one shown or cited), and cited with the paper in BibTeX. Rarely: a few hundred papers a week, each again every half year while under three years old. Only the papers' DOIs and titles are sent."
+>
+	<label class="check"
+		><input id="find-errata" type="checkbox" bind:checked={findErrata} /> Look for them</label
 	>
 </SettingRow>
 <SettingRow

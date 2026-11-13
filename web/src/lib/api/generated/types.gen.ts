@@ -4667,6 +4667,10 @@ export type SystemConfig = {
      */
     find_published?: boolean;
     /**
+     * Find Errata
+     */
+    find_errata?: boolean;
+    /**
      * Find References
      */
     find_references?: boolean;
@@ -5289,7 +5293,7 @@ export type VersionIn = {
 /**
  * VersionKind
  */
-export type VersionKind = 'draft' | 'submitted' | 'preprint' | 'accepted' | 'published' | 'edition' | 'other';
+export type VersionKind = 'draft' | 'submitted' | 'preprint' | 'accepted' | 'published' | 'edition' | 'erratum' | 'other';
 
 /**
  * VersionOut

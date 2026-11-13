@@ -41,7 +41,12 @@ JOURNAL = (VersionKind.PUBLISHED, VersionKind.ACCEPTED)
 
 
 def _with_files() -> Select[uuid.UUID]:
-    return select(Version.item_id).join(File).where(File.deleted_at.is_(None))
+    # An erratum's PDF is not the paper's.
+    return (
+        select(Version.item_id)
+        .join(File)
+        .where(File.deleted_at.is_(None), Version.kind != VersionKind.ERRATUM)
+    )
 
 
 def _journal_without_file() -> Select[uuid.UUID]:

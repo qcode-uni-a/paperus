@@ -36,6 +36,8 @@ KIND_PREFERENCE = [
     VersionKind.PREPRINT,
     VersionKind.DRAFT,
     VersionKind.OTHER,
+    # Shown and cited only when there is nothing else.
+    VersionKind.ERRATUM,
 ]
 _RANK = {kind.value: rank for rank, kind in enumerate(KIND_PREFERENCE)}
 

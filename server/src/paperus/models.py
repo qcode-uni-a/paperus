@@ -297,6 +297,9 @@ class VersionKind(StrEnum):
     PUBLISHED = "published"
     EDITION = "edition"
     """E.g. lecture notes of one semester, or a book's 2nd edition (see label)."""
+    ERRATUM = "erratum"
+    """A correction the journal published to the paper, with its own DOI
+    (``paperus.errata``); never the version cited or shown."""
     OTHER = "other"
 
 
@@ -447,6 +450,8 @@ class Item(Record, Trashable, Base):
         DateTime(timezone=True)
     )
     """A preprint: when paperus last looked for its published version."""
+    errata_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """When paperus last looked for corrections to it (``paperus.errata``)."""
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Kept for good, but left out of lists and search unless asked for."""
     references_checked_at: Mapped[datetime | None] = mapped_column(

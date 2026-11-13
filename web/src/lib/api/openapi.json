@@ -6664,7 +6664,7 @@
           "admin"
         ],
         "summary": "Run Job",
-        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again), ``ocr`` (read scans waiting\nfor OCR), ``published`` (look for preprints' published versions),\n``references`` (look for papers' reference lists), ``authors`` (link\npapers' authors to people),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
+        "description": "Start a sweep now: ``embeddings`` (embed what is missing), ``text``\n(read files still pending), ``text-failed`` (try failed files again),\n``text-all`` (read every file again), ``ocr`` (read scans waiting\nfor OCR), ``published`` (look for preprints' published versions),\n``references`` (look for papers' reference lists), ``errata`` (look\nfor corrections to papers), ``authors`` (link\npapers' authors to people),\n``trash`` (delete what is older than the trash days), ``integrity``\n(check stored contents), ``integrity-deep`` (also their SHA-256) or\n``integrity-clean`` (check and remove unused stored contents), ``copy``\n(update the readable copy), ``copy-remove`` (delete it) or ``tidy``\n(retry stalled jobs, delete old jobs and expired logins).",
         "operationId": "run_job",
         "parameters": [
           {
@@ -17220,6 +17220,11 @@
             "title": "Find Published",
             "default": true
           },
+          "find_errata": {
+            "type": "boolean",
+            "title": "Find Errata",
+            "default": true
+          },
           "find_references": {
             "type": "boolean",
             "title": "Find References",
@@ -18430,6 +18435,7 @@
           "accepted",
           "published",
           "edition",
+          "erratum",
           "other"
         ],
         "title": "VersionKind"

@@ -12,7 +12,7 @@ the conventions are taken (Zotero's translator is AGPL), not its code.
 
 import re
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from paperus import library
@@ -134,13 +134,47 @@ def bibtex(
     """BibTeX entries in UTF-8 (fine for biber and modern bibtex);
     ``keywords`` gives a paper's tags."""
     entries = [
-        _entry(key, csl, keywords(item) if keywords else [])
+        _entry(key, csl, keywords(item) if keywords else [], errata(item))
         for item, (key, csl) in zip(items, keyed(items), strict=True)
     ]
     return "\n\n".join(entries) + "\n" if entries else ""
 
 
-def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
+def errata(item: Item) -> list[str]:
+    """The paper's corrections (its versions of kind "erratum") as cited,
+    with their DOIs ("Erratum: Phys. Rev. B 96, 199902 (2017),
+    doi:10.1103/…"): cited with the paper, as journals ask."""
+    found = []
+    for version in item.versions:
+        if version.kind != "erratum":
+            continue
+        csl = version.csl
+        journal = _first(csl.get("container-title-short")) or _first(
+            csl.get("container-title")
+        )
+        volume = csl.get("volume")
+        number = csl.get("article-number") or csl.get("page")
+        year = year_of(csl)
+        cited = (
+            f"Erratum: {journal} {volume}"
+            + (f", {number}" if number else "")
+            + (f" ({year})" if year else "")
+            if journal and volume
+            else _first(csl.get("title")) or "Erratum"
+        )
+        doi = csl.get("DOI") or next(
+            (i.value for i in version.identifiers if i.scheme == "doi"), None
+        )
+        found.append(f"{cited}, doi:{doi}" if doi else str(cited))
+    return found
+
+
+def _entry(
+    key: str,
+    csl: dict[str, Any],
+    tags: list[str],
+    errata: Sequence[str] = (),
+) -> str:
     entry = ENTRY_TYPES.get(str(csl.get("type") or ""), "misc")
     genre = csl.get("genre")
     if entry == "phdthesis":
@@ -202,6 +236,8 @@ def _entry(key: str, csl: dict[str, Any], tags: list[str]) -> str:
         fields.append(("month", month))  # a BibTeX macro: no braces
     add("year", _year(csl))
     add("note", csl.get("note"))
+    # biblatex prints it after the reference; classic BibTeX styles skip it.
+    add("addendum", "; ".join(errata))
     arxiv = _arxiv_id(csl)
     if arxiv:  # as arXiv's own BibTeX has it (Zotero writes only a note)
         add("eprint", arxiv)

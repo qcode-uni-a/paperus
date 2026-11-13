@@ -87,6 +87,7 @@ export const VERSION_KINDS: VersionKind[] = [
 	'preprint',
 	'draft',
 	'edition',
+	'erratum',
 	'other'
 ];
 
