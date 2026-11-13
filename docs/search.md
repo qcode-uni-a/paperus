@@ -357,6 +357,7 @@ and vague questions first, without and with bge-reranker-v2-m3:
 | bge-m3                    | 0.83 / 0.98 / 0.89 | 0.75 / 0.81    | 0.91 / 0.99 / 0.95 | 0.83 / 0.89    |
 | qwen3-embedding-0.6b      | 0.83 / 0.99 / 0.90 | 0.78 / 0.78    | 0.92 / 0.99 / 0.95 | 0.83 / 0.89    |
 | embeddinggemma-2          | 0.81 / 0.99 / 0.89 | 0.78 / 0.78    |                    |                |
+| nemotron-3-embed-1b       | 0.68 / 0.89 / 0.76 | 0.61 / 0.81    | 0.89 / 0.96 / 0.92 | 0.83 / 0.86    |
 
 (EmbeddingGemma 2 with reranking was not run.) Compared question by
 question (sign test: of the questions only one of two puts first, how
@@ -377,3 +378,11 @@ good ones):
 So arctic-embed-m-v2 stays the default, and a server without a GPU, which
 does not rerank by default ("auto"), loses little with it. The reranker
 matters for the weaker models (e5-small 158 → 181 first).
+
+NVIDIA's Nemotron 3 Embed 1B (July 2026, OpenMDW 1.1; 2048 dimensions,
+which `halfvec` stores and could index up to 4000) in a third party's
+ONNX export, fp16 on the GPU (22 minutes for the library; no int8, so on
+a CPU slower than Qwen3-Embedding): the weakest here without reranking,
+German especially (arctic-embed-m-v2 wins 52 : 6), and with it no better
+(177 first; 12 : 5 for arctic with reranking, p = 0.14). Not adopted.
+Whether the export loses quality was not checked.

@@ -146,18 +146,29 @@ Server → Reference lists, on by default): every hour up to 40 papers
 (never looked at first), and each paper right after its file is read, get
 their reference list, from the best source there is:
 
-1. a paper with an arXiv ID: arXiv's LaTeX source (one request to
-   `arxiv.org/e-print/`, at least 3 s apart), read as the import of LaTeX
-   sources reads it: the `.bbl`, else `thebibliography`, else the `.bib`
-   entries the `.tex` cites;
-2. a paper with a DOI: Crossref's record (`api.crossref.org/works/{doi}`),
-   with the references its publisher deposited (some deposit DOIs only);
+1. a paper with a journal's DOI: Crossref's record
+   (`api.crossref.org/works/{doi}`), with the references its publisher
+   deposited (some deposit DOIs only);
+2. a paper with an arXiv ID (a preprint, or Crossref has no list): arXiv's
+   LaTeX source (one request to `arxiv.org/e-print/`, at least 3 s apart),
+   read as the import of LaTeX sources reads it: the `.bbl`, else
+   `thebibliography`, else the `.bib` entries the `.tex` cites;
 3. else the PDF's own list, from its stored text: split where references
    are numbered (`[12]`, `12.`, AIP's `12A. Name`, counted up from 1),
    else, best effort, where an author-year entry starts (`Smith, J.` after
    the end of the one before). Not split: other layouts (initials first
    without numbers, `1)`); a page's running head or footer may stay in a
    reference.
+
+Crossref comes first since 2026-11-13: on 40 of our papers with both,
+its lists were as long as the LaTeX source's (but for one book it had
+none) and 96 % of their references had a DOI, against 76 % with a DOI or
+arXiv ID in the LaTeX; and it needs neither arXiv's 3 s pause nor a
+download. For preprints the source stays: OpenAlex had 569 of 1575 of
+their references. Lookups run in a queue per service (`paperus.jobs`:
+arXiv's one at a time, Crossref's and OpenAlex's two), so none waits
+behind another service's pauses; a paper's job starts in Crossref's and
+goes on in arXiv's if it needs the source.
 
 Only identifiers are taken in the background: DOIs, arXiv IDs and links
 in the references (no searching). A reference matches a paper the person
