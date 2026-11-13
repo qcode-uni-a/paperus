@@ -442,7 +442,7 @@
 					{#if writable}
 						<hr />
 						<button role="menuitem" onclick={() => shareDialog?.open()}>
-							{isShared(item.library_id) ? 'Share with another group…' : 'Share with group…'}
+							{isShared(item.library_id) ? 'Share with others…' : 'Share…'}
 						</button>
 						<button role="menuitem" onclick={() => editDialog?.open()}>Edit</button>
 						<button role="menuitem" onclick={() => mergeDialog?.open()}

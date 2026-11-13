@@ -39,10 +39,14 @@
 	const selectedId = $derived(page.url.searchParams.get('group'));
 	const selected = $derived(groups.find((g) => g.id === selectedId) ?? groups[0]);
 	const childrenOf = (id: string | null) => groups.filter((g) => g.parent_id === id);
-	// Groups whose parent the person cannot see show at the top.
+	// Groups whose parent the person cannot see show at the top; groups of
+	// people (shared with single people) in a section of their own.
 	const roots = $derived(
-		groups.filter((g) => g.parent_id === null || !groups.some((p) => p.id === g.parent_id))
+		groups.filter(
+			(g) => !g.people && (g.parent_id === null || !groups.some((p) => p.id === g.parent_id))
+		)
 	);
+	const peopleGroups = $derived(groups.filter((g) => g.people));
 
 	async function load() {
 		const { data } = await listGroups();
@@ -146,6 +150,12 @@
 			<ul>
 				{#each roots as group (group.id)}{@render node(group)}{/each}
 			</ul>
+			{#if peopleGroups.length}
+				<h3 class="people-head">Shared with people</h3>
+				<ul>
+					{#each peopleGroups as group (group.id)}{@render node(group)}{/each}
+				</ul>
+			{/if}
 		</nav>
 
 		<section class="detail" aria-labelledby="group-name">
@@ -154,7 +164,9 @@
 					<h2 id="group-name">{selected.name}</h2>
 					{#if selected.description}<p class="description">{selected.description}</p>{/if}
 					<p class="muted facts">
-						{#if selected.role}You are {selected.role === 'admin' ? 'an' : 'a'}
+						{#if selected.people}Shared with people: everyone in it may share papers in it, add
+							people and rename it.
+						{:else if selected.role}You are {selected.role === 'admin' ? 'an' : 'a'}
 							{roleLabel(selected.role).toLowerCase()}.{:else}You manage groups but are not a
 							member.{/if}
 						{#if selected.items !== null}
@@ -196,30 +208,30 @@
 							{/if}
 						</span>
 						{#if selected.can_manage}
-							<select
-								value={member.direct_role ?? ''}
-								aria-label="Role of {shownName(member)}"
-								onchange={async (event) => {
-									const role = event.currentTarget.value as Role | '';
-									await changed(
-										role
-											? await setMember({
-													path: { group_id: selected.id, user_id: member.user_id },
-													body: { role }
-												})
-											: await removeMember({
-													path: { group_id: selected.id, user_id: member.user_id }
-												})
-									);
-								}}
-							>
-								{#if member.inherited_from}
-									<option value="">Inherited</option>
-								{/if}
-								{#each ROLES as role (role.value)}
-									<option value={role.value}>{role.label}</option>
-								{/each}
-							</select>
+							{#if !selected.people}<select
+									value={member.direct_role ?? ''}
+									aria-label="Role of {shownName(member)}"
+									onchange={async (event) => {
+										const role = event.currentTarget.value as Role | '';
+										await changed(
+											role
+												? await setMember({
+														path: { group_id: selected.id, user_id: member.user_id },
+														body: { role }
+													})
+												: await removeMember({
+														path: { group_id: selected.id, user_id: member.user_id }
+													})
+										);
+									}}
+								>
+									{#if member.inherited_from}
+										<option value="">Inherited</option>
+									{/if}
+									{#each ROLES as role (role.value)}
+										<option value={role.value}>{role.label}</option>
+									{/each}
+								</select>{/if}
 							{#if member.direct_role}
 								<IconButton
 									icon="delete"
@@ -257,19 +269,23 @@
 							<option value={person.username}>{person.display_name ?? ''}</option>
 						{/each}
 					</datalist>
-					<select bind:value={newRole} aria-label="Role">
-						{#each ROLES as role (role.value)}
-							<option value={role.value}>{role.label}: {role.help}</option>
-						{/each}
-					</select>
+					{#if !selected.people}
+						<select bind:value={newRole} aria-label="Role">
+							{#each ROLES as role (role.value)}
+								<option value={role.value}>{role.label}: {role.help}</option>
+							{/each}
+						</select>
+					{/if}
 					<button>Add</button>
 				</form>
 				<p class="licence">
-					Everyone you add can open the PDFs of this group's papers and those of the groups inside
-					it. Make sure the licences of these papers allow sharing them with these people.
+					Everyone you add can open the PDFs of this group's papers{selected.people
+						? ''
+						: ' and those of the groups inside it'}. Make sure the licences of these papers allow
+					sharing them with these people.
 				</p>
 
-				<h3>Groups inside</h3>
+				{#if !selected.people}<h3>Groups inside</h3>{/if}
 				{#if childrenOf(selected.id).length}
 					<ul class="subgroups">
 						{#each childrenOf(selected.id) as child (child.id)}
@@ -277,9 +293,11 @@
 						{/each}
 					</ul>
 				{/if}
-				<button class="new-inside" onclick={() => dialog?.open({ parent: selected })}>
-					New group in {selected.name}
-				</button>
+				{#if !selected.people}
+					<button class="new-inside" onclick={() => dialog?.open({ parent: selected })}>
+						New group in {selected.name}
+					</button>
+				{/if}
 			{/if}
 		</section>
 	</div>
@@ -303,7 +321,7 @@
 			onclick={() => select(group.id)}
 		>
 			<span class="name">{group.name}</span>
-			{#if group.role}<span class="badge">{roleLabel(group.role)}</span>{/if}
+			{#if group.role && !group.people}<span class="badge">{roleLabel(group.role)}</span>{/if}
 		</button>
 		{#if childrenOf(group.id).length}
 			<ul>
@@ -345,6 +363,12 @@
 		margin: 0;
 		padding: 0;
 		list-style: none;
+	}
+	.people-head {
+		margin: 18px 0 6px;
+		color: var(--muted);
+		font-size: var(--step--1);
+		font-weight: 600;
 	}
 	.groups ul ul {
 		margin-left: 14px;

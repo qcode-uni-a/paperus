@@ -1695,6 +1695,10 @@ export type GroupOut = {
      * Library Id
      */
     library_id: string;
+    /**
+     * People
+     */
+    people?: boolean;
     role: Role | null;
     /**
      * Can Manage
@@ -2430,6 +2434,10 @@ export type LibraryOut = {
      * Group Id
      */
     group_id: string | null;
+    /**
+     * People
+     */
+    people?: boolean;
     /**
      * Path
      */
@@ -3604,6 +3612,16 @@ export type PasswordChange = {
      * New
      */
     new: string;
+};
+
+/**
+ * PeopleIn
+ */
+export type PeopleIn = {
+    /**
+     * User Ids
+     */
+    user_ids: Array<string>;
 };
 
 /**
@@ -10150,6 +10168,31 @@ export type CreateGroupResponses = {
 };
 
 export type CreateGroupResponse = CreateGroupResponses[keyof CreateGroupResponses];
+
+export type GroupOfPeopleData = {
+    body: PeopleIn;
+    path?: never;
+    query?: never;
+    url: '/api/groups/people';
+};
+
+export type GroupOfPeopleErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GroupOfPeopleError = GroupOfPeopleErrors[keyof GroupOfPeopleErrors];
+
+export type GroupOfPeopleResponses = {
+    /**
+     * Successful Response
+     */
+    200: GroupOut;
+};
+
+export type GroupOfPeopleResponse = GroupOfPeopleResponses[keyof GroupOfPeopleResponses];
 
 export type DeleteGroupData = {
     body?: never;

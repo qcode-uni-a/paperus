@@ -63,10 +63,11 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 
 	// A private paper, then shared with the group.
 	const paper = await uploadPaper(page, 'Shared');
-	await itemAction(page, 'Share with group…');
-	const share = page.getByRole('dialog', { name: 'Share with group' });
-	await share.getByLabel('Group').selectOption({ label: groupName });
-	await share.getByRole('button', { name: 'Share' }).click();
+	await itemAction(page, 'Share…');
+	const share = page.getByRole('dialog', { name: 'Share' });
+	await share.getByRole('radio', { name: 'With a group' }).check();
+	await share.getByRole('combobox').selectOption({ label: groupName });
+	await share.getByRole('button', { name: 'Share', exact: true }).click();
 	await expect(share).toBeHidden();
 	await expect(page.getByText(/Added by you/)).toBeVisible();
 
@@ -149,4 +150,44 @@ test("whose papers: all, only one's own, a group's", async ({ page, browser }) =
 	await expect(mine).toBeVisible();
 	expect(new URL(own.url()).searchParams.has('owner')).toBe(false);
 	await context.close();
+});
+
+test('a paper shared with a single person', async ({ page, browser }) => {
+	// Two people of their own (a group of the admin's would change the other
+	// tests' uploads: they would ask where to).
+	const ann = { username: unique('ann'), password: 'ann-password-e2e' };
+	const ben = { username: unique('ben'), password: 'ben-password-e2e' };
+	for (const person of [ann, ben]) {
+		expect((await page.request.post('/api/admin/users', { data: person })).status()).toBe(201);
+	}
+	const a = await logIn(browser, ann.username, ann.password);
+	const b = await logIn(browser, ben.username, ben.password);
+	// Their names as they show them.
+	await a.page.request.put('/api/auth/profile', { data: { display_name: 'Ann Lee' } });
+	await b.page.request.put('/api/auth/profile', { data: { display_name: 'Ben Ott' } });
+	const title = unique('For Ben ');
+	const made = await a.page.request.post('/api/items', { data: { metadata: { title } } });
+	const paper = await made.json();
+
+	await a.page.goto(`/items/${paper.id}`);
+	await itemAction(a.page, 'Share…');
+	const share = a.page.getByRole('dialog', { name: 'Share' });
+	// Without groups: with people at once.
+	await expect(share.getByRole('radio', { name: 'With people' })).toBeChecked();
+	await share.getByRole('searchbox', { name: 'Find a person' }).fill('Ben');
+	await share.getByRole('button', { name: /^Ben Ott/ }).click();
+	await share.getByRole('button', { name: 'Share with Ben Ott' }).click();
+	await expect(share).toBeHidden();
+	await expect(
+		a.page.getByText('Shared with Ann Lee & Ben Ott').filter({ visible: true })
+	).toBeVisible();
+
+	// Ben sees it, and the two of them under Groups, apart.
+	await b.page.goto('/');
+	await expect(b.page.getByRole('link', { name: title })).toBeVisible();
+	await b.page.goto('/manage/groups');
+	await expect(b.page.getByRole('heading', { name: 'Shared with people' })).toBeVisible();
+	await expect(b.page.getByRole('heading', { name: 'Ann Lee & Ben Ott', level: 2 })).toBeVisible();
+	await a.context.close();
+	await b.context.close();
 });

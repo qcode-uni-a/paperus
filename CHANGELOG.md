@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Share with single people**: a paper's Share… now offers people as
+  well as groups. Choose Anna (found by name, anyone on the server), and
+  the paper goes to a small group of the two of you, "Anna & Ben", made
+  the first time and found again after that, with more people as one
+  wishes. Everyone in it is equal (adds people, renames it); these groups
+  show under Groups in a section of their own, "Shared with people", and
+  as owners everywhere else.
+
 ## 0.1.2 (2026-11-13)
 
 *paperus now skips the publisher's cover page, files the referees' grumbles under "Peer review", and quietly checks every few months whether anyone had to say "erratum".*

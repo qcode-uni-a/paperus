@@ -7757,6 +7757,48 @@
         }
       }
     },
+    "/api/groups/people": {
+      "post": {
+        "tags": [
+          "groups"
+        ],
+        "summary": "Group Of People",
+        "description": "The group of exactly these people and oneself, to share papers with\nthem (#16): the one there is (one's own, made by anyone of them), else a\nnew one named after them (\"Anna & Ben\"), all its members admins. Anyone\nmay ask, for anyone on the server (not those deactivated).",
+        "operationId": "group_of_people",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PeopleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/groups/{group_id}": {
       "patch": {
         "tags": [
@@ -7899,7 +7941,7 @@
           "groups"
         ],
         "summary": "Set Member",
-        "description": "Add someone to the group, or change their role here. A role lower than\none inherited from a group above has no effect (inherited roles win).",
+        "description": "Add someone to the group, or change their role here. A role lower than\none inherited from a group above has no effect (inherited roles win).\nIn a group of people everyone is an admin.",
         "operationId": "set_member",
         "parameters": [
           {
@@ -8060,7 +8102,7 @@
           "groups"
         ],
         "summary": "Find Users",
-        "description": "People to add to a group, by username or display name; for site\nadministrators and group admins.",
+        "description": "People to add to a group or share with, by username or display name:\nanyone, from two letters on (site administrators and group admins also\nwithout); not those deactivated.",
         "operationId": "find_users",
         "parameters": [
           {
@@ -11918,6 +11960,11 @@
             "format": "uuid",
             "title": "Library Id"
           },
+          "people": {
+            "type": "boolean",
+            "title": "People",
+            "default": false
+          },
           "role": {
             "anyOf": [
               {
@@ -13293,6 +13340,11 @@
               }
             ],
             "title": "Group Id"
+          },
+          "people": {
+            "type": "boolean",
+            "title": "People",
+            "default": false
           },
           "path": {
             "items": {
@@ -15363,6 +15415,25 @@
           "new"
         ],
         "title": "PasswordChange"
+      },
+      "PeopleIn": {
+        "properties": {
+          "user_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 19,
+            "minItems": 1,
+            "title": "User Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_ids"
+        ],
+        "title": "PeopleIn"
       },
       "Person": {
         "properties": {

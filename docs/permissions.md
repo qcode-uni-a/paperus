@@ -114,7 +114,7 @@ because of it; they need a membership like everyone else.
 | Rename, describe | no | no | yes | yes |
 | Delete (only without papers and subgroups) | no | no | yes | yes |
 | Add people, change roles, remove people | no | no | yes | yes |
-| Look up users to add | no | no | yes | yes |
+| Look up users to add | by name (2 letters on), to share with | by name | yes | yes |
 | Leave (only a group one was added to directly) | — | yes | yes, unless the last admin | — |
 | Move into another group (admin of both) or to the top (site administrators) | no | no | yes, into groups one administers | yes |
 
@@ -122,6 +122,24 @@ because of it; they need a membership like everyone else.
 - Who is in a group through a group above leaves it there.
 - When adding people, the website reminds that the group's licences must
   allow sharing its PDFs.
+
+### Sharing with single people (#16)
+
+Sharing a paper with people (its page → Share… → With people) gives it to
+their small group of their own, "Anna & Ben": the group of exactly those
+people (oneself among them), made the first time by whoever shares, found
+again after that (whoever of them shares). So a paper still has one
+owner, as with every group.
+
+- Anyone may make one, with anyone on the server (found by name from two
+  letters on; not deactivated people). Its name is everyone's shown name
+  in alphabetical order ("Anna, Ben & Clara"); any of them may rename it.
+- All its members are equal: admins (add people, rename, delete when
+  empty, share papers in it); a role chosen when adding is ignored. No
+  groups inside.
+- Under Groups in a section of their own, "Shared with people"; as
+  owners like any group (the filter's "Owned by", where new papers go,
+  giving a collection to it).
 
 ## Users
 

@@ -39,6 +39,8 @@ class LibraryOut(BaseModel):
     """"Me" or the group's name."""
     kind: Literal["personal", "group"]
     group_id: uuid.UUID | None
+    people: bool = False
+    """A few people sharing papers ("Anna & Ben"), not a research group."""
     path: list[str]
     """Names of the groups above, top first (for nested groups)."""
     role: Role | None
@@ -59,6 +61,9 @@ class GroupOut(BaseModel):
     description: str | None
     parent_id: uuid.UUID | None
     library_id: uuid.UUID
+    people: bool = False
+    """A few people sharing papers ("Anna & Ben"): all equal, no groups
+    inside."""
     role: Role | None
     """The person's role (direct or inherited); ``None`` for site
     administrators who are not members."""
@@ -195,6 +200,7 @@ def list_libraries(db: DB, access: CurrentAccess) -> list[LibraryOut]:
                 name=groups[group_id].name,
                 kind="group",
                 group_id=group_id,
+                people=groups[group_id].people,
                 path=path(group_id),
                 role=access.roles[group_id],
                 writable=access.can_write(library_id),
@@ -235,6 +241,7 @@ def _group_out(db: DB, access: Access, group: Group) -> GroupOut:
         description=group.description,
         parent_id=group.parent_id,
         library_id=library_id,
+        people=group.people,
         role=role,
         can_manage=_can_manage(access, group.id),
         members=members or 0,
@@ -269,7 +276,9 @@ def create_group(body: GroupIn, db: DB, access: CurrentAccess) -> GroupOut:
         if db.get(User, admin_id) is None:
             raise HTTPException(422, "unknown user for the first admin")
     else:
-        _managed_group(db, access, body.parent_id)
+        parent = _managed_group(db, access, body.parent_id)
+        if parent.people:
+            raise HTTPException(409, "a group of people has no groups inside")
         admin_id = None
     group = Group(
         name=name,
@@ -285,6 +294,66 @@ def create_group(body: GroupIn, db: DB, access: CurrentAccess) -> GroupOut:
             Membership(
                 group_id=group.id,
                 user_id=admin_id,
+                role=Role.ADMIN,
+                added_by=access.user.id,
+            )
+        )
+    db.commit()
+    return _group_out(db, Access.of(db, access.user), group)
+
+
+class PeopleIn(BaseModel):
+    user_ids: list[uuid.UUID] = Field(min_length=1, max_length=19)
+    """The others: the person asking is one of them anyway."""
+
+
+def people_name(users: list[User]) -> str:
+    """ "Anna & Ben", "Anna, Ben & Clara": everyone by the name they show,
+    in alphabetical order, so it reads the same for each of them."""
+    names = sorted(
+        (user.display_name or user.username for user in users), key=str.casefold
+    )
+    if len(names) > 6:
+        names = [*names[:5], f"{len(names) - 5} more"]
+    name = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} & {names[-1]}"
+    return name[:200]
+
+
+@router.post("/api/groups/people")
+def group_of_people(body: PeopleIn, db: DB, access: CurrentAccess) -> GroupOut:
+    """The group of exactly these people and oneself, to share papers with
+    them (#16): the one there is (one's own, made by anyone of them), else a
+    new one named after them ("Anna & Ben"), all its members admins. Anyone
+    may ask, for anyone on the server (not those deactivated)."""
+    wanted = {access.user.id, *body.user_ids}
+    users = list(
+        db.scalars(
+            select(User).where(User.id.in_(wanted), User.deactivated_at.is_(None))
+        )
+    )
+    if len(users) != len(wanted):
+        raise HTTPException(404, "user not found")
+    if len(wanted) < 2:
+        raise HTTPException(422, "share with someone else")
+    for group in db.scalars(
+        select(Group).where(Group.people, Group.id.in_(access.roles))
+    ):
+        members = set(
+            db.scalars(
+                select(Membership.user_id).where(Membership.group_id == group.id)
+            )
+        )
+        if members == wanted:
+            return _group_out(db, access, group)
+    group = Group(name=people_name(users), people=True, created_by=access.user.id)
+    db.add(group)
+    db.flush()
+    db.add(Library(group_id=group.id))
+    for user in users:
+        db.add(
+            Membership(
+                group_id=group.id,
+                user_id=user.id,
                 role=Role.ADMIN,
                 added_by=access.user.id,
             )
@@ -400,8 +469,9 @@ def set_member(
     access: CurrentAccess,
 ) -> list[MemberOut]:
     """Add someone to the group, or change their role here. A role lower than
-    one inherited from a group above has no effect (inherited roles win)."""
-    _managed_group(db, access, group_id)
+    one inherited from a group above has no effect (inherited roles win).
+    In a group of people everyone is an admin."""
+    group = _managed_group(db, access, group_id)
     if db.get(User, user_id) is None:
         raise HTTPException(404, "user not found")
     membership = db.get(Membership, (group_id, user_id))
@@ -412,7 +482,7 @@ def set_member(
         db.add(membership)
     elif membership.role == Role.ADMIN and body.role != Role.ADMIN:
         _keep_an_admin(db, group_id, user_id)
-    membership.role = body.role
+    membership.role = Role.ADMIN if group.people else body.role
     db.commit()
     return list_members(group_id, db, access)
 
@@ -479,11 +549,19 @@ def find_users(
     access: CurrentAccess,
     q: Annotated[str, Query(max_length=64)] = "",
 ) -> list[UserBrief]:
-    """People to add to a group, by username or display name; for site
-    administrators and group admins."""
-    if not (access.site_admin or Role.ADMIN in access.roles.values()):
-        raise HTTPException(403, "only admins look up people")
-    query = select(User).order_by(func.lower(User.username)).limit(20)
+    """People to add to a group or share with, by username or display name:
+    anyone, from two letters on (site administrators and group admins also
+    without); not those deactivated."""
+    if len(q.strip()) < 2 and not (
+        access.site_admin or Role.ADMIN in access.roles.values()
+    ):
+        raise HTTPException(403, "only admins list people; others find them by name")
+    query = (
+        select(User)
+        .where(User.deactivated_at.is_(None))
+        .order_by(func.lower(User.username))
+        .limit(20)
+    )
     if q.strip():
         words = q.strip()
         query = query.where(

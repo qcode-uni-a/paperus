@@ -124,6 +124,9 @@ class Group(Record, Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    people: Mapped[bool] = mapped_column(server_default=text("false"))
+    """A few people sharing papers ("Anna & Ben", #16): made by sharing with
+    someone, by anyone; all its members equal (admins), no groups inside."""
 
 
 class Membership(Base):

@@ -288,6 +288,7 @@ ROUTES = {
     ("POST", "/api/files/{file_id}/restore"): "papers.write",
     ("GET", "/api/groups"): "groups.read",
     ("POST", "/api/groups"): None,
+    ("POST", "/api/groups/people"): None,
     ("DELETE", "/api/groups/{group_id}"): None,
     ("PATCH", "/api/groups/{group_id}"): None,
     ("POST", "/api/groups/{group_id}/leave"): None,
