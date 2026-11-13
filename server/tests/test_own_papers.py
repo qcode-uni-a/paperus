@@ -180,3 +180,17 @@ def test_switches_per_library(client: TestClient, db: Session, job_app: App) -> 
         libraries=automations.libraries_with(db, "open_access"),
     )
     assert [item_id for item_id, _ in waiting] == [uuid.UUID(mine)]
+
+
+def test_a_group_first(client: TestClient, db: Session) -> None:
+    """Wanted by a group and by its member: in the group, not twice."""
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    lab = group(root, "Lab", ada)
+    with_orcid(db, ada)
+    ada.put(f"/api/libraries/{lab['library_id']}/automations", {"own_papers": True})
+    http = openalex_and_doi(["10.1000/new"], {"10.1000/new": csl("New hail", 2)})
+    for library in own_papers.waiting(db):
+        own_papers.add_new(db, http, library)
+    assert titles(db, lab["library_id"]) == ["New hail"]
+    assert titles(db, ada.libraries()["Me"]["id"]) == []

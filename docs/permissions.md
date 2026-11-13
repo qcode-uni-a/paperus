@@ -151,6 +151,8 @@ What paperus does by itself for a library's papers is its owner's choice
 | Add papers by ORCID iD, each morning (from OpenAlex; one removed stays out) | one's own (on) | its members' who may add papers (off) | the person; the group's admins |
 | Free PDFs: an open-access copy for papers without a file | on | on | the person; the group's admins |
 
+A new paper wanted by a group and by its member goes to the group (they
+see it there), not twice; papers they have already stay where they are.
 Everyone in a group sees its switches. What the whole server does
 (published versions, errata, reference lists, authors, OCR, and whether
 open-access copies are fetched at all) is the site administrator's; the

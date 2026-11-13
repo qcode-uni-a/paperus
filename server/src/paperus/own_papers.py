@@ -4,7 +4,9 @@ of a library's person (a group's: of each member who may add papers) that
 are in no library that person can read (the trash included) are added to
 the library by DOI (its details from its registry), as "Add" under Manage
 → Missing does, as added by them. A work is handled once per library
-(``libraries.own_papers_seen``): one removed stays removed. A few dozen a
+(``libraries.own_papers_seen``): one removed stays removed. A paper wanted
+by a group and by its member goes to the group (groups come first), not
+twice. A few dozen a
 day each, so a long list comes over a few days. The people are told under
 the bell; a paper out in the last week is celebrated (``notifications``)."""
 
@@ -35,9 +37,17 @@ PER_DAY = 30
 
 
 def waiting(db: Session) -> list[Library]:
-    """Libraries with the switch on."""
+    """Libraries with the switch on: groups' first. A member's new paper,
+    wanted by their group and by themselves, goes to the group (they see
+    it there); their own library then finds it there and leaves it."""
     on = automations.libraries_with(db, "own_papers")
-    return list(db.scalars(select(Library).where(Library.id.in_(on))))
+    return list(
+        db.scalars(
+            select(Library)
+            .where(Library.id.in_(on))
+            .order_by(Library.group_id.is_(None), Library.id)
+        )
+    )
 
 
 def people(db: Session, library: Library) -> list[User]:
