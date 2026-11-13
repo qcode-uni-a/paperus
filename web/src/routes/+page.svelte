@@ -18,6 +18,7 @@
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 	import BulkBar from '#lib/BulkBar.svelte';
 	import SelectAllBox from '#lib/SelectAllBox.svelte';
+	import { NearEnd } from '#lib/nearEnd.ts';
 	import { Selection } from '#lib/selection.svelte.ts';
 
 	const PAGE = 50;
@@ -141,6 +142,7 @@
 		items = before ? [...items, ...data] : data;
 		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
 		more = data.length > 0 && items.length < total;
+		if (before) nearEnd.again();
 	}
 
 	/** While the first rows load again: no pages added in between. */
@@ -157,6 +159,7 @@
 		} finally {
 			refilling = false;
 		}
+		nearEnd.again();
 	}
 
 	keepPlace(
@@ -176,17 +179,10 @@
 		});
 	});
 
-	/** Load the next page when the end of the list comes near. */
-	function loadMoreNearby(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry.isIntersecting && more && !refilling) loadItems(items.at(-1)?.id);
-			},
-			{ rootMargin: '800px 0px' }
-		);
-		observer.observe(node);
-		return () => observer.disconnect();
-	}
+	/** The next page as the end of the list comes near. */
+	const nearEnd = new NearEnd(() => {
+		if (more && !loading && !refilling) loadItems(items.at(-1)?.id);
+	});
 
 	// The list for the current filter (reloads when it changes).
 	const filterKey = $derived(JSON.stringify([toQuery(filter), sortQuery(sort)]));
@@ -360,7 +356,7 @@
 			onchange={() => loadUpTo(items.length)}
 		/>
 		{#if more}
-			<div {@attach loadMoreNearby} class="more">
+			<div {@attach nearEnd.attach} class="more">
 				<button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button>
 			</div>
 		{/if}

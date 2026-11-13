@@ -7,6 +7,7 @@
 	import { ago } from '#lib/format.ts';
 	import ItemRow from '#lib/ItemRow.svelte';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
+	import { NearEnd } from '#lib/nearEnd.ts';
 
 	const PAGE = 50;
 	// All activity (changes by anyone, and what one opened), or only opened.
@@ -31,6 +32,7 @@
 		items = offset ? [...items, ...data] : data;
 		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
 		more = data.length === limit && items.length < total;
+		if (offset) nearEnd.again();
 	}
 
 	/** While the first rows load again: no pages added in between. */
@@ -49,6 +51,7 @@
 			} finally {
 				refilling = false;
 			}
+			nearEnd.again();
 		}
 	);
 
@@ -57,16 +60,9 @@
 		untrack(() => load());
 	});
 
-	function loadMoreNearby(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry.isIntersecting && more && !refilling) load(items.length);
-			},
-			{ rootMargin: '800px 0px' }
-		);
-		observer.observe(node);
-		return () => observer.disconnect();
-	}
+	const nearEnd = new NearEnd(() => {
+		if (more && !loading && !refilling) load(items.length);
+	});
 
 	/** Why the item is here: opened by the reader, added, or changed. */
 	function note(item: Item): string {
@@ -104,7 +100,7 @@
 	{#each items as item (item.id)}<ItemRow {item} note={note(item)} />{/each}
 </ul>
 {#if more}
-	<div {@attach loadMoreNearby} class="more">
+	<div {@attach nearEnd.attach} class="more">
 		<button onclick={() => load(items.length)}>Show more</button>
 	</div>
 {/if}

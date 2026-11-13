@@ -7,6 +7,7 @@
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 	import BulkBar from '#lib/BulkBar.svelte';
 	import SelectAllBox from '#lib/SelectAllBox.svelte';
+	import { NearEnd } from '#lib/nearEnd.ts';
 	import { organize } from '#lib/organize.svelte.ts';
 	import { Selection } from '#lib/selection.svelte.ts';
 	import { isDefault, sortFromAddress, sortQuery } from '#lib/librarySort.ts';
@@ -47,6 +48,7 @@
 		items = before ? [...items, ...data] : data;
 		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
 		more = data.length > 0 && items.length < total;
+		if (before) nearEnd.again();
 	}
 
 	/** While the first rows load again: no pages added in between. */
@@ -63,6 +65,7 @@
 		} finally {
 			refilling = false;
 		}
+		nearEnd.again();
 	}
 
 	keepPlace('collection', () => items.length, loadUpTo);
@@ -85,16 +88,9 @@
 		if (uploads.finished) untrack(() => loadUpTo(items.length));
 	});
 
-	function loadMoreNearby(node: HTMLElement) {
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry.isIntersecting && more && !refilling) load(items.at(-1)?.id);
-			},
-			{ rootMargin: '800px 0px' }
-		);
-		observer.observe(node);
-		return () => observer.disconnect();
-	}
+	const nearEnd = new NearEnd(() => {
+		if (more && !loading && !refilling) load(items.at(-1)?.id);
+	});
 
 	/** Reload, e.g. after items were added elsewhere. */
 	export function refresh() {
@@ -132,7 +128,7 @@
 	onchange={() => loadUpTo(items.length)}
 />
 {#if more}
-	<div {@attach loadMoreNearby} class="more">
+	<div {@attach nearEnd.attach} class="more">
 		<button onclick={() => load(items.at(-1)?.id)}>Show more</button>
 	</div>
 {/if}

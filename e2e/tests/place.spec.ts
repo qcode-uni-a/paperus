@@ -1,7 +1,23 @@
 import { expect, test } from '@playwright/test';
-import { unique } from './helpers.ts';
+import { LOGGED_OUT, unique } from './helpers.ts';
 
-test('Back from a paper returns to the same place in the library', async ({ page }) => {
+test('Back from a paper returns to the same place in the library', async ({
+	page: admin,
+	browser
+}) => {
+	// A person of their own: 120 papers in the admin's library pushed other
+	// tests' papers off the list's first page, and their changes (and the
+	// admin's Getting started above the list) moved this one's place.
+	const pia = { username: unique('pia'), password: 'pia-password-e2e' };
+	expect((await admin.request.post('/api/admin/users', { data: pia })).status()).toBe(201);
+	const context = await browser.newContext({ storageState: LOGGED_OUT });
+	const page = await context.newPage();
+	await page.goto('/login');
+	await page.getByLabel('Username').fill(pia.username);
+	await page.getByLabel('Password').fill(pia.password);
+	await page.getByRole('button', { name: 'Log in' }).click();
+	await expect(page).toHaveURL(/\/$/);
+
 	// More papers than one page of the list (50).
 	const word = unique('Place');
 	for (let n = 1; n <= 120; n++) {
@@ -40,4 +56,5 @@ test('Back from a paper returns to the same place in the library', async ({ page
 	await page.goto('/');
 	await expect(page.getByRole('link', { name: `${word} paper 123`, exact: true })).toBeVisible();
 	expect(await page.evaluate(() => window.scrollY)).toBe(0);
+	await context.close();
 });
