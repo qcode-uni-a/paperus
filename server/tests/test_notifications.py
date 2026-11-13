@@ -268,6 +268,23 @@ def test_an_erratum_found(client: TestClient, db: Session) -> None:
     )
 
 
+def test_dismissed(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    for title in ("Rain", "Snow", "Hail"):
+        item = db.get(Item, uuid.UUID(ada.add(title)["id"]))
+        assert item is not None
+        notifications.erratum(db, item, f"Erratum: {title}")
+    db.commit()
+    first, *rest = listed(ada)["notifications"]
+    assert ada.delete(f"/api/me/notifications/{first['id']}").status_code == 204
+    assert [n["id"] for n in listed(ada)["notifications"]] == [n["id"] for n in rest]
+    # Only one's own.
+    assert bob.delete(f"/api/me/notifications/{rest[0]['id']}").status_code == 404
+    assert ada.delete(f"/api/me/notifications/{first['id']}").status_code == 404
+    assert ada.delete("/api/me/notifications").status_code == 204
+    assert listed(ada) == {"notifications": [], "unread": 0}
+
+
 def test_prune(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     now = datetime.now(UTC)

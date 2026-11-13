@@ -196,6 +196,10 @@ test('a paper shared with a single person', async ({ page, browser }) => {
 			.getByRole('dialog', { name: 'Notifications' })
 			.getByRole('link', { name: `Ann Lee shared “${title}” with you` })
 	).toBeVisible();
+	// Dismissed: gone for good.
+	const bobsNotices = b.page.getByRole('dialog', { name: 'Notifications' });
+	await bobsNotices.getByRole('button', { name: 'Dismiss' }).click();
+	await expect(bobsNotices.getByText('Nothing yet.')).toBeVisible();
 	await b.page.keyboard.press('Escape');
 	await expect(b.page.getByRole('link', { name: title })).toBeVisible();
 	await b.page.goto('/manage/groups');

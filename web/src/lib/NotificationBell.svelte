@@ -1,8 +1,14 @@
 <script lang="ts">
 	import { live } from '#lib/live.svelte.ts';
-	import { mdiBellOutline } from '@mdi/js';
+	import { mdiBellOutline, mdiClose } from '@mdi/js';
 	import { resolve } from '$app/paths';
-	import { apiHref, listNotifications, markNotificationsRead } from '#lib/api/client.ts';
+	import {
+		apiHref,
+		dismissNotification,
+		dismissNotifications,
+		listNotifications,
+		markNotificationsRead
+	} from '#lib/api/client.ts';
 	import type { NotificationOut } from '#lib/api/generated/types.gen.ts';
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { ago } from '#lib/format.ts';
@@ -70,6 +76,16 @@
 			unread = 0;
 			await markNotificationsRead({ body: {} });
 		}
+	}
+
+	/** Gone from the list: one, or all. */
+	function dismiss(notice: NotificationOut) {
+		notices = notices.filter((n) => n.id !== notice.id);
+		void dismissNotification({ path: { notification_id: notice.id } });
+	}
+	function dismissAll() {
+		notices = [];
+		void dismissNotifications();
 	}
 
 	/** Below the bell, right-aligned with it, within the window. */
@@ -186,7 +202,10 @@
 		if (event.newState === 'closed') fresh = new Set();
 	}}
 >
-	<h2>Notifications</h2>
+	<div class="head">
+		<h2>Notifications</h2>
+		{#if notices.length}<button class="link" onclick={dismissAll}>Clear all</button>{/if}
+	</div>
 	{#if notices.length}
 		<ul>
 			{#each notices as notice (notice.id)}
@@ -199,6 +218,12 @@
 						>{#if yours(notice)}<span class="star" aria-hidden="true"></span>{/if}{text}</a
 					>
 					<time datetime={notice.at}>{ago(notice.at)}</time>
+					<button
+						class="dismiss"
+						aria-label="Dismiss"
+						title="Dismiss"
+						onclick={() => dismiss(notice)}><Icon path={mdiClose} size={16} /></button
+					>
 				</li>
 			{/each}
 		</ul>
@@ -254,8 +279,23 @@
 		color: var(--ink);
 		box-shadow: var(--shadow);
 	}
+	.head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+		margin-bottom: 8px;
+	}
+	.head .link {
+		padding: 2px 6px;
+		border: none;
+		background: none;
+		color: var(--royal);
+		font-size: var(--step--1);
+		font-weight: 550;
+	}
 	h2 {
-		margin: 0 0 8px;
+		margin: 0;
 		font-size: var(--step-0);
 		font-family: var(--sans);
 	}
@@ -267,10 +307,40 @@
 		gap: 2px;
 	}
 	li {
+		position: relative;
 		display: grid;
 		gap: 2px;
-		padding: 8px 10px;
+		padding: 8px 34px 8px 10px;
 		border-radius: 8px;
+	}
+	/* Dismiss: there on hover (always on a touch screen). */
+	.dismiss {
+		position: absolute;
+		top: 6px;
+		right: 4px;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: none;
+		color: var(--muted);
+		opacity: 0;
+	}
+	li:hover .dismiss,
+	.dismiss:focus-visible {
+		opacity: 1;
+	}
+	.dismiss:hover {
+		background: var(--rail);
+		color: var(--ink);
+	}
+	@media (pointer: coarse) {
+		.dismiss {
+			opacity: 1;
+		}
 	}
 	li.new {
 		background: color-mix(in srgb, var(--royal) 8%, transparent);
@@ -336,7 +406,6 @@
 		}
 	}
 	li.yours {
-		position: relative;
 		background: color-mix(in srgb, var(--highlighter) 16%, transparent);
 	}
 	/* Round one's own published paper in the list, as the list opens. */

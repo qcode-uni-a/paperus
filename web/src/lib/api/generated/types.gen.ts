@@ -6866,6 +6866,22 @@ export type ReportResponses = {
 
 export type ReportResponse = ReportResponses[keyof ReportResponses];
 
+export type DismissNotificationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me/notifications';
+};
+
+export type DismissNotificationsResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DismissNotificationsResponse = DismissNotificationsResponses[keyof DismissNotificationsResponses];
+
 export type ListNotificationsData = {
     body?: never;
     path?: never;
@@ -6920,6 +6936,36 @@ export type MarkNotificationsReadResponses = {
 };
 
 export type MarkNotificationsReadResponse = MarkNotificationsReadResponses[keyof MarkNotificationsReadResponses];
+
+export type DismissNotificationData = {
+    body?: never;
+    path: {
+        /**
+         * Notification Id
+         */
+        notification_id: number;
+    };
+    query?: never;
+    url: '/api/me/notifications/{notification_id}';
+};
+
+export type DismissNotificationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DismissNotificationError = DismissNotificationErrors[keyof DismissNotificationErrors];
+
+export type DismissNotificationResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DismissNotificationResponse = DismissNotificationResponses[keyof DismissNotificationResponses];
 
 export type ListReferencesData = {
     body?: never;

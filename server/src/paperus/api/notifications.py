@@ -5,9 +5,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from paperus.api.deps import DB, SessionUser
 from paperus.models import Item, Notification
@@ -101,5 +101,27 @@ def mark_notifications_read(body: Read, db: DB, user: SessionUser) -> Response:
     if body.ids is not None:
         query = query.where(Notification.id.in_(body.ids))
     db.execute(query.values(read_at=func.now()))
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/{notification_id}", status_code=204)
+def dismiss_notification(notification_id: int, db: DB, user: SessionUser) -> Response:
+    """Gone from the list (one's own; 404 for none such)."""
+    gone = db.execute(
+        delete(Notification).where(
+            Notification.id == notification_id, Notification.user_id == user.id
+        )
+    )
+    if not getattr(gone, "rowcount", 0):
+        raise HTTPException(404, "notification not found")
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("", status_code=204)
+def dismiss_notifications(db: DB, user: SessionUser) -> Response:
+    """All of one's notifications gone."""
+    db.execute(delete(Notification).where(Notification.user_id == user.id))
     db.commit()
     return Response(status_code=204)

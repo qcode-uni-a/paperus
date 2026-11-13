@@ -11,7 +11,8 @@
 - **More under the bell**: a paper shared with you ("Ann shared “…” with
   you"), being added to a group by someone ("Ann added you to Lab"; to a
   group of people, what is shared with you there), and a correction
-  (erratum) found for one of your papers.
+  (erratum) found for one of your papers. A notification can be
+  dismissed (×), or all at once ("Clear all").
 - **Saving an edit no longer fails now and then**: saving a paper's
   details (Edit) while paperus was still working on the same paper (just
   after its upload: its reference list, its authors) could end in

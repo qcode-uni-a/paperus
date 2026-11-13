@@ -2549,6 +2549,19 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Dismiss Notifications",
+        "description": "All of one's notifications gone.",
+        "operationId": "dismiss_notifications",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
       }
     },
     "/api/me/notifications/read": {
@@ -2568,6 +2581,42 @@
           },
           "required": true
         },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/notifications/{notification_id}": {
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Dismiss Notification",
+        "description": "Gone from the list (one's own; 404 for none such).",
+        "operationId": "dismiss_notification",
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Notification Id"
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "Successful Response"

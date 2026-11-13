@@ -322,6 +322,8 @@ ROUTES = {
     ("POST", "/api/items/bulk"): None,
     ("GET", "/api/me/notifications"): None,
     ("POST", "/api/me/notifications/read"): None,
+    ("DELETE", "/api/me/notifications/{notification_id}"): None,
+    ("DELETE", "/api/me/notifications"): None,
     ("GET", "/api/items/{item_id}/reading"): None,
     ("PUT", "/api/items/{item_id}/reading"): None,
     ("POST", "/api/logs"): "papers.write",
