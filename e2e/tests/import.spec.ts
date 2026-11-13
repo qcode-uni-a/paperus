@@ -4,6 +4,10 @@ import { expect, test } from '@playwright/test';
 import { makePdf } from '../fixtures/pdf.ts';
 import { LOGGED_OUT, unique } from './helpers.ts';
 
+// An import waits for the worker (behind the other tests' files, slower on
+// WebKit in CI): a minute for its report, so more than the usual 30 s.
+test.describe.configure({ timeout: 90_000 });
+
 // Settings → Import: a Zotero export as the folder Zotero writes (no zip),
 // sent file by file, then imported.
 test('import a whole folder, without zipping it', async ({ page }) => {
