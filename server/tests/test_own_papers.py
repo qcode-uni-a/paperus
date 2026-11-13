@@ -8,11 +8,10 @@ from typing import Any
 import httpx2
 from fastapi.testclient import TestClient
 from procrastinate import App
-from procrastinate.testing import InMemoryConnector
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import automations, missing, own_papers
+from paperus import automations, missing, own_papers, published
 from paperus.jobs import _open_access_wanted
 from paperus.models import Item, Library, User
 from tests.people import Person, group
@@ -121,57 +120,47 @@ def test_ones_papers_added_once(client: TestClient, db: Session) -> None:
 
 def test_switches_per_library(client: TestClient, db: Session, job_app: App) -> None:
     root = Person(client, db, "root", admin=True)
-    ada, bob, eve = (Person(client, db, n) for n in ("ada", "bob", "eve"))
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
     lab = group(root, "Lab", ada)
     ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "member"})
-    ada.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "reader"})
     found = bob.get("/api/automations").json()
     assert found["server"]["find_published"] is True
     own, theirs = found["libraries"]
+    mine = bob.libraries()["Me"]["id"]
     assert own == {
-        "library_id": bob.libraries()["Me"]["id"],
-        "own_papers": True,
+        "library_id": mine,
+        "published": True,
         "open_access": True,
+        "own_papers": True,
+        "own_papers_to": None,
         "can_change": True,
     }
     assert theirs == {
         "library_id": lab["library_id"],
-        "own_papers": False,
+        "published": True,
         "open_access": True,
+        "own_papers": None,
+        "own_papers_to": None,
         "can_change": False,
     }
     url = f"/api/libraries/{lab['library_id']}/automations"
-    assert bob.put(url, {"own_papers": True}).status_code == 403
-    assert (
-        root.put(f"/api/libraries/{own['library_id']}/automations", {}).status_code
-        == 404
-    )
-    switched = ada.put(url, {"own_papers": True, "open_access": False})
+    assert bob.put(url, {"published": False}).status_code == 403
+    assert root.put(f"/api/libraries/{mine}/automations", {}).status_code == 404
+    switched = ada.put(url, {"published": False, "open_access": False})
     assert switched.status_code == 200, switched.text
-    assert switched.json()["own_papers"] is True
-    assert isinstance(job_app.connector, InMemoryConnector)
-    assert any(
-        job["task_name"] == "paperus:add_own_papers"
-        and job["args"].get("library_id") == lab["library_id"]
-        for job in job_app.connector.jobs.values()
+    assert (switched.json()["published"], switched.json()["own_papers"]) == (
+        False,
+        None,
     )
-    assert uuid.UUID(lab["library_id"]) in {lib.id for lib in own_papers.waiting(db)}
 
-    # The members who may add papers, with ORCID iDs: theirs come in.
-    for person in (bob, eve):
-        with_orcid(db, person)
-    assert [u.id for u in own_papers.people(db, library_of(db, lab["library_id"]))] == [
-        uuid.UUID(bob.id)
-    ]
-    # Open-access copies: not for the group's papers now, neither when a
-    # published version is found nor in the sweep (whose query leaves them
-    # out, so they cannot hold up everyone else's).
+    # Off for the group: neither published versions nor open-access copies
+    # looked for its papers, in the queries (they cannot hold up others').
     paper = with_doi(ada, "Rain", "10.1000/rain", library=lab["library_id"])
-    mine = with_doi(ada, "Snow", "10.1000/snow")
+    other = with_doi(ada, "Snow", "10.1000/snow")
     wanted = _open_access_wanted(
-        db, [(uuid.UUID(paper), None), (uuid.UUID(mine), None)]
+        db, [(uuid.UUID(paper), None), (uuid.UUID(other), None)]
     )
-    assert wanted == [(uuid.UUID(mine), None)]
+    assert wanted == [(uuid.UUID(other), None)]
     soon = datetime.now(UTC) + timedelta(minutes=1)
     waiting = missing.never_tried(
         db,
@@ -179,21 +168,71 @@ def test_switches_per_library(client: TestClient, db: Session, job_app: App) -> 
         limit=10,
         libraries=automations.libraries_with(db, "open_access"),
     )
-    assert [item_id for item_id, _ in waiting] == [uuid.UUID(mine)]
+    assert [item_id for item_id, _ in waiting] == [uuid.UUID(other)]
+    for title, arxiv, library in (
+        ("Rain v1", "2401.00001", lab["library_id"]),
+        ("Snow v1", "2401.00002", None),
+    ):
+        ada.post(
+            "/api/items",
+            {
+                "metadata": {"title": title},
+                "identifiers": [{"scheme": "arxiv", "value": arxiv}],
+                "library_id": library,
+            },
+        )
+    preprints = published.waiting(
+        db, 10, libraries=automations.libraries_with(db, "published")
+    )
+    assert [item.title for item in preprints] == ["Snow v1"]
 
 
-def test_a_group_first(client: TestClient, db: Session) -> None:
-    """Wanted by a group and by its member: in the group, not twice."""
+def test_ones_papers_where_one_chooses(client: TestClient, db: Session) -> None:
+    """Adding one's papers is one's own switch: where one's new papers go,
+    or an owner one chooses (a group one may add papers to; else one's own
+    library)."""
     root = Person(client, db, "root", admin=True)
     ada = Person(client, db, "ada")
     lab = group(root, "Lab", ada)
     with_orcid(db, ada)
-    ada.put(f"/api/libraries/{lab['library_id']}/automations", {"own_papers": True})
+    own = ada.libraries()["Me"]["id"]
+    url = f"/api/libraries/{own}/automations"
+    assert ada.put(url, {"own_papers_to": str(uuid.uuid4())}).status_code == 422
+    # Groups have no such switch.
+    group_url = f"/api/libraries/{lab['library_id']}/automations"
+    assert ada.put(group_url, {"own_papers": True}).json()["own_papers"] is None
+    assert [lib.id for lib in own_papers.waiting(db)] == [uuid.UUID(own)]
+    user = db.get(User, uuid.UUID(ada.id))
+    assert user is not None
+
+    def target() -> uuid.UUID:
+        db.expire_all()
+        assert user is not None
+        return own_papers.target(db, library_of(db, own), user)
+
+    # Like her new papers: to the group once they go there.
+    ada.put("/api/me/default-library", {"library_id": own})
+    assert target() == uuid.UUID(own)
+    ada.put("/api/me/default-library", {"library_id": lab["library_id"]})
+    assert target() == uuid.UUID(lab["library_id"])
+    # Chosen apart: her own library; then "like new papers" again.
+    ada.put(url, {"own_papers_to": own})
+    assert target() == uuid.UUID(own)
+    assert ada.put(url, {"own_papers_to": "new papers"}).json()["own_papers_to"] is None
+    assert target() == uuid.UUID(lab["library_id"])
+
     http = openalex_and_doi(["10.1000/new"], {"10.1000/new": csl("New hail", 2)})
-    for library in own_papers.waiting(db):
-        own_papers.add_new(db, http, library)
+    own_papers.add_new(db, http, library_of(db, own))
     assert titles(db, lab["library_id"]) == ["New hail"]
-    assert titles(db, ada.libraries()["Me"]["id"]) == []
+    # A reader there now (another admin keeps the group): her own library.
+    eve = Person(client, db, "eve")
+    root.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "admin"})
+    demoted = root.put(f"/api/groups/{lab['id']}/members/{ada.id}", {"role": "reader"})
+    assert demoted.status_code == 200, demoted.text
+    assert target() == uuid.UUID(own)
+    # Switched off: hers are not looked for.
+    ada.put(url, {"own_papers": False})
+    assert own_papers.waiting(db) == []
 
 
 def test_a_renamed_journal_version_joins_its_preprint(

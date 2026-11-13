@@ -53,11 +53,16 @@ _ENTRY_DOI = re.compile(r"<arxiv:doi[^>]*>([^<]+)</arxiv:doi>")
 
 
 def waiting(
-    db: Session, limit: int, now: datetime | None = None, *, new: bool = False
+    db: Session,
+    limit: int,
+    now: datetime | None = None,
+    *,
+    new: bool = False,
+    libraries: set[uuid.UUID] | None = None,
 ) -> list[Item]:
     """Preprints (with an arXiv ID, without a journal version) not checked
     in the last month, never checked first; ``new``: only those never
-    checked (just added)."""
+    checked (just added); in these ``libraries`` (those that want them)."""
     now = now or datetime.now(UTC)
     with_arxiv = (
         select(Version.item_id)
@@ -74,6 +79,7 @@ def waiting(
                 Item.id.in_(with_arxiv),
                 Item.id.not_in(journal),
                 never if new else or_(never, Item.published_checked_at < now - RECHECK),
+                *([Item.library_id.in_(libraries)] if libraries is not None else []),
             )
             .order_by(Item.published_checked_at.asc().nulls_first(), Item.id)
             .limit(limit)

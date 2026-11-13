@@ -1,15 +1,16 @@
-"""Papers added by their authors' ORCID iDs (Settings → Automations, "Add
-papers by ORCID iD"): each day, the works OpenAlex lists under the ORCID iD
-of a library's person (a group's: of each member who may add papers) that
-are in no library that person can read (the trash included) are added to
-the library by DOI (its details from its registry), as "Add" under Manage
-→ Missing does, as added by them. A work is handled once per library
-(``libraries.own_papers_seen``): one removed stays removed. A paper wanted
-by a group and by its member goes to the group (groups come first), not
-twice; the journal version of a preprint there (renamed, so listed apart)
-becomes its published version (``published``), not a paper of its own. A few dozen a
-day each, so a long list comes over a few days. The people are told under
-the bell; a paper out in the last week is celebrated (``notifications``)."""
+"""One's own papers, added by themselves (Settings → Automations, "Add my
+papers", a person's switch): each day, the works OpenAlex lists under a
+person's ORCID iD that are in no library they can read (the trash
+included) are added by DOI (its details from its registry), as "Add"
+under Manage → Missing does, as added by them, to the owner they chose
+(else where their new papers go: their own library, or a group they may
+add papers to). A work is handled
+once (``own_papers_seen`` of their own library): one removed stays
+removed; one that is somewhere they can see is left there. The journal
+version of a preprint there (renamed, so listed apart) becomes its
+published version (``published``), not a paper of its own. A few dozen a
+day each, so a long list comes over a few days. They are told under the
+bell; a paper out in the last week is celebrated (``notifications``)."""
 
 import logging
 import uuid
@@ -45,41 +46,32 @@ PER_DAY = 30
 
 
 def waiting(db: Session) -> list[Library]:
-    """Libraries with the switch on: groups' first. A member's new paper,
-    wanted by their group and by themselves, goes to the group (they see
-    it there); their own library then finds it there and leaves it."""
-    on = automations.libraries_with(db, "own_papers")
+    """People's own libraries with the switch on (their ORCID iD set, not
+    deactivated)."""
+    on = automations.libraries_with(db, automations.OWN_PAPERS)
     return list(
         db.scalars(
             select(Library)
-            .where(Library.id.in_(on))
-            .order_by(Library.group_id.is_(None), Library.id)
-        )
-    )
-
-
-def people(db: Session, library: Library) -> list[User]:
-    """Whose papers go into the library: its person, or the group's members
-    who may add papers to it; with an ORCID iD, not deactivated."""
-    ids = (
-        [library.user_id]
-        if library.user_id is not None
-        else notifications.people_of(db, library.id)
-    )
-    found = list(
-        db.scalars(
-            select(User).where(
-                User.id.in_(ids), User.orcid.is_not(None), User.deactivated_at.is_(None)
+            .join(User, User.id == Library.user_id)
+            .where(
+                Library.id.in_(on),
+                User.orcid.is_not(None),
+                User.deactivated_at.is_(None),
             )
+            .order_by(Library.id)
         )
     )
-    if library.user_id is not None:
-        return found
-    return [
-        user
-        for user in found
-        if Access.of(db, user).role_in_library(library.id) not in (None, Role.READER)
-    ]
+
+
+def target(db: Session, own: Library, user: User) -> uuid.UUID:
+    """Where their papers go: the owner they chose, else where their new
+    papers go; while they may add papers there, else their own library."""
+    chosen = automations.of(own)[automations.OWN_PAPERS_TO] or user.default_library_id
+    if chosen is None or chosen == own.id:
+        return own.id
+    if Access.of(db, user).role_in_library(chosen) in (None, Role.READER):
+        return own.id
+    return chosen
 
 
 def _add(
@@ -123,39 +115,40 @@ def _add(
 
 
 def add_new(
-    db: Session, http: httpx2.Client, owner: Library, contact_email: str | None = None
+    db: Session, http: httpx2.Client, own: Library, contact_email: str | None = None
 ) -> list[Item]:
-    """Add the papers of the library's people not yet there; commits; those
-    added. A person OpenAlex (or the DOIs' registry) does not answer for is
-    tried again tomorrow."""
-    seen = set(owner.own_papers_seen or [])
+    """Add the person's papers not yet where they can see them, to the
+    owner they chose; commits; those added. Raises ``works.Unavailable``
+    if OpenAlex (or a DOI's registry) does not answer: tried again
+    tomorrow."""
+    user = db.get(User, own.user_id) if own.user_id else None
+    if user is None or not user.orcid:
+        return []
+    to = target(db, own, user)
+    seen = set(own.own_papers_seen or [])
     added: list[Item] = []
-    for user in people(db, owner):
-        mine: list[Item] = []
-        try:
-            found = works.works_of(
-                http, orcid=user.orcid, openalex_id=None, contact_email=contact_email
-            )
-            known = _known(db, Access.of(db, user), found)
-            for work in found:
-                if work.doi in seen:
-                    continue
-                if not known & {work.doi, *work.copies}:
-                    if len(added) >= PER_DAY:
-                        break  # tomorrow
-                    item = _add(db, http, owner.id, user, work.doi)
-                    if item is not None:
-                        added.append(item)
-                        mine.append(item)
-                seen.add(work.doi)
-        except works.Unavailable as error:
-            log.info("own papers of %s: %s", user.id, error)
-        if mine:
-            notifications.own_added(db, user.id, owner, mine)
-    owner = db.get(Library, owner.id) or owner
-    owner.own_papers_seen = sorted(seen)
-    db.commit()
-    log.info("own papers of library %s: %d added", owner.id, len(added))
+    try:
+        found = works.works_of(
+            http, orcid=user.orcid, openalex_id=None, contact_email=contact_email
+        )
+        known = _known(db, Access.of(db, user), found)
+        for work in found:
+            if work.doi in seen:
+                continue
+            if not known & {work.doi, *work.copies}:
+                if len(added) >= PER_DAY:
+                    break  # tomorrow
+                item = _add(db, http, to, user, work.doi)
+                if item is not None:
+                    added.append(item)
+            seen.add(work.doi)
+    finally:
+        if added:
+            notifications.own_added(db, user.id, db.get(Library, to) or own, added)
+        own = db.get(Library, own.id) or own
+        own.own_papers_seen = sorted(seen)
+        db.commit()
+    log.info("own papers of %s: %d added", user.id, len(added))
     return added
 
 

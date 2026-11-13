@@ -322,7 +322,6 @@
 				<LibraryAutomations
 					bind:automations={automations.libraries[automated]}
 					server={automations.server}
-					personal={false}
 				/>
 			{/if}
 		</section>

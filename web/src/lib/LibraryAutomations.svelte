@@ -1,32 +1,43 @@
 <script lang="ts">
 	import { errorMessage, setAutomations } from '#lib/api/client.ts';
-	import type { LibraryAutomations, ServerAutomations } from '#lib/api/generated/types.gen.ts';
+	import type {
+		AutomationsIn,
+		LibraryAutomations,
+		ServerAutomations
+	} from '#lib/api/generated/types.gen.ts';
+	import { defaultLibrary, libraryName, writableLibraries } from '#lib/organize.svelte.ts';
 
 	/** One library's automations (server: paperus.automations): a person's
-	 * own (Settings → Automations) or a group's (on its page under Groups);
-	 * switched by its owner, shown to the others. */
+	 * own (Settings → Automations, with adding their own papers) or a
+	 * group's (on its page under Groups); switched by its owner, shown to
+	 * the others. */
 	let {
 		automations = $bindable(),
 		server,
-		personal,
 		orcid = null
 	}: {
 		automations: LibraryAutomations;
 		server: ServerAutomations;
-		personal: boolean;
 		orcid?: string | null;
 	} = $props();
+
+	const personal = $derived(
+		automations.own_papers !== null && automations.own_papers !== undefined
+	);
+	const LIKE_NEW = 'new papers';
+	// Where one's papers go: as chosen, else where new papers go.
+	const into = $derived(automations.own_papers_to ?? LIKE_NEW);
 
 	let saving = $state(false);
 	let message = $state('');
 	let error = $state('');
 
-	async function change(key: 'own_papers' | 'open_access', on: boolean) {
+	async function change(body: AutomationsIn) {
 		saving = true;
 		message = error = '';
 		const { data, error: failure } = await setAutomations({
 			path: { library_id: automations.library_id },
-			body: { [key]: on }
+			body
 		});
 		saving = false;
 		if (!data) {
@@ -40,22 +51,59 @@
 
 <fieldset>
 	<legend class="visually-hidden">Automations</legend>
+	{#if personal}
+		<div class="option">
+			<input
+				id="own-papers"
+				type="checkbox"
+				checked={automations.own_papers ?? false}
+				disabled={!automations.can_change || saving}
+				onchange={(event) => change({ own_papers: event.currentTarget.checked })}
+			/>
+			<span>
+				<label for="own-papers"><strong>Add my papers</strong></label>
+				<small
+					>Each morning, your papers that OpenAlex lists under your ORCID iD and that are not in a
+					library you can see yet are added; new ones are celebrated. One you remove stays out.</small
+				>
+				{#if automations.own_papers}
+					<label class="into">
+						<small>Into</small>
+						<select
+							value={into}
+							disabled={!automations.can_change || saving}
+							onchange={(event) => change({ own_papers_to: event.currentTarget.value })}
+						>
+							<option value={LIKE_NEW}
+								>where your new papers go ({libraryName(defaultLibrary()?.id)})</option
+							>
+							{#each writableLibraries() as library (library.id)}
+								<option value={library.id}>{libraryName(library.id)}</option>
+							{/each}
+						</select>
+					</label>
+				{/if}
+				{#if !orcid && automations.own_papers}<small class="note"
+						>Needs your ORCID iD (under Account, above).</small
+					>{/if}
+			</span>
+		</div>
+	{/if}
 	<label class="option">
 		<input
 			type="checkbox"
-			checked={automations.own_papers}
+			checked={automations.published}
 			disabled={!automations.can_change || saving}
-			onchange={(event) => change('own_papers', event.currentTarget.checked)}
+			onchange={(event) => change({ published: event.currentTarget.checked })}
 		/>
 		<span>
-			<strong>{personal ? 'Add my papers' : 'Add our members’ papers'}</strong>
+			<strong>Published versions</strong>
 			<small
-				>{personal
-					? 'Each morning, your papers that OpenAlex lists under your ORCID iD come into your library; new ones are celebrated. One you remove stays out.'
-					: 'Each morning, the papers of the members who may add papers (by their ORCID iDs) come into the group’s library: a list of the group’s work. One removed stays out.'}</small
+				>The journal versions of preprints here are looked for and added to them (where they are),
+				to cite.</small
 			>
-			{#if personal && !orcid && automations.own_papers}<small class="note"
-					>Needs your ORCID iD (under Account, above).</small
+			{#if !server.find_published}<small class="note"
+					>Off on this server for now: the administrator decides.</small
 				>{/if}
 		</span>
 	</label>
@@ -64,7 +112,7 @@
 			type="checkbox"
 			checked={automations.open_access}
 			disabled={!automations.can_change || saving}
-			onchange={(event) => change('open_access', event.currentTarget.checked)}
+			onchange={(event) => change({ open_access: event.currentTarget.checked })}
 		/>
 		<span>
 			<strong>Free PDFs</strong>
@@ -78,8 +126,8 @@
 		</span>
 	</label>
 </fieldset>
-{#if !automations.can_change}<p class="muted small">
-		{personal ? '' : 'The group’s admins switch these.'}
+{#if !automations.can_change && !personal}<p class="muted small">
+		The group’s admins switch these.
 	</p>{/if}
 {#if message}<p class="saved" aria-live="polite">{message}</p>{/if}
 {#if error}<p class="error">{error}</p>{/if}
@@ -107,12 +155,12 @@
 		width: auto;
 		margin-top: 4px;
 	}
-	.option input:disabled + span {
-		cursor: default;
-	}
 	.option span {
 		display: grid;
 		gap: 2px;
+	}
+	.option label {
+		cursor: pointer;
 	}
 	.option small {
 		color: var(--muted);
@@ -121,6 +169,19 @@
 	}
 	.option small.note {
 		color: var(--tag-amber-ink);
+	}
+	.into {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+		margin-top: 4px;
+	}
+	.into select {
+		width: auto;
+		max-width: 100%;
+		padding: 3px 8px;
+		font-size: var(--step--1);
 	}
 	p {
 		margin: 6px 0 0;

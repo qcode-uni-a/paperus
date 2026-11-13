@@ -44,6 +44,7 @@ from paperus import (
     storage,
     system,
     trash,
+    works,
 )
 from paperus import export as exports
 from paperus.access import Access
@@ -446,7 +447,7 @@ NEW_PUBLISHED_PER_RUN = 500
 def add_own_papers(
     job: JobContext, timestamp: int, library_id: str | None = None
 ) -> None:
-    """Every library's with the switch on, or one library's."""
+    """Everyone's with the switch on, or one person's (their library's)."""
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
@@ -454,7 +455,10 @@ def add_own_papers(
         if library_id is not None:
             libraries = [lib for lib in libraries if lib.id == uuid.UUID(library_id)]
         for library in libraries:
-            own_papers.add_new(db, context.http, library, config.contact_email)
+            try:
+                own_papers.add_new(db, context.http, library, config.contact_email)
+            except works.Unavailable as error:
+                log.info("own papers of library %s: %s", library.id, error)
 
 
 def queue_own_papers(app: App, library_id: uuid.UUID | None = None) -> None:
@@ -533,7 +537,10 @@ def _find_published(job: JobContext, *, new: bool) -> None:
         if not config.find_published:
             return
         items = published.waiting(
-            db, NEW_PUBLISHED_PER_RUN if new else PUBLISHED_PER_HOUR, new=new
+            db,
+            NEW_PUBLISHED_PER_RUN if new else PUBLISHED_PER_HOUR,
+            new=new,
+            libraries=automations.libraries_with(db, "published"),
         )
         if not items:
             return

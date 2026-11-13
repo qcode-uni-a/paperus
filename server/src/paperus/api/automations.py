@@ -1,9 +1,10 @@
 """What paperus does by itself (``paperus.automations``): for the whole
 server (the administrator's settings, shown to everyone), and for each
 library one is in (its owner's switches: a person's own, a group's
-admins')."""
+admins'; adding one's own papers, and where, one's own alone)."""
 
 import uuid
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -38,12 +39,17 @@ class ServerAutomations(BaseModel):
 
 class LibraryAutomations(BaseModel):
     library_id: uuid.UUID
-    own_papers: bool
-    """Its people's papers added each day by their ORCID iDs (a person's
-    own; a group's members')."""
+    published: bool
+    """Its preprints' published versions are looked for (where the server
+    looks for them)."""
     open_access: bool
     """Its papers without a file get an open-access copy (where the server
     fetches them)."""
+    own_papers: bool | None = None
+    """One's own library: one's papers added each day by one's ORCID iD."""
+    own_papers_to: uuid.UUID | None = None
+    """One's own library: where those papers go (it, or a group one may add
+    papers to); none chosen: where one's new papers go."""
     can_change: bool
     """The person may switch them (their own library; a group's admins)."""
 
@@ -55,8 +61,13 @@ class Automations(BaseModel):
 
 
 class AutomationsIn(BaseModel):
-    own_papers: bool | None = None
+    published: bool | None = None
     open_access: bool | None = None
+    own_papers: bool | None = None
+    """One's own library only."""
+    own_papers_to: uuid.UUID | Literal["new papers"] | None = None
+    """One's own library only: a library one may add papers to, or "new
+    papers": where one's new papers go."""
 
 
 def _can_change(access: Access, library: Library) -> bool:
@@ -110,13 +121,22 @@ def set_automations(
     if not _can_change(access, library):
         raise HTTPException(403, "only the library's owner can change this")
     before = automations.of(library)
-    changed = {
+    changed: dict[str, Any] = {
         key: value
         for key, value in body.model_dump(exclude_none=True).items()
         if key in before
     }
-    library.automations = {**(library.automations or {}), **changed}
+    kept = dict(library.automations or {})
+    if automations.OWN_PAPERS_TO in changed:
+        to = changed.pop(automations.OWN_PAPERS_TO)
+        if to == "new papers":
+            kept.pop(automations.OWN_PAPERS_TO, None)
+        elif access.can_write(to):
+            kept[automations.OWN_PAPERS_TO] = str(to)
+        else:
+            raise HTTPException(422, "one's papers go where one may add papers")
+    library.automations = {**kept, **changed}
     db.commit()
-    if changed.get("own_papers") and not before["own_papers"]:
+    if changed.get(automations.OWN_PAPERS) and not before.get(automations.OWN_PAPERS):
         queue_own_papers(request.app.state.jobs, library.id)
     return _out(library, access)

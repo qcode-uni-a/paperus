@@ -23,7 +23,7 @@
 
 	/** What the server does by itself, as people know it. */
 	const SERVER = [
-		['find_published', 'Published versions of preprints are looked for'],
+		['find_published', 'Published versions of preprints are looked for (where wanted)'],
 		['find_errata', 'Corrections (errata) to papers are looked for'],
 		['find_references', 'Papers’ reference lists are looked for'],
 		['find_authors', 'Authors are recognised by their ORCID iDs (OpenAlex)'],
@@ -39,7 +39,6 @@
 		<LibraryAutomations
 			bind:automations={found.libraries[found.libraries.indexOf(own)]}
 			server={found.server}
-			personal
 			orcid={session.user?.orcid ?? null}
 		/>
 	{/if}
@@ -54,7 +53,7 @@
 						>{libraryName(group.library_id)}</a
 					>
 					<span class="muted"
-						>members’ papers {onOff(group.own_papers)}, free PDFs {onOff(group.open_access)}</span
+						>published versions {onOff(group.published)}, free PDFs {onOff(group.open_access)}</span
 					>
 				</li>
 			{/each}

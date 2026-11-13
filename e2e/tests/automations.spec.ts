@@ -20,19 +20,23 @@ test('automations: one’s own switched, a group’s on its page', async ({ page
 
 	await own.goto('/settings?open=automations');
 	const section = own.locator('#automations');
+	// One's papers: where one's new papers go, or an owner one chooses.
+	const into = section.getByRole('combobox', { name: 'Into' });
+	await expect(into).toHaveValue('new papers');
+	await into.selectOption({ label: lab });
+	await expect(section.getByText('Saved.')).toBeVisible();
 	const mine = section.getByRole('checkbox', { name: /Add my papers/ });
 	await expect(mine).toBeChecked();
 	await mine.uncheck();
-	await expect(section.getByText('Saved.')).toBeVisible();
 	await own.reload();
 	await expect(section.getByRole('checkbox', { name: /Add my papers/ })).not.toBeChecked();
-	await expect(section.getByText('members’ papers off, free PDFs on')).toBeVisible();
+	await expect(section.getByText('published versions on, free PDFs on')).toBeVisible();
 
 	// The group's, on its page: its admin switches them.
 	await section.getByRole('link', { name: lab }).click();
-	const theirs = own.getByRole('checkbox', { name: /Add our members’ papers/ });
-	await expect(theirs).not.toBeChecked();
-	await theirs.check();
+	const theirs = own.getByRole('checkbox', { name: /Published versions/ });
+	await expect(theirs).toBeChecked();
+	await theirs.uncheck();
 	await expect(own.getByText('Saved.')).toBeVisible();
 	await context.close();
 });

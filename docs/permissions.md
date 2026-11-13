@@ -144,18 +144,17 @@ owner, as with every group.
 ### Automations
 
 What paperus does by itself for a library's papers is its owner's choice
-(Settings → Automations; a group's on its page under Groups):
+(Settings → Automations; a group's on its page under Groups, switched by
+its admins, seen by its members):
 
-| Switch | Own library (default) | A group's (default) | Who changes it |
+| Switch | Whose | Default | What it does |
 | --- | --- | --- | --- |
-| Add papers by ORCID iD, each morning (from OpenAlex; one removed stays out) | one's own (on) | its members' who may add papers (off) | the person; the group's admins |
-| Free PDFs: an open-access copy for papers without a file | on | on | the person; the group's admins |
+| Published versions | every owner | on | the journal versions of its preprints looked for and added to them, where they are |
+| Free PDFs | every owner | on | an open-access copy for its papers without a file |
+| Add my papers | a person's alone | on, into where their new papers go | each morning, their papers by their ORCID iD (OpenAlex) not in a library they can see yet, added to the owner they choose (their own library or a group they may add papers to; their own if they may not add papers there any more); one removed stays out |
 
-A new paper wanted by a group and by its member goes to the group (they
-see it there), not twice; papers they have already stay where they are.
-Everyone in a group sees its switches. What the whole server does
-(published versions, errata, reference lists, authors, OCR, and whether
-open-access copies are fetched at all) is the site administrator's; the
+What the whole server does (published versions and free PDFs at all,
+errata, reference lists, authors, OCR) is the site administrator's; the
 section shows it to everyone.
 
 ## Users

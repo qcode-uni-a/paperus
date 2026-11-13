@@ -472,13 +472,21 @@ export type Automations = {
  */
 export type AutomationsIn = {
     /**
-     * Own Papers
+     * Published
      */
-    own_papers?: boolean | null;
+    published?: boolean | null;
     /**
      * Open Access
      */
     open_access?: boolean | null;
+    /**
+     * Own Papers
+     */
+    own_papers?: boolean | null;
+    /**
+     * Own Papers To
+     */
+    own_papers_to?: string | 'new papers' | null;
 };
 
 /**
@@ -2448,13 +2456,21 @@ export type LibraryAutomations = {
      */
     library_id: string;
     /**
-     * Own Papers
+     * Published
      */
-    own_papers: boolean;
+    published: boolean;
     /**
      * Open Access
      */
     open_access: boolean;
+    /**
+     * Own Papers
+     */
+    own_papers?: boolean | null;
+    /**
+     * Own Papers To
+     */
+    own_papers_to?: string | null;
     /**
      * Can Change
      */

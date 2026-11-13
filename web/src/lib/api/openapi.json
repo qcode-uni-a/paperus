@@ -9918,7 +9918,7 @@
       },
       "AutomationsIn": {
         "properties": {
-          "own_papers": {
+          "published": {
             "anyOf": [
               {
                 "type": "boolean"
@@ -9927,7 +9927,7 @@
                 "type": "null"
               }
             ],
-            "title": "Own Papers"
+            "title": "Published"
           },
           "open_access": {
             "anyOf": [
@@ -9939,6 +9939,33 @@
               }
             ],
             "title": "Open Access"
+          },
+          "own_papers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Papers"
+          },
+          "own_papers_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "string",
+                "const": "new papers"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Papers To"
           }
         },
         "type": "object",
@@ -13489,13 +13516,36 @@
             "format": "uuid",
             "title": "Library Id"
           },
-          "own_papers": {
+          "published": {
             "type": "boolean",
-            "title": "Own Papers"
+            "title": "Published"
           },
           "open_access": {
             "type": "boolean",
             "title": "Open Access"
+          },
+          "own_papers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Papers"
+          },
+          "own_papers_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Papers To"
           },
           "can_change": {
             "type": "boolean",
@@ -13505,7 +13555,7 @@
         "type": "object",
         "required": [
           "library_id",
-          "own_papers",
+          "published",
           "open_access",
           "can_change"
         ],
