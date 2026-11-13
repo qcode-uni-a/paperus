@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Saving an edit no longer fails now and then**: saving a paper's
+  details (Edit) while paperus was still working on the same paper (just
+  after its upload: its reference list, its authors) could end in
+  "Something went wrong." (the two waited for each other); now one waits
+  for the other. The same for saving a note.
+
 ## 0.1.3 (2026-11-13)
 
 *paperus now reads your papers the way you do: across the columns, over the page break, and politely past the running header — and you can finally share one with just Anna.*

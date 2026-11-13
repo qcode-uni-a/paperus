@@ -12,6 +12,7 @@ from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import changes
 from paperus.models import Chunk, Note, NoteChunk, NoteRevision
 from paperus.text import chunk_document
 
@@ -48,6 +49,7 @@ def save(
     """Replace the text if it is still the version ``expected`` (from
     ``etag``); locks the note, so two saves from the same version cannot both
     pass. Raises ``Conflict`` otherwise. Callers check rights first."""
+    changes.change_number(db)  # the counter before the row (#55)
     note = db.get(Note, note_id, with_for_update={"of": Note}, populate_existing=True)
     if note is None:
         raise LookupError(note_id)

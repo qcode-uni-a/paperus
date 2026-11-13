@@ -8,6 +8,12 @@ library version). Taking the number locks the counter row
 until commit, so numbers become visible in order and ``since=N`` never misses
 a change that commits late.
 
+So the counter comes first: a transaction that locks a row it will change
+(``with_for_update``) takes its number (``change_number``) before, else it
+may hold the row while waiting for the counter, held by another that
+waits for the row: a deadlock (#55: the Edit dialog's save against a
+worker's job on the same paper).
+
 What is deleted for good, or leaves a library (moved to another, an
 annotation no longer shared), is recorded as a ``Removal`` there with the
 number of the transaction, so a device that synced before learns to remove

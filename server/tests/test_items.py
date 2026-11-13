@@ -1,12 +1,18 @@
+import threading
+import time
+import uuid
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import Engine, func, text, update
 from sqlalchemy.orm import object_session
 
+from paperus import changes
 from paperus.api import items as items_api
+from paperus.db import make_sessionmaker
 from paperus.metadata import csl_type
+from paperus.models import Item
 from tests.conftest import FakeDOIRegistry
 
 DOI = "10.1038/s41586-020-2649-2"
@@ -327,3 +333,49 @@ def test_a_paper_is_read_from_one_snapshot(
     monkeypatch.setattr(items_api, "item_detail", recording)
     assert logged_in.get(f"/api/items/{item['id']}").status_code == 200
     assert seen == ["repeatable read"]
+
+
+def test_an_edit_saved_while_a_job_changes_the_paper(
+    logged_in: TestClient, engine: Engine
+) -> None:
+    """The Edit dialog's save and a worker's job changing the same paper at
+    once: one waits for the other, neither fails (#55: the save held the
+    paper's row and waited for the change counter, the job held the counter
+    and waited for the row)."""
+    created = logged_in.post("/api/items", json={"metadata": {"title": "Racing"}})
+    item_id, etag = created.json()["id"], created.headers["ETag"]
+    job = make_sessionmaker(engine)()
+    changes.change_number(job)  # the job's first change: it has the counter
+    saved: list[Any] = []
+
+    def save() -> None:
+        saved.append(
+            logged_in.put(
+                f"/api/items/{item_id}/overrides",
+                json={"title": "Edited"},
+                headers={"If-Match": etag},
+            )
+        )
+
+    thread = threading.Thread(target=save)
+    thread.start()
+    # Until the save waits for the job.
+    with engine.connect() as watch:
+        for _ in range(100):
+            waiting = watch.scalar(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity"
+                    " WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                )
+            )
+            if waiting:
+                break
+            time.sleep(0.05)
+    assert waiting
+    job.execute(
+        update(Item).where(Item.id == uuid.UUID(item_id)).values(changed_at=func.now())
+    )
+    job.commit()
+    job.close()
+    thread.join(timeout=10)
+    assert saved[0].status_code == 200, saved[0].text
