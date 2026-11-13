@@ -239,6 +239,7 @@ ROUTES = {
     ("GET", "/api/auth/me"): "papers.read",
     ("POST", "/api/auth/password"): None,
     ("GET", "/api/authors"): "papers.read",
+    ("GET", "/api/journals"): "papers.read",
     ("GET", "/api/authors/{author_id}"): "papers.read",
     ("GET", "/api/files/{file_id}/annotations"): "papers.read",
     ("GET", "/api/files/{file_id}/annotated"): "files.read",

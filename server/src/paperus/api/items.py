@@ -673,6 +673,7 @@ class ItemFilter(BaseModel):
     added_days: int | None = Field(None, ge=1, le=36500)
     author: str | None = Field(None, max_length=300)
     author_id: list[uuid.UUID] = []
+    journal: list[Annotated[str, Field(max_length=500)]] = []
     collection: uuid.UUID | None = None
     nested: bool = True
     title: str | None = Field(None, max_length=200)
@@ -713,6 +714,7 @@ def item_conditions(db: Session, access: Access, f: ItemFilter) -> list[Any]:
             owners=f.owner,
             added_days=f.added_days,
             authors=f.author_id,
+            journals=f.journal,
         )
     )
     if f.author and f.author.strip():
@@ -760,6 +762,7 @@ def list_items(
     added_days: Annotated[int | None, Query(ge=1, le=36500)] = None,
     author: Annotated[str | None, Query(max_length=300)] = None,
     author_id: Annotated[list[uuid.UUID] | None, Query()] = None,
+    journal: Annotated[list[str] | None, Query()] = None,
     collection: uuid.UUID | None = None,
     nested: bool = True,
     title: Annotated[str | None, Query(max_length=200)] = None,
@@ -796,7 +799,8 @@ def list_items(
     ``added_days``; see ``organize.Rules``), ``author`` ("Family, Given" as
     in ``authors``: the family name, and the given name's first letter if
     one is given), ``author_id`` (repeatable: by one of these people,
-    ``paperus.authors``) and ``collection`` (with its
+    ``paperus.authors``), ``journal`` (repeatable: in one of these journals,
+    any case) and ``collection`` (with its
     subcollections unless ``nested=false``) filter the list, and ``title``
     to items with all of its words in their title (any case, as parts of
     words too); ``title_words`` too, as words (stems: "qubits" finds
@@ -822,6 +826,7 @@ def list_items(
         added_days=added_days,
         author=author,
         author_id=author_id or [],
+        journal=journal or [],
         collection=collection,
         nested=nested,
         title=title,
@@ -892,6 +897,39 @@ def list_items(
         .limit(limit)
     )
     return [item_out(item, access) for item in db.scalars(query)]
+
+
+class JournalOut(BaseModel):
+    name: str
+    papers: int
+
+
+@router.get("/api/journals")
+def list_journals(
+    db: DB,
+    access: CurrentAccess,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[JournalOut]:
+    """The journals and venues of the papers the person can see (not in the
+    trash), the most papers first; ``q``: with all of its words in the
+    name, as parts of words too (for the filter's journal rule)."""
+    conditions = [
+        access.item_filter(access.readable),
+        Item.deleted_at.is_(None),
+        Item.journal.is_not(None),
+    ]
+    for word in (q or "").split():
+        conditions.append(Item.journal.icontains(word, autoescape=True))
+    papers = func.count()
+    rows = db.execute(
+        select(Item.journal, papers)
+        .where(*conditions)
+        .group_by(Item.journal)
+        .order_by(papers.desc(), Item.journal)
+        .limit(limit)
+    )
+    return [JournalOut(name=name, papers=n) for name, n in rows if name]
 
 
 _NEWEST_FIRST = ("added", "year", "published")

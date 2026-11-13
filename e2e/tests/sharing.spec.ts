@@ -132,18 +132,20 @@ test("whose papers: all, only one's own, a group's", async ({ page, browser }) =
 	const ours = own.getByRole('link', { name: `Ours ${word}` });
 
 	await own.goto('/');
-	const whose = own.getByRole('combobox', { name: 'Whose papers' });
-	await expect(whose).toHaveValue('');
 	await expect(mine).toBeVisible();
 	await expect(ours).toBeVisible();
-	await whose.selectOption({ label: 'Only mine' });
+	// In the filter: whose papers, a button each (none pressed: all).
+	await own.getByRole('button', { name: 'Filter', exact: true }).click();
+	const owners = own.getByRole('group', { name: 'Owned by' });
+	await owners.getByRole('button', { name: 'Me', exact: true }).click();
 	await expect(ours).toBeHidden();
 	await expect(mine).toBeVisible();
-	await whose.selectOption({ label: name });
+	await owners.getByRole('button', { name: 'Me', exact: true }).click();
+	await owners.getByRole('button', { name }).click();
 	await expect(own).toHaveURL(new RegExp(`owner=${lab.id}`));
 	await expect(mine).toBeHidden();
 	await expect(ours).toBeVisible();
-	await whose.selectOption({ label: 'All' });
+	await owners.getByRole('button', { name }).click();
 	await expect(mine).toBeVisible();
 	expect(new URL(own.url()).searchParams.has('owner')).toBe(false);
 	await context.close();

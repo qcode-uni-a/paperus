@@ -158,6 +158,7 @@ export function describeRules(rules: Rules): string {
 	if (published) parts.push(published);
 	if (rules.owners?.length) parts.push(`owned by ${and(rules.owners.map(libraryName), 'or')}`);
 	if (rules.authors?.length) parts.push(`by ${and(rules.authors.map(authorName), 'or')}`);
+	if (rules.journals?.length) parts.push(`in ${and(rules.journals, 'or')}`);
 	if (rules.added_days != null)
 		parts.push(
 			rules.added_days === 1

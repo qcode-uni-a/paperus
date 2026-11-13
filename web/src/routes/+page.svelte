@@ -330,12 +330,9 @@
 				{/each}
 			</ul>
 		{/if}
-	{:else if items.length === 0 && filtered}
-		<LibraryFilter count={heading} />
-		<p class="muted">No papers match the filter.</p>
-	{:else if items.length === 0 && starting}
+	{:else if items.length === 0 && !filtered && starting}
 		<!-- The getting-started steps say how to add papers. -->
-	{:else if items.length === 0}
+	{:else if items.length === 0 && !filtered}
 		<div class="empty">
 			<h2>Nothing in the library yet</h2>
 			<p class="muted">
@@ -344,21 +341,27 @@
 			</p>
 		</div>
 	{:else}
+		<!-- One filter for both, so its panel stays as it is when a rule
+		     leaves no papers (or brings them back). -->
 		<LibraryFilter count={heading} />
-		<ul class="items">
-			{#each items as item (item.id)}<ItemRow {item} {selection} />{/each}
-		</ul>
-		<BulkBar
-			{selection}
-			{items}
-			total={total ?? items.length}
-			matching={{ collection: collectionId ?? undefined, ...toQuery(filter) }}
-			onchange={() => loadUpTo(items.length)}
-		/>
-		{#if more}
-			<div {@attach nearEnd.attach} class="more">
-				<button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button>
-			</div>
+		{#if items.length === 0}
+			<p class="muted">No papers match the filter.</p>
+		{:else}
+			<ul class="items">
+				{#each items as item (item.id)}<ItemRow {item} {selection} />{/each}
+			</ul>
+			<BulkBar
+				{selection}
+				{items}
+				total={total ?? items.length}
+				matching={{ collection: collectionId ?? undefined, ...toQuery(filter) }}
+				onchange={() => loadUpTo(items.length)}
+			/>
+			{#if more}
+				<div {@attach nearEnd.attach} class="more">
+					<button onclick={() => loadItems(items.at(-1)?.id)}>Show more</button>
+				</div>
+			{/if}
 		{/if}
 	{/if}
 </div>

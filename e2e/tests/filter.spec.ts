@@ -41,8 +41,9 @@ test('filter the library by tags and authors', async ({ page }) => {
 
 	// More rules in the filter's panel: not the ones already read.
 	await page.getByRole('button', { name: 'Filter', exact: true }).click();
+	await page.getByRole('combobox', { name: 'How the next tag counts' }).selectOption('has not');
 	await page
-		.getByRole('combobox', { name: 'Without these tags: add a tag' })
+		.getByRole('combobox', { name: 'Add a tag', exact: true })
 		.selectOption({ label: read });
 	await expect(page.getByText(`Papers tagged ${radar}, not tagged ${read}.`)).toBeVisible();
 	await expect(rows).toHaveCount(1);
@@ -86,4 +87,16 @@ test.describe('on a phone', () => {
 		await expect.poll(async () => (await middles()).apart).toBeLessThan(8);
 		expect((await middles()).right).toBeGreaterThan(300);
 	});
+});
+
+test('the panel stays open, with its rules, when no papers match', async ({ page }) => {
+	await page.goto(`/?${new URLSearchParams({ journal: 'No such journal' })}`);
+	await expect(page.getByText('No papers match the filter.')).toBeVisible();
+	await page.getByRole('button', { name: 'Filter', exact: true }).click();
+	const journal = page.getByRole('button', { name: 'Remove No such journal' });
+	await expect(journal).toBeVisible();
+	// Taken away: papers again, the panel as it was.
+	await journal.click();
+	await expect(page.getByRole('heading', { name: /^\d+ items?$/ })).toBeVisible();
+	await expect(page.getByRole('combobox', { name: 'Add a tag', exact: true })).toBeVisible();
 });

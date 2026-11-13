@@ -11,7 +11,8 @@ const LISTS = {
 	tags_none: 'tag_none',
 	types: 'type',
 	owners: 'owner',
-	authors: 'author_id'
+	authors: 'author_id',
+	journals: 'journal'
 } as const;
 const DATES = { published_from: 'published_from', published_to: 'published_to' } as const;
 
@@ -60,6 +61,7 @@ export function toQuery(filter: Filter) {
 		type: list(rules.types),
 		owner: list(rules.owners),
 		author_id: list(rules.authors),
+		journal: list(rules.journals),
 		published_from: rules.published_from ?? undefined,
 		published_to: rules.published_to ?? undefined,
 		added_days: rules.added_days ?? undefined,

@@ -3,6 +3,7 @@
 import uuid
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Select, func, select
@@ -48,6 +49,8 @@ class Rules(BaseModel):
     """Added to paperus in the last so many days."""
     authors: list[uuid.UUID] = []
     """Written by one of these people (``paperus.authors``)."""
+    journals: list[Annotated[str, Field(max_length=500)]] = Field([], max_length=50)
+    """In one of these journals or venues (as cited; any case)."""
 
 
 class NotFound(LookupError):
@@ -286,6 +289,9 @@ def rule_conditions(rules: Rules) -> list[ColumnElement[bool]]:
                 )
             )
         )
+    if rules.journals:
+        names = {name.casefold() for name in rules.journals}
+        conditions.append(func.lower(Item.journal).in_(names))
     if rules.added_days is not None:
         since = datetime.now(UTC) - timedelta(days=rules.added_days)
         conditions.append(Item.created_at >= since)

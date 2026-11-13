@@ -9,13 +9,13 @@
 	import { fromAddress, isEmpty, toAddress, type Filter } from '#lib/libraryFilter.ts';
 	import { describeRules } from '#lib/organize.svelte.ts';
 	import RulesEditor from '#lib/RulesEditor.svelte';
-	import OwnerControl from '#lib/OwnerControl.svelte';
 	import SortControl from '#lib/SortControl.svelte';
 	import { writtenName } from '#lib/names.svelte.ts';
 
 	/** The library's filter: a button opening the rules of smart collections
-	 * (tags and keywords, types, dates, owners, when added), and what is
-	 * filtered by, in words. The filter lives in the address. */
+	 * (tags and keywords, authors, journals, types, dates, owners, when
+	 * added), and what is filtered by, in words. The filter lives in the
+	 * address. */
 
 	/** ``count``: the line's left side (how many papers). */
 	let { count }: { count: Snippet } = $props();
@@ -71,7 +71,7 @@
 	<div class="head">
 		{@render count()}
 		<div class="tools">
-			<span class="sorting"><OwnerControl /><SortControl /></span>
+			<span class="sorting"><SortControl /></span>
 			<button class="toggle" class:active={!isEmpty(filter)} aria-expanded={open} onclick={toggle}
 				><Icon path={mdiFilterVariant} size={18} />Filter</button
 			>

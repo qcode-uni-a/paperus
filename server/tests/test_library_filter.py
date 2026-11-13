@@ -79,3 +79,44 @@ def test_filter_by_author(client: TestClient, db: Session) -> None:
     assert titles("Platero") == ["Initial"]
     assert titles("LIGO Scientific Collaboration") == ["A consortium"]
     assert titles("Nobody, A.") == []
+
+
+def test_filter_by_journal(client: TestClient, db: Session) -> None:
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+
+    def add(person: Person, title: str, journal: str | None) -> None:
+        metadata = {"title": title, **({"container-title": journal} if journal else {})}
+        person.post("/api/items", json={"metadata": metadata})
+
+    add(ada, "Spins", "Physical Review B")
+    add(ada, "Holes", "Physical Review B")
+    add(ada, "Cavities", "Physical Review Letters")
+    add(ada, "Notes", None)
+    add(bob, "Bob's", "Nature Physics")
+
+    def titles(**params: Any) -> list[str]:  # noqa: ANN401
+        return sorted(i["title"] for i in ada.get("/api/items", params=params).json())
+
+    # Any case; one of several.
+    assert titles(journal=["physical review b"]) == ["Holes", "Spins"]
+    assert titles(journal=["Physical Review B", "Physical Review Letters"]) == [
+        "Cavities",
+        "Holes",
+        "Spins",
+    ]
+    # A smart collection with the rule.
+    smart = ada.post(
+        "/api/collections",
+        json={"name": "PRL", "rules": {"journals": ["Physical Review Letters"]}},
+    ).json()
+    assert titles(collection=smart["id"]) == ["Cavities"]
+
+    # The journals to choose from: one's own (not bob's), the most papers
+    # first; by words in them.
+    assert ada.get("/api/journals").json() == [
+        {"name": "Physical Review B", "papers": 2},
+        {"name": "Physical Review Letters", "papers": 1},
+    ]
+    assert [
+        j["name"] for j in ada.get("/api/journals", params={"q": "lett"}).json()
+    ] == ["Physical Review Letters"]

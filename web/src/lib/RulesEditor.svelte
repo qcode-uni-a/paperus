@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { listAuthors } from '#lib/api/client.ts';
-	import type { AuthorRow, Rules } from '#lib/api/generated/types.gen.ts';
+	import { listAuthors, listJournals } from '#lib/api/client.ts';
+	import type { AuthorRow, JournalOut, Rules } from '#lib/api/generated/types.gen.ts';
 	import { authorName, rememberAuthor } from '#lib/authorNames.svelte.ts';
 	import DateInput from '#lib/DateInput.svelte';
 	import { TYPE_NAMES } from '#lib/format.ts';
@@ -23,11 +23,16 @@
 	const types = Object.entries(TYPE_NAMES).filter(([type]) => type !== 'note');
 
 	type TagRule = 'tags_all' | 'tags_any' | 'tags_none';
+	/** How an added tag counts; its chip says so ("or", "not"). */
 	const TAG_RULES: [TagRule, string][] = [
-		['tags_all', 'With all of these tags'],
-		['tags_any', 'With any of these tags'],
-		['tags_none', 'Without these tags']
+		['tags_all', 'has'],
+		['tags_any', 'has any of'],
+		['tags_none', 'has not']
 	];
+	let tagRule = $state<TagRule>('tags_all');
+	const usedTags = $derived(
+		new Set([...(rules.tags_all ?? []), ...(rules.tags_any ?? []), ...(rules.tags_none ?? [])])
+	);
 
 	function tagLabel(id: string): string {
 		const tag = organize.tags.find((t) => t.id === id);
@@ -87,6 +92,29 @@
 		authorsFound = [];
 	}
 
+	// Journals and venues of the library, found by words in their names.
+	let journalSearch = $state('');
+	let journalsFound = $state<JournalOut[]>([]);
+	$effect(() => {
+		const words = journalSearch.trim();
+		if (!words) {
+			journalsFound = [];
+			return;
+		}
+		const timer = setTimeout(async () => {
+			const { data } = await listJournals({ query: { q: words, limit: 6 } });
+			if (words === journalSearch.trim()) {
+				journalsFound = (data ?? []).filter((j) => !(rules.journals ?? []).includes(j.name));
+			}
+		}, 200);
+		return () => clearTimeout(timer);
+	});
+	function addJournal(name: string) {
+		rules.journals = [...(rules.journals ?? []), name];
+		journalSearch = '';
+		journalsFound = [];
+	}
+
 	/** Empty fields: no rule. */
 	function number(value: string): number | null {
 		const parsed = Number.parseInt(value, 10);
@@ -96,38 +124,43 @@
 
 <fieldset class="rules">
 	<legend>Papers that match all of these (leave out what does not matter)</legend>
-	{#each TAG_RULES as [rule, label] (rule)}
-		<div class="row">
-			<span class="name">{label}</span>
-			<div class="chips">
+
+	<div class="row">
+		<span class="name" id="{uid}-tags">Tags</span>
+		<div class="chips">
+			{#each TAG_RULES as [rule, how] (rule)}
 				{#each rules[rule] ?? [] as id (id)}
-					<span class="chip"
-						>{tagLabel(id)}<button
+					<span class="chip" class:not={rule === 'tags_none'}
+						>{#if rule !== 'tags_all'}<span class="how">{rule === 'tags_any' ? 'or' : 'not'}</span
+							>{/if}{tagLabel(id)}<button
 							type="button"
-							aria-label="Remove {tagLabel(id)}"
+							aria-label="Remove {tagLabel(id)} ({how})"
 							onclick={() => removeTag(rule, id)}>×</button
 						></span
 					>
 				{/each}
-				<select
-					aria-label="{label}: add a tag"
-					value=""
-					onchange={(event) => {
-						addTag(rule, event.currentTarget.value);
-						event.currentTarget.value = '';
-					}}
-				>
-					<option value="">Add a tag…</option>
-					{#each tags.filter((t) => !(rules[rule] ?? []).includes(t.id)) as tag (tag.id)}
-						<option value={tag.id}>{tagLabel(tag.id)}</option>
-					{/each}
-				</select>
-			</div>
+			{/each}
+			<select aria-label="How the next tag counts" bind:value={tagRule} class="how-select">
+				{#each TAG_RULES as [rule, how] (rule)}<option value={rule}>{how}</option>{/each}
+			</select>
+			<select
+				aria-label="Add a tag"
+				value=""
+				onchange={(event) => {
+					addTag(tagRule, event.currentTarget.value);
+					event.currentTarget.value = '';
+				}}
+			>
+				<option value="">Add a tag…</option>
+				{#each tags.filter((t) => !usedTags.has(t.id)) as tag (tag.id)}
+					<option value={tag.id}>{tagLabel(tag.id)}</option>
+				{/each}
+			</select>
 		</div>
-	{/each}
+	</div>
 
 	<div class="row">
-		<span class="name">By these authors</span>
+		<span class="name">Authors</span>
 		<div class="chips">
 			{#each rules.authors ?? [] as id (id)}
 				<span class="chip"
@@ -141,15 +174,15 @@
 			{/each}
 			<input
 				type="search"
-				class="author-search"
+				class="search"
 				bind:value={authorSearch}
 				placeholder="Add an author…"
-				aria-label="By these authors: find an author"
+				aria-label="Authors: find an author"
 				autocomplete="off"
 			/>
 		</div>
 		{#if authorsFound.length}
-			<div class="chips">
+			<div class="chips found">
 				{#each authorsFound as author (author.id)}
 					<button type="button" class="pick" onclick={() => addAuthor(author)}
 						>{personName(author)} <span class="muted">{author.papers}</span></button
@@ -160,17 +193,63 @@
 	</div>
 
 	<div class="row">
-		<span class="name">Of these types</span>
+		<span class="name">Journal</span>
 		<div class="chips">
-			{#each types as [type, name] (type)}
-				<label class="check"
-					><input
-						type="checkbox"
-						checked={(rules.types ?? []).includes(type)}
-						onchange={() => toggle('types', type)}
-					/>{name}</label
+			{#each rules.journals ?? [] as name (name)}
+				<span class="chip"
+					>{name}<button
+						type="button"
+						aria-label="Remove {name}"
+						onclick={() => (rules.journals = (rules.journals ?? []).filter((j) => j !== name))}
+						>×</button
+					></span
 				>
 			{/each}
+			<input
+				type="search"
+				class="search"
+				bind:value={journalSearch}
+				placeholder="Add a journal…"
+				aria-label="Journal: find a journal"
+				autocomplete="off"
+			/>
+		</div>
+		{#if journalsFound.length}
+			<div class="chips found">
+				{#each journalsFound as journal (journal.name)}
+					<button type="button" class="pick" onclick={() => addJournal(journal.name)}
+						>{journal.name} <span class="muted">{journal.papers}</span></button
+					>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
+	<div class="row">
+		<span class="name">Type</span>
+		<div class="chips">
+			{#each rules.types ?? [] as type (type)}
+				<span class="chip"
+					>{TYPE_NAMES[type] ?? type}<button
+						type="button"
+						aria-label="Remove {TYPE_NAMES[type] ?? type}"
+						onclick={() => toggle('types', type)}>×</button
+					></span
+				>
+			{/each}
+			<select
+				aria-label="Add a type"
+				value=""
+				onchange={(event) => {
+					if (event.currentTarget.value) toggle('types', event.currentTarget.value);
+					event.currentTarget.value = '';
+				}}
+			>
+				<option value="">Add a type…</option>
+				{#each types.filter(([type]) => !(rules.types ?? []).includes(type)) as [type, name] (type)}
+					<option value={type}>{name}</option>
+				{/each}
+			</select>
 		</div>
 	</div>
 
@@ -194,17 +273,17 @@
 
 	{#if !group && organize.libraries.length > 1}
 		<div class="row">
-			<span class="name">Owned by</span>
-			<div class="chips">
+			<span class="name" id="{uid}-owners">Owned by</span>
+			<div class="chips" role="group" aria-labelledby="{uid}-owners">
 				{#each organize.libraries as owner (owner.id)}
-					<label class="check"
-						><input
-							type="checkbox"
-							checked={(rules.owners ?? []).includes(owner.id)}
-							onchange={() => toggle('owners', owner.id)}
-						/>{libraryName(owner.id)}</label
+					<button
+						type="button"
+						class="toggle"
+						aria-pressed={(rules.owners ?? []).includes(owner.id)}
+						onclick={() => toggle('owners', owner.id)}>{libraryName(owner.id)}</button
 					>
 				{/each}
+				{#if !(rules.owners ?? []).length}<span class="muted small">all</span>{/if}
 			</div>
 		</div>
 	{/if}
@@ -241,13 +320,51 @@
 		font-size: var(--step--1);
 		color: var(--muted);
 	}
+	/* One line per rule: its name beside it; above it on a phone. */
 	.row {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr);
-		gap: 6px;
+		grid-template-columns: 7rem minmax(0, 1fr);
+		align-items: center;
+		gap: 4px 12px;
+	}
+	.found {
+		grid-column: 2;
 	}
 	.name {
 		font-weight: 600;
+	}
+	@media (max-width: 560px) {
+		.row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.found {
+			grid-column: 1;
+		}
+	}
+	.how {
+		margin-right: 4px;
+		font-size: 0.85em;
+		opacity: 0.75;
+	}
+	/* Without the tag: grey, its "not" in front. */
+	.chip.not {
+		background: var(--rail);
+		color: var(--ink);
+	}
+	.chips .how-select {
+		min-width: 0;
+	}
+	.toggle {
+		padding: 2px 12px;
+		border-radius: 999px;
+	}
+	.toggle[aria-pressed='true'] {
+		border-color: var(--royal);
+		background: var(--tag-blue-bg);
+		color: var(--tag-blue-ink);
+	}
+	.small {
+		font-size: var(--step--1);
 	}
 	.chips {
 		display: flex;
@@ -255,7 +372,7 @@
 		align-items: center;
 		gap: 6px 10px;
 	}
-	.author-search {
+	.search {
 		flex: 1 1 12rem;
 		max-width: 20rem;
 	}
@@ -291,16 +408,6 @@
 		min-width: 9rem;
 		/* Long tag names would widen the dialog past a phone's screen. */
 		max-width: 100%;
-	}
-	.check {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-weight: 400;
-	}
-	.check input {
-		width: auto;
-		margin: 0;
 	}
 	.dates,
 	.days {

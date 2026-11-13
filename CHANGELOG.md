@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **A more compact library filter**: one line per rule, its name beside
+  it (above it on a phone). The tags are one line: "has", "has any of" or
+  "has not" and "Add a tag…", the tags chosen as chips ("or", "not"); the
+  types the same way instead of a dozen boxes. "Owned by" is in the
+  filter, as buttons; the menu beside Sort is gone. The panel stays open
+  when a rule leaves no papers (before, it closed).
+- **Filter by journal**: "Journal" in the filter and in smart collections,
+  with suggestions from one's papers (the most papers first).
 - **Cover pages are passed over**: the page a site puts in front of a
   paper (IOP's "To cite this article", Taylor & Francis', JSTOR's,
   ResearchGate's, a repository's licence sheet) is recognised when the

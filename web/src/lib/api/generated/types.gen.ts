@@ -2126,6 +2126,10 @@ export type ItemFilter = {
      */
     author_id?: Array<string>;
     /**
+     * Journal
+     */
+    journal?: Array<string>;
+    /**
      * Collection
      */
     collection?: string | null;
@@ -2347,6 +2351,20 @@ export type Joining = {
      * Role
      */
     role?: 'reader' | 'member';
+};
+
+/**
+ * JournalOut
+ */
+export type JournalOut = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Papers
+     */
+    papers: number;
 };
 
 /**
@@ -4181,6 +4199,10 @@ export type Rules = {
      * Authors
      */
     authors?: Array<string>;
+    /**
+     * Journals
+     */
+    journals?: Array<string>;
 };
 
 /**
@@ -5823,6 +5845,10 @@ export type ListItemsData = {
          */
         author_id?: Array<string> | null;
         /**
+         * Journal
+         */
+        journal?: Array<string> | null;
+        /**
          * Collection
          */
         collection?: string | null;
@@ -6200,6 +6226,42 @@ export type RestoreItemResponses = {
 };
 
 export type RestoreItemResponse = RestoreItemResponses[keyof RestoreItemResponses];
+
+export type ListJournalsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Q
+         */
+        q?: string | null;
+        /**
+         * Limit
+         */
+        limit?: number;
+    };
+    url: '/api/journals';
+};
+
+export type ListJournalsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListJournalsError = ListJournalsErrors[keyof ListJournalsErrors];
+
+export type ListJournalsResponses = {
+    /**
+     * Response List Journals
+     *
+     * Successful Response
+     */
+    200: Array<JournalOut>;
+};
+
+export type ListJournalsResponse = ListJournalsResponses[keyof ListJournalsResponses];
 
 export type UnarchiveItemData = {
     body?: never;
