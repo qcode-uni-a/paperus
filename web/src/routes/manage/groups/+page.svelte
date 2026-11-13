@@ -385,9 +385,14 @@
 		justify-content: space-between;
 		gap: 12px;
 	}
+	/* A long name (one long word, as German has) wraps, the buttons stay. */
+	.title > div:first-child {
+		min-width: 0;
+	}
 	h2 {
 		margin: 0;
 		font-size: var(--step-3);
+		overflow-wrap: anywhere;
 	}
 	.description {
 		margin: 4px 0 0;
@@ -400,6 +405,7 @@
 	}
 	.actions {
 		display: flex;
+		flex: none;
 	}
 	h3 {
 		margin: 28px 0 10px;
