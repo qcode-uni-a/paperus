@@ -128,6 +128,16 @@
 						href: `${resolve('/manage/groups')}?group=${d.group_id}`
 					};
 		}
+		if (notice.kind === 'own_added') {
+			const count = Number(d.count ?? 1);
+			const where = d.group ? String(d.group) : 'your library';
+			return count === 1
+				? { text: `Your paper “${d.title}” was added to ${where}`, href: item }
+				: {
+						text: `${plural(count)} of yours were added to ${where}, from OpenAlex`,
+						href: `${resolve('/')}?owner=${d.library_id}`
+					};
+		}
 		if (notice.kind === 'erratum') {
 			return { text: `A correction to “${d.title}”: ${d.erratum}`, href: item };
 		}
