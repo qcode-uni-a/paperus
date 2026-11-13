@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from paperus import abstracts, annotations, pdf
+from paperus.covers import cover_pages
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
 from paperus.storage import BlobStore
@@ -46,7 +47,9 @@ class _Text:
     with_ocr: bool = False
     """Some pages' text comes from OCR."""
     first_pages: list[str] = dataclasses.field(default_factory=list)
-    """A PDF's first pages as read (for its abstract)."""
+    """A PDF's first pages as read (for its abstract), without covers."""
+    covers: list[int] = dataclasses.field(default_factory=list)
+    """Cover pages (from 1), left out of the text."""
 
 
 def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
@@ -78,7 +81,11 @@ def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
         else:
             scans.append(index)
     with_ocr = any(index in read for index in range(len(pages)))
-    return _Text(chunk_pages(pages), scans, with_ocr, pages[:2])
+    covers = cover_pages(pages)
+    for number in covers:
+        pages[number - 1] = ""  # out of the text; the pages keep their numbers
+    first = [text for n, text in enumerate(pages, 1) if n not in covers][:2]
+    return _Text(chunk_pages(pages), scans, with_ocr, first, covers)
 
 
 def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
@@ -116,6 +123,7 @@ def _copy_manifest(db: Session, file: File) -> bool:
     if source is None:
         return False
     file.ocr_status = source.ocr_status
+    file.cover_pages = source.cover_pages
     for row in db.scalars(select(FileChunk).where(FileChunk.file_id == source.id)):
         db.add(
             FileChunk(
@@ -192,6 +200,7 @@ def process_file(
         file.text_error = f"{type(error).__name__}: {error}"[:500]
         db.commit()
         return False
+    file.cover_pages = read.covers
     if read.scans:
         file.ocr_status = OcrStatus.PENDING if ocr else OcrStatus.SKIPPED
     else:

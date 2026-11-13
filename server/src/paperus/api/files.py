@@ -66,6 +66,9 @@ class FileOut(BaseModel):
     ocr_status: OcrStatus | None = None
     """Its scanned pages (no text layer): waiting for OCR, read, skipped
     (OCR off), failed; None if it has none."""
+    cover_pages: list[int] = []
+    """Pages (from 1) a site put in front of or behind the paper: left out
+    of its text; the viewer starts after them."""
     created_at: datetime
     deleted_at: datetime | None
 
@@ -83,6 +86,7 @@ def file_out(file: File) -> FileOut:
         text_status=TextStatus(file.text_status),
         text_error=file.text_error,
         ocr_status=OcrStatus(file.ocr_status) if file.ocr_status else None,
+        cover_pages=file.cover_pages,
         created_at=file.created_at,
         deleted_at=file.deleted_at,
     )

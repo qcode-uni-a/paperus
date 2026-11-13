@@ -1,5 +1,6 @@
 """The migrations give the schema the models describe."""
 
+import hashlib
 import uuid
 from datetime import UTC, datetime
 
@@ -270,3 +271,51 @@ def test_0016_last_active_from_logins_and_tokens(
     logged_in.get("/api/items", headers={"Authorization": f"Bearer {made['token']}"})
     [active] = db.scalars(select(User.last_active_at)).all()
     assert active is not None and active > used
+
+
+def test_0018_finds_the_covers_of_files_read_before(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """Updated: a file read before with IOP's cover in front gets it noted,
+    and the cover's passage leaves its text; a paper's own short page with
+    a footer stays."""
+    made = logged_in.post("/api/items", json={"metadata": {"title": "Floquet"}})
+    file = logged_in.post(
+        f"/api/items/{made.json()['id']}/files",
+        files={"upload": ("p.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")},
+    ).json()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0017")
+    pages = {
+        1: "To cite this article: T. Banerjee et al 2025 New J. Phys. 27 084506 "
+        "View the article online for updates and enhancements.",
+        2: "Exact Floquet flat band. Downloaded from https://iopscience.iop.org",
+        3: "The paper itself, its last page.",
+    }
+    for page, words in pages.items():
+        sha = hashlib.sha256(words.encode()).digest()
+        db.execute(
+            text("INSERT INTO chunks (sha256, text) VALUES (:sha, :text)"),
+            {"sha": sha, "text": words},
+        )
+        db.execute(
+            text(
+                "INSERT INTO file_chunks (file_id, position, chunk_sha256, page,"
+                " in_references) VALUES (:file, :page, :sha, :page, false)"
+            ),
+            {"file": file["id"], "page": page, "sha": sha},
+        )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+
+    covers = db.execute(
+        text("SELECT cover_pages FROM files WHERE id = :id"), {"id": file["id"]}
+    ).scalar_one()
+    left = db.execute(
+        text("SELECT page FROM file_chunks WHERE file_id = :id ORDER BY page"),
+        {"id": file["id"]},
+    ).scalars()
+    assert (covers, list(left)) == ([1], [2, 3])

@@ -1496,6 +1496,10 @@ export type FileOut = {
     text_error?: string | null;
     ocr_status?: OcrStatus | null;
     /**
+     * Cover Pages
+     */
+    cover_pages?: Array<number>;
+    /**
      * Created At
      */
     created_at: string;

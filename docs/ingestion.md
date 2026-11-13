@@ -77,6 +77,22 @@ Details:
   matters for sharing rules.
 - Items are deduplicated by DOI, so a PDF one member adds is available to the
   group, subject to the group's sharing settings.
+- **Cover pages** (`paperus.covers`, #42): a page a site puts in front of
+  (or, in repositories, behind) the paper is noted with the file
+  (`files.cover_pages`) when it is read; the file stays as it is. Its text
+  is left out of the paper's (search, passages, the abstract and details
+  read from the first pages), the viewer opens after it, and fluent mode
+  shows a bar instead ("Show"). A cover is the first page (or the last of
+  three or more) with at most 300 words and one of the sources' own
+  phrases (IOP's "To cite this article … View the article online", JSTOR's,
+  ResearchGate's, Taylor & Francis', Cambridge's, repositories' licence
+  sheets) or two that repositories share ("Citation for published
+  version", "General rights", "Take down policy", …). In the development
+  library: 18 files, all right (IOP's covers, Taylor & Francis', a
+  university repository's thesis sheets); first pages with a "Downloaded
+  from" footer are papers' own (thousands of characters) and stay. Files
+  read before 0.1.2 were looked at by the same rule in the migration.
+  Not yet: marking a page by hand when the guess is wrong.
 
 ## Browser extension
 

@@ -11457,6 +11457,14 @@
               }
             ]
           },
+          "cover_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Cover Pages",
+            "default": []
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",

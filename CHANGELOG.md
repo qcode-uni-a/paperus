@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Cover pages are passed over**: the page a site puts in front of a
+  paper (IOP's "To cite this article", Taylor & Francis', JSTOR's,
+  ResearchGate's, a repository's licence sheet) is recognised when the
+  file is read. The PDF opens after it, fluent mode shows a bar instead
+  ("Show"), and its words stay out of search and passages; the file
+  itself is unchanged. Files read before are looked at once on the update.
+- Error messages say what the server or the connection answered, instead
+  of only "Something went wrong".
+
 ## 0.1.1 (2026-11-13)
 
 *"Select all" now actually selects all, and reading files no longer waits while arXiv does its three-second breathing exercises.*

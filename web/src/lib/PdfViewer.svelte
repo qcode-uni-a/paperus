@@ -40,7 +40,8 @@
 		fileId = null,
 		sha256 = null,
 		itemId = null,
-		title = ''
+		title = '',
+		coverPages = []
 	}: {
 		url: string;
 		startPage?: number;
@@ -61,6 +62,9 @@
 		itemId?: string | null;
 		/** The paper's (for a note gathered from the annotations). */
 		title?: string;
+		/** Pages a site put in front of or behind the paper (from 1): fluent
+		 * mode leaves them out, with a way to show them. */
+		coverPages?: number[];
 	} = $props();
 
 	type Place = { page: number; top: number; left: number | null };
@@ -691,6 +695,7 @@
 					{startTop}
 					{startLeft}
 					{readingLine}
+					covers={coverPages}
 					onlink={follow}
 					viewports={pieceViewports}
 				/>

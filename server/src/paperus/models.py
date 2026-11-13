@@ -764,6 +764,11 @@ class File(Record, Trashable, Base):
     )
     text_error: Mapped[str | None]
     ocr_status: Mapped[str | None] = mapped_column(String(16), index=True)
+    cover_pages: Mapped[list[int]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """Pages (from 1) a site put in front of or behind the paper
+    (``paperus.covers``): left out of its text; the viewer starts after."""
     file_marks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     """The PDF's own annotations taken in as ``Annotation`` rows (of the
     person who uploaded it): where each sits in the PDF ({page_index,

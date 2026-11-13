@@ -34,6 +34,7 @@
 		readingLine = () => 0,
 		onlink,
 		viewports,
+		covers = [],
 		current = $bindable(1)
 	}: {
 		doc: PDFDocumentProxy;
@@ -58,6 +59,9 @@
 		onlink?: (place: Place) => void;
 		/** Each piece's viewport by its key, for marking a selection. */
 		viewports: Map<string, Viewport>;
+		/** Pages a site put in front of or behind the paper (from 1): left
+		 * out until asked for. */
+		covers?: number[];
 		current?: number;
 	} = $props();
 
@@ -244,6 +248,8 @@
 		for (const draw of draws.values()) draw.update();
 	});
 
+	/** Covers shown after all (asked for by their bar). */
+	let showCovers = $state(false);
 	let scrolledToStart = untrack(() => startPage) <= 1 && untrack(() => startTop) === null;
 
 	/** Watches a piece: near the screen it is drawn, far away let go. */
@@ -429,7 +435,14 @@
 
 <div class="fluent" style:width="{width}px">
 	{#each layouts.pages as found, i (i)}
-		{#if !found}
+		{#if covers.includes(i + 1) && !showCovers}
+			<p class="cover">
+				{i === 0
+					? 'A cover page the site put in front of the paper'
+					: 'A page the site put behind the paper'}
+				<button class="link" onclick={() => (showCovers = true)}>Show</button>
+			</p>
+		{:else if !found}
 			<div
 				class="waiting"
 				data-waiting={i + 1}
@@ -485,6 +498,15 @@
 		background: white;
 		border-radius: 6px;
 		overflow: hidden;
+	}
+	.cover {
+		margin: 8px 0;
+		padding: 8px 12px;
+		border-radius: 6px;
+		background: var(--rail);
+		color: var(--muted);
+		font-family: var(--sans);
+		font-size: var(--step--1);
 	}
 	.waiting {
 		width: 100%;

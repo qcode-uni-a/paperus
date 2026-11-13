@@ -61,7 +61,6 @@
 
 	const id = $derived(page.params.id ?? '');
 	// Search results link to the page with the matching passage.
-	const startPage = $derived(Number(page.url.searchParams.get('page')) || 1);
 	/** A passage to mark, from a search result (?file=…&passage=…). */
 	let highlight = $state<{ page: number; text: string } | null>(null);
 	$effect(() => {
@@ -115,6 +114,17 @@
 		];
 		return candidates[0] ?? null;
 	});
+
+	/** Where the PDF opens: the page asked for, else the first one after a
+	 * cover the site put in front of the paper. */
+	const startPage = $derived(
+		Number(page.url.searchParams.get('page')) || afterCovers(pdfFile?.cover_pages ?? [])
+	);
+	function afterCovers(covers: number[]): number {
+		let first = 1;
+		while (covers.includes(first)) first++;
+		return first;
+	}
 
 	/** Without a PDF: the main text file (notes, Markdown), if any. */
 	const textFile = $derived.by(() => {
@@ -691,6 +701,7 @@
 					itemId={item.id}
 					title={plainTitle(item.title)}
 					startPage={resume?.page ?? startPage}
+					coverPages={pdfFile.cover_pages ?? []}
 					startTop={resume?.top ?? null}
 					startLeft={resume?.left ?? null}
 					onplace={saveReading}
