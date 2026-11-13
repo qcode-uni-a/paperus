@@ -1,8 +1,8 @@
 """Notifications: what happened that concerns a person (mostly what they did
 not do themselves), under the bell in the header. Papers added to one of
 their groups (by upload, DOI, the extension, an import, or given to the
-group: one notification per person who added and group, counted up while
-unread for a few hours); a published version found for one of their
+group: one notification a group, counted up while unread, whoever adds
+them and when); a published version found for one of their
 preprints (told apart where it is their own paper: they are among its
 authors by their ORCID iD; their own paper is also told, to celebrate, when
 it comes less than a week after it came out, however it comes and whoever
@@ -55,9 +55,6 @@ ones would come all at once, when reference lists are looked for anew)."""
 FRESH = timedelta(days=7)
 """A paper out less than this long ago, when it comes: one's own is
 celebrated (``_fresh``)."""
-ONE_NOTICE = timedelta(hours=6)
-"""Papers added by the same person to the same group within this, while
-unread, are one notification."""
 
 ADDED = "added"
 PUBLISHED = "published"
@@ -103,27 +100,31 @@ def _added(
     if group is None or who is None:
         return
     connection = db.connection()
-    since = datetime.now(UTC) - ONE_NOTICE
     first = items[0]
+    name = who.display_name or who.username
     for user_id in people_of(db, library_id):
         if user_id == actor:
             continue
+        # One notice a group while unread, however many add and when.
         known = connection.execute(
             select(Notification.id, Notification.data).where(
                 Notification.user_id == user_id,
                 Notification.kind == ADDED,
                 Notification.read_at.is_(None),
-                Notification.at >= since,
                 Notification.data["library_id"].astext == str(library_id),
-                Notification.data["actor_id"].astext == str(actor),
             )
         ).first()
         if known is not None:
-            data = {**known.data, "count": known.data.get("count", 1) + len(items)}
             connection.execute(
                 update(Notification)
                 .where(Notification.id == known.id)
-                .values(data=data, at=func.now())
+                .values(
+                    data={
+                        **_with_actor(known.data, actor, name),
+                        "count": known.data.get("count", 1) + len(items),
+                    },
+                    at=func.now(),
+                )
             )
             continue
         connection.execute(
@@ -134,7 +135,9 @@ def _added(
                     "library_id": str(library_id),
                     "group": group.name,
                     "actor_id": str(actor),
-                    "actor": who.display_name or who.username,
+                    "actor": name,
+                    "actor_ids": [str(actor)],
+                    "actors": [name],
                     "count": len(items),
                     "item_id": str(first.id),
                     "title": first.title,
@@ -142,6 +145,20 @@ def _added(
                 },
             )
         )
+
+
+def _with_actor(data: dict[str, Any], actor: uuid.UUID, name: str) -> dict[str, Any]:
+    """A merged notice's people who did it: all their ids, the first three
+    names."""
+    ids = data.get("actor_ids") or [data.get("actor_id")]
+    names = data.get("actors") or [data.get("actor")]
+    if str(actor) in ids:
+        return data
+    return {
+        **data,
+        "actor_ids": [*ids, str(actor)],
+        "actors": [*names, name][:3],
+    }
 
 
 def published(db: Session, item: Item, version: Version) -> None:
@@ -416,8 +433,8 @@ def _member_added(
     member_id: uuid.UUID,
 ) -> None:
     """Someone added to the group: told to its admins (here or above), but
-    not to who added them or to them; people added one after another, while
-    unread for a few hours, one notice ("Ann added Ben and 2 others")."""
+    not to who added them or to them; one notice a group while unread
+    ("Ann added Ben and 2 others")."""
     member = db.get(User, member_id)
     if member is None:
         return
@@ -439,21 +456,20 @@ def _member_added(
         .distinct()
     )
     connection = db.connection()
-    since = datetime.now(UTC) - ONE_NOTICE
+    actor_name = actor.display_name or actor.username
     for user_id in admins:
+        # One notice a group while unread, however many add and when.
         known = connection.execute(
             select(Notification.id, Notification.data).where(
                 Notification.user_id == user_id,
                 Notification.kind == MEMBER_ADDED,
                 Notification.read_at.is_(None),
-                Notification.at >= since,
                 Notification.data["group_id"].astext == str(group.id),
-                Notification.data["actor_id"].astext == str(actor.id),
             )
         ).first()
         if known is not None:
             data = {
-                **known.data,
+                **_with_actor(known.data, actor.id, actor_name),
                 "count": known.data.get("count", 1) + 1,
                 "members": [*known.data.get("members", []), name][:3],
             }
@@ -473,7 +489,9 @@ def _member_added(
                     "group": group.name,
                     "people": group.people,
                     "actor_id": str(actor.id),
-                    "actor": actor.display_name or actor.username,
+                    "actor": actor_name,
+                    "actor_ids": [str(actor.id)],
+                    "actors": [actor_name],
                     "members": [name],
                     "count": 1,
                 },

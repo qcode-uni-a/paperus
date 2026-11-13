@@ -20,7 +20,7 @@ def listed(person: Person) -> dict:
 
 def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
     root = Person(client, db, "root", admin=True)
-    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    ada, bob, eve = (Person(client, db, n) for n in ("ada", "bob", "eve"))
     lab = group(root, "Lab", ada)
     ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", json={"role": "member"})
     first = ada.add("Rainfall records", lab["library_id"])
@@ -37,6 +37,8 @@ def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
         "group": "Lab",
         "actor_id": ada.id,
         "actor": "ada",
+        "actor_ids": [ada.id],
+        "actors": ["ada"],
         "count": 2,
         "item_id": first["id"],
         "title": "Rainfall records",
@@ -57,6 +59,12 @@ def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
     added = [n for n in found["notifications"] if n["kind"] == "added"]
     assert [n["data"]["count"] for n in added] == [1, 2]
     assert [n["read"] for n in added] == [False, True]
+    # Someone else adding too, while unread (and however much later): the
+    # same notice.
+    ada.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "member"})
+    eve.add("Fog records", lab["library_id"])
+    unread = next(n for n in listed(bob)["notifications"] if n["kind"] == "added")
+    assert (unread["data"]["actors"], unread["data"]["count"]) == (["ada", "eve"], 2)
 
 
 def test_papers_given_to_a_group_and_groups_inside(
@@ -319,6 +327,8 @@ def test_someone_added_told_to_the_admins(client: TestClient, db: Session) -> No
             "people": False,
             "actor_id": ada.id,
             "actor": "ada",
+            "actor_ids": [ada.id],
+            "actors": ["ada"],
             "members": ["bob", "carl"],
             "count": 2,
         }

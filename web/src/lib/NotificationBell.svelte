@@ -105,6 +105,22 @@
 
 	const plural = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'paper' : 'papers'}`;
 
+	/** "Ann", "Ann and Ben", "Ann, Ben and Clara", "Ann, Ben, Clara and 2
+	 * others": the first few names of ``count`` people. */
+	function listed(names: string[], count = names.length): string {
+		const more = count - names.length;
+		if (more > 0) return `${names.join(', ')} and ${more} ${more === 1 ? 'other' : 'others'}`;
+		if (names.length > 1) return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+		return names[0] ?? 'someone';
+	}
+
+	/** Who did it, in a notice merged while unread (older ones name one). */
+	function actors(d: Record<string, unknown>): string {
+		const names = (d.actors as string[] | undefined) ?? [String(d.actor)];
+		const ids = (d.actor_ids as string[] | undefined) ?? [d.actor_id];
+		return listed(names, ids.length);
+	}
+
 	/** What it says, and where it leads. */
 	function told(notice: NotificationOut): { text: string; href: string; reload?: boolean } {
 		const d = notice.data as Record<string, string | number | null>;
@@ -114,8 +130,8 @@
 			// In a group of people: shared with one (its name is just its people).
 			const what = count === 1 ? `“${d.title || 'a paper'}”` : plural(count);
 			const text = d.people
-				? `${d.actor} shared ${what} with you`
-				: `${d.actor} added ${what} to ${d.group}`;
+				? `${actors(d)} shared ${what} with you`
+				: `${actors(d)} added ${what} to ${d.group}`;
 			return { text, href: count === 1 ? item : `${resolve('/')}?owner=${d.library_id}` };
 		}
 		if (notice.kind === 'joined') {
@@ -158,16 +174,8 @@
 		}
 		if (notice.kind === 'member_added') {
 			const names = (d.members as unknown as string[] | null) ?? [];
-			const count = Number(d.count ?? names.length);
-			const more = count - names.length;
-			const who =
-				more > 0
-					? `${names.join(', ')} and ${more} ${more === 1 ? 'other' : 'others'}`
-					: names.length > 1
-						? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
-						: (names[0] ?? 'someone');
 			return {
-				text: `${d.actor} added ${who} to ${d.group}`,
+				text: `${actors(d)} added ${listed(names, Number(d.count ?? names.length))} to ${d.group}`,
 				href: `${resolve('/manage/groups')}?group=${d.group_id}`
 			};
 		}

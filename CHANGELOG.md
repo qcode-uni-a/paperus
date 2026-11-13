@@ -3,8 +3,12 @@
 ## Unreleased
 
 - **A group's admins hear who joins**: "Ann added Ben and Clara to Lab",
-  under the bell of the group's other admins (one notice for people added
-  one after another); members are not told of each new one.
+  under the bell of the group's other admins; members are not told of
+  each new one.
+- **One notice a group while unread**: papers added to a group, and
+  people added to it, come together in one notice for as long as it is
+  unread, whoever adds them and however much later ("Ann, Ben and Clara
+  added 50 papers to Lab"): back from a week away, one line a group.
 - **Times cited**: each paper's citations as OpenAlex counts them, shown
   beside its DOI ("Cited 123 times") and a new way to sort the library
   ("Times cited", most first). Looked up when a paper is new, then each
