@@ -92,7 +92,6 @@
 		listMembers({ path: { group_id: id } }).then(({ data }) => {
 			if (selected?.id === id) members = data ?? [];
 		});
-		if (selected?.can_manage) findUsers().then(({ data }) => (people = data ?? []));
 	});
 
 	function select(id: string) {
@@ -105,15 +104,47 @@
 		await Promise.all([load(), loadOrganize()]);
 	}
 
+	// People to add, found by name or username as one types (from two
+	// letters on), without those in the group already.
+	let picked = $state<UserBrief | null>(null);
+	$effect(() => {
+		const words = newPerson.trim();
+		if (words.length < 2 || (picked && words === shownName(picked))) {
+			people = [];
+			return;
+		}
+		picked = null;
+		const timer = setTimeout(async () => {
+			const { data } = await findUsers({ query: { q: words } });
+			if (words !== newPerson.trim()) return;
+			people = (data ?? []).filter(
+				(p) => !members.some((m) => m.user_id === p.id && m.direct_role)
+			);
+		}, 200);
+		return () => clearTimeout(timer);
+	});
+	function pick(person: UserBrief) {
+		picked = person;
+		newPerson = shownName(person);
+		people = [];
+	}
+
 	async function addPerson(event: SubmitEvent) {
 		event.preventDefault();
 		if (!selected) return;
-		const person = people.find((p) => p.username === newPerson.trim());
+		const typed = newPerson.trim();
+		let person = picked;
 		if (!person) {
-			error = `No user “${newPerson.trim()}”.`;
+			// A username typed whole, picked or not.
+			const { data } = await findUsers({ query: { q: typed } });
+			person = (data ?? []).find((p) => p.username === typed) ?? null;
+		}
+		if (!person) {
+			error = `No user “${typed}”: pick one of those found as you type.`;
 			return;
 		}
 		newPerson = '';
+		picked = null;
 		await changed(
 			await setMember({
 				path: { group_id: selected.id, user_id: person.id },
@@ -283,18 +314,15 @@
 				<form class="add" onsubmit={addPerson}>
 					<input
 						bind:value={newPerson}
-						list="group-people"
 						{@attach enterSubmits}
-						placeholder="Username"
+						placeholder="Name or username"
+						role="combobox"
 						aria-label="Person to add"
+						aria-expanded={people.length > 0}
+						aria-controls="group-people"
 						autocomplete="off"
 						required
 					/>
-					<datalist id="group-people">
-						{#each people.filter((p) => !members.some((m) => m.user_id === p.id && m.direct_role)) as person (person.id)}
-							<option value={person.username}>{person.display_name ?? ''}</option>
-						{/each}
-					</datalist>
 					{#if !selected.people}
 						<select bind:value={newRole} aria-label="Role">
 							{#each ROLES as role (role.value)}
@@ -304,6 +332,21 @@
 					{/if}
 					<button>Add</button>
 				</form>
+				{#if people.length}
+					<div class="found" id="group-people" role="listbox" aria-label="People found">
+						{#each people as person (person.id)}
+							<button
+								type="button"
+								role="option"
+								aria-selected="false"
+								class="pick"
+								onclick={() => pick(person)}
+								>{shownName(person)}{#if person.display_name}
+									<span class="muted">{person.username}</span>{/if}</button
+							>
+						{/each}
+					</div>
+				{/if}
 				<p class="licence">
 					Everyone you add can open the PDFs of this group's papers{selected.people
 						? ''
@@ -508,6 +551,17 @@
 	.add select {
 		width: auto;
 		max-width: 100%;
+	}
+	.found {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-top: 8px;
+	}
+	.pick {
+		padding: 3px 12px;
+		border-radius: 999px;
+		font-size: var(--step--1);
 	}
 	.licence {
 		margin: 8px 0 0;

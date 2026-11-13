@@ -41,7 +41,9 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 	await page.getByRole('navigation', { name: 'Groups' }).getByText(groupName).click();
 	const group = page.getByRole('region', { name: groupName });
 	await expect(group).toBeVisible();
-	await group.getByRole('combobox', { name: 'Person to add' }).fill(bob.username);
+	// Found as one types: a few letters, then picked.
+	await group.getByRole('combobox', { name: 'Person to add' }).fill(bob.username.slice(0, 6));
+	await group.getByRole('option', { name: bob.username }).click();
 	await group.getByRole('combobox', { name: 'Role', exact: true }).selectOption('member');
 	await group.getByRole('button', { name: 'Add', exact: true }).click();
 	await expect(group.getByRole('combobox', { name: `Role of ${bob.username}` })).toHaveValue(
