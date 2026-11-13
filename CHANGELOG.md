@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.3 (2026-11-13)
+
+*paperus now reads your papers the way you do: across the columns, over the page break, and politely past the running header — and you can finally share one with just Anna.*
 
 - **Share with single people**: a paper's Share… now offers people as
   well as groups. Choose Anna (found by name, anyone on the server), and
@@ -27,6 +29,10 @@
   was read in halves, its left half joining the left column's text; now
   row by row. A contents page's page numbers, standing apart at the right,
   are no longer taken for a margin note and left out.
+- **A new upload's page shows its title**: now and then a paper's page
+  kept the file name as its title after the upload, although the title
+  had been found (the page asked at the very moment it was saved, and saw
+  the file read but the old title); now it reads both at once.
 
 ## 0.1.2 (2026-11-13)
 

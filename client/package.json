@@ -1,6 +1,6 @@
 {
 	"name": "paperus",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "TypeScript client for the paperus API (self-hosted research library for groups)",
 	"license": "Apache-2.0",
 	"repository": {
