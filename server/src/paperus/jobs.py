@@ -30,6 +30,7 @@ from paperus import (
     authors,
     automations,
     changes,
+    citation_counts,
     errata,
     integrity,
     item_references,
@@ -469,6 +470,29 @@ def queue_own_papers(app: App, library_id: uuid.UUID | None = None) -> None:
         _queue(app, "add_own_papers", key, timestamp=0)
     else:
         _queue(app, "add_own_papers", key, timestamp=0, library_id=str(library_id))
+
+
+# How often papers are cited (paperus.citation_counts): each hour, the new
+# papers and those counted a week ago, 50 to a request to OpenAlex.
+@tasks.periodic(cron="40 * * * *")
+@tasks.task(
+    name="count_citations",
+    queue=OPENALEX,
+    queueing_lock="count-citations",
+    pass_context=True,
+)
+def count_citations(job: JobContext, timestamp: int) -> None:
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        if not config.find_citations:
+            return
+        items = citation_counts.waiting(db)
+        known = citation_counts.check(
+            db, context.http, items, contact_email=config.contact_email
+        )
+    if items:
+        log.info("citation counts: %d of %d papers known", known, len(items))
 
 
 # Corrections to papers (paperus.errata): rarely, Sunday nights, a few

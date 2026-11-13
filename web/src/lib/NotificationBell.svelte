@@ -40,6 +40,7 @@
 	 * once in this page while it is new, and a star on its line in the list. */
 	const yours = (notice: NotificationOut) =>
 		notice.kind === 'cited' ||
+		notice.kind === 'milestone' ||
 		(notice.kind === 'published' && Boolean((notice.data as Record<string, unknown>).yours));
 	const SPARKLING = 3200;
 	let sparkle = $state(false);
@@ -138,6 +139,12 @@
 						text: `${plural(count)} of yours were added to ${where}, from OpenAlex`,
 						href: `${resolve('/')}?owner=${d.library_id}`
 					};
+		}
+		if (notice.kind === 'milestone') {
+			return {
+				text: `Congratulations! Your paper “${d.title}” has been cited ${Number(d.milestone).toLocaleString()} times`,
+				href: item
+			};
 		}
 		if (notice.kind === 'cited') {
 			const count = Number(d.count ?? 1);

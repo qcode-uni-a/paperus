@@ -131,6 +131,8 @@ class ItemOut(BaseModel):
     deleted_at: datetime | None
     archived_at: datetime | None = None
     """In the archive: left out of lists and search unless asked for."""
+    cited_by_count: int | None = None
+    """How often it is cited, as OpenAlex counts (looked up each week)."""
     processing: bool
     """Files are still being read (text, and metadata for uploads)."""
     tags: list[ItemTagOut]
@@ -201,6 +203,7 @@ def item_out(item: Item, access: Access) -> ItemOut:
         changed_at=item.changed_at,
         deleted_at=item.deleted_at,
         archived_at=item.archived_at,
+        cited_by_count=item.cited_by_count,
         tags=item_tags(item, access),
         collection_ids=[
             link.collection_id
@@ -770,7 +773,15 @@ def list_items(
     title_words: Annotated[str | None, Query(max_length=200)] = None,
     library_id: Annotated[uuid.UUID | None, Query(alias="library")] = None,
     sort: Literal[
-        "added", "recent", "opened", "title", "author", "year", "published", "journal"
+        "added",
+        "recent",
+        "opened",
+        "title",
+        "author",
+        "year",
+        "published",
+        "journal",
+        "citations",
     ] = "added",
     order: Literal["asc", "desc"] | None = None,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -784,9 +795,10 @@ def list_items(
     newest first, paged with ``offset`` instead of ``before``;
     ``sort=opened``: only items the reader opened, by when. Sorted by
     ``title``, first ``author`` (then year), ``year`` (then first author),
-    publication date (``published``) or ``journal`` (then year), or by
-    when added in ``order=asc``: ``order`` is ``asc`` or ``desc`` (the
-    default: newest first for dates and years, A to Z for words), papers
+    publication date (``published``), ``journal`` (then year) or
+    ``citations`` (OpenAlex's count), or by when added in ``order=asc``:
+    ``order`` is ``asc`` or ``desc`` (the default: newest first for dates
+    and years, most first for citations, A to Z for words), papers
     without the value last either way; paged with ``offset``.
 
     ``trashed=true`` lists the trash instead, ``archived=true`` the archive
@@ -933,7 +945,7 @@ def list_journals(
     return [JournalOut(name=name, papers=n) for name, n in rows if name]
 
 
-_NEWEST_FIRST = ("added", "year", "published")
+_NEWEST_FIRST = ("added", "year", "published", "citations")
 
 
 def _sorted_by(sort: str, descending: bool) -> list[ColumnElement[Any]]:
@@ -958,6 +970,7 @@ def _sorted_by(sort: str, descending: bool) -> list[ColumnElement[Any]]:
             Item.year.desc().nulls_last(),
             title.asc(),
         ],
+        "citations": [way(Item.cited_by_count), Item.year.desc().nulls_last()],
     }.get(sort, [way(Item.id)])
     return [*keys, Item.id.desc()]
 

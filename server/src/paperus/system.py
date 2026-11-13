@@ -63,6 +63,10 @@ class SystemConfig(BaseModel):
     find_references: bool = True
     """Look for papers' reference lists (arXiv's LaTeX sources, Crossref,
     the PDF's own list); a few dozen papers an hour."""
+    find_citations: bool = True
+    """Count how often papers are cited (OpenAlex, by their DOIs): each
+    paper when new, then each week, 50 a request; shown on its page, a way
+    to sort, and milestones celebrated for its authors here."""
     find_authors: bool = True
     """Look up papers' authors at OpenAlex by the papers' DOIs: their ids,
     ORCID iDs and affiliations on each paper (``paperus.authors``); a few

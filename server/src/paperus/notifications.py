@@ -6,14 +6,14 @@ unread for a few hours); a published version found for one of their
 preprints (told apart where it is their own paper: they are among its
 authors by their ORCID iD; their own paper is also told, to celebrate,
 when it comes less than a week after it came out, however it comes and
-whoever adds it); a paper new here citing one of their own (celebrated
-too); a correction (erratum) found for one of their papers;
-being added to a group by someone else (to a group of people: once it has
-papers, else the papers' own notice says it); their own papers added from
-OpenAlex by the daily job (to their library or a group's); each zip of their export as
-it is written (or the export failing); and the end of their imports,
-which may take long. Read ones go after ``KEEP_READ``, all after ``KEEP``
-(the nightly tidy-up).
+whoever adds it); a paper new here citing one of their own, and their own
+passing a milestone of citations (celebrated too); a correction (erratum)
+found for one of their papers; being added to a group by someone else (to
+a group of people: once it has papers, else the papers' own notice says
+it); their own papers added from OpenAlex by the daily job (to their
+library or a group's); each zip of their export as it is written (or the
+export failing); and the end of their imports, which may take long. Read
+ones go after ``KEEP_READ``, all after ``KEEP`` (the nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
 so every way of adding them counts; the person who did it is the one who
@@ -67,6 +67,7 @@ ERRATUM = "erratum"
 JOINED = "joined"
 OWN_ADDED = "own_added"
 CITED = "cited"
+MILESTONE = "milestone"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -250,6 +251,37 @@ def cited(db: Session, citing: Item, dois: set[str], arxivs: set[str]) -> None:
                     "cited_id": str(items[0].id),
                     "cited_title": items[0].title,
                     "count": len(items),
+                },
+            )
+        )
+
+
+def milestone(db: Session, item: Item, passed: int, count: int) -> None:
+    """One's own paper cited ``passed`` times now (``citation_counts``):
+    for those of its authors (by ORCID iD) it concerns; once a milestone."""
+    people = people_of(db, item.library_id)
+    authors = _orcids(db, item, list(item.versions))
+    if not people or not authors:
+        return
+    told = select(Notification.user_id).where(
+        Notification.kind == MILESTONE,
+        Notification.data["item_id"].astext == str(item.id),
+        Notification.data["milestone"].as_integer() == passed,
+    )
+    for user_id in db.scalars(
+        select(User.id).where(
+            User.id.in_(people), User.orcid.in_(authors), User.id.not_in(told)
+        )
+    ):
+        db.add(
+            Notification(
+                user_id=user_id,
+                kind=MILESTONE,
+                data={
+                    "item_id": str(item.id),
+                    "title": item.title,
+                    "milestone": passed,
+                    "count": count,
                 },
             )
         )

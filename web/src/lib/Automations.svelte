@@ -27,6 +27,7 @@
 		['find_errata', 'Corrections (errata) to papers are looked for'],
 		['find_references', 'Papers’ reference lists are looked for'],
 		['find_authors', 'Authors are recognised by their ORCID iDs (OpenAlex)'],
+		['find_citations', 'How often papers are cited is counted (OpenAlex, weekly)'],
 		['open_access', 'Free PDFs are fetched (where a library wants them)'],
 		['ocr', 'Scanned pages are read (OCR)']
 	] as const;

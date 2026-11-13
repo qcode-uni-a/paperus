@@ -2060,6 +2060,10 @@ export type ItemDetail = {
      */
     archived_at?: string | null;
     /**
+     * Cited By Count
+     */
+    cited_by_count?: number | null;
+    /**
      * Processing
      */
     processing: boolean;
@@ -2328,6 +2332,10 @@ export type ItemOut = {
      * Archived At
      */
     archived_at?: string | null;
+    /**
+     * Cited By Count
+     */
+    cited_by_count?: number | null;
     /**
      * Processing
      */
@@ -4333,6 +4341,10 @@ export type ServerAutomations = {
      */
     find_authors: boolean;
     /**
+     * Find Citations
+     */
+    find_citations: boolean;
+    /**
      * Open Access
      */
     open_access: boolean;
@@ -4483,6 +4495,10 @@ export type SimilarItem = {
      * Archived At
      */
     archived_at?: string | null;
+    /**
+     * Cited By Count
+     */
+    cited_by_count?: number | null;
     /**
      * Processing
      */
@@ -4799,6 +4815,10 @@ export type SystemConfig = {
      * Find References
      */
     find_references?: boolean;
+    /**
+     * Find Citations
+     */
+    find_citations?: boolean;
     /**
      * Find Authors
      */
@@ -6000,7 +6020,7 @@ export type ListItemsData = {
         /**
          * Sort
          */
-        sort?: 'added' | 'recent' | 'opened' | 'title' | 'author' | 'year' | 'published' | 'journal';
+        sort?: 'added' | 'recent' | 'opened' | 'title' | 'author' | 'year' | 'published' | 'journal' | 'citations';
         /**
          * Order
          */

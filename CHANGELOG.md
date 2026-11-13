@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Times cited**: each paper's citations as OpenAlex counts them, shown
+  beside its DOI ("Cited 123 times") and a new way to sort the library
+  ("Times cited", most first). Looked up when a paper is new, then each
+  week, 50 papers to a request (only DOIs are sent; a switch under
+  Administration → Settings). When one of your own papers passes 10, 50,
+  100, 250, 500, 1,000… citations, the bell congratulates you, with
+  sparkles (the first count sets where you start).
 - **Cited!** When a paper new in the library cites one of yours (you are
   among its authors by your ORCID iD), the bell says so, with a star and
   a few sparkles: "“…” cites your paper “…”". Once a citing paper; only

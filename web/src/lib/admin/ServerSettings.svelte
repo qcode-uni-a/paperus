@@ -20,6 +20,7 @@
 	let findReferences = $state(true);
 	let findErrata = $state(true);
 	let findAuthors = $state(true);
+	let findCitations = $state(true);
 	let dates = $state<DateFormat>('browser');
 	const now = new Date();
 	let saving = $state(false);
@@ -33,6 +34,7 @@
 		findReferences = config?.find_references ?? true;
 		findErrata = config?.find_errata ?? true;
 		findAuthors = config?.find_authors ?? true;
+		findCitations = config?.find_citations ?? true;
 		dates = config?.date_format ?? 'browser';
 	}
 	// The page reloads its data every few seconds: start over only when the
@@ -49,6 +51,7 @@
 			config.find_references,
 			config.find_errata,
 			config.find_authors,
+			config.find_citations,
 			config.date_format
 		]);
 		if (saved === seen) return;
@@ -66,6 +69,7 @@
 				findReferences !== (config.find_references ?? true) ||
 				findErrata !== (config.find_errata ?? true) ||
 				findAuthors !== (config.find_authors ?? true) ||
+				findCitations !== (config.find_citations ?? true) ||
 				dates !== (config.date_format ?? 'browser'))
 	);
 
@@ -81,6 +85,7 @@
 				find_references: findReferences,
 				find_errata: findErrata,
 				find_authors: findAuthors,
+				find_citations: findCitations,
 				date_format: dates
 			},
 			'Server settings'
@@ -130,6 +135,15 @@
 >
 	<label class="check"
 		><input id="find-errata" type="checkbox" bind:checked={findErrata} /> Look for them</label
+	>
+</SettingRow>
+<SettingRow
+	id="find-citations"
+	title="Times cited"
+	description="How often each paper is cited, as OpenAlex counts: shown on its page and a way to sort the library; its authors here are congratulated when it passes 10, 50, 100… citations. Each paper when new, then each week, 50 to a request; only the papers' DOIs are sent."
+>
+	<label class="check"
+		><input id="find-citations" type="checkbox" bind:checked={findCitations} /> Count them</label
 	>
 </SettingRow>
 <SettingRow

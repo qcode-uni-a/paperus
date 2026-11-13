@@ -466,6 +466,12 @@ class Item(Record, Trashable, Base):
     """A preprint: when paperus last looked for its published version."""
     errata_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """When paperus last looked for corrections to it (``paperus.errata``)."""
+    cited_by_count: Mapped[int | None]
+    """How often it is cited, as OpenAlex counts (``paperus.citation_counts``)."""
+    citations_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    """When that was looked up (each week)."""
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Kept for good, but left out of lists and search unless asked for."""
     references_checked_at: Mapped[datetime | None] = mapped_column(

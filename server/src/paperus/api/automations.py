@@ -30,6 +30,8 @@ class ServerAutomations(BaseModel):
     """Papers' reference lists looked for."""
     find_authors: bool
     """Papers' authors looked up at OpenAlex (ORCID iDs)."""
+    find_citations: bool
+    """How often papers are cited counted (OpenAlex), each week."""
     open_access: bool
     """Open-access copies fetched for papers without a file (where their
     library wants them)."""
@@ -97,6 +99,7 @@ def get_automations(request: Request, db: DB, access: CurrentAccess) -> Automati
             find_errata=config.find_errata,
             find_references=config.find_references,
             find_authors=config.find_authors,
+            find_citations=config.find_citations,
             open_access=config.open_access_auto,
             ocr=config.ocr,
         ),

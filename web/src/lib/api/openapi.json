@@ -612,7 +612,7 @@
           "items"
         ],
         "summary": "List Items",
-        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when. Sorted by\n``title``, first ``author`` (then year), ``year`` (then first author),\npublication date (``published``) or ``journal`` (then year), or by\nwhen added in ``order=asc``: ``order`` is ``asc`` or ``desc`` (the\ndefault: newest first for dates and years, A to Z for words), papers\nwithout the value last either way; paged with ``offset``.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given), ``author_id`` (repeatable: by one of these people,\n``paperus.authors``), ``journal`` (repeatable: in one of these journals,\nany case) and ``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case, as parts of\nwords too); ``title_words`` too, as words (stems: \"qubits\" finds\n\"qubit\", \"spin\" not \"inspiring\"; stop words left out), by an index.\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
+        "description": "Items the person can read, newest first; ``before`` = last ``id`` for\nthe next page. ``library`` shows one library only. ``sort=recent``:\nby the latest of the item's last change and the reader's last opening,\nnewest first, paged with ``offset`` instead of ``before``;\n``sort=opened``: only items the reader opened, by when. Sorted by\n``title``, first ``author`` (then year), ``year`` (then first author),\npublication date (``published``), ``journal`` (then year) or\n``citations`` (OpenAlex's count), or by when added in ``order=asc``:\n``order`` is ``asc`` or ``desc`` (the default: newest first for dates\nand years, most first for citations, A to Z for words), papers\nwithout the value last either way; paged with ``offset``.\n\n``trashed=true`` lists the trash instead, ``archived=true`` the archive\n(archived papers are otherwise left out, except when asked for by\n``id``). ``unsorted=true``: only papers\nwith a PDF whose details could not be found (all guessed from the file;\npapers still being read, and notes or other files without a DOI to\nfind, are left out). ``tag`` (repeatable: items\nwith all of them), the other rules of smart collections (``tag_any``,\n``tag_none``, ``type``, ``published_from``/``published_to``, ``owner``,\n``added_days``; see ``organize.Rules``), ``author`` (\"Family, Given\" as\nin ``authors``: the family name, and the given name's first letter if\none is given), ``author_id`` (repeatable: by one of these people,\n``paperus.authors``), ``journal`` (repeatable: in one of these journals,\nany case) and ``collection`` (with its\nsubcollections unless ``nested=false``) filter the list, and ``title``\nto items with all of its words in their title (any case, as parts of\nwords too); ``title_words`` too, as words (stems: \"qubits\" finds\n\"qubit\", \"spin\" not \"inspiring\"; stop words left out), by an index.\n``X-Total-Count`` is the number of matching items, for showing the total\nwhile paging.\n``since=N`` is for syncing:\nevery item changed after change number N, trashed or not, in change\norder; ``limit`` and ``before`` do not apply. The ``Last-Change`` header\nis the number to pass as ``since`` next time.",
         "operationId": "list_items",
         "parameters": [
           {
@@ -979,7 +979,8 @@
                 "author",
                 "year",
                 "published",
-                "journal"
+                "journal",
+                "citations"
               ],
               "type": "string",
               "default": "added",
@@ -12783,6 +12784,17 @@
             ],
             "title": "Archived At"
           },
+          "cited_by_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cited By Count"
+          },
           "processing": {
             "type": "boolean",
             "title": "Processing"
@@ -13351,6 +13363,17 @@
               }
             ],
             "title": "Archived At"
+          },
+          "cited_by_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cited By Count"
           },
           "processing": {
             "type": "boolean",
@@ -16847,6 +16870,10 @@
             "type": "boolean",
             "title": "Find Authors"
           },
+          "find_citations": {
+            "type": "boolean",
+            "title": "Find Citations"
+          },
           "open_access": {
             "type": "boolean",
             "title": "Open Access"
@@ -16862,6 +16889,7 @@
           "find_errata",
           "find_references",
           "find_authors",
+          "find_citations",
           "open_access",
           "ocr"
         ],
@@ -17123,6 +17151,17 @@
               }
             ],
             "title": "Archived At"
+          },
+          "cited_by_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cited By Count"
           },
           "processing": {
             "type": "boolean",
@@ -17646,6 +17685,11 @@
           "find_references": {
             "type": "boolean",
             "title": "Find References",
+            "default": true
+          },
+          "find_citations": {
+            "type": "boolean",
+            "title": "Find Citations",
             "default": true
           },
           "find_authors": {

@@ -1,7 +1,8 @@
 /** The order of the library's and collections' lists, kept in the address
  * (``sort``, ``order``) and remembered on this device for the next visit. */
 
-export type SortField = 'added' | 'title' | 'author' | 'year' | 'published' | 'journal';
+export type SortField =
+	'added' | 'title' | 'author' | 'year' | 'published' | 'journal' | 'citations';
 export type SortOrder = 'asc' | 'desc';
 export type Sort = { field: SortField; order: SortOrder };
 
@@ -11,20 +12,23 @@ export const SORT_FIELDS: { value: SortField; label: string }[] = [
 	{ value: 'author', label: 'First author' },
 	{ value: 'year', label: 'Year' },
 	{ value: 'published', label: 'Publication date' },
-	{ value: 'journal', label: 'Journal' }
+	{ value: 'journal', label: 'Journal' },
+	{ value: 'citations', label: 'Times cited' }
 ];
 
 const DATES: SortField[] = ['added', 'year', 'published'];
 const REMEMBERED = 'paperus.sort';
 
-/** Dates newest first, words A to Z, unless asked otherwise. */
+/** Dates newest first, citations most first, words A to Z, unless asked
+ * otherwise. */
 export function defaultOrder(field: SortField): SortOrder {
-	return DATES.includes(field) ? 'desc' : 'asc';
+	return DATES.includes(field) || field === 'citations' ? 'desc' : 'asc';
 }
 
-/** The order in words: "Newest first", "Z to A". */
+/** The order in words: "Newest first", "Most first", "Z to A". */
 export function orderName(sort: Sort): string {
 	if (DATES.includes(sort.field)) return sort.order === 'desc' ? 'Newest first' : 'Oldest first';
+	if (sort.field === 'citations') return sort.order === 'desc' ? 'Most first' : 'Fewest first';
 	return sort.order === 'asc' ? 'A to Z' : 'Z to A';
 }
 

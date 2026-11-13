@@ -476,7 +476,12 @@
 					target="_blank"
 					rel="noreferrer"
 					title="The paper at its publisher (opens a new tab)">DOI {doi}</a
-				>
+				>{#if item.cited_by_count !== null && item.cited_by_count !== undefined}<span
+						class="cited"
+						title="As OpenAlex counts: by all the papers it knows, looked up each week"
+						>Cited {item.cited_by_count.toLocaleString()}
+						{item.cited_by_count === 1 ? 'time' : 'times'}</span
+					>{/if}
 			</p>
 		{/if}
 		{#if item.added_by && isShared(item.library_id)}
@@ -810,6 +815,10 @@
 		flex-basis: 100%;
 		color: var(--danger);
 		font-size: var(--step--1);
+	}
+	.cited {
+		margin-left: 12px;
+		color: var(--muted);
 	}
 	.doi {
 		margin: -4px 0 12px;
