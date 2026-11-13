@@ -32,8 +32,9 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 
 	// A group with the administrator and bob, not carol.
 	await page.goto('/manage/groups');
-	await page.getByRole('button', { name: 'New group' }).click();
-	const groupDialog = page.getByRole('dialog', { name: 'New group' });
+	// Exactly: other tests' groups add "New group in …".
+	await page.getByRole('button', { name: 'New group', exact: true }).click();
+	const groupDialog = page.getByRole('dialog', { name: 'New group', exact: true });
 	await groupDialog.getByLabel('Name').fill(groupName);
 	await groupDialog.getByRole('button', { name: 'Create group' }).click();
 	await expect(groupDialog).toBeHidden();
