@@ -141,6 +141,19 @@ test.describe('on a phone', () => {
 		await expect(bar.getByText('2 selected')).toBeVisible();
 		await page.keyboard.press('Escape');
 		await expect(bar).toBeHidden();
+		// Android answers a long press with its menu (often before the
+		// timer): that is the long press, and no menu opens.
+		await row.dispatchEvent('pointerdown', at);
+		const menu = await row.getByRole('link', { name: `${word} one` }).evaluate((link) => {
+			const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+			link.dispatchEvent(event);
+			return event.defaultPrevented;
+		});
+		expect(menu).toBe(true);
+		await expect(bar.getByText('1 selected')).toBeVisible();
+		await row.dispatchEvent('pointerup', at);
+		await page.keyboard.press('Escape');
+		await expect(bar).toBeHidden();
 		// Without a long press, a tap opens the paper.
 		await page.getByRole('link', { name: `${word} two` }).tap();
 		await expect(page).toHaveURL(new RegExp(`/items/${ids[1]}`));

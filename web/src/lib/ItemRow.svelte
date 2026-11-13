@@ -56,21 +56,28 @@
 
 	/** A long press on the row picks it, and so starts picking (on a phone,
 	 * where the rows have no boxes); a finger moving scrolls instead. */
-	const LONG_PRESS = 500;
+	// Shorter than the browsers' own long press (half a second), which opens their
+	// menu.
+	const LONG_PRESS = 350;
 	let press: ReturnType<typeof setTimeout> | undefined;
 	let from = { x: 0, y: 0 };
+	let touch = false;
 	let pressed = false;
+	function longPress() {
+		clearTimeout(press);
+		if (pressed || !selection) return;
+		pressed = true;
+		selection.toggle(item.id);
+		navigator.vibrate?.(15);
+	}
 	function pressStart(event: PointerEvent) {
+		pressed = false;
+		touch = event.pointerType !== 'mouse';
+		clearTimeout(press);
 		if (!selection || selection.active || event.button !== 0) return;
 		if ((event.target as HTMLElement).closest('input, button')) return;
 		from = { x: event.clientX, y: event.clientY };
-		pressed = false;
-		clearTimeout(press);
-		press = setTimeout(() => {
-			pressed = true;
-			selection.toggle(item.id);
-			navigator.vibrate?.(15);
-		}, LONG_PRESS);
+		press = setTimeout(longPress, LONG_PRESS);
 	}
 	function pressMove(event: PointerEvent) {
 		if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 10) clearTimeout(press);
@@ -78,9 +85,13 @@
 	function pressEnd() {
 		clearTimeout(press);
 	}
-	/** No menu of the browser's for the long press (Android's for links). */
-	function noMenu(event: Event) {
-		if (pressed) event.preventDefault();
+	/** Android's browsers answer a long press with their menu (for a link:
+	 * open in a new tab, copy, …), often before the timer: that menu is the
+	 * long press, and does not open. A mouse's right click keeps its menu. */
+	function pressMenu(event: MouseEvent) {
+		if (!touch || !selection) return;
+		event.preventDefault();
+		longPress();
 	}
 
 	const authors = $derived(shortAuthors(item.authors));
@@ -101,7 +112,7 @@
 	onpointerup={pressEnd}
 	onpointercancel={pressEnd}
 	onpointerleave={pressEnd}
-	oncontextmenu={noMenu}
+	oncontextmenu={pressMenu}
 >
 	{#if selection}<input
 			type="checkbox"
