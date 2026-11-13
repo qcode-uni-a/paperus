@@ -2954,6 +2954,10 @@ export type MemberOut = {
      * Avatar Url
      */
     avatar_url?: string | null;
+    /**
+     * Deactivated
+     */
+    deactivated?: boolean;
 };
 
 /**

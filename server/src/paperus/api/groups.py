@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 
-from paperus import organize
+from paperus import notifications, organize
 from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
 from paperus.avatars import avatar_url
@@ -108,6 +108,8 @@ class MemberOut(BaseModel):
     inherited_from: str | None
     """The group above that gives the (higher) inherited role, if any."""
     avatar_url: str | None = None
+    deactivated: bool = False
+    """Their account is deactivated: no longer in (an admin of them neither)."""
 
 
 class MemberIn(BaseModel):
@@ -449,12 +451,18 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
     chain = [group, *_ancestors(db, group)]
     names = {g.id: g.name for g in chain}
     rows = db.execute(
-        select(Membership, User.username, User.display_name, User.avatar_version)
+        select(
+            Membership,
+            User.username,
+            User.display_name,
+            User.avatar_version,
+            User.deactivated_at,
+        )
         .join(User, User.id == Membership.user_id)
         .where(Membership.group_id.in_(names))
     )
     members: dict[uuid.UUID, MemberOut] = {}
-    for membership, username, display_name, avatar_version in rows:
+    for membership, username, display_name, avatar_version, deactivated in rows:
         role = Role(membership.role)
         here = membership.group_id == group.id
         current = members.get(membership.user_id) or MemberOut(
@@ -465,6 +473,7 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
             direct_role=None,
             inherited_from=None,
             avatar_url=avatar_url(membership.user_id, avatar_version),
+            deactivated=deactivated is not None,
         )
         if here:
             current.direct_role = role
@@ -511,6 +520,7 @@ def set_member(
     if user is None or user.deactivated_at is not None:
         raise HTTPException(404, "user not found")
     membership = db.get(Membership, (group_id, user_id))
+    new = membership is None
     if membership is None:
         membership = Membership(
             group_id=group_id, user_id=user_id, added_by=access.user.id
@@ -519,6 +529,9 @@ def set_member(
     elif membership.role == Role.ADMIN and body.role != Role.ADMIN:
         _keep_an_admin(db, group_id, user_id)
     membership.role = Role.ADMIN if group.people else body.role
+    if rescue and not _can_manage(access, group_id):
+        # Its people learn who runs it now, and who named them.
+        notifications.admin_named(db, group, access.user, user, new=new)
     db.commit()
     return list_members(group_id, db, access)
 

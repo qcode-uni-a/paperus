@@ -14453,6 +14453,11 @@
               }
             ],
             "title": "Avatar Url"
+          },
+          "deactivated": {
+            "type": "boolean",
+            "title": "Deactivated",
+            "default": false
           }
         },
         "type": "object",

@@ -27,7 +27,9 @@ class NotificationOut(BaseModel):
     by someone (group_id, library_id, group, people, papers: how many it
     has, actor); "member_added": for a group's admins, people added to it
     (group_id, library_id, group, people, actor, members: up to three
-    names, count); "cited": a paper new here cites one's own (item_id and
+    names, count); "admin_named": a site administrator named an admin for a
+    group left without one (group_id, library_id, group, actor, admin_id,
+    admin); "cited": a paper new here cites one's own (item_id and
     title of the citing paper, cited_id and cited_title of the first of
     one's own, count); "own_added": one's papers added by their ORCID iD
     (count, item_id and title of the first, library_id, group: the group's

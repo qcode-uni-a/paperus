@@ -67,6 +67,7 @@ OWN_ADDED = "own_added"
 CITED = "cited"
 MILESTONE = "milestone"
 MEMBER_ADDED = "member_added"
+ADMIN_NAMED = "admin_named"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -497,6 +498,30 @@ def _member_added(
                 },
             )
         )
+
+
+def admin_named(
+    db: Session, group: Group, actor: User, admin: User, *, new: bool = False
+) -> None:
+    """A site administrator named an admin for a group left without one: told
+    to everyone in it (the new admin too, unless ``new`` to it: then they
+    are told they were added)."""
+    library_id = db.scalar(select(Library.id).where(Library.group_id == group.id))
+    if library_id is None:
+        return
+    data = {
+        "group_id": str(group.id),
+        "library_id": str(library_id),
+        "group": group.name,
+        "actor": actor.display_name or actor.username,
+        "admin_id": str(admin.id),
+        "admin": admin.display_name or admin.username,
+    }
+    told = {*people_of(db, library_id), admin.id} - {actor.id}
+    if new:
+        told.discard(admin.id)
+    for user_id in told:
+        db.add(Notification(user_id=user_id, kind=ADMIN_NAMED, data=data))
 
 
 def export_ready(

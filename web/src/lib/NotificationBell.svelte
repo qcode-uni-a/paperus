@@ -13,6 +13,7 @@
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import { ago } from '#lib/format.ts';
 	import Icon from '#lib/Icon.svelte';
+	import { session } from '#lib/session.svelte.ts';
 
 	/** What happened that concerns the person (server: paperus.notifications):
 	 * papers added to their groups or shared with them, being added to a
@@ -176,6 +177,15 @@
 			const names = (d.members as unknown as string[] | null) ?? [];
 			return {
 				text: `${actors(d)} added ${listed(names, Number(d.count ?? names.length))} to ${d.group}`,
+				href: `${resolve('/manage/groups')}?group=${d.group_id}`
+			};
+		}
+		if (notice.kind === 'admin_named') {
+			const you = d.admin_id === session.user?.id;
+			return {
+				text: you
+					? `${d.actor} made you an admin of ${d.group}, which had none left`
+					: `${d.actor} made ${d.admin} an admin of ${d.group}, which had none left`,
 				href: `${resolve('/manage/groups')}?group=${d.group_id}`
 			};
 		}

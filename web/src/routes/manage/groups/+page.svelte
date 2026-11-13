@@ -263,6 +263,7 @@
 							{#if member.inherited_from}
 								<small>{roleLabel(member.role)} through {member.inherited_from}</small>
 							{/if}
+							{#if member.deactivated}<small class="deactivated">Account deactivated</small>{/if}
 						</span>
 						{#if selected.can_manage}
 							{#if !selected.people}<select
@@ -558,6 +559,9 @@
 	.add select {
 		width: auto;
 		max-width: 100%;
+	}
+	.deactivated {
+		color: var(--tag-amber-ink);
 	}
 	.found {
 		display: flex;

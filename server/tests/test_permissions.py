@@ -597,8 +597,17 @@ def test_groups_name_an_admin_for_one_without(w: World, db: Session) -> None:
     [chair] = [g for g in w.root.get("/api/groups").json() if g["name"] == "Chair"]
     assert chair["can_rescue"] is True
     assert w.root.put(url, json={"role": "member"}).status_code == 403
-    assert w.root.put(url, json={"role": "admin"}).status_code == 200
+    members = w.root.put(url, json={"role": "admin"})
+    assert members.status_code == 200
     assert w.root.put(url, json={"role": "admin"}).status_code == 403  # one now
+    # The members' list shows who is deactivated.
+    shown = {m["username"]: m["deactivated"] for m in members.json()}
+    assert shown == {"admin": True, "member": False}
+    # Everyone in it is told who runs it now.
+    for person in (w.member, w.reader):
+        notices = person.get("/api/me/notifications").json()["notifications"]
+        named = [n["data"] for n in notices if n["kind"] == "admin_named"]
+        assert [(d["admin"], d["actor"]) for d in named] == [("member", "root")]
 
 
 def test_groups_without_anyone_or_anything_go(w: World) -> None:

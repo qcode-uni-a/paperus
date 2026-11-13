@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A rescued group says so**: under Groups, an account that is
+  deactivated is marked as such, and when a site administrator names a
+  new admin for a group left without one, everyone in it is told ("Root
+  made Ben an admin of Lab, which had none left").
 - **OpenAlex key**: OpenAlex now gives each address a small daily budget
   for its lists ($0.10, about 1,000) and ten times that with a free key.
   An optional key under Administration → Settings → Server (or
