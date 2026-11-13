@@ -109,7 +109,7 @@
 			{#if total > 0 && !selection.active}<button
 					class="select"
 					onclick={() => (selection.active = true)}>Select</button
-				><button class="select" onclick={() => selection.everyMatching()}>Select all</button>{/if}
+				>{/if}
 		</div>
 	</div>
 {/if}
@@ -143,14 +143,11 @@
 	}
 	.tools {
 		display: flex;
-		flex-wrap: wrap;
-		justify-content: flex-end;
 		gap: 8px;
 		margin-left: auto;
 	}
 	.select {
 		padding: 3px 12px;
-		white-space: nowrap;
 	}
 	.count {
 		font-family: var(--sans);

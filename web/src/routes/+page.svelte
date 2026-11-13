@@ -371,11 +371,9 @@
 		{(total ?? items.length).toLocaleString()}
 		{(total ?? items.length) === 1 ? 'item' : 'items'}
 	</h1>
-	{#if items.length && !selection.active}<span class="picking"
-			><button class="select" onclick={() => (selection.active = true)}>Select</button><button
-				class="select all"
-				onclick={() => selection.everyMatching()}>Select all</button
-			></span
+	{#if items.length && !selection.active}<button
+			class="select"
+			onclick={() => (selection.active = true)}>Select</button
 		>{/if}
 {/snippet}
 
@@ -435,21 +433,9 @@
 		margin: 0;
 		white-space: nowrap;
 	}
-	.picking {
-		margin-right: auto;
-		display: flex;
-		gap: 6px;
-	}
 	.select {
+		margin-left: auto;
 		padding: 3px 12px;
-		white-space: nowrap;
-	}
-	/* On a phone the filter stays beside the count; picking, the bar
-	   offers all of them. */
-	@media (max-width: 560px) {
-		.select.all {
-			display: none;
-		}
 	}
 	ul {
 		margin: 0;

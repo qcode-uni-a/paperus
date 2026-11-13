@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { unique } from './helpers.ts';
+import { LOGGED_OUT, unique } from './helpers.ts';
 
 test('pick papers in a collection, tag them, trash them, undo', async ({ page }) => {
 	const word = unique('Picked');
@@ -48,39 +48,55 @@ test('pick papers in a collection, tag them, trash them, undo', async ({ page })
 	await expect(bar).toBeHidden();
 });
 
-test('select all: every paper of the collection, also those not loaded yet', async ({ page }) => {
+test('select all: every paper of the collection, also those not loaded yet', async ({
+	page,
+	browser
+}) => {
+	// A person of their own: the other tests' lists keep their few papers.
+	const kim = { username: unique('kim'), password: 'kim-password-e2e' };
+	expect((await page.request.post('/api/admin/users', { data: kim })).status()).toBe(201);
+	const context = await browser.newContext({ storageState: LOGGED_OUT });
+	const own = await context.newPage();
+	await own.goto('/login');
+	await own.getByLabel('Username').fill(kim.username);
+	await own.getByLabel('Password').fill(kim.password);
+	await own.getByRole('button', { name: 'Log in' }).click();
+	await expect(own).toHaveURL(/\/$/);
+
 	const word = unique('Many');
 	const tag = unique('all');
 	const shelf = await (
-		await page.request.post('/api/collections', { data: { name: unique('Shelf') } })
+		await own.request.post('/api/collections', { data: { name: unique('Shelf') } })
 	).json();
 	// More than the list loads at first (50).
 	const ids: string[] = [];
 	for (let n = 0; n < 60; n++) {
-		const added = await page.request.post('/api/items', {
+		const added = await own.request.post('/api/items', {
 			data: { metadata: { title: `${word} ${n}` } }
 		});
 		ids.push((await added.json()).id);
 	}
-	await page.request.post(`/api/collections/${shelf.id}/items`, { data: { item_ids: ids } });
+	await own.request.post(`/api/collections/${shelf.id}/items`, { data: { item_ids: ids } });
 
-	await page.goto(`/collections/${shelf.id}`);
-	await expect(page.getByRole('heading', { name: '60 items' })).toBeVisible();
-	await page.getByRole('button', { name: 'Select all' }).click();
-	const bar = page.getByRole('toolbar', { name: 'Selected papers' });
+	await own.goto(`/collections/${shelf.id}`);
+	await expect(own.getByRole('heading', { name: '60 items' })).toBeVisible();
+	await own.getByRole('button', { name: 'Select', exact: true }).click();
+	const bar = own.getByRole('toolbar', { name: 'Selected papers' });
+	await bar.getByRole('button', { name: 'Select all 60' }).click();
 	await expect(bar.getByText('60 selected')).toBeVisible();
 
 	await bar.getByRole('button', { name: 'Tag' }).click();
-	await page.getByLabel('Add a tag').fill(tag);
-	await page.getByLabel('Add a tag').press('Enter');
+	await own.getByLabel('Add a tag').fill(tag);
+	await own.getByLabel('Add a tag').press('Enter');
 	await expect(bar.getByRole('status')).toHaveText(`Tagged 60 papers “${tag}”.`);
-	const tags = await (await page.request.get('/api/tags')).json();
+	const tags = await (await own.request.get('/api/tags')).json();
 	const made = tags.find((t: { name: string }) => t.name === tag);
-	const tagged = await page.request.get(`/api/items?tag=${made.id}&limit=1`);
+	const tagged = await own.request.get(`/api/items?tag=${made.id}&limit=1`);
 	expect(tagged.headers()['x-total-count']).toBe('60');
 
 	// Unticking one: back to picking by hand, the rows shown.
-	await page.getByRole('checkbox', { name: `Select “${word} 59”` }).click();
+	await own.getByRole('checkbox', { name: `Select “${word} 59”` }).click();
 	await expect(bar.getByText(/^\d+ selected$/)).not.toHaveText('60 selected');
 	await expect(bar.getByRole('button', { name: 'Select all 60' })).toBeVisible();
+	await context.close();
 });

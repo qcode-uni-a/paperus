@@ -2,9 +2,8 @@
 
 ## Unreleased
 
-- **Select all**, next to Select in the library and in collections, and in
-  the selection's bar ("Select all 1,429"): every paper the list's filters
-  match, also those not loaded yet, changed by the server in one go (up to
+- **Select all** in the selection's bar ("Select all 1,429"): every paper
+  the list's filters match, also those not loaded yet, changed by the server in one go (up to
   50,000). Before, only the rows loaded so far could be picked, and
   changing more than 1,000 picked papers failed; now they are sent in
   parts.
