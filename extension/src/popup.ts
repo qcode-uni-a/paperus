@@ -30,9 +30,9 @@ type Result =
 	| { ok: false; text: string };
 /** A supplementary file the paper's page links; ``inPaperus``: the paper
  * has a file of its name. */
-type Supplement = { url: string; name: string; inPaperus?: boolean };
+type Supplement = { url: string; name: string; role?: string; inPaperus?: boolean };
 type SupplementOutcome = Supplement & {
-	state: 'saved' | 'failed' | 'too-large';
+	state: 'saved' | 'failed' | 'too-large' | 'offered';
 	text: string;
 	size?: number;
 };
@@ -352,6 +352,11 @@ function showList(
 /** The paper's supplementary files under it, each with how it went: to
  * choose and add to a paper paperus has (``choose``), or as they are saved
  * with the paper (marked as the background tells, ``supplementState``). */
+/** What a file is, when not just a supplement. */
+const ROLES: Record<string, string> = { peer_review: 'Peer review', code: 'Code', data: 'Data' };
+/** Not saved by themselves (Options): to pick. */
+const offered = (file: Supplement) => 'state' in file && file.state === 'offered';
+
 function showSupplements(itemId: string | null, files: Supplement[], choose: boolean): void {
 	$('supplements').hidden = files.length === 0;
 	if (!files.length) return;
@@ -366,7 +371,8 @@ function showSupplements(itemId: string | null, files: Supplement[], choose: boo
 		button.textContent = `Add ${chosen === 1 ? 'it' : chosen} to this paper`;
 		button.disabled = chosen === 0;
 	};
-	const mark = (url: string, state: ListedState, text = '', size?: number) => {
+	const mark = (url: string, state: ListedState | 'offered', text = '', size?: number) => {
+		if (state === 'offered') return; // nothing to say yet: one picks
 		const shown = marks.get(url);
 		if (!shown) return;
 		shown.className = `mark ${state}`;
@@ -416,7 +422,7 @@ function showSupplements(itemId: string | null, files: Supplement[], choose: boo
 			if (choose) {
 				const box = document.createElement('input');
 				box.type = 'checkbox';
-				box.checked = !file.inPaperus;
+				box.checked = !file.inPaperus && !offered(file);
 				box.addEventListener('change', count);
 				boxes.set(file.url, box);
 				label.append(box);
@@ -434,7 +440,7 @@ function showSupplements(itemId: string | null, files: Supplement[], choose: boo
 				// No address to show.
 			}
 			const type = /\.([a-z0-9]{2,5})$/i.exec(new URL(file.url, location.href).pathname)?.[1];
-			detail.textContent = [type?.toUpperCase(), host].filter(Boolean).join(' · ');
+			detail.textContent = [ROLES[file.role ?? ''], type?.toUpperCase(), host].filter(Boolean).join(' · ');
 			name.append(words, detail);
 			label.append(name);
 			const shown = document.createElement('span');
@@ -494,7 +500,11 @@ async function save(tabId: number, owners: Owner[], supplements: Supplement[] = 
 	showSupplements(null, supplements, false);
 	const result = (await chrome.runtime.sendMessage({ type: 'popupSave', tabId })) as Result;
 	show(result, owners);
-	if (result.ok && result.item) showSupplements(result.item.id, result.supplements ?? [], false);
+	if (result.ok && result.item) {
+		// Not saved by themselves (Options): to pick, as for a paper one has.
+		const picking = result.supplements?.some((s) => s.state === 'offered') ?? false;
+		showSupplements(result.item.id, result.supplements ?? [], picking);
+	}
 	else $('supplements').hidden = true;
 	const missed = result.ok && result.supplements?.some((s) => s.state !== 'saved');
 	closeIn(

@@ -11,6 +11,10 @@
   are (supplement, code, data, peer review) and are named as the page's
   link reads when the site's own name says nothing ("Peer Review
   File.pdf", not "…_MOESM2_ESM.pdf").
+- **Browser extension: supplementary files at your choice.** A new option,
+  "Save a paper's supplementary files with it" (on, as before): when off,
+  the popup lists them after saving the paper, each with what it is, to
+  tick those you want. Links to code and data are kept either way.
 - **A more compact library filter**: one line per rule, its name beside
   it (above it on a phone). The tags are one line: "has", "has any of" or
   "has not" and "Add a tag…", the tags chosen as chips ("or", "not"); the

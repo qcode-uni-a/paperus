@@ -88,7 +88,8 @@ type Supplement = {
 };
 /** How saving one went. */
 type SupplementOutcome = Supplement & {
-  state: "saved" | "failed" | "too-large";
+  /** "offered": not saved (the option is off), to add from the popup. */
+  state: "saved" | "failed" | "too-large" | "offered";
   text: string;
   size?: number;
 };
@@ -1004,7 +1005,14 @@ async function saveExtras(
       trace("A link not added", { url: link.url, reason: String(error) });
     }
   }
-  const supplements = await saveSupplements(itemId, extras.files);
+  // Saved with the paper unless the reader chose to pick them (Options).
+  const { saveSupplements: wanted } = (await chrome.storage.local.get(
+    "saveSupplements",
+  )) as { saveSupplements?: boolean };
+  const supplements: SupplementOutcome[] =
+    wanted === false
+      ? extras.files.map((file) => ({ ...file, state: "offered", text: "" }))
+      : await saveSupplements(itemId, extras.files);
   const saved = supplements.filter((s) => s.state === "saved").length;
   const parts: string[] = [];
   if (saved)

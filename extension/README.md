@@ -34,7 +34,9 @@ does the same; a full one with a check means you have it already.
   code, data or the peer review file (Nature's "Peer Review File",
   reviewer reports), named as the link reads when the site's name says
   nothing ("Peer Review File.pdf", not "…_MOESM2_ESM.pdf"); a page of the
-  paper's published reviews (PLOS's, eLife's) as a link.
+  paper's published reviews (PLOS's, eLife's) as a link. The option "Save
+  a paper's supplementary files with it" (on by default) turned off, the
+  popup lists them to tick those wanted instead.
 - **Pages that list papers or files** (a course's lecture notes, a
   publication list, a journal's contents): the popup lists the files the
   page links (PDFs, slides, …) and the papers it links by DOI or arXiv ID,

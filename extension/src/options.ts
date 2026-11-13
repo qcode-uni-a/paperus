@@ -145,6 +145,19 @@ $('owner').addEventListener('change', async () => {
 	message(select.value ? `New papers belong to ${select.selectedOptions[0].text}.` : 'New papers go to your default owner.');
 });
 
+const saveSupplements = $<HTMLInputElement>('save-supplements');
+void chrome.storage.local
+	.get('saveSupplements')
+	.then(({ saveSupplements: on }) => (saveSupplements.checked = on !== false));
+saveSupplements.addEventListener('change', async () => {
+	await chrome.storage.local.set({ saveSupplements: saveSupplements.checked });
+	message(
+		saveSupplements.checked
+			? "A paper's supplementary files are saved with it."
+			: 'Supplementary files are only listed in the popup, to add those you want.'
+	);
+});
+
 const markPapers = $<HTMLInputElement>('mark-papers');
 void chrome.storage.local
 	.get('markPapers')
