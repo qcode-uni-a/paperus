@@ -172,6 +172,25 @@ answer) and 3 German pages with umlauts and ß, each clean and as a "scan"
   model handling, CPU or GPU, as the other models). Handwriting is read
   poorly.
 
+Vision-language models on the same pages (2026-11-13; PyTorch on the GPU,
+fp16, a whole page each, for comparison only):
+
+| model (licence)                        | en clean | en scan | de clean | de scan | GPU per page |
+| -------------------------------------- | -------- | ------- | -------- | ------- | ------------ |
+| Qwen3-VL-2B-Instruct (Apache-2.0)      | 0.84     | 0.95    | 0.99     | 0.99    | 26 s         |
+| granite-docling-258M (Apache-2.0)      | 0.93     | 0.77    | 0.99     | 0.99    | 150 s (fp32) |
+| PaddleOCR-VL 1.6 (Apache-2.0)          | 0.80     | 0.69    | 0.99     | 1.00    | 94 s         |
+
+They read plain German pages as well as ours, but on English pages with
+figures and formulas they loop (Qwen3-VL asked for LaTeX wrote
+`\begin{tabular}` until the limit; plain text and a slight repetition
+penalty helped), and they take 10 to 50 times as long on a GPU as ours on
+a CPU. granite-docling gives only "!" in fp16 (an overflow; the RTX 2080
+has no bf16). PaddleOCR-VL is made for regions cut out by a layout model,
+not whole pages. Each would also need its own generation loop in ONNX
+Runtime. Not adopted; worth another look for formulas, tables and
+handwriting, which this test does not measure.
+
 ### Passage size and overlap (#11, 2026-11-07)
 
 The same 44 questions on a copy of the library, with arctic-embed-m-v2
