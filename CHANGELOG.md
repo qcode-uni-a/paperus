@@ -1,34 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.4 (2026-11-13)
 
-- **A group's admins hear who joins**: "Ann added Ben and Clara to Lab",
-  under the bell of the group's other admins; members are not told of
-  each new one.
-- **One notice a group while unread**: papers added to a group, and
-  people added to it, come together in one notice for as long as it is
-  unread, whoever adds them and however much later ("Ann, Ben and Clara
-  added 50 papers to Lab"): back from a week away, one line a group.
-- **Times cited**: each paper's citations as OpenAlex counts them, shown
-  beside its DOI ("Cited 123 times") and a new way to sort the library
-  ("Times cited", most first). Looked up when a paper is new, then each
-  week, 50 papers to a request (only DOIs are sent; a switch under
-  Administration → Settings). When one of your own papers passes 10, 50,
-  100, 250, 500, 1,000… citations, the bell congratulates you, with
-  sparkles (the first count sets where you start).
-- **Cited!** When a paper new in the library cites one of yours (you are
-  among its authors by your ORCID iD), the bell says so, with a star and
-  a few sparkles: "“…” cites your paper “…”". Once a citing paper; only
-  where you can read both; not for your own papers citing each other.
-- **Groups are run by their own admins**: a site administrator creates
-  top-level groups and sees every group (its admins, how many people and
-  papers), but no longer runs other people's groups: no adding or
-  removing people (themselves neither), renaming, deleting or switching.
-  For a group whose admins are all gone, they may name a new admin. A
-  group left by its last member, with nothing in it, is deleted.
-- **People to add, found as you type**: under Groups, from two letters
-  on, people are suggested by name or username (a group's admin who is
-  no site administrator saw no suggestions before).
+*paperus now fetches your new papers by itself, throws a small party when they get published or cited, and keeps the site administrator's hands off your group.*
+
 - **Automations, and your papers by themselves**: a new section under
   Settings, "Automations", shows what paperus does by itself, and lets
   each owner choose. "Add my papers" (yours alone, on): each morning, the
@@ -45,11 +20,38 @@
   version is found for your preprint, or when the paper comes into a
   library less than a week after it came out, however it comes and
   whoever adds it. Once a paper.
+- **Cited!** When a paper new in the library cites one of yours (you are
+  among its authors by your ORCID iD), the bell says so, with a star and
+  a few sparkles: "“…” cites your paper “…”". Once a citing paper; only
+  where you can read both; not for your own papers citing each other.
+- **Times cited**: each paper's citations as OpenAlex counts them, shown
+  beside its DOI ("Cited 123 times") and a new way to sort the library
+  ("Times cited", most first). Looked up when a paper is new, then each
+  week, 50 papers to a request (only DOIs are sent; a switch under
+  Administration → Settings). When one of your own papers passes 10, 50,
+  100, 250, 500, 1,000… citations, the bell congratulates you, with
+  sparkles (the first count sets where you start).
 - **More under the bell**: a paper shared with you ("Ann shared “…” with
   you"), being added to a group by someone ("Ann added you to Lab"; to a
   group of people, what is shared with you there), and a correction
   (erratum) found for one of your papers. A notification can be
   dismissed (×), or all at once ("Clear all").
+- **One notice a group while unread**: papers added to a group, and
+  people added to it, come together in one notice for as long as it is
+  unread, whoever adds them and however much later ("Ann, Ben and Clara
+  added 50 papers to Lab"): back from a week away, one line a group.
+- **A group's admins hear who joins**: "Ann added Ben and Clara to Lab",
+  under the bell of the group's other admins; members are not told of
+  each new one.
+- **Groups are run by their own admins**: a site administrator creates
+  top-level groups and sees every group (its admins, how many people and
+  papers), but no longer runs other people's groups: no adding or
+  removing people (themselves neither), renaming, deleting or switching.
+  For a group whose admins are all gone, they may name a new admin. A
+  group left by its last member, with nothing in it, is deleted.
+- **People to add, found as you type**: under Groups, from two letters
+  on, people are suggested by name or username (a group's admin who is
+  no site administrator saw no suggestions before).
 - **Saving an edit no longer fails now and then**: saving a paper's
   details (Edit) while paperus was still working on the same paper (just
   after its upload: its reference list, its authors) could end in
