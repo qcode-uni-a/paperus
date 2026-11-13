@@ -6,6 +6,7 @@
 	import { uploads } from '#lib/uploads.svelte.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 	import BulkBar from '#lib/BulkBar.svelte';
+	import SelectAllBox from '#lib/SelectAllBox.svelte';
 	import { organize } from '#lib/organize.svelte.ts';
 	import { Selection } from '#lib/selection.svelte.ts';
 	import { isDefault, sortFromAddress, sortQuery } from '#lib/librarySort.ts';
@@ -103,7 +104,10 @@
 
 {#if total !== null}
 	<div class="head">
-		<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
+		<div class="counted">
+			<SelectAllBox {selection} {total} />
+			<h2 class="count">{total.toLocaleString()} {total === 1 ? 'item' : 'items'}</h2>
+		</div>
 		<div class="tools">
 			{#if total > 1}<SortControl />{/if}
 			{#if total > 0 && !selection.active}<button
@@ -148,6 +152,16 @@
 	}
 	.select {
 		padding: 3px 12px;
+	}
+	/* With a mouse the rows' boxes and the list's are there; Select is for
+	   phones and tablets. */
+	@media (min-width: 761px) and (pointer: fine) {
+		.select {
+			display: none;
+		}
+	}
+	.counted {
+		position: relative;
 	}
 	.count {
 		font-family: var(--sans);

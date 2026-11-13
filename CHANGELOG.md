@@ -18,6 +18,9 @@
   added as one's own with them (before, its files were dropped without a
   word). The bell tells when an import is done (it may take long), with
   its counts.
+- **Checkboxes** on a computer: every row's box is always there, and the
+  list's own box above them selects all of its papers (a dash when some
+  are picked; a click then clears). On a phone, Select as before.
 - **Select all** in the selection's bar ("Select all 1,429"): every paper
   the list's filters match, also those not loaded yet, changed by the server in one go (up to
   50,000). Before, only the rows loaded so far could be picked, and

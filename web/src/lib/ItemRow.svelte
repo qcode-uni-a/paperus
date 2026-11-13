@@ -137,8 +137,9 @@
 		outline-color: var(--success);
 		border-bottom-color: transparent;
 	}
-	/* The box to pick the row: in the margin, seen on hover (or while
-	   picking); on narrow screens only while picking, inside the row. */
+	/* The box to pick the row: in the margin, always there (fully on hover
+	   and while picking); on narrow screens only while picking, inside the
+	   row. */
 	.pick {
 		position: absolute;
 		top: 17px;
@@ -146,7 +147,7 @@
 		width: 18px;
 		height: 18px;
 		margin: 0;
-		opacity: 0;
+		opacity: 0.55;
 		accent-color: var(--royal);
 		cursor: pointer;
 	}

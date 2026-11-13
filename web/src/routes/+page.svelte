@@ -17,6 +17,7 @@
 	import { isDefault, sortFromAddress, sortQuery } from '#lib/librarySort.ts';
 	import { keepPlace } from '#lib/keepPlace.svelte.ts';
 	import BulkBar from '#lib/BulkBar.svelte';
+	import SelectAllBox from '#lib/SelectAllBox.svelte';
 	import { Selection } from '#lib/selection.svelte.ts';
 
 	const PAGE = 50;
@@ -367,10 +368,13 @@
 </div>
 
 {#snippet heading()}
-	<h1 class="count listed">
-		{(total ?? items.length).toLocaleString()}
-		{(total ?? items.length) === 1 ? 'item' : 'items'}
-	</h1>
+	<div class="counted">
+		<SelectAllBox {selection} total={total ?? items.length} />
+		<h1 class="count listed">
+			{(total ?? items.length).toLocaleString()}
+			{(total ?? items.length) === 1 ? 'item' : 'items'}
+		</h1>
+	</div>
 	{#if items.length && !selection.active}<button
 			class="select"
 			onclick={() => (selection.active = true)}>Select</button
@@ -429,6 +433,9 @@
 		letter-spacing: 0;
 	}
 	/* Beside the Filter button. */
+	.counted {
+		position: relative;
+	}
 	.count.listed {
 		margin: 0;
 		white-space: nowrap;
@@ -436,6 +443,13 @@
 	.select {
 		margin-left: auto;
 		padding: 3px 12px;
+	}
+	/* With a mouse the rows' boxes and the list's are there; Select is for
+	   phones and tablets. */
+	@media (min-width: 761px) and (pointer: fine) {
+		.select {
+			display: none;
+		}
 	}
 	ul {
 		margin: 0;

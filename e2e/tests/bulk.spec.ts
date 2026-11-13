@@ -18,16 +18,19 @@ test('pick papers in a collection, tag them, trash them, undo', async ({ page })
 
 	await page.goto(`/collections/${shelf.id}`);
 	await expect(page.getByRole('heading', { name: '3 items' })).toBeVisible();
-	await page.getByRole('button', { name: 'Select', exact: true }).click();
+	// A row's box picks it (and starts picking); Shift picks the rows between.
+	await page.getByRole('checkbox', { name: `Select “${word} three”` }).click();
 	const bar = page.getByRole('toolbar', { name: 'Selected papers' });
-	await expect(bar.getByText('0 selected')).toBeVisible();
-
-	// A click on a row picks it while picking; Shift picks the rows between.
-	await page.getByRole('link', { name: `${word} three` }).click();
-	await expect(page).toHaveURL(new RegExp(`/collections/${shelf.id}$`));
+	await expect(bar.getByText('1 selected')).toBeVisible();
 	await page
 		.getByRole('checkbox', { name: `Select “${word} two”` })
 		.click({ modifiers: ['Shift'] });
+	await expect(bar.getByText('2 selected')).toBeVisible();
+	// While picking, a click on a row picks it too, instead of opening it.
+	await page.getByRole('link', { name: `${word} one` }).click();
+	await expect(page).toHaveURL(new RegExp(`/collections/${shelf.id}$`));
+	await expect(bar.getByText('3 selected')).toBeVisible();
+	await page.getByRole('link', { name: `${word} one` }).click();
 	await expect(bar.getByText('2 selected')).toBeVisible();
 
 	await bar.getByRole('button', { name: 'Tag' }).click();
@@ -80,9 +83,9 @@ test('select all: every paper of the collection, also those not loaded yet', asy
 
 	await own.goto(`/collections/${shelf.id}`);
 	await expect(own.getByRole('heading', { name: '60 items' })).toBeVisible();
-	await own.getByRole('button', { name: 'Select', exact: true }).click();
+	// The list's own box: all of them, also those not loaded yet.
+	await own.getByRole('checkbox', { name: 'Select all 60' }).click();
 	const bar = own.getByRole('toolbar', { name: 'Selected papers' });
-	await bar.getByRole('button', { name: 'Select all 60' }).click();
 	await expect(bar.getByText('60 selected')).toBeVisible();
 
 	await bar.getByRole('button', { name: 'Tag' }).click();
@@ -98,5 +101,8 @@ test('select all: every paper of the collection, also those not loaded yet', asy
 	await own.getByRole('checkbox', { name: `Select “${word} 59”` }).click();
 	await expect(bar.getByText(/^\d+ selected$/)).not.toHaveText('60 selected');
 	await expect(bar.getByRole('button', { name: 'Select all 60' })).toBeVisible();
+	// The list's box, with some picked: none.
+	await own.getByRole('checkbox', { name: 'Clear the selection' }).click();
+	await expect(bar).toBeHidden();
 	await context.close();
 });

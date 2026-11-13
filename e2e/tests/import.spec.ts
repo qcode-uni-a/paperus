@@ -33,17 +33,30 @@ test('import a whole folder, without zipping it', async ({ page }) => {
 
 // A paper already in a group one may only read, with a file: added as
 // one's own, so the file comes too; the bell says the import is done.
-test('an import says what was there already, and where', async ({ page, browser }) => {
+test('an import says what was there already, and where', async ({
+	page,
+	browser,
+	playwright,
+	baseURL
+}) => {
 	const kim = { username: unique('kim'), password: 'kim-password-e2e' };
 	const made = await page.request.post('/api/admin/users', { data: kim });
 	expect(made.status()).toBe(201);
 	const kimId = (await made.json()).id;
+	// The group is lea's (in the admin's own groups it would change the
+	// other tests' uploads: they would ask where to).
+	const lea = { username: unique('lea'), password: 'lea-password-e2e' };
+	const leaMade = await page.request.post('/api/admin/users', { data: lea });
+	const leaApi = await playwright.request.newContext({ baseURL });
+	expect((await leaApi.post('/api/auth/login', { data: lea })).ok()).toBe(true);
 	const lab = await (
-		await page.request.post('/api/groups', { data: { name: unique('Lab') } })
+		await page.request.post('/api/groups', {
+			data: { name: unique('Lab'), admin_id: (await leaMade.json()).id }
+		})
 	).json();
-	await page.request.put(`/api/groups/${lab.id}/members/${kimId}`, { data: { role: 'reader' } });
+	await leaApi.put(`/api/groups/${lab.id}/members/${kimId}`, { data: { role: 'reader' } });
 	const doi = `10.5555/${unique('e2e').toLowerCase()}`;
-	await page.request.post('/api/items', {
+	await leaApi.post('/api/items', {
 		data: {
 			metadata: { title: 'In the lab already' },
 			identifiers: [{ scheme: 'doi', value: doi }],
@@ -81,4 +94,5 @@ test('an import says what was there already, and where', async ({ page, browser 
 		own.getByText('Import of Kim export done: 2 papers added (1 also in a group, as your own)')
 	).toBeVisible();
 	await context.close();
+	await leaApi.dispose();
 });
