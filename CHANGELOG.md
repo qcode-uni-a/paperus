@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **A group's admins hear who joins**: "Ann added Ben and Clara to Lab",
+  under the bell of the group's other admins (one notice for people added
+  one after another); members are not told of each new one.
 - **Times cited**: each paper's citations as OpenAlex counts them, shown
   beside its DOI ("Cited 123 times") and a new way to sort the library
   ("Times cited", most first). Looked up when a paper is new, then each

@@ -156,6 +156,21 @@
 				href: item
 			};
 		}
+		if (notice.kind === 'member_added') {
+			const names = (d.members as unknown as string[] | null) ?? [];
+			const count = Number(d.count ?? names.length);
+			const more = count - names.length;
+			const who =
+				more > 0
+					? `${names.join(', ')} and ${more} ${more === 1 ? 'other' : 'others'}`
+					: names.length > 1
+						? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`
+						: (names[0] ?? 'someone');
+			return {
+				text: `${d.actor} added ${who} to ${d.group}`,
+				href: `${resolve('/manage/groups')}?group=${d.group_id}`
+			};
+		}
 		if (notice.kind === 'erratum') {
 			return { text: `A correction to “${d.title}”: ${d.erratum}`, href: item };
 		}

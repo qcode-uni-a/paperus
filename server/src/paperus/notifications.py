@@ -1,19 +1,20 @@
-"""Notifications: what happened that concerns a person (mostly what they
-did not do themselves), under the bell in the header. Papers added to one
-of their groups (by upload, DOI, the extension, an import, or given to the
+"""Notifications: what happened that concerns a person (mostly what they did
+not do themselves), under the bell in the header. Papers added to one of
+their groups (by upload, DOI, the extension, an import, or given to the
 group: one notification per person who added and group, counted up while
 unread for a few hours); a published version found for one of their
 preprints (told apart where it is their own paper: they are among its
-authors by their ORCID iD; their own paper is also told, to celebrate,
-when it comes less than a week after it came out, however it comes and
-whoever adds it); a paper new here citing one of their own, and their own
-passing a milestone of citations (celebrated too); a correction (erratum)
-found for one of their papers; being added to a group by someone else (to
-a group of people: once it has papers, else the papers' own notice says
-it); their own papers added from OpenAlex by the daily job (to their
-library or a group's); each zip of their export as it is written (or the
-export failing); and the end of their imports, which may take long. Read
-ones go after ``KEEP_READ``, all after ``KEEP`` (the nightly tidy-up).
+authors by their ORCID iD; their own paper is also told, to celebrate, when
+it comes less than a week after it came out, however it comes and whoever
+adds it); a paper new here citing one of their own, and their own passing a
+milestone of citations (celebrated too); a correction (erratum) found for
+one of their papers; being added to a group by someone else (to a group of
+people: once it has papers, else the papers' own notice says it), and, for
+a group's admins, someone added to it; their own papers added from OpenAlex
+by the daily job (to their library or a group's); each zip of their export
+as it is written (or the export failing); and the end of their imports,
+which may take long. Read ones go after ``KEEP_READ``, all after ``KEEP``
+(the nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
 so every way of adding them counts; the person who did it is the one who
@@ -68,6 +69,7 @@ JOINED = "joined"
 OWN_ADDED = "own_added"
 CITED = "cited"
 MILESTONE = "milestone"
+MEMBER_ADDED = "member_added"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -388,6 +390,7 @@ def _joined(db: Session, membership: Membership) -> None:
     # A group of people just made for a paper: its paper's notice says it.
     if group.people and not papers:
         return
+    _member_added(db, group, library_id, who, membership.user_id)
     connection.execute(
         insert(Notification).values(
             user_id=membership.user_id,
@@ -403,6 +406,79 @@ def _joined(db: Session, membership: Membership) -> None:
             },
         )
     )
+
+
+def _member_added(
+    db: Session,
+    group: Group,
+    library_id: uuid.UUID | None,
+    actor: User,
+    member_id: uuid.UUID,
+) -> None:
+    """Someone added to the group: told to its admins (here or above), but
+    not to who added them or to them; people added one after another, while
+    unread for a few hours, one notice ("Ann added Ben and 2 others")."""
+    member = db.get(User, member_id)
+    if member is None:
+        return
+    name = member.display_name or member.username
+    chain: list[uuid.UUID] = []
+    current: Group | None = group
+    while current is not None:
+        chain.append(current.id)
+        current = db.get(Group, current.parent_id) if current.parent_id else None
+    admins = db.scalars(
+        select(Membership.user_id)
+        .join(User, User.id == Membership.user_id)
+        .where(
+            Membership.group_id.in_(chain),
+            Membership.role == "admin",
+            Membership.user_id.not_in([actor.id, member_id]),
+            User.deactivated_at.is_(None),
+        )
+        .distinct()
+    )
+    connection = db.connection()
+    since = datetime.now(UTC) - ONE_NOTICE
+    for user_id in admins:
+        known = connection.execute(
+            select(Notification.id, Notification.data).where(
+                Notification.user_id == user_id,
+                Notification.kind == MEMBER_ADDED,
+                Notification.read_at.is_(None),
+                Notification.at >= since,
+                Notification.data["group_id"].astext == str(group.id),
+                Notification.data["actor_id"].astext == str(actor.id),
+            )
+        ).first()
+        if known is not None:
+            data = {
+                **known.data,
+                "count": known.data.get("count", 1) + 1,
+                "members": [*known.data.get("members", []), name][:3],
+            }
+            connection.execute(
+                update(Notification)
+                .where(Notification.id == known.id)
+                .values(data=data, at=func.now())
+            )
+            continue
+        connection.execute(
+            insert(Notification).values(
+                user_id=user_id,
+                kind=MEMBER_ADDED,
+                data={
+                    "group_id": str(group.id),
+                    "library_id": str(library_id),
+                    "group": group.name,
+                    "people": group.people,
+                    "actor_id": str(actor.id),
+                    "actor": actor.display_name or actor.username,
+                    "members": [name],
+                    "count": 1,
+                },
+            )
+        )
 
 
 def export_ready(

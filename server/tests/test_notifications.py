@@ -301,6 +301,33 @@ def test_added_to_a_group(client: TestClient, db: Session) -> None:
     assert listed(bob)["unread"] == 1
 
 
+def test_someone_added_told_to_the_admins(client: TestClient, db: Session) -> None:
+    """The group's other admins are told who was added (one notice for
+    people added one after another); not who added them, not the members."""
+    root = Person(client, db, "root", admin=True)
+    ada, eve, bob, carl = (Person(client, db, n) for n in ("ada", "eve", "bob", "carl"))
+    lab = group(root, "Lab", ada)
+    ada.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "admin"})
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "member"})
+    ada.put(f"/api/groups/{lab['id']}/members/{carl.id}", {"role": "reader"})
+    added = [n for n in listed(eve)["notifications"] if n["kind"] == "member_added"]
+    assert [n["data"] for n in added] == [
+        {
+            "group_id": lab["id"],
+            "library_id": lab["library_id"],
+            "group": "Lab",
+            "people": False,
+            "actor_id": ada.id,
+            "actor": "ada",
+            "members": ["bob", "carl"],
+            "count": 2,
+        }
+    ]
+    for person in (ada, bob):
+        kinds = [n["kind"] for n in listed(person)["notifications"]]
+        assert "member_added" not in kinds
+
+
 def test_an_erratum_found(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     paper = ada.add("Edge states of hail")
