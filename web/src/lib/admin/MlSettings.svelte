@@ -308,6 +308,7 @@
 						<th scope="row">
 							<span class="name">{model.name}</span>
 							{#if inUse}<span class="badge current">In use</span>{/if}
+							{#if model.recommended}<span class="badge">Recommended</span>{/if}
 							<small>{facts(model)}</small>
 							{#if model.description}<small>{model.description}</small>{/if}
 						</th>
@@ -323,9 +324,11 @@
 									? `${model.download_mb} MB`
 									: '–'}
 							<small
-								>{model.dimensions}-dim.{model.cached_bytes == null
-									? ', not downloaded'
-									: ''}</small
+								>{model.dimensions}-dim.{model.builtin
+									? ', comes with the ML service'
+									: model.cached_bytes == null
+										? ', not downloaded'
+										: ''}</small
 							>
 						</td>
 						<td class="num" data-label="Speed here">
@@ -350,7 +353,7 @@
 								<button class="small" onclick={() => use(model)} disabled={saving || !config}
 									>Use</button
 								>
-								{#if model.cached_bytes != null}
+								{#if model.cached_bytes != null && !model.builtin}
 									<button
 										class="link danger"
 										title="Delete the downloaded files; they download again when used"
@@ -382,8 +385,9 @@
 	<h3>Reranking</h3>
 	<p class="muted">
 		A reranker reads the question together with each of the best 40 hits and puts the best answers
-		first. On our test questions the right paper came first 86 instead of 66 times in 100. It takes
-		about half a second per search on a GPU, but many seconds on a CPU.
+		first. On our 200 test questions it helps weaker search models most (the right paper first 181
+		instead of 158 times) and the recommended one little (184 instead of 181). It takes about half a
+		second per search on a GPU, but many seconds on a CPU.
 	</p>
 	<fieldset class="choice">
 		<legend class="visually-hidden">Reranking</legend>
@@ -404,7 +408,8 @@
 			>Reranker
 			<select bind:value={rerankModel}>
 				{#each rerankers as model (model.name)}
-					<option value={model.name}>{model.name}</option>
+					<option value={model.name}>{model.name}{model.recommended ? ' (recommended)' : ''}</option
+					>
 				{/each}
 			</select>
 		</label>
@@ -414,7 +419,7 @@
 				{chosen.description}
 				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
-					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
+					? `${chosen.builtin ? 'Comes with the ML service' : 'Downloaded'}, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}
@@ -459,7 +464,8 @@
 			>OCR model
 			<select bind:value={() => ocrModel, (name) => (ocrModelChoice = name)}>
 				{#each ocrModels as model (model.name)}
-					<option value={model.name}>{model.name}</option>
+					<option value={model.name}>{model.name}{model.recommended ? ' (recommended)' : ''}</option
+					>
 				{/each}
 			</select>
 		</label>
@@ -469,7 +475,7 @@
 				{chosen.description}
 				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
-					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
+					? `${chosen.builtin ? 'Comes with the ML service' : 'Downloaded'}, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}

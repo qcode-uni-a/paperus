@@ -13305,6 +13305,16 @@
             "title": "Released",
             "default": ""
           },
+          "recommended": {
+            "type": "boolean",
+            "title": "Recommended",
+            "default": false
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin",
+            "default": false
+          },
           "memory_bytes": {
             "anyOf": [
               {

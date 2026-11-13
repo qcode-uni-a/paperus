@@ -65,6 +65,11 @@ class MLModel(BaseModel):
     """Its size: how many weights (0: not published)."""
     released: str = ""
     """When it was published ("2024-01")."""
+    recommended: bool = False
+    """The one to use for its task where the ML service runs (on a CPU no
+    reranker)."""
+    builtin: bool = False
+    """Came with the ML service's image (not downloaded; cannot be deleted)."""
     memory_bytes: int | None = None
     """What it took once loaded on the ML service (RAM, or GPU memory there),
     as measured when it last loaded; None if never loaded there."""

@@ -182,7 +182,9 @@ do: switch to the `-cuda` image, pass the GPU to its container, or update
 the driver; or that it runs on the GPU, by name.
 
 The image `paperus-ml:<version>-cuda` (e.g. `release-cuda`) is the same
-service with ONNX Runtime's GPU build and CUDA (about 4 GB larger). On the
+service with ONNX Runtime's GPU build and CUDA (about 4 GB larger), and
+with the recommended models for a GPU in fp16 (1.8 GB, the reranker
+included; the CPU image has those for a CPU, 360 MB). On the
 host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
 generation on) and the NVIDIA Container Toolkit, set up for Docker:
 
@@ -301,11 +303,12 @@ files again".
 
 A reranker reads the question with each of the best 40 hits and puts the
 best answers first (Administration → Settings → Machine learning →
-Reranking). On our test questions (docs/search.md) bge-reranker-v2-m3 put
-the right paper first 89 times in 100 instead of 66, and in the top five 98
-times. A search then takes about 0.6 s on an RTX 2080 SUPER instead of
-0.15 s; on a CPU many seconds, so "Automatic" (the default) reranks only
-when the ML service runs on a GPU. The reranker needs about 1.2 GB of GPU
+Reranking). On our 200 test questions (docs/search.md) bge-reranker-v2-m3
+helps weaker search models most (the right paper first 181 times instead
+of 158 with multilingual-e5-small) and the recommended arctic-embed-m-v2
+little (184 instead of 181). A search then takes about 0.6 s on an RTX
+2080 SUPER instead of 0.15 s; on a CPU many seconds, so "Automatic" (the
+default) reranks only when the ML service runs on a GPU. The reranker needs about 1.2 GB of GPU
 memory; the ML service gives back what a batch needed after each run, so
 models and other programs share the card. If reranking fails or takes
 longer than 15 s, results come in the usual order.
@@ -573,7 +576,7 @@ these services ask; nothing about people or their notes is sent.
 | OpenAlex: `api.openalex.org` | A DOI or arXiv ID | Published versions; a paper's arXiv version and the journal's open copy | Server → Published versions / Open-access copies |
 | Unpaywall: `api.unpaywall.org` | A DOI | Open copies, only with a contact email | No contact email |
 | Publishers, repositories | A PDF address OpenAlex or Unpaywall gave | Downloading an open copy | as above |
-| Hugging Face | A model name | The ML service's first use of a model | Model cache filled once |
+| Hugging Face | A model name | The ML service's first use of a model not in its image | Model cache filled once |
 | The OIDC provider | The login | OIDC login | Settings → Authentication |
 
 The browser extension talks only to the person's paperus and, on their

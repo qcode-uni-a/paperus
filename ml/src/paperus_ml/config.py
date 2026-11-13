@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Downloaded models, one folder per task and model:
     # <cache>/embedding/bge-m3/. "/cache" (a volume) in the container.
     cache_path: Path = Field(default_factory=lambda: default_cache_path())
+    # Models that came with the image (read-only, same layout), used instead
+    # of downloading them: the recommended ones, in /models.
+    builtin_path: Path | None = None
     # Shared secret: requests need "Authorization: Bearer <token>" when set.
     token: str | None = None
     # Unload a model after this many idle seconds (0: never).

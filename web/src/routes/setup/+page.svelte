@@ -88,9 +88,10 @@
 	const embedders = $derived(ml?.models.filter((m) => m.task === 'embedding') ?? []);
 	const rerankers = $derived(ml?.models.filter((m) => m.task === 'rerank') ?? []);
 	const readers = $derived(ml?.models.filter((m) => m.task === 'ocr') ?? []);
-	/** A model's name with its download size, for the lists. */
+	/** A model's name with its download size (or that it comes with the ML
+	 * service) and whether it is recommended, for the lists. */
 	const sized = (model: MlModel) =>
-		`${model.name}${model.download_mb ? ` (${model.download_mb} MB)` : ''}`;
+		`${model.name}${model.builtin ? '' : model.download_mb ? ` (${model.download_mb} MB)` : ''}${model.recommended ? ', recommended' : ''}`;
 	const advice = $derived(gpu ? gpuAdvice(gpu) : null);
 
 	async function checkMl() {

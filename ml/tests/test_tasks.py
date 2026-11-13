@@ -14,13 +14,13 @@ import pytest
 from fastapi.testclient import TestClient
 from prometheus_client import REGISTRY
 
-from paperus_ml import cli, main, manager, metrics
+from paperus_ml import cli, download, main, metrics
 from paperus_ml.config import Settings
 from paperus_ml.device import Device
 from paperus_ml.encoder import Encoder
 from paperus_ml.main import create_app, usable_cores
 from paperus_ml.manager import Model, ModelManager
-from paperus_ml.models import MODELS, ModelSpec
+from paperus_ml.models import MODELS, ModelSpec, recommended
 from paperus_ml.ocr import Reader
 from paperus_ml.rerank import Reranker
 from tests.test_ocr import TWO_COLUMNS, page
@@ -169,9 +169,13 @@ def hub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[str]:
             from_file = model if pattern.endswith("*") else tokenizer
             assert from_file is not None
             shutil.copy(from_file, target)
+        # As Hugging Face does: notes on what was downloaded.
+        notes = Path(local_dir) / ".cache" / "huggingface"
+        notes.mkdir(parents=True, exist_ok=True)
+        (notes / "download.lock").touch()
         return str(local_dir)
 
-    monkeypatch.setattr(manager, "snapshot_download", snapshot_download)
+    monkeypatch.setattr(download, "snapshot_download", snapshot_download)
     return downloaded
 
 
@@ -209,6 +213,76 @@ def test_without_a_usable_gpu_models_run_on_the_cpu(
     # The GPU's file (full precision) was downloaded.
     folder = tmp_path / "cache" / "rerank" / "ms-marco-minilm-l6"
     assert (folder / "onnx" / "model.onnx").is_file()
+
+
+def test_the_recommended_models() -> None:
+    names = {"cpu": ["arctic-embed-m-v2", "pp-ocrv6-small"]}
+    names["cuda"] = [*names["cpu"], "bge-reranker-v2-m3"]
+    for device, expected in names.items():
+        found = recommended(device)
+        assert sorted(s.name for s in found) == sorted(expected)
+        # One per task.
+        assert len({s.task for s in found}) == len(found)
+
+
+def test_download_into_a_folder_for_the_image(
+    tmp_path: Path, hub: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "models"
+    download.main([str(folder), "--device", "cuda", "ms-marco-minilm-l6"])
+    model = folder / "rerank" / "ms-marco-minilm-l6"
+    # The GPU's file, without Hugging Face's notes.
+    assert (model / "onnx" / "model.onnx").is_file()
+    assert not list(folder.rglob(".cache"))
+    assert str(model) in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        download.main([str(folder), "no-such-model"])
+
+
+def test_the_recommended_ones_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fetched: list[tuple[str, str, Path]] = []
+    monkeypatch.setattr(
+        download,
+        "fetch",
+        lambda spec, device, to: fetched.append((spec.name, device, to)),
+    )
+    download.main([str(tmp_path)])
+    assert fetched == [
+        (s.name, "cpu", tmp_path / s.task / s.name) for s in recommended("cpu")
+    ]
+
+
+def test_models_from_the_image_are_not_downloaded(
+    tmp_path: Path, hub: list[str]
+) -> None:
+    builtin = tmp_path / "models"
+    download.main([str(builtin), "ms-marco-minilm-l6"])
+    hub.clear()
+    settings = Settings(
+        cache_path=tmp_path / "cache", builtin_path=builtin, device="cpu"
+    )
+    models = ModelManager(settings)
+    spec = MODELS["ms-marco-minilm-l6"]
+    assert models.model_dir(spec) == builtin / "rerank" / "ms-marco-minilm-l6"
+    reranker = models.get("ms-marco-minilm-l6")
+    assert isinstance(reranker, Reranker)
+    assert reranker.score("rain", ["rain"]) == [tiny_rerank_score("rain", "rain")]
+    assert hub == []
+    # Only the CPU's file came with it: for the GPU it is downloaded.
+    assert models.builtin_dir(spec, "cuda") is None
+    assert models.model_dir(spec, "cuda") == tmp_path / "cache" / "rerank" / spec.name
+    with TestClient(create_app(settings, models)) as client:
+        listed = {m["name"]: m for m in client.get("/models").json()}
+        assert listed["ms-marco-minilm-l6"]["builtin"] is True
+        assert listed["ms-marco-minilm-l6"]["cached_bytes"] > 0
+        assert listed["bge-m3"]["builtin"] is False
+        assert listed["arctic-embed-m-v2"]["recommended"] is True
+        assert listed["bge-reranker-v2-m3"]["recommended"] is False
+        # Deleting removes downloads only.
+        assert client.delete("/models/ms-marco-minilm-l6").status_code == 204
+    assert (builtin / "rerank" / "ms-marco-minilm-l6" / "tokenizer.json").is_file()
 
 
 def test_simultaneous_requests_load_a_model_once(tiny_models: TinyModels) -> None:

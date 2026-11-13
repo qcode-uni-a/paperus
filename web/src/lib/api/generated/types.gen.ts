@@ -2543,6 +2543,14 @@ export type MlModel = {
      */
     released?: string;
     /**
+     * Recommended
+     */
+    recommended?: boolean;
+    /**
+     * Builtin
+     */
+    builtin?: boolean;
+    /**
      * Memory Bytes
      */
     memory_bytes?: number | null;

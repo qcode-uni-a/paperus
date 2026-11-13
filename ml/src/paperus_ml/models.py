@@ -67,6 +67,9 @@ class ModelSpec:
     released: str = ""
     """When it was published ("2024-01"), from its first version on Hugging
     Face."""
+    recommended: tuple[str, ...] = ()
+    """Where it is the one to use for its task ("cpu", "cuda"), from our
+    question set (docs/search.md); the image for that device comes with it."""
 
     def onnx_file_for(self, device: str) -> str:
         return (
@@ -152,9 +155,10 @@ MODELS = {
             max_tokens=8192,
             query_prefix="query: ",
             description=(
-                "Recommended: multilingual and made for search; good quality, fast, "
-                "small."
+                "Multilingual and made for search; the best on our questions, fast, "
+                "small. Good without a reranker too."
             ),
+            recommended=("cpu", "cuda"),
             licence="Apache-2.0",
             download_mb=311,
             scores=(
@@ -254,8 +258,9 @@ MODELS = {
             ),
         ),
         # Qwen3-Embedding 0.6B (Apache-2.0): a decoder (last token's vector),
-        # queries with an instruction; many languages, long texts. On trial
-        # (docs/search.md).
+        # queries with an instruction; many languages, long texts. On our
+        # questions as good as arctic-embed-m-v2 with a reranker, worse
+        # without (docs/search.md).
         ModelSpec(
             name="qwen3-embedding-0.6b",
             parameters=596_000_000,
@@ -280,7 +285,8 @@ MODELS = {
         ),
         # EmbeddingGemma 2 (Apache-2.0): text, images, video and sound in
         # one space; here its text model (the others' features empty), its
-        # pooling in the ONNX file. On trial (docs/search.md).
+        # pooling in the ONNX file. On our questions worse than
+        # arctic-embed-m-v2 without a reranker (docs/search.md).
         ModelSpec(
             name="embeddinggemma-2",
             parameters=744_000_000,
@@ -352,6 +358,7 @@ MODELS = {
             ),
             licence="Apache-2.0",
             download_mb=31,
+            recommended=("cpu", "cuda"),
         ),
         # Rerankers: read a query and a passage together and score how well
         # they fit; for reordering the best search hits. Tested on our own
@@ -376,6 +383,9 @@ MODELS = {
             ),
             licence="Apache-2.0",
             download_mb=571,
+            # Not on a CPU: too slow there, and the recommended embedding
+            # model gains little from it (docs/search.md).
+            recommended=("cuda",),
         ),
         ModelSpec(
             name="gte-multilingual-reranker-base",
@@ -415,3 +425,9 @@ MODELS = {
         ),
     ]
 }
+
+
+def recommended(device: str) -> list[ModelSpec]:
+    """The models to use on ``device`` ("cpu", "cuda"), one per task (on a
+    CPU no reranker); the image for that device comes with them."""
+    return [spec for spec in MODELS.values() if device in spec.recommended]

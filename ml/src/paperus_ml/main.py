@@ -112,6 +112,11 @@ class ModelInfo(BaseModel):
     """Its size: how many weights (0: not published)."""
     released: str = ""
     """When it was published ("2024-01")."""
+    recommended: bool = False
+    """The one to use for its task where this service runs (on a CPU no
+    reranker)."""
+    builtin: bool = False
+    """Came with the image (not downloaded; cannot be deleted)."""
     memory_bytes: int | None = None
     """What it took once loaded on this service (RAM, or GPU memory on the
     GPU), as measured when it last loaded; None if never loaded here. Runs
@@ -258,6 +263,8 @@ def create_app(
                 scores=dict(s.scores),
                 parameters=s.parameters,
                 released=s.released,
+                recommended=models.device in s.recommended,
+                builtin=models.builtin_dir(s, models.device) is not None,
                 memory_bytes=models.measured.get(s.vectors(models.device)),
             )
             for s in MODELS.values()

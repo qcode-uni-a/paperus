@@ -8,11 +8,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from huggingface_hub import snapshot_download
-
 from paperus_ml import memory
 from paperus_ml.config import Settings
 from paperus_ml.device import Device, choose, gpu_problem
+from paperus_ml.download import fetch
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
 from paperus_ml.ocr import Reader
@@ -81,10 +80,23 @@ class ModelManager:
                 else gpu_problem()
             )
 
-    def model_dir(self, spec: ModelSpec) -> Path:
-        """<cache>/<task>/<model>, with plain files: the shared Hugging Face
+    def model_dir(self, spec: ModelSpec, device: Device | None = None) -> Path:
+        """Where the model's files are: in the image if it came with the file
+        for ``device`` (this service's by default), else
+        <cache>/<task>/<model>, with plain files: the shared Hugging Face
         cache uses symlinks, and ONNX Runtime refuses weight files that
         resolve outside the model's folder."""
+        return self.builtin_dir(spec, device or self.device) or self._cache_dir(spec)
+
+    def builtin_dir(self, spec: ModelSpec, device: Device) -> Path | None:
+        """The model's folder in the image, if it came with the file for
+        ``device``."""
+        if self.settings.builtin_path is None:
+            return None
+        directory = self.settings.builtin_path / spec.task / spec.name
+        return directory if (directory / spec.onnx_file_for(device)).is_file() else None
+
+    def _cache_dir(self, spec: ModelSpec) -> Path:
         return self.settings.cache_path / spec.task / spec.name
 
     def cached_bytes(self, spec: ModelSpec) -> int | None:
@@ -95,31 +107,21 @@ class ModelManager:
         return sum(p.stat().st_size for p in directory.rglob("*") if p.is_file())
 
     def delete_cached(self, name: str) -> None:
-        """Unload a model and remove its files; it downloads again when used."""
+        """Unload a model and remove its downloaded files (not those that
+        came with the image); it downloads again when used."""
         spec = MODELS.get(name)
         if spec is None:
             raise UnknownModel(name)
         with self._locks[name]:
             self._models.pop(name, None)
             self._errors.pop(name, None)
-            shutil.rmtree(self.model_dir(spec), ignore_errors=True)
+            shutil.rmtree(self._cache_dir(spec), ignore_errors=True)
 
     def _download_and_load(self, spec: ModelSpec, device: Device) -> Model:
-        model_dir = self.model_dir(spec)
-        # Revision changes download the changed files into the same folder.
-        snapshot_download(
-            spec.repo,
-            revision=spec.revision,
-            local_dir=model_dir,
-            allow_patterns=[f"{spec.onnx_file_for(device)}*", spec.tokenizer_file],
-        )
-        if spec.detector is not None:
-            snapshot_download(
-                spec.detector.repo,
-                revision=spec.detector.revision,
-                local_dir=model_dir / spec.detector.folder,
-                allow_patterns=[f"{spec.detector.onnx_file}*"],
-            )
+        model_dir = self.builtin_dir(spec, device)
+        if model_dir is None:
+            model_dir = self._cache_dir(spec)
+            fetch(spec, device, model_dir)
         kinds = {"embedding": Encoder, "rerank": Reranker, "ocr": Reader}
         encoder = kinds[spec.task](
             spec,

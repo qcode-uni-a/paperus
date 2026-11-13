@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **The ML service's images come with the recommended models**, so search
+  and OCR work from the first start without downloading: on a CPU
+  arctic-embed-m-v2 and PP-OCRv6 (the image about 360 MB larger), on a GPU
+  also the bge-reranker-v2-m3 reranker (the `-cuda` image about 1.8 GB
+  larger). The layer stays the same across releases until the models change.
+  Other models still download on first use. Choosing a model, the
+  administration marks the recommended ones for where the ML service runs:
+  on 200 test questions arctic-embed-m-v2 was the best search model, and
+  without a reranker as good as any with one, so a CPU, which does not
+  rerank by default, loses little. A copy downloaded before this into
+  the model cache (`model-cache/embedding/arctic-embed-m-v2` and the
+  others) is no longer used and can be deleted.
+
 ## 0.1.0 (2026-11-12)
 
 *Version 0.1: officially a beta, which in academic terms means it has passed peer review by one very patient reviewer.*

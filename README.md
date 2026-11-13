@@ -88,8 +88,8 @@ a proxy, see [operations](docs/operations.md#outgoing-connections)).
    machine only; with the proxy on another one, set `PAPERUS_PORT=8000`.
    Folders on a network share must belong to uid 1000 there (the
    containers' user).
-4. Start: `docker compose up -d`. The first start downloads the model (about
-   2.3 GB).
+4. Start: `docker compose up -d`. The ML service's image comes with the
+   recommended models; other models download when chosen.
 5. Open paperus at its address (the proxy's) in the browser: create the
    administrator account, or restore a backup found in the backup folder
    (for moving to a new server). Check the address under Administration →
