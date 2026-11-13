@@ -169,6 +169,16 @@ What changed since 0.0.29:
   files", for a version without one.
 - **The Manage counts in the menu follow at once**: a merge on a Manage
   page left its number standing until the next page or minute.
+- **An eighth page twin, Nurture**, from a Nature paper as saved: four
+  other files on another site (Supplementary Information, Reporting
+  Summary, Peer Review File, Source Data), each checked for what the
+  extension saves. Nature's link texts end in "(download PDF )", so the
+  Peer Review File would have been saved as "Peer Review File (download
+  PDF ).pdf": that ending is left out now. Springer Nature's file names
+  (…_MOESM3_ESM.pdf) mark a supplement wherever they are served. Making
+  twins keeps link texts that say what a file is (peer review, reporting
+  summary, source data) and replaces ORCID iDs with placeholders; two
+  twins had the real authors' iDs and were made again.
 - **"Probably the same person" without collaborations' namesakes**: two
   names that fit ("A. Huber" and "Anna Huber") on one paper's author list
   were suggested as one person, with all the paper's other authors as

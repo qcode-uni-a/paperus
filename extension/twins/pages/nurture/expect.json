@@ -1,0 +1,48 @@
+{
+	"about": "Nurture (Nurture Publishing Group): complete citation_* and Dublin Core tags, six authors, pages 1 to 8; the PDF at <article>.pdf, and four other files on another site (static-content.sprinkler.com, …_MOESM1_ESM.pdf to _MOESM4_ESM.zip): Supplementary Information, Reporting Summary, Peer Review File and Source Data, each link inside a heading of its own, its text ending in \"(download PDF )\" (an icon inside); data deposited at EMDB. Saved 2026-11-13.",
+	"url": "https://www.nurture.com/articles/s1234-026-0002-0",
+	"expect": {
+		"mode": "paper",
+		"title": "A Field Guide to Lost Socks",
+		"doi": "10.5555/s1234-026-0002-0",
+		"pdfUrl": "https://www.nurture.com/articles/s1234-026-0002-0.pdf",
+		"authors": ["Skip Connor", "Ida Entity", "Res Netson", "Batch Norman", "Al Gorithm", "Max Likelihood"],
+		"journal": "Nurture",
+		"publisher": "Nurture Publishing Group",
+		"firstPage": "1",
+		"lastPage": "8",
+		"date": "2026/11/11"
+	},
+	"extras": {
+		"files": [
+			{
+				"url": "https://static-content.sprinkler.com/esm/art%3A10.5555%2Fs1234-026-0002-0/MediaObjects/1234_2026_0002_MOESM1_ESM.pdf",
+				"name": "Supplementary Information.pdf",
+				"role": "supplementary"
+			},
+			{
+				"url": "https://static-content.sprinkler.com/esm/art%3A10.5555%2Fs1234-026-0002-0/MediaObjects/1234_2026_0002_MOESM2_ESM.pdf",
+				"name": "Reporting Summary.pdf",
+				"role": "supplementary"
+			},
+			{
+				"url": "https://static-content.sprinkler.com/esm/art%3A10.5555%2Fs1234-026-0002-0/MediaObjects/1234_2026_0002_MOESM3_ESM.pdf",
+				"name": "Peer Review File.pdf",
+				"role": "peer_review"
+			},
+			{
+				"url": "https://static-content.sprinkler.com/esm/art%3A10.5555%2Fs1234-026-0002-0/MediaObjects/1234_2026_0002_MOESM4_ESM.zip",
+				"name": "Source Data Fig. 5.zip",
+				"role": "data"
+			}
+		],
+		"links": [
+			{ "url": "https://www.ebi.ac.uk/pdbe/emdb", "kind": "data" },
+			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000006", "kind": "data" },
+			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000007", "kind": "data" },
+			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000008", "kind": "data" },
+			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000009", "kind": "data" },
+			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000010", "kind": "data" }
+		]
+	}
+}

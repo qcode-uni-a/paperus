@@ -41,6 +41,7 @@ const SUPPLEMENT_HEADING =
 const SUPPLEMENT_URL = [
   /\/doi\/suppl\//i,
   /static-content\.springer\.com\/esm\//i,
+  /_MOESM\d+_ESM\.\w+$/i,
   /els-cdn\.com\/.+-mmc\d+\.\w+$/i,
   /\/action\/downloadSupplement\b/i,
   /[?&]type=supplementary\b/i,
@@ -93,9 +94,15 @@ const CODE_FILE = /\.(py|ipynb|m|r|jl|c|cpp|f90|nb)$/i;
 const DATA_FILE =
   /\.(csv|tsv|xlsx?|h5|hdf5|nc|mat|npz|json|cif|pdb|fasta|fa)$/i;
 
-/** The link's own words, if they say something ("Peer Review File"). */
+/** The link's own words, if they say something ("Peer Review File");
+ * without what it does ("Peer Review File (download PDF )", Nature's, an
+ * icon with the size inside). */
 function wordsOf(text: string): string {
-  const words = text.replace(/\s+/g, " ").trim().slice(0, 100);
+  const words = text
+    .replace(/\s+/g, " ")
+    .replace(/\s*\(\s*download\b[^)]*\)\s*$/i, "")
+    .trim()
+    .slice(0, 100);
   return GENERIC_TEXT.test(words) || /^link$/i.test(words) ? "" : words;
 }
 

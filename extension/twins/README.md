@@ -10,8 +10,8 @@ journal, the publisher and their hosts get parody names that keep the
 acronym (IEEE Xplore → EEEK Xplore at eeekxplore.eeek.org). Addresses keep
 their shapes (`/document/…`, `/doi/pdf/<DOI>`, `/pii/…/pdfft`), which the
 extension's rules read; DOIs are under 10.5555 (Crossref's prefix for
-examples), and other papers' DOIs and IDs, authors' profile links and
-headlines in addresses become placeholders. A site whose rules name its
+examples), and other papers' DOIs and IDs, authors' profile links, ORCID
+iDs and headlines in addresses become placeholders. A site whose rules name its
 host (Wiley's reader, arXiv, Google Scholar) will need its twin read at
 the real host.
 

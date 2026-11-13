@@ -143,9 +143,15 @@ function cleanUrl(href) {
 			return long.length >= 4 && !long.every((word) => GENERIC.has(word)) ? 'a-page' : part;
 		})
 		.join('/');
+	// ORCID iDs (in groups of four digits, so not caught below) name the
+	// real authors: placeholders, the same for each.
+	const named = url.href.replace(/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/gi, (id) => {
+		if (!orcids.has(id)) orcids.set(id, `0000-0000-0000-${String(orcids.size + 1).padStart(4, '0')}`);
+		return orcids.get(id);
+	});
 	// Other numbers that name someone or something (authors' profiles, other
 	// papers): placeholders, the same for each.
-	return url.href.replace(/\d{5,}/g, (number) => {
+	return named.replace(/\d{5,}/g, (number) => {
 		if (parodies.has(number)) return number;
 		if (!otherNumbers.has(number)) otherNumbers.set(number, String(9000001 + otherNumbers.size));
 		return otherNumbers.get(number);
@@ -154,6 +160,7 @@ function cleanUrl(href) {
 /** Numbers in the parodies (an article's own), kept. */
 const parodies = new Set(replacements.flatMap(([, parody]) => parody.match(/\d{5,}/g) ?? []));
 const otherNumbers = new Map();
+const orcids = new Map();
 
 /** Link texts kept as they are: words that say what a link is, never whose
  * or about what. Any other text: "Link". */
@@ -166,14 +173,15 @@ const GENERIC = new Set(
 	us privacy terms cookies next previous issue volume journal home page reader read online free
 	alerts document sections section metadata introduction conclusion conclusions acknowledgment
 	acknowledgments acknowledgement acknowledgements appendix footnotes notes availability available
-	statement funding similar related additional extended`
+	statement funding similar related additional extended peer review reviews reviewer reviewers
+	referee report reports reporting summary source fig zip history transparent policy process`
 		.split(/\s+/)
 		.filter(Boolean)
 );
 function label(text) {
 	const clean = text.replace(/\s+/g, ' ').trim();
 	const words = clean.toLowerCase().match(/[a-z]+/g) ?? [];
-	if (!clean || clean.length > 40) return 'Link';
+	if (!clean || clean.length > 60) return 'Link';
 	return words.every((word) => GENERIC.has(word)) ? clean : 'Link';
 }
 
@@ -311,11 +319,12 @@ ${body.join('\n')}
 </html>
 `;
 
-// Nothing real left: the names replaced (as written) and the forbidden
-// words (any case).
+// Nothing real left: the names replaced (as written), the forbidden words
+// (any case) and ORCID iDs other than the placeholders.
 const left = [
 	...replacements.map(([real]) => real).filter((real) => twin.includes(real)),
-	...(spec.forbid ?? []).filter((word) => twin.toLowerCase().includes(word.toLowerCase()))
+	...(spec.forbid ?? []).filter((word) => twin.toLowerCase().includes(word.toLowerCase())),
+	...(twin.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b/gi) ?? []).filter((id) => !id.startsWith('0000-0000-0000-'))
 ];
 if (unchanged.length)
 	throw new Error(
