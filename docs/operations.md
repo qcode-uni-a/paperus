@@ -182,9 +182,7 @@ do: switch to the `-cuda` image, pass the GPU to its container, or update
 the driver; or that it runs on the GPU, by name.
 
 The image `paperus-ml:<version>-cuda` (e.g. `release-cuda`) is the same
-service with ONNX Runtime's GPU build and CUDA (about 4 GB larger), and
-with the recommended models for a GPU in fp16 (1.8 GB, the reranker
-included; the CPU image has those for a CPU, 360 MB). On the
+service with ONNX Runtime's GPU build and CUDA (about 4 GB larger). On the
 host: the NVIDIA driver (580 or newer, for CUDA 13; cards from the RTX 20xx
 generation on) and the NVIDIA Container Toolkit, set up for Docker:
 
@@ -576,7 +574,7 @@ these services ask; nothing about people or their notes is sent.
 | OpenAlex: `api.openalex.org` | A DOI or arXiv ID | Published versions; a paper's arXiv version and the journal's open copy | Server → Published versions / Open-access copies |
 | Unpaywall: `api.unpaywall.org` | A DOI | Open copies, only with a contact email | No contact email |
 | Publishers, repositories | A PDF address OpenAlex or Unpaywall gave | Downloading an open copy | as above |
-| Hugging Face | A model name | The ML service's first use of a model not in its image | Model cache filled once |
+| Hugging Face | A model name | The ML service's first use of a model | Model cache filled once |
 | The OIDC provider | The login | OIDC login | Settings → Authentication |
 
 The browser extension talks only to the person's paperus and, on their

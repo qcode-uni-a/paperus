@@ -1,5 +1,4 @@
-# paperus-ml. It comes with the recommended models for its device (in
-# /models); others are downloaded to /cache on first use: mount a volume
+# paperus-ml. Models are downloaded to /cache on first use; mount a volume
 # there so they survive updates.
 #
 # DEVICE=cpu (the default) builds the CPU image; DEVICE=cuda the "-cuda"
@@ -27,7 +26,12 @@ pattern = r'(name = "%s"\nversion = )"[^"]*"' % re.escape(name)
 lock.write_text(re.sub(pattern, r'\1"0"', lock.read_text()))
 PY
 
-FROM python:3.13-slim AS base
+FROM python:3.13-slim
+ARG DEVICE=cpu
+LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
+      org.opencontainers.image.description="paperus machine learning service (embeddings; ${DEVICE})" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
 COPY --from=uv /uv /bin/uv
 
 ENV UV_COMPILE_BYTECODE=1 \
@@ -39,22 +43,6 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 COPY --from=dependencies /lock/pyproject.toml /lock/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-
-# The recommended models for the device (models.py), downloaded with only
-# the two files that say which: a release that changes neither keeps this
-# layer, and the files' times are fixed so a new download is the same layer.
-FROM base AS models
-ARG DEVICE=cpu
-COPY src/paperus_ml/models.py src/paperus_ml/download.py /build/paperus_ml/
-RUN touch /build/paperus_ml/__init__.py \
-    && PYTHONPATH=/build /app/.venv/bin/python -m paperus_ml.download --device "$DEVICE" /models \
-    && find /models -exec touch --no-dereference --date=@0 {} +
-
-FROM base
-ARG DEVICE=cpu
-LABEL org.opencontainers.image.source="https://github.com/qcode-uni-a/paperus" \
-      org.opencontainers.image.description="paperus machine learning service (embeddings; ${DEVICE})" \
-      org.opencontainers.image.licenses="Apache-2.0"
 # The GPU build of the same ONNX Runtime version as in uv.lock (before the
 # code: a change to it leaves this layer alone too).
 RUN if [ "$DEVICE" = cuda ]; then \
@@ -62,8 +50,6 @@ RUN if [ "$DEVICE" = cuda ]; then \
         && uv pip uninstall onnxruntime \
         && uv pip install "onnxruntime-gpu[cuda,cudnn]==$version"; \
     elif [ "$DEVICE" != cpu ]; then echo "DEVICE must be cpu or cuda" >&2; exit 1; fi
-COPY --from=models /models /models
-ENV PAPERUS_ML_BUILTIN_PATH=/models
 # Then the project itself, with its real version; ONNX Runtime left as it is
 # (the CPU build, or the GPU one in its place).
 COPY pyproject.toml uv.lock README.md ./

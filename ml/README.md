@@ -3,10 +3,7 @@
 Machine learning service of [paperus](https://github.com/qcode-uni-a/paperus):
 text embeddings for search by meaning, reranking of search hits, and OCR of
 scanned pages, with ONNX Runtime on the CPU or an NVIDIA GPU. Models are
-downloaded from Hugging Face on first use and unloaded when idle. The
-container images come with the recommended ones for their device (in
-`/models`); `python -m paperus_ml.download <folder> [--device cuda]
-[models…]` downloads them ahead of time the same way.
+downloaded from Hugging Face on first use and unloaded when idle.
 
 ```sh
 pip install paperus-ml
@@ -19,7 +16,6 @@ Settings are environment variables:
 | --- | --- | --- |
 | `PAPERUS_ML_TOKEN` | none | Shared secret; requests need `Authorization: Bearer <token>` |
 | `PAPERUS_ML_CACHE_PATH` | `~/.cache/paperus-ml` | Downloaded models |
-| `PAPERUS_ML_BUILTIN_PATH` | none (`/models` in the images) | Models downloaded ahead of time (read-only), used instead of downloading |
 | `PAPERUS_ML_PRELOAD` | `[]` | Models to load at start and keep, e.g. `["arctic-embed-m-v2"]` (paperus then sends the one in use) |
 | `PAPERUS_ML_MODEL_TTL` | `300` | Unload other models after this many idle seconds (0: never) |
 | `PAPERUS_ML_INTRA_OP_THREADS` | `0` | CPU cores per model at start (0: all it sees); paperus' administration sets it afterwards |

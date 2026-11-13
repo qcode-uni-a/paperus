@@ -324,11 +324,9 @@
 									? `${model.download_mb} MB`
 									: '–'}
 							<small
-								>{model.dimensions}-dim.{model.builtin
-									? ', comes with the ML service'
-									: model.cached_bytes == null
-										? ', not downloaded'
-										: ''}</small
+								>{model.dimensions}-dim.{model.cached_bytes == null
+									? ', not downloaded'
+									: ''}</small
 							>
 						</td>
 						<td class="num" data-label="Speed here">
@@ -353,7 +351,7 @@
 								<button class="small" onclick={() => use(model)} disabled={saving || !config}
 									>Use</button
 								>
-								{#if model.cached_bytes != null && !model.builtin}
+								{#if model.cached_bytes != null}
 									<button
 										class="link danger"
 										title="Delete the downloaded files; they download again when used"
@@ -419,7 +417,7 @@
 				{chosen.description}
 				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
-					? `${chosen.builtin ? 'Comes with the ML service' : 'Downloaded'}, ${formatSize(chosen.cached_bytes)}.`
+					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}
@@ -475,7 +473,7 @@
 				{chosen.description}
 				{facts(chosen) ? `${facts(chosen)}.` : ''}
 				{chosen.cached_bytes != null
-					? `${chosen.builtin ? 'Comes with the ML service' : 'Downloaded'}, ${formatSize(chosen.cached_bytes)}.`
+					? `Downloaded, ${formatSize(chosen.cached_bytes)}.`
 					: chosen.download_mb
 						? `${chosen.download_mb} MB to download.`
 						: ''}

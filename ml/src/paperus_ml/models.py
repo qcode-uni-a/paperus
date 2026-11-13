@@ -69,7 +69,7 @@ class ModelSpec:
     Face."""
     recommended: tuple[str, ...] = ()
     """Where it is the one to use for its task ("cpu", "cuda"), from our
-    question set (docs/search.md); the image for that device comes with it."""
+    question set (docs/search.md)."""
 
     def onnx_file_for(self, device: str) -> str:
         return (
@@ -429,5 +429,5 @@ MODELS = {
 
 def recommended(device: str) -> list[ModelSpec]:
     """The models to use on ``device`` ("cpu", "cuda"), one per task (on a
-    CPU no reranker); the image for that device comes with them."""
+    CPU no reranker)."""
     return [spec for spec in MODELS.values() if device in spec.recommended]
