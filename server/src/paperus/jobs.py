@@ -72,7 +72,7 @@ from paperus.models import (
     User,
     Version,
 )
-from paperus.processing import pending_files, process_file
+from paperus.processing import pending_files, process_file, recut
 from paperus.storage import BlobStore, FilesystemStore, make_blob_store
 from paperus.system import (
     SystemConfig,
@@ -193,11 +193,15 @@ LAYOUT_ASKED = 10
 LAYOUT_LATER = -10
 
 
-@tasks.task(name="page_layout", queue="layout", retry=1)
-def page_layout(sha256: str) -> None:
+@tasks.task(name="page_layout", queue="layout", retry=1, pass_context=True)
+def page_layout(job: JobContext, sha256: str) -> None:
     context = _worker_context()
     with context.sessions() as db:
-        layouts.make(db, context.blobs, bytes.fromhex(sha256))
+        read = layouts.make(db, context.blobs, bytes.fromhex(sha256))
+        # Made again (the layout code changed): passages cut by them too.
+        files = recut(db, bytes.fromhex(sha256), read) if read else []
+    for file_id in files:
+        queue_embedding(job.app, file_id)
 
 
 @tasks.periodic(cron="*/10 * * * *")

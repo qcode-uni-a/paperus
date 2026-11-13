@@ -56,7 +56,10 @@ def make_pdf(
     if title is not None:
         objects.append(f"<< /Title ({_escape(title)}) >>".encode())
         info = f" /Info {len(objects)} 0 R"
+    return _assemble(objects, info)
 
+
+def _assemble(objects: list[bytes], info: str = "") -> bytes:
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
     for number, body in enumerate(objects, 1):
@@ -72,3 +75,40 @@ def make_pdf(
         xref,
     )
     return bytes(out)
+
+
+type Text = tuple[float, float, float, str]
+"""Text at x, y (its top; points from the page's top left) in a size."""
+type Box = tuple[float, float, float, float, bool]
+"""A rectangle at x, y, its width and height, filled or drawn round."""
+
+
+def make_placed_pdf(pages: list[tuple[list[Text], list[Box]]]) -> bytes:
+    """A PDF of US letter pages with text (Courier: each character 0.6 of
+    its size wide) and rectangles where given."""
+    height = 792
+    count = len(pages)
+    kids = " ".join(f"{4 + 2 * i} 0 R" for i in range(count))
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Pages /Kids [{kids}] /Count {count} >>".encode(),
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
+    ]
+    for i, (texts, boxes) in enumerate(pages):
+        objects.append(
+            (
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]"
+                f" /Resources << /Font << /F1 3 0 R >> >> /Contents {5 + 2 * i} 0 R >>"
+            ).encode()
+        )
+        stream = "".join(
+            f"{x} {height - y - h} {w} {h} re {'f' if filled else 'S'} "
+            for x, y, w, h, filled in boxes
+        ) + "".join(
+            f"BT /F1 {size} Tf {x} {base} Td ({_escape(text)}) Tj ET "
+            for x, y, size, text in texts
+            for base in [height - y - size * 0.8]
+        )
+        data = stream.encode()
+        objects.append(b"<< /Length %d >>\nstream\n%s\nendstream" % (len(data), data))
+    return _assemble(objects)

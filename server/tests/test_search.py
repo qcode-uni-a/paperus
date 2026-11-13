@@ -13,8 +13,17 @@ from tests.pdfs import make_pdf
 
 PAPER = make_pdf(
     [
-        ["Drought indices in Bavaria", "We computed the SPEI at a 3-month scale."],
-        ["Gaps shorter than five days were filled", "by linear interpolation."],
+        [
+            "Drought indices in Bavaria",
+            "We computed the SPEI at a 3-month scale.",
+            "Daily station records from the weather service cover the years",
+            "from 1961 to 2020, from the Alps in the south to the north.",
+        ],
+        [
+            "Methods",
+            "Gaps shorter than five days were filled",
+            "by linear interpolation.",
+        ],
     ]
 )
 
@@ -163,7 +172,17 @@ def test_best_few_per_paper_and_within_one(
 ) -> None:
     """One paper full of hits does not fill the list; a search within one
     paper gets the rest of its hits."""
-    long = make_pdf([[f"Drought in year {n}", "Drought again."] for n in range(1, 9)])
+    long = make_pdf(
+        [
+            [
+                f"{n}. Drought",
+                "Drought again in this year.",
+                "Rivers ran low from spring on, and the wells of the region fell",
+                "to their lowest level since records began in the old town.",
+            ]
+            for n in range(1, 9)
+        ]
+    )
     many, few = add_item(logged_in, "Many droughts"), add_item(logged_in, "Few")
     process(db, blobs, upload(logged_in, many, long, "long.pdf"))
     process(db, blobs, upload(logged_in, few))

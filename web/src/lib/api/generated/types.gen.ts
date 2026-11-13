@@ -4469,6 +4469,14 @@ export type Stats = {
      */
     files_ocr?: number;
     /**
+     * Pdfs
+     */
+    pdfs: number;
+    /**
+     * Pdfs Laid Out
+     */
+    pdfs_laid_out: number;
+    /**
      * Chunks
      */
     chunks: number;

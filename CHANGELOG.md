@@ -9,6 +9,16 @@
   wishes. Everyone in it is equal (adds people, renames it); these groups
   show under Groups in a section of their own, "Shared with people", and
   as owners everywhere else.
+- **Search reads PDFs as fluent mode does**: a PDF's text now comes from
+  its page layouts, in reading order across columns and pages: a
+  paragraph over a page break is one passage, and running headers, page
+  numbers, arXiv's margin stamp and the labels inside plots no longer
+  land in mid-sentence. Figure captions are passages of their own (the
+  text runs on past them), and each section starts a new passage. After
+  the update, the layouts and passages of all PDFs are made again in the
+  background, a few at a time (Administration → Jobs shows how far);
+  search keeps working meanwhile, and passages whose text stayed keep
+  their vectors.
 
 ## 0.1.2 (2026-11-13)
 

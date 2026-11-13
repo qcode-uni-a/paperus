@@ -16920,6 +16920,14 @@
             "title": "Files Ocr",
             "default": 0
           },
+          "pdfs": {
+            "type": "integer",
+            "title": "Pdfs"
+          },
+          "pdfs_laid_out": {
+            "type": "integer",
+            "title": "Pdfs Laid Out"
+          },
           "chunks": {
             "type": "integer",
             "title": "Chunks"
@@ -16952,6 +16960,8 @@
           "files",
           "files_pending",
           "files_failed",
+          "pdfs",
+          "pdfs_laid_out",
           "chunks",
           "embedded",
           "embedding_model",

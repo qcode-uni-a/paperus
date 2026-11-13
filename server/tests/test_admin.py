@@ -14,6 +14,7 @@ from paperus.processing import process_file
 from paperus.storage import BlobStore
 from paperus.system import load_config
 from tests.conftest import FakeML
+from tests.pdfs import make_pdf
 from tests.people import Person
 
 
@@ -119,6 +120,17 @@ def test_stats_and_progress(
     assert (stats["chunks"], stats["embedded"], stats["files_pending"]) == (1, 0, 0)
     embed_file(db, fake_ml.client(), "bge-m3", uuid.UUID(file["id"]))
     assert admin.get("/api/admin/stats").json()["embedded"] == 1
+
+    # PDFs: laid out (and their passages cut by them) when read.
+    paper = admin.post(
+        f"/api/items/{item['id']}/files",
+        files={"upload": ("p.pdf", make_pdf([["Rain gauges."]]), "application/pdf")},
+    ).json()
+    stats = admin.get("/api/admin/stats").json()
+    assert (stats["pdfs_laid_out"], stats["pdfs"]) == (0, 1)
+    process_file(db, blobs, uuid.UUID(paper["id"]))
+    stats = admin.get("/api/admin/stats").json()
+    assert (stats["pdfs_laid_out"], stats["pdfs"]) == (1, 1)
 
 
 def test_run_jobs(admin: TestClient, job_app: App) -> None:

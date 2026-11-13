@@ -86,7 +86,12 @@ def ada(client: TestClient, db: Session, blobs: BlobStore) -> Person:
     ).json()
     pdf = make_pdf(
         [
-            ["Radar gap filling", "Blind zones below the beam hide rainfall."],
+            [
+                "Radar gap filling",
+                "Blind zones below the beam hide rainfall.",
+                "Mountains block the beam, and so do towers and trees near the",
+                "radar; the gaps they leave are large in the Alps and small elsewhere.",
+            ],
             ["Methods", "We fill the gaps with a diffusion model."],
         ]
     )

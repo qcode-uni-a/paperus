@@ -19,14 +19,15 @@ versions are made again (``jobs.queue_outdated_layouts``).
 import ctypes
 import itertools
 import math
+import re
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 7
+VERSION = 8
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -101,6 +102,23 @@ UPRIGHT = 80
 RULE_ROWS = 5
 # Ink: pixels darker than this (0 black, 255 white).
 INK_LIGHT = 190
+# Figures: drawing found in cells this wide (points), those a cell apart
+# joined; at least this wide and tall, and mostly drawn (a table's rules
+# or a box around text are not: its text is more).
+FIGURE_CELL = 6
+FIGURE_WIDTH = 40
+FIGURE_HEIGHT = 30
+FIGURE_DRAWN = 0.5
+# A figure's labels lie in it or this close (points: an axis's ticks); a
+# line of text is a label where most of its letters are.
+FIGURE_LABEL_REACH = 10
+FIGURE_LINE = 0.6
+# Lines further apart than this many times their type size (from middle to
+# middle) have blank space between them: a caption ends there.
+CAPTION_GAP = 1.6
+# A character this many times its size above or below the one before is on
+# another line (sub- and superscripts are less).
+NEXT_LINE = 0.7
 
 
 class Piece(TypedDict):
@@ -117,13 +135,34 @@ class Piece(TypedDict):
     wider column's for a column (both columns' text the same size)."""
 
 
+class Figure(TypedDict):
+    """Where a page has a drawing (a plot, a diagram, a picture), in PDF
+    points from its top left."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+
 class PageLayout(TypedDict):
     width: float
     height: float
     columns: bool
     """The page is set in two columns (over a good part of it)."""
     pieces: list[Piece]
+    figures: NotRequired[list[Figure]]
+    """Its drawings (since version 8)."""
 
+
+type Char = tuple[str, float, float, float] | tuple[str, None, None, None]
+"""A character of the page's text: where its middle is (pixels) and its
+size (points); ``None`` for those without a place (spaces and line ends
+PDFium adds, marks)."""
+
+type Part = tuple[str, bool]
+"""A piece's text, or a caption in it (``True``: read apart from the
+text around it, which runs on past it)."""
 
 type Run = list[int]
 """A run of rows or columns: [start, end], both included."""
@@ -194,6 +233,13 @@ def _sums(values: np.ndarray) -> np.ndarray:
     sums = np.zeros((values.shape[0] + 1, values.shape[1] + 1), dtype=np.int64)
     sums[1:, 1:] = values.cumsum(axis=0, dtype=np.int64).cumsum(axis=1)
     return sums
+
+
+def _box_sum(sums: np.ndarray, x0: int, x1: int, y0: int, y1: int) -> int:
+    """The sum over a rectangle (all included) from ``_sums``."""
+    return int(
+        sums[y1 + 1, x1 + 1] - sums[y0, x1 + 1] - sums[y1 + 1, x0] + sums[y0, x0]
+    )
 
 
 @dataclass
@@ -1145,6 +1191,14 @@ def lay_out(
 def analyse(page: pypdfium2.PdfPage, first: bool) -> PageLayout:
     """A page's layout: drawn at one pixel a point, where it has ink and
     where text."""
+    return read(page, first)[0]
+
+
+def read(page: pypdfium2.PdfPage, first: bool) -> tuple[PageLayout, list[Part]]:
+    """A page's layout, and its text by its pieces (in the order the PDF
+    has it within each; figures' labels left out, captions apart): what
+    lies outside them (margins, running headers and footers) is no part of
+    the page's reading."""
     width, height = page.get_size()
     bitmap = page.render(scale=1, grayscale=True, may_draw_forms=False)
     try:
@@ -1154,24 +1208,206 @@ def analyse(page: pypdfium2.PdfPage, first: bool) -> PageLayout:
         ink = pixels < INK_LIGHT
     finally:
         bitmap.close()
-    text, turned = _text_boxes(page, bitmap.width, bitmap.height)
+    text, turned, chars = _text_boxes(page, bitmap.width, bitmap.height)
     # Turned text (a download line running up the margin, arXiv's stamp) is
     # no part of the page's reading: its ink goes, however close it sits.
     for x0, y0, x1, y1 in turned:
         ink[y0 : y1 + 1, x0 : x1 + 1] = False
     columns, pieces = lay_out(ink, first, text)
-    return {"width": width, "height": height, "columns": columns, "pieces": pieces}
+    drawings = figures(ink, text > 0)
+    layout: PageLayout = {
+        "width": width,
+        "height": height,
+        "columns": columns,
+        "pieces": pieces,
+        "figures": drawings,
+    }
+    return layout, pieces_text(chars, pieces, drawings)
+
+
+def figures(ink: np.ndarray, text: np.ndarray) -> list[Figure]:
+    """Where a page has drawings (plots, diagrams, pictures): stretches of
+    ink outside its text, near each other, mostly drawn and not small."""
+    height, width = ink.shape
+    ink = without_uprights(ink)
+    drawn = ink & ~text
+    rows, columns = -(-height // FIGURE_CELL), -(-width // FIGURE_CELL)
+    padded = np.zeros((rows * FIGURE_CELL, columns * FIGURE_CELL), dtype=bool)
+    padded[:height, :width] = drawn
+    # Cells with drawing; those a cell apart join (a plot's curves and its
+    # frame, its markers).
+    cells = padded.reshape(rows, FIGURE_CELL, columns, FIGURE_CELL).any(axis=(1, 3))
+    near = cells.copy()
+    near[1:] |= cells[:-1]
+    near[:-1] |= cells[1:]
+    near[:, 1:] |= near[:, :-1].copy()
+    near[:, :-1] |= near[:, 1:].copy()
+    all_ink, drawn_ink = _sums(ink), _sums(drawn)
+    seen = np.zeros_like(near)
+    found: list[Figure] = []
+    for start in zip(*np.nonzero(cells), strict=True):
+        if seen[start]:
+            continue
+        seen[start] = True
+        stack, members = [start], []
+        while stack:
+            r, c = stack.pop()
+            if cells[r, c]:
+                members.append((r, c))
+            for nr in range(max(0, r - 1), min(rows, r + 2)):
+                for nc in range(max(0, c - 1), min(columns, c + 2)):
+                    if near[nr, nc] and not seen[nr, nc]:
+                        seen[nr, nc] = True
+                        stack.append((nr, nc))
+        r0, r1 = min(m[0] for m in members), max(m[0] for m in members)
+        c0, c1 = min(m[1] for m in members), max(m[1] for m in members)
+        x0, y0 = int(c0 * FIGURE_CELL), int(r0 * FIGURE_CELL)
+        x1 = min(width, int((c1 + 1) * FIGURE_CELL)) - 1
+        y1 = min(height, int((r1 + 1) * FIGURE_CELL)) - 1
+        # Where its drawing is, to the point.
+        rows_in = runs(drawn[y0 : y1 + 1, x0 : x1 + 1].any(axis=1))
+        columns_in = runs(drawn[y0 : y1 + 1, x0 : x1 + 1].any(axis=0))
+        x0, x1 = x0 + columns_in[0][0], x0 + columns_in[-1][1]
+        y0, y1 = y0 + rows_in[0][0], y0 + rows_in[-1][1]
+        if x1 - x0 + 1 < FIGURE_WIDTH or y1 - y0 + 1 < FIGURE_HEIGHT:
+            continue
+
+        box = (x0, x1, y0, y1)
+        if _box_sum(drawn_ink, *box) > _box_sum(all_ink, *box) * FIGURE_DRAWN:
+            found.append(
+                {"x": x0, "y": y0, "width": x1 - x0 + 1, "height": y1 - y0 + 1}
+            )
+    return found
+
+
+# A caption's first line: kept even beside its figure; and one starting a
+# caption ("FIG. 2.", "Figure 3:", "Fig. 1 |", "TABLE I.").
+_CAPTION = re.compile(r"^\W*(?:fig(?:ure)?|table|tab|abb(?:ildung)?)\b", re.IGNORECASE)
+_CAPTION_START = re.compile(
+    r"^\W*(?:fig(?:ure)?|table|tab|abb(?:ildung)?)\.?\s*(?:\d+|[IVX]+)[a-z]?\s*[.:|]",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class _Line:
+    chars: list[str]
+    ys: list[float]
+    """Its characters' middles (where it has them)."""
+    sizes: list[float]
+    in_figure: int = 0
+
+    @property
+    def text(self) -> str:
+        return "".join(self.chars).strip()
+
+
+def pieces_text(
+    chars: list[Char], pieces: list[Piece], drawings: list[Figure]
+) -> list[Part]:
+    """The page's text by its pieces: their characters (by where their
+    middles are; a space or line end with the character before it). Lines
+    in a figure (most of their letters) are left out: its labels, ticks
+    and legend; captions are parts of their own (from a line starting one,
+    after a gap, to the next gap), kept whole however close to their
+    figures."""
+    lines: list[list[_Line]] = [[] for _ in pieces]
+    reach = FIGURE_LABEL_REACH
+    last: int | None = None
+    for char, x, y, size in chars:
+        if x is None or y is None or size is None:
+            if last is not None and lines[last]:
+                if char in "\r\n":
+                    lines[last].append(_Line([], [], []))
+                else:
+                    lines[last][-1].chars.append(char)
+            continue
+        piece = next(
+            (
+                i
+                for i, p in enumerate(pieces)
+                if p["x"] <= x < p["x"] + p["width"]
+                and p["y"] <= y < p["y"] + p["height"]
+            ),
+            None,
+        )
+        if piece is not None and (
+            piece != last
+            or not lines[piece]
+            or (
+                # On the next line without a line end (after a hyphen).
+                lines[piece][-1].ys
+                and abs(y - lines[piece][-1].ys[-1])
+                > max(size, lines[piece][-1].sizes[-1]) * NEXT_LINE
+            )
+        ):
+            # Its text went on elsewhere in between, or on the next line: a
+            # new line here.
+            lines[piece].append(_Line([], [], []))
+        last = piece
+        if piece is None:
+            continue
+        line = lines[piece][-1]
+        line.chars.append(char)
+        line.ys.append(y)
+        line.sizes.append(size)
+        line.in_figure += any(
+            f["x"] - reach <= x < f["x"] + f["width"] + reach
+            and f["y"] - reach <= y < f["y"] + f["height"] + reach
+            for f in drawings
+        )
+    parts: list[Part] = []
+    for own in lines:
+        placed = [line for line in own if line.ys]
+        text: list[str] = []
+        captions: list[list[str]] = []
+        in_caption = False
+        for i, line in enumerate(placed):
+            if i == 0 or _gap(placed[i - 1], line):
+                in_caption = bool(_CAPTION_START.match(line.text))
+                if in_caption:
+                    captions.append([])
+            if in_caption:
+                captions[-1].append(line.text)
+            elif _kept(line):
+                text.append(line.text)
+        if text:
+            parts.append(("\n".join(text), False))
+        parts += [("\n".join(caption), True) for caption in captions]
+    return parts
+
+
+def _gap(above: _Line, line: _Line) -> bool:
+    """Blank space between two lines (more than between a paragraph's), or
+    the text going back up (on elsewhere)."""
+    up, down = _middle(above.ys), _middle(line.ys)
+    size = max(_middle(above.sizes), _middle(line.sizes))
+    return down - up > size * CAPTION_GAP or down < up - size / 2
+
+
+def _middle(values: list[float]) -> float:
+    return sorted(values)[len(values) // 2]
+
+
+def _kept(line: _Line) -> bool:
+    """Whether a line is kept: not if most of its letters are in a figure
+    (but a caption's first line is)."""
+    letters = sum(not c.isspace() for c in line.chars)
+    return not (
+        line.in_figure > letters * FIGURE_LINE and not _CAPTION.match(line.text)
+    )
 
 
 def _text_boxes(
     page: pypdfium2.PdfPage, width: int, height: int
-) -> tuple[np.ndarray, list[tuple[int, int, int, int]]]:
+) -> tuple[np.ndarray, list[tuple[int, int, int, int]], list[Char]]:
     """Where a page has text (its characters' boxes, one pixel a point),
     each pixel its type size (points; 0 where none): ink outside them is
     drawn (figures). ``turned``: the boxes of text set upright (x0, y0,
-    x1, y1)."""
+    x1, y1), no part of its text. ``chars``: its text, in the PDF's order."""
     boxes = np.zeros((height, width), dtype=np.float32)
     turned: list[tuple[int, int, int, int]] = []
+    chars: list[Char] = []
     # From the page's points to the picture's pixels (its rotation and crop
     # box with it).
     device = _device_transform(page, width, height)
@@ -1180,9 +1416,11 @@ def _text_boxes(
         for i in range(textpage.count_chars()):
             char = textpage.get_text_range(i, 1)
             if not char.strip():
+                chars.append((char, None, None, None))
                 continue
             left, bottom, right, top = textpage.get_charbox(i, loose=True)
             if right <= left or top <= bottom:
+                chars.append((char, None, None, None))
                 continue
             xs, ys = zip(
                 *(device(x, y) for x in (left, right) for y in (bottom, top)),
@@ -1202,9 +1440,11 @@ def _text_boxes(
             x0, x1 = max(0, math.floor(min(xs))), min(width - 1, math.ceil(max(xs)))
             y0, y1 = max(0, math.floor(min(ys))), min(height - 1, math.ceil(max(ys)))
             boxes[y0 : y1 + 1, x0 : x1 + 1] = top - bottom
+            middle = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+            chars.append((char, *middle, top - bottom))
     finally:
         textpage.close()
-    return boxes, turned
+    return boxes, turned, chars
 
 
 def _device_transform(page: pypdfium2.PdfPage, width: int, height: int) -> Any:  # noqa: ANN401 (a function of two floats)

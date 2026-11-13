@@ -19,6 +19,7 @@ import zlib
 from collections.abc import Callable, Generator
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass
 from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
@@ -138,9 +139,24 @@ def render(path: Path, index: int) -> bytes:
     return _run(_render, path, index)
 
 
-def layouts(path: Path) -> list[page_layout.PageLayout]:
-    """Fluent mode's layout of each page (``paperus.page_layout``)."""
-    return _run(_layouts, path)
+@dataclass
+class Read:
+    """A PDF read with its layouts."""
+
+    pages: list[str]
+    """The text of each page (empty where none)."""
+    layouts: list[page_layout.PageLayout] | None
+    """Each page's layout (``paperus.page_layout``); None if they could
+    not be worked out."""
+    pieces: list[list[page_layout.Part]] | None
+    """Each page's text by its pieces, in reading order, captions apart
+    (with ``layouts``)."""
+
+
+def read(path: Path) -> Read:
+    """The text of each page, and its layout with the text of its pieces,
+    in one go."""
+    return Read(*_run(_read, path))
 
 
 def png(width: int, height: int, pixels: bytes, stride: int) -> bytes:
@@ -196,14 +212,32 @@ def _title(path: str) -> str | None:
         return pdf.get_metadata_dict().get("Title") or None
 
 
-def _layouts(path: str) -> list[page_layout.PageLayout]:
-    found = []
+def _read(
+    path: str,
+) -> tuple[
+    list[str], list[page_layout.PageLayout] | None, list[list[page_layout.Part]] | None
+]:
+    texts: list[str] = []
+    layouts: list[page_layout.PageLayout] | None = []
+    pieces: list[list[page_layout.Part]] = []
     with _open(path) as pdf:
         for index in range(len(pdf)):
             page = pdf[index]
-            found.append(page_layout.analyse(page, index == 0))
+            text_page = page.get_textpage()
+            texts.append(text_page.get_text_bounded())
+            text_page.close()
+            if layouts is not None:
+                try:
+                    layout, own = page_layout.read(page, index == 0)
+                    layouts.append(layout)
+                    pieces.append(own)
+                except Exception:
+                    log.warning(
+                        "no layout of page %d of %s", index + 1, path, exc_info=True
+                    )
+                    layouts = None
             page.close()
-    return found
+    return texts, layouts, pieces if layouts is not None else None
 
 
 def _render(path: str, index: int) -> bytes:

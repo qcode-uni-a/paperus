@@ -30,6 +30,20 @@ author's AI assistant.
 
 Figure and table captions, abstracts and equations are separate chunk types.
 
+How a PDF's text is read now (#43): from its page layouts (fluent mode's,
+`paperus.page_layout`), each piece's characters in reading order, one flow
+across columns and pages, without margins, running headers and footers and
+page numbers. Lines in a figure (its labels, ticks, legend) are left out;
+captions are passages of their own, the text running on past them.
+Passages of about 200 words (at most 350) are cut at sentence ends, a new
+one at each section heading (after 30 words at least) and where a
+reference list starts or ends (where entries follow its heading); each has
+the page it starts on. Pages read by OCR are sections of their own, and
+PDFs without layouts (too large or slow to lay out) are read page by page.
+A change of the layout code (`page_layout.VERSION`) makes the layouts and
+cuts the passages again, a few at a time; passages whose text stayed keep
+their vectors.
+
 ## Retrieval
 
 1. Hybrid: Postgres full-text search + pgvector, merged with reciprocal rank

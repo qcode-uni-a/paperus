@@ -7,7 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from paperus import auth, integrity, metrics, ocr, oidc, readable, system, usage
+from paperus import (
+    auth,
+    integrity,
+    layouts,
+    metrics,
+    ocr,
+    oidc,
+    readable,
+    system,
+    usage,
+)
 from paperus.access import Access
 from paperus.api.auth import OIDC_CALLBACK, public_base
 from paperus.api.deps import DB, CurrentUser, request_token
@@ -141,6 +151,11 @@ class Stats(BaseModel):
     """Files whose text (and, for uploads, metadata) is still being read."""
     files_ocr: int = 0
     """Files whose scanned pages wait for OCR."""
+    pdfs: int
+    pdfs_laid_out: int
+    """PDFs (their contents) with page layouts of the server's layout code,
+    and passages cut by them (after an update that changed it: catching
+    up, a few at a time)."""
     chunks: int
     """Passages searchable by meaning (reference lists are left out)."""
     embedded: int
@@ -267,7 +282,10 @@ def delete_ml_model(name: str, request: Request, db: DB, admin: Admin) -> None:
 @router.get("/stats")
 def stats(request: Request, db: DB, admin: Admin) -> Stats:
     figures = metrics.library_figures(db, request.app.state.settings)
+    laid_out, pdfs = layouts.progress(db)
     return Stats(
+        pdfs=pdfs,
+        pdfs_laid_out=laid_out,
         items=figures.items,
         files=figures.files,
         files_pending=figures.files_pending,

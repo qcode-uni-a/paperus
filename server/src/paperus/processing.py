@@ -11,14 +11,17 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import abstracts, annotations, pdf
+from paperus import abstracts, annotations, layouts, pdf
 from paperus.covers import cover_pages
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
+from paperus.page_layout import Part
 from paperus.storage import BlobStore
 from paperus.text import (
+    Flow,
     TextChunk,
     chunk_document,
+    chunk_flow,
     chunk_pages,
     extract_pdf_pages,
     html_text,
@@ -53,28 +56,52 @@ class _Text:
 
 
 def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
-    """The file's text in chunks; scanned pages with the text OCR read."""
+    """The file's text in chunks; scanned pages with the text OCR read. A
+    PDF's layouts are worked out and kept on the way: its text is read by
+    them."""
     if file.media_type.startswith(TEXT_TYPES):
         data = b"".join(blobs.iter_bytes(file.blob_sha256))
         if file.media_type in ("text/html", "application/xhtml+xml"):
             return _Text(chunk_document(html_text(data)), [])
         return _Text(chunk_document(data.decode(errors="replace")), [])
+    pieces = None
     if file.media_type == PDF:
         with blobs.local_file(file.blob_sha256) as path:
-            pages = extract_pdf_pages(path)
+            try:
+                read = pdf.read(path)
+            except pdf.PdfError:
+                # Too large or slow to lay out: its pages' text alone.
+                log.warning("file %s read without layouts", file.id, exc_info=True)
+                pages = extract_pdf_pages(path)
+            else:
+                pages, pieces = read.pages, read.pieces
+                layouts.store(db, file.blob_sha256, read.layouts)
     elif file.media_type in IMAGE_TYPES:
         pages = [""]
     else:
         return _Text(None, [])
+    return _pages_text(pages, pieces, _ocr_text(db, file.blob_sha256))
+
+
+def _ocr_text(db: Session, sha256: bytes) -> dict[int, str]:
+    """The text OCR read, by page (from 0)."""
     rows = db.execute(
-        select(OcrPage.page, OcrPage.text).where(
-            OcrPage.blob_sha256 == file.blob_sha256
-        )
+        select(OcrPage.page, OcrPage.text).where(OcrPage.blob_sha256 == sha256)
     ).all()
-    read = {page: text for page, text in rows}
+    return {page: text for page, text in rows}
+
+
+def _pages_text(
+    pages: list[str], pieces: list[list[Part]] | None, read: dict[int, str]
+) -> _Text:
+    """Chunks of pages' text (and, by their layouts, their pieces': one
+    flow), scanned pages with the text OCR ``read``; covers left out."""
+    pages = list(pages)
     scans = []
+    own = []
     for index, text in enumerate(pages):
-        if not scanned(text):
+        own.append(not scanned(text))
+        if own[-1]:
             continue
         if index in read:
             pages[index] = read[index]
@@ -85,7 +112,44 @@ def _read(db: Session, file: File, blobs: BlobStore) -> _Text:
     for number in covers:
         pages[number - 1] = ""  # out of the text; the pages keep their numbers
     first = [text for n, text in enumerate(pages, 1) if n not in covers][:2]
-    return _Text(chunk_pages(pages), scans, with_ocr, first, covers)
+    if pieces is None:
+        return _Text(chunk_pages(pages), scans, with_ocr, first, covers)
+    parts: list[tuple[str, int, Flow]] = []
+    for number, (text, laid_out) in enumerate(zip(pages, pieces, strict=True), 1):
+        if number in covers:
+            continue
+        # A scan's text (by OCR) is not in its layout's pieces: a section
+        # of its own.
+        if own[number - 1]:
+            parts += [(t, number, "caption" if c else "text") for t, c in laid_out]
+        else:
+            parts.append((text, number, "page"))
+    return _Text(chunk_flow(parts), scans, with_ocr, first, covers)
+
+
+def recut(db: Session, sha256: bytes, read: pdf.Read) -> list[uuid.UUID]:
+    """The passages of a PDF's files cut again from its new layouts (after
+    the layout code changed); commits. The files (to embed what is new:
+    passages whose text stayed keep their vectors)."""
+    files = list(
+        db.scalars(
+            select(File).where(
+                File.blob_sha256 == sha256,
+                File.media_type == PDF,
+                File.text_status == TextStatus.DONE,
+            )
+        )
+    )
+    if not files or read.pieces is None:
+        return []
+    chunks = _pages_text(read.pages, read.pieces, _ocr_text(db, sha256)).chunks
+    if not chunks:
+        return []
+    for file in files:
+        db.execute(delete(FileChunk).where(FileChunk.file_id == file.id))
+        _store_manifest(db, file, chunks)
+    db.commit()
+    return [file.id for file in files]
 
 
 def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
@@ -138,16 +202,23 @@ def _copy_manifest(db: Session, file: File) -> bool:
 
 
 def _identify(
-    db: Session, blobs: BlobStore, http: httpx2.Client | None, file: File
+    db: Session,
+    blobs: BlobStore,
+    http: httpx2.Client | None,
+    file: File,
+    first_pages: list[str] | None = None,
 ) -> None:
-    """Metadata from the text, in the same transaction, so the item is only
-    shown as done when its title is too. Failures keep the text."""
+    """Metadata from the text (``first_pages``: as read, with their running
+    headers and margins: a DOI or arXiv's stamp may be there), in the same
+    transaction, so the item is only shown as done when its title is too.
+    Failures keep the text."""
     if http is None:
         return
     db.flush()
+    text = "\n".join(first_pages) if first_pages is not None else None
     try:
         with db.begin_nested():
-            identify(db, blobs, http, file.id)
+            identify(db, blobs, http, file.id, text)
     except Exception:
         log.warning("identifying file %s failed", file.id, exc_info=True)
 
@@ -213,7 +284,7 @@ def process_file(
     else:
         _store_manifest(db, file, chunks)
         file.text_status = TextStatus.DONE
-        _identify(db, blobs, http, file)
+        _identify(db, blobs, http, file, read.first_pages)
         # Without one in its details: the abstract the PDF begins with.
         if file.version is not None:
             found = abstracts.from_pages(read.first_pages)

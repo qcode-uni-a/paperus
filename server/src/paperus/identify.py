@@ -134,9 +134,14 @@ def _doi_for(scheme: Scheme, value: str) -> str:
 
 
 def identify(
-    db: Session, blobs: BlobStore, http: httpx2.Client, file_id: uuid.UUID
+    db: Session,
+    blobs: BlobStore,
+    http: httpx2.Client,
+    file_id: uuid.UUID,
+    text: str | None = None,
 ) -> None:
-    """Replace placeholder metadata with what the file says it is (no commit)."""
+    """Replace placeholder metadata with what the file says it is (no
+    commit): by its first pages' ``text`` (else its passages there)."""
     file = db.get(File, file_id)
     if file is None or file.media_type != PDF or file.text_status != TextStatus.DONE:
         return
@@ -152,7 +157,8 @@ def identify(
         )
         return
 
-    text = _first_pages_text(db, file.id)
+    if text is None:
+        text = _first_pages_text(db, file.id)
     candidates = find_identifiers(text) + identifiers_in_filename(file.filename)
     for scheme, value in dict.fromkeys(candidates):
         doi = _doi_for(scheme, value)

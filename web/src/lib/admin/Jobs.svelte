@@ -14,8 +14,10 @@
 		{
 			queue: 'text',
 			title: 'Reading files',
-			description: 'Text and, for uploads, details from each file.',
-			color: 'var(--royal)'
+			description:
+				'Text and, for uploads, details from each file; a PDF read by its page layouts (its columns in reading order, as in fluent mode).',
+			color: 'var(--royal)',
+			queues: ['text', 'layout']
 		},
 		{
 			queue: 'lookup',
@@ -215,6 +217,13 @@
 					{(stats.files - stats.files_pending).toLocaleString()} of {stats.files.toLocaleString()} files
 					read
 				</p>
+				{#if stats.pdfs_laid_out < stats.pdfs}
+					<progress value={stats.pdfs_laid_out} max={stats.pdfs}></progress>
+					<p class="muted small">
+						{stats.pdfs_laid_out.toLocaleString()} of {stats.pdfs.toLocaleString()} PDFs with this version's
+						page layouts and passages; the rest follow a few at a time.
+					</p>
+				{/if}
 				{#if stats.files_failed}
 					<p class="failed">
 						{stats.files_failed.toLocaleString()}

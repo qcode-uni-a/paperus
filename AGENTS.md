@@ -28,7 +28,7 @@ close them from commits with "Fixes #n".
   there); fluent mode's page layouts on layout twins (`server/tests/twins/`, in
   pytest): never check in a paper's PDF, only its measured layout. Raise
   `page_layout.VERSION` when a change alters layouts (stored ones are then
-  made again). The extension reads publishers' pages on page twins
+  made again, and the PDFs' passages cut by them). The extension reads publishers' pages on page twins
   (`extension/twins/`, `npm test` there): never check in a saved page, only
   its twin, with parody names (`extension/twins/README.md`).
 
