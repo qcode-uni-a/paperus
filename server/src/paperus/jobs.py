@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from paperus import (
     auth,
     authors,
+    automations,
     changes,
     errata,
     integrity,
@@ -37,6 +38,7 @@ from paperus import (
     missing,
     notifications,
     ocr,
+    own_papers,
     published,
     readable,
     storage,
@@ -432,6 +434,39 @@ PUBLISHED_PER_HOUR = 40
 NEW_PUBLISHED_PER_RUN = 500
 
 
+# Papers by their authors' ORCID iDs (paperus.own_papers): each morning,
+# and soon after one sets one's ORCID iD or switches it on.
+@tasks.periodic(cron="15 4 * * *")
+@tasks.task(
+    name="add_own_papers",
+    queue=OPENALEX,
+    queueing_lock="own-papers",
+    pass_context=True,
+)
+def add_own_papers(
+    job: JobContext, timestamp: int, library_id: str | None = None
+) -> None:
+    """Every library's with the switch on, or one library's."""
+    context = _worker_context()
+    with context.sessions() as db:
+        config = load_config(db, context.settings)
+        libraries = own_papers.waiting(db)
+        if library_id is not None:
+            libraries = [lib for lib in libraries if lib.id == uuid.UUID(library_id)]
+        for library in libraries:
+            own_papers.add_new(db, context.http, library, config.contact_email)
+
+
+def queue_own_papers(app: App, library_id: uuid.UUID | None = None) -> None:
+    """Papers by ORCID iD looked for soon: for one library (its switch or
+    its person's ORCID iD changed), or all."""
+    key = f"own-papers-{library_id}" if library_id else "own-papers-all"
+    if library_id is None:
+        _queue(app, "add_own_papers", key, timestamp=0)
+    else:
+        _queue(app, "add_own_papers", key, timestamp=0, library_id=str(library_id))
+
+
 # Corrections to papers (paperus.errata): rarely, Sunday nights, a few
 # hundred papers at a time.
 @tasks.periodic(cron="30 3 * * 0")
@@ -506,10 +541,10 @@ def _find_published(job: JobContext, *, new: bool) -> None:
             db, context.http, items, contact_email=config.contact_email
         )
         found = [(item.id, item.added_by) for item in upgraded]
+        wanted = _open_access_wanted(db, found) if config.open_access_auto else []
     log.info("published versions: %d of %d preprints", len(found), len(items))
-    if config.open_access_auto:
-        for item_id, added_by in found:
-            queue_open_access(job.app, item_id, added_by, "journal")
+    for item_id, added_by in wanted:
+        queue_open_access(job.app, item_id, added_by, "journal")
     if found and config.find_authors:
         # Their authors at OpenAlex by the journal's DOI (ORCID iDs) now,
         # not at the next hour.
@@ -674,13 +709,34 @@ def queue_open_access_sweep(job: JobContext, timestamp: int) -> None:
     with context.sessions() as db:
         if not load_config(db, context.settings).open_access_auto:
             return
+        # Only the papers of libraries that want copies: the others' would
+        # wait here for ever, never tried, ahead of everyone else's.
         waiting = missing.never_tried(
             db,
             added_before=datetime.now(UTC) - OPEN_ACCESS_WAIT,
             limit=OPEN_ACCESS_PER_SWEEP,
+            libraries=automations.libraries_with(db, "open_access"),
         )
     for item_id, added_by in waiting:
         queue_open_access(job.app, item_id, added_by)
+
+
+def _open_access_wanted(
+    db: Session, items: list[tuple[uuid.UUID, uuid.UUID | None]]
+) -> list[tuple[uuid.UUID, uuid.UUID | None]]:
+    """Those of the papers whose library wants open-access copies (its
+    owner did not switch them off, ``automations``)."""
+    off = automations.libraries_with(db, "open_access", on=False)
+    if not off or not items:
+        return items
+    unwanted = set(
+        db.scalars(
+            select(Item.id).where(
+                Item.id.in_([i for i, _ in items]), Item.library_id.in_(off)
+            )
+        )
+    )
+    return [(i, by) for i, by in items if i not in unwanted]
 
 
 def queue_text_extraction(app: App, file_id: uuid.UUID) -> None:

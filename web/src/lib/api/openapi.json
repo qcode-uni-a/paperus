@@ -9038,6 +9038,81 @@
           }
         }
       }
+    },
+    "/api/automations": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Get Automations",
+        "operationId": "get_automations",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Automations"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/libraries/{library_id}/automations": {
+      "put": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Set Automations",
+        "description": "Switch a library's automations (its person; a group's admins).",
+        "operationId": "set_automations",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryAutomations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9820,6 +9895,54 @@
           "candidates"
         ],
         "title": "AuthorToCheck"
+      },
+      "Automations": {
+        "properties": {
+          "server": {
+            "$ref": "#/components/schemas/ServerAutomations"
+          },
+          "libraries": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryAutomations"
+            },
+            "type": "array",
+            "title": "Libraries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "server",
+          "libraries"
+        ],
+        "title": "Automations"
+      },
+      "AutomationsIn": {
+        "properties": {
+          "own_papers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Papers"
+          },
+          "open_access": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Access"
+          }
+        },
+        "type": "object",
+        "title": "AutomationsIn"
       },
       "BackupConfig": {
         "properties": {
@@ -13359,6 +13482,35 @@
         "title": "LayoutPiece",
         "description": "A part of a page, in PDF points from its top left."
       },
+      "LibraryAutomations": {
+        "properties": {
+          "library_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Library Id"
+          },
+          "own_papers": {
+            "type": "boolean",
+            "title": "Own Papers"
+          },
+          "open_access": {
+            "type": "boolean",
+            "title": "Open Access"
+          },
+          "can_change": {
+            "type": "boolean",
+            "title": "Can Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "library_id",
+          "own_papers",
+          "open_access",
+          "can_change"
+        ],
+        "title": "LibraryAutomations"
+      },
       "LibraryOut": {
         "properties": {
           "id": {
@@ -16579,6 +16731,45 @@
         },
         "type": "object",
         "title": "Secret"
+      },
+      "ServerAutomations": {
+        "properties": {
+          "find_published": {
+            "type": "boolean",
+            "title": "Find Published"
+          },
+          "find_errata": {
+            "type": "boolean",
+            "title": "Find Errata"
+          },
+          "find_references": {
+            "type": "boolean",
+            "title": "Find References"
+          },
+          "find_authors": {
+            "type": "boolean",
+            "title": "Find Authors"
+          },
+          "open_access": {
+            "type": "boolean",
+            "title": "Open Access"
+          },
+          "ocr": {
+            "type": "boolean",
+            "title": "Ocr"
+          }
+        },
+        "type": "object",
+        "required": [
+          "find_published",
+          "find_errata",
+          "find_references",
+          "find_authors",
+          "open_access",
+          "ocr"
+        ],
+        "title": "ServerAutomations",
+        "description": "What the server does by itself (Administration \u2192 Settings)."
       },
       "ServerSteps": {
         "properties": {

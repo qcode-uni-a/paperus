@@ -12,6 +12,7 @@
 	import { resolve } from '$app/paths';
 	import {
 		mdiAccountCircleOutline,
+		mdiAutoFix,
 		mdiDatabaseExportOutline,
 		mdiDatabaseImportOutline,
 		mdiFolderAccountOutline,
@@ -28,6 +29,7 @@
 		writableLibraries
 	} from '#lib/organize.svelte.ts';
 	import AccessTokens from '#lib/AccessTokens.svelte';
+	import Automations from '#lib/Automations.svelte';
 	import ConnectedApps from '#lib/ConnectedApps.svelte';
 	import ExportLibrary from '#lib/ExportLibrary.svelte';
 	import ImportLibrary from '#lib/ImportLibrary.svelte';
@@ -274,6 +276,17 @@
 			{/each}
 		</fieldset>
 		{#if ownerMessage}<p class="saved" aria-live="polite">{ownerMessage}</p>{/if}
+	</SettingSection>
+
+	<SettingSection
+		id="automations"
+		title="Automations"
+		subtitle="What paperus does by itself: your papers, free PDFs, lookups"
+		icon={mdiAutoFix}
+		open={open.includes('automations')}
+		ontoggle={(opened) => toggle('automations', opened)}
+	>
+		<Automations />
 	</SettingSection>
 
 	<SettingSection

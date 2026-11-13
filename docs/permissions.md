@@ -141,6 +141,21 @@ owner, as with every group.
   owners like any group (the filter's "Owned by", where new papers go,
   giving a collection to it).
 
+### Automations
+
+What paperus does by itself for a library's papers is its owner's choice
+(Settings → Automations; a group's on its page under Groups):
+
+| Switch | Own library (default) | A group's (default) | Who changes it |
+| --- | --- | --- | --- |
+| Add papers by ORCID iD, each morning (from OpenAlex; one removed stays out) | one's own (on) | its members' who may add papers (off) | the person; the group's admins |
+| Free PDFs: an open-access copy for papers without a file | on | on | the person; the group's admins |
+
+Everyone in a group sees its switches. What the whole server does
+(published versions, errata, reference lists, authors, OCR, and whether
+open-access copies are fetched at all) is the site administrator's; the
+section shows it to everyone.
+
 ## Users
 
 | Action | Everyone | Site administrator |

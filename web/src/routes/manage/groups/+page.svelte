@@ -8,13 +8,21 @@
 		deleteGroup,
 		errorMessage,
 		findUsers,
+		getAutomations,
 		leaveGroup,
 		listGroups,
 		listMembers,
 		removeMember,
 		setMember
 	} from '#lib/api/client.ts';
-	import type { GroupOut, MemberOut, Role, UserBrief } from '#lib/api/generated/types.gen.ts';
+	import type {
+		Automations,
+		GroupOut,
+		MemberOut,
+		Role,
+		UserBrief
+	} from '#lib/api/generated/types.gen.ts';
+	import LibraryAutomations from '#lib/LibraryAutomations.svelte';
 	import GroupDialog from '#lib/GroupDialog.svelte';
 	import IconButton from '#lib/IconButton.svelte';
 	import { loadOrganize } from '#lib/organize.svelte.ts';
@@ -53,6 +61,15 @@
 		groups = data ?? [];
 		loaded = true;
 	}
+
+	// The group's automations (its members see them, its admins switch them).
+	let automations = $state<Automations | null>(null);
+	$effect(() => {
+		getAutomations().then(({ data }) => (automations = data ?? null));
+	});
+	const automated = $derived(
+		automations?.libraries.findIndex((l) => l.library_id === selected?.library_id) ?? -1
+	);
 
 	$effect(() => {
 		load();
@@ -298,6 +315,15 @@
 						New group in {selected.name}
 					</button>
 				{/if}
+			{/if}
+
+			{#if automations && automated >= 0}
+				<h3>Automations</h3>
+				<LibraryAutomations
+					bind:automations={automations.libraries[automated]}
+					server={automations.server}
+					personal={false}
+				/>
 			{/if}
 		</section>
 	</div>

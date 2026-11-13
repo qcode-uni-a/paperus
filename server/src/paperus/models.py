@@ -163,6 +163,16 @@ class Library(Record, Base):
     group_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("groups.id", ondelete="CASCADE"), unique=True
     )
+    automations: Mapped[dict[str, bool]] = mapped_column(
+        JSONB, server_default=text("'{}'::jsonb")
+    )
+    """What its owner switched of what paperus does by itself for its papers
+    (``paperus.automations``); unset: the default."""
+    own_papers_seen: Mapped[list[str]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """DOIs of its people's works the daily job added or found already:
+    never added again (``paperus.own_papers``)."""
 
 
 class LoginSession(Record, Base):

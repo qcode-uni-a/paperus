@@ -8,7 +8,8 @@ authors by their ORCID iD; their own paper is also told, to celebrate,
 when it comes less than a week after it came out, however it comes and
 whoever adds it); a correction (erratum) found for one of their papers;
 being added to a group by someone else (to a group of people: once it has
-papers, else the papers' own notice says it); each zip of their export as
+papers, else the papers' own notice says it); their own papers added from
+OpenAlex by the daily job (to their library or a group's); each zip of their export as
 it is written (or the export failing); and the end of their imports,
 which may take long. Read ones go after ``KEEP_READ``, all after ``KEEP``
 (the nightly tidy-up).
@@ -58,6 +59,7 @@ EXPORT_FAILED = "export_failed"
 IMPORT = "import"
 ERRATUM = "erratum"
 JOINED = "joined"
+OWN_ADDED = "own_added"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -240,6 +242,28 @@ def erratum(db: Session, item: Item, cited: str) -> None:
     data = {"item_id": str(item.id), "title": item.title, "erratum": cited}
     for user_id in people_of(db, item.library_id):
         db.add(Notification(user_id=user_id, kind=ERRATUM, data=data))
+
+
+def own_added(
+    db: Session, user_id: uuid.UUID, library: Library, items: list[Item]
+) -> None:
+    """One's own papers added by the daily job (``own_papers``), to one's
+    library or a group's (its other members are told as of any paper added
+    to it)."""
+    group = db.get(Group, library.group_id) if library.group_id else None
+    db.add(
+        Notification(
+            user_id=user_id,
+            kind=OWN_ADDED,
+            data={
+                "count": len(items),
+                "item_id": str(items[0].id),
+                "title": items[0].title,
+                "library_id": str(library.id),
+                "group": group.name if group else None,
+            },
+        )
+    )
 
 
 def _joined(db: Session, membership: Membership) -> None:

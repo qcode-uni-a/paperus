@@ -47,6 +47,7 @@ from paperus.api import (
 )
 from paperus.api import annotations as annotation_api
 from paperus.api import authors as author_api
+from paperus.api import automations as automations_api
 from paperus.api import tokens as token_api
 from paperus.config import Settings
 from paperus.db import make_engine, make_sessionmaker
@@ -159,6 +160,7 @@ def create_app(
     app.include_router(token_api.router)
     app.include_router(oauth.router)
     app.include_router(start.router)
+    app.include_router(automations_api.router)
 
     @app.exception_handler(Forbidden)
     def forbidden(request: Request, error: Forbidden) -> JSONResponse:

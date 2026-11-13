@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import auth, authors, oidc
+from paperus import auth, authors, automations, oidc
 from paperus.api.deps import (
     DB,
     SESSION_COOKIE,
@@ -21,7 +21,8 @@ from paperus.api.deps import (
     request_token,
 )
 from paperus.avatars import avatar_url
-from paperus.models import Author
+from paperus.jobs import queue_own_papers
+from paperus.models import Author, Library
 from paperus.system import DateFormat, SystemConfig, load_config, oidc_secret
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -368,6 +369,12 @@ def set_profile(
         if orcid is None or not authors.valid_orcid(orcid):
             raise HTTPException(422, "not an ORCID iD (0000-0002-1825-0097)")
     user.display_name = (body.display_name or "").strip() or None
+    new_orcid = orcid is not None and orcid != user.orcid
     user.orcid = orcid
     db.commit()
+    if new_orcid:
+        # Their papers by it, soon (if their library wants them).
+        own = db.scalar(select(Library).where(Library.user_id == user.id))
+        if own is not None and automations.of(own)["own_papers"]:
+            queue_own_papers(request.app.state.jobs, own.id)
     return session_user_out(user, db, request)

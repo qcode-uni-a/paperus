@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Automations, and your papers by themselves**: a new section under
+  Settings, "Automations", shows what paperus does by itself, and lets
+  each owner choose: for your own library, "Add my papers" (on: each
+  morning, the papers OpenAlex lists under your ORCID iD come into your
+  library, the new ones celebrated; one you remove stays out) and "Free
+  PDFs" (open-access copies for papers without a file); for a group, its
+  admins choose on its page under Groups ("Add our members’ papers": a
+  list of the group's work that fills itself, off unless switched on).
+  What the whole server does (published versions, errata, reference
+  lists, authors, OCR) is listed there too.
 - **Your paper is published: congratulations!** When one of your own
   papers (you are among its authors by your ORCID iD, set under Settings)
   is published, the bell says so with a few sparkles: when its published

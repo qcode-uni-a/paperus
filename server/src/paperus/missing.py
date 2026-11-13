@@ -106,12 +106,16 @@ def journal_doi(item: Item) -> str | None:
 
 
 def never_tried(
-    db: Session, *, added_before: datetime, limit: int
+    db: Session,
+    *,
+    added_before: datetime,
+    limit: int,
+    libraries: set[uuid.UUID] | None = None,
 ) -> list[tuple[uuid.UUID, uuid.UUID | None]]:
     """Papers without a file, with a DOI or arXiv ID, never tried for an
     open-access copy (and added before ``added_before``, so a browser that
-    sends the PDF right after the paper gets there first); with who added
-    them."""
+    sends the PDF right after the paper gets there first), in these
+    ``libraries`` (those that want copies); with who added them."""
     with_id = (
         select(Version.item_id)
         .join(Identifier)
@@ -124,6 +128,7 @@ def never_tried(
             Item.open_access_tried_at.is_(None),
             Item.created_at < added_before,
             Item.id.in_(with_id),
+            *([Item.library_id.in_(libraries)] if libraries is not None else []),
         )
         .order_by(Item.id)
         .limit(limit)

@@ -457,6 +457,31 @@ export type AuthorToCheck = {
 };
 
 /**
+ * Automations
+ */
+export type Automations = {
+    server: ServerAutomations;
+    /**
+     * Libraries
+     */
+    libraries: Array<LibraryAutomations>;
+};
+
+/**
+ * AutomationsIn
+ */
+export type AutomationsIn = {
+    /**
+     * Own Papers
+     */
+    own_papers?: boolean | null;
+    /**
+     * Open Access
+     */
+    open_access?: boolean | null;
+};
+
+/**
  * BackupConfig
  *
  * When backups run on their own (checked every hour by the worker).
@@ -2415,6 +2440,28 @@ export type LayoutPiece = {
 };
 
 /**
+ * LibraryAutomations
+ */
+export type LibraryAutomations = {
+    /**
+     * Library Id
+     */
+    library_id: string;
+    /**
+     * Own Papers
+     */
+    own_papers: boolean;
+    /**
+     * Open Access
+     */
+    open_access: boolean;
+    /**
+     * Can Change
+     */
+    can_change: boolean;
+};
+
+/**
  * LibraryOut
  */
 export type LibraryOut = {
@@ -4241,6 +4288,38 @@ export type Secret = {
      * Secret
      */
     secret?: string | null;
+};
+
+/**
+ * ServerAutomations
+ *
+ * What the server does by itself (Administration → Settings).
+ */
+export type ServerAutomations = {
+    /**
+     * Find Published
+     */
+    find_published: boolean;
+    /**
+     * Find Errata
+     */
+    find_errata: boolean;
+    /**
+     * Find References
+     */
+    find_references: boolean;
+    /**
+     * Find Authors
+     */
+    find_authors: boolean;
+    /**
+     * Open Access
+     */
+    open_access: boolean;
+    /**
+     * Ocr
+     */
+    ocr: boolean;
 };
 
 /**
@@ -11033,3 +11112,49 @@ export type GettingStartedResponses = {
 };
 
 export type GettingStartedResponse = GettingStartedResponses[keyof GettingStartedResponses];
+
+export type GetAutomationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/automations';
+};
+
+export type GetAutomationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: Automations;
+};
+
+export type GetAutomationsResponse = GetAutomationsResponses[keyof GetAutomationsResponses];
+
+export type SetAutomationsData = {
+    body: AutomationsIn;
+    path: {
+        /**
+         * Library Id
+         */
+        library_id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{library_id}/automations';
+};
+
+export type SetAutomationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetAutomationsError = SetAutomationsErrors[keyof SetAutomationsErrors];
+
+export type SetAutomationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: LibraryAutomations;
+};
+
+export type SetAutomationsResponse = SetAutomationsResponses[keyof SetAutomationsResponses];
