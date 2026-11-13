@@ -12,6 +12,10 @@
   paperus (website, app, extension, assistant), not only logging in,
   which happens every few weeks.
 - The jobs charts' times no longer overlap: full minutes only.
+- Files in the trash (or of a paper in it) get no OCR and no vectors until
+  restored, so trashing a large import of scans right away frees the ML
+  service; a file deleted while its scans are read ends that quietly
+  instead of with an error.
 - **Imports say where papers were already**: besides "already here",
   how many are in other libraries one sees ("1 already in Lab"). A paper
   in a group one may only read, with files the group's copy lacks, is

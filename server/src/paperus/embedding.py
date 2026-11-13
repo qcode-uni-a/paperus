@@ -19,6 +19,7 @@ from paperus.models import (
     NoteChunk,
     TextStatus,
 )
+from paperus.trash import file_in_trash, file_outside_trash
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,10 @@ def missing_chunks(db: Session, file_id: uuid.UUID, model: str) -> list[Chunk]:
 
 
 def embed_file(db: Session, ml: MLClient, model: str, file_id: uuid.UUID) -> int:
-    """Embed the file's missing chunks, committing per batch; returns the count."""
+    """Embed the file's missing chunks, committing per batch; returns the
+    count. None for a file in the trash (the sweep embeds it once restored)."""
+    if file_in_trash(db, file_id):
+        return 0
     vectors = ml.vectors_name(model)
     return _embed(db, ml, model, vectors, missing_chunks(db, file_id, vectors))
 
@@ -105,7 +109,7 @@ def files_missing_embeddings(
             .join(FileChunk, FileChunk.file_id == File.id)
             .where(
                 File.text_status == TextStatus.DONE,
-                File.deleted_at.is_(None),
+                file_outside_trash(),
                 FileChunk.in_references.is_(False),
                 FileChunk.chunk_sha256.not_in(has_vector),
             )

@@ -1,6 +1,7 @@
 """Emptying the trash: papers, files and notes deleted for good, and stored
 contents nothing uses any more removed (Administration → Settings → Trash,
-and "Empty trash" on the trash page)."""
+and "Empty trash" on the trash page). Also which files count as in the
+trash, for the work spent on files (OCR, vectors)."""
 
 import logging
 import uuid
@@ -27,6 +28,25 @@ from paperus.models import (
 from paperus.storage import BlobStore
 
 log = logging.getLogger(__name__)
+
+
+def file_outside_trash() -> ColumnElement[bool]:
+    """A file neither in the trash nor of a paper in it: worth OCR and
+    vectors (those in the trash get them once restored, by the sweeps)."""
+    paper_in_trash = (
+        select(Version.id)
+        .join(Item, Item.id == Version.item_id)
+        .where(Version.id == File.version_id, Item.deleted_at.is_not(None))
+        .exists()
+    )
+    return File.deleted_at.is_(None) & ~paper_in_trash
+
+
+def file_in_trash(db: Session, file_id: uuid.UUID) -> bool:
+    """The file is gone, in the trash, or of a paper in the trash."""
+    return not db.scalar(
+        select(exists().where(File.id == file_id, file_outside_trash()))
+    )
 
 
 @dataclass

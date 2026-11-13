@@ -11,6 +11,7 @@ import uuid
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from paperus import pdf
@@ -18,6 +19,7 @@ from paperus.ml import MLClient, MLRejected
 from paperus.models import File, FileChunk, OcrPage, OcrStatus, TextStatus
 from paperus.processing import IMAGE_TYPES, PDF, scanned
 from paperus.storage import BlobStore
+from paperus.trash import file_in_trash, file_outside_trash
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ def waiting(db: Session, limit: int = 500) -> list[uuid.UUID]:
             .where(
                 File.ocr_status == OcrStatus.PENDING,
                 File.text_status != TextStatus.PENDING,
-                File.deleted_at.is_(None),
+                file_outside_trash(),
             )
             .order_by(File.id)
             .limit(limit)
@@ -44,9 +46,14 @@ def read_scans(
     """Read the file's scanned pages with OCR, each saved as soon as it is
     read (an interruption loses one page at most); then every file with
     these contents is to be read again, with that text. Returns those files.
-    ``MLUnavailable`` (to try again later) if no ML service answers."""
+    ``MLUnavailable`` (to try again later) if no ML service answers.
+    Files in the trash wait (the sweep takes them once restored); a file
+    deleted meanwhile ends it quietly."""
     file = db.get(File, file_id)
     if file is None or file.ocr_status != OcrStatus.PENDING:
+        return []
+    if file_in_trash(db, file_id):
+        log.info("OCR of file %s left for later: it is in the trash", file_id)
         return []
     sha256 = file.blob_sha256
     done = set(db.scalars(select(OcrPage.page).where(OcrPage.blob_sha256 == sha256)))
@@ -78,6 +85,13 @@ def read_scans(
                 )
                 db.commit()
             log.info("OCR read %d pages of file %s", len(pages), file_id)
+    except (FileNotFoundError, IntegrityError):
+        # Deleted while being read (the trash emptied): its contents gone.
+        db.rollback()
+        if db.get(File, file_id) is None:
+            log.info("OCR of file %s stopped: the file was deleted", file_id)
+            return []
+        raise
     except (MLRejected, pdf.PdfError) as error:
         # Not an image the service can read, or no OCR model by that name:
         # "Read again" tries once more (e.g. after changing the model).

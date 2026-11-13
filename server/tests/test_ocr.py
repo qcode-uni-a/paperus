@@ -5,12 +5,12 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from paperus import ocr
+from paperus import embedding, ocr
 from paperus.ml import MLUnavailable
-from paperus.models import File, OcrPage, OcrStatus, TextStatus
+from paperus.models import Blob, File, OcrPage, OcrStatus, TextStatus
 from paperus.pdf import png
 from paperus.processing import process_file, reread_all
 from paperus.storage import BlobStore
@@ -130,3 +130,57 @@ def test_ml_down_or_refusing(
     # Not waiting (any more), or gone: nothing to read.
     assert ocr.read_scans(db, blobs, fake_ml.client(), MODEL, file_id) == []
     assert ocr.read_scans(db, blobs, fake_ml.client(), MODEL, uuid.uuid4()) == []
+
+
+def test_files_in_the_trash_wait(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    """A scan of a paper in the trash is neither read nor embedded, until
+    it is restored: then the sweeps take it."""
+    file_id = upload(logged_in, HALF_SCANNED)
+    assert process_file(db, blobs, file_id) is True
+    file = db.get(File, file_id)
+    assert file is not None and file.version is not None
+    item_id = file.version.item_id
+    assert logged_in.delete(f"/api/items/{item_id}").status_code == 204
+    db.expire_all()
+
+    assert ocr.waiting(db) == []
+    assert ocr.read_scans(db, blobs, fake_ml.client(), MODEL, file_id) == []
+    assert fake_ml.read == []
+    assert status(db, file_id) == (TextStatus.DONE, OcrStatus.PENDING)
+    assert embedding.embed_file(db, fake_ml.client(), "bge-m3", file_id) == 0
+    assert embedding.files_missing_embeddings(db, "bge-m3") == []
+
+    assert logged_in.post(f"/api/items/{item_id}/restore").status_code == 200
+    db.expire_all()
+    assert ocr.waiting(db) == [file_id]
+    assert embedding.files_missing_embeddings(db, "bge-m3") == [file_id]
+
+
+def test_a_file_deleted_while_its_scans_are_read(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    fake_ml: FakeML,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The trash emptied meanwhile: the reading stops, quietly."""
+    file_id = upload(logged_in, HALF_SCANNED)
+    assert process_file(db, blobs, file_id) is True
+    ml = fake_ml.client()
+    read = ml.ocr
+
+    def deleted_meanwhile(image: bytes, *, model: str, timeout: float = 300) -> Any:  # noqa: ANN401
+        found = read(image, model=model)
+        file = db.get(File, file_id)
+        assert file is not None
+        sha256 = file.blob_sha256
+        db.execute(delete(File).where(File.id == file_id))
+        db.execute(delete(Blob).where(Blob.sha256 == sha256))
+        db.commit()
+        return found
+
+    monkeypatch.setattr(ml, "ocr", deleted_meanwhile)
+    assert ocr.read_scans(db, blobs, ml, MODEL, file_id) == []
+    assert db.scalar(select(func.count()).select_from(OcrPage)) == 0
