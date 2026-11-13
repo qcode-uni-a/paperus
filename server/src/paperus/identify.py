@@ -142,6 +142,14 @@ def identify(
         return
     version = file.version
     if version.metadata_source != MetadataSource.FILE or version.item.deleted_at:
+        # Each way out said, so a paper left with its placeholder title tells
+        # why (issue #56).
+        log.info(
+            "file %s: details kept (from %s%s)",
+            file_id,
+            version.metadata_source,
+            ", in the trash" if version.item.deleted_at else "",
+        )
         return
 
     text = _first_pages_text(db, file.id)
@@ -178,6 +186,9 @@ def identify(
     if plausible_title(title, file.filename):
         version.csl = {**version.csl, "title": title}
         library.refresh_item(version.item)
+        log.info("file %s: titled from its PDF: %r", file_id, title)
+    else:
+        log.info("file %s: no title from its PDF (it has %r)", file_id, title)
 
 
 def _known_to_uploader(db: Session, file: File) -> list[uuid.UUID]:

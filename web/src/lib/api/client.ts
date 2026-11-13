@@ -64,6 +64,14 @@ export function errorMessage(error: unknown): string {
 			return String((detail as { message: unknown }).message);
 		}
 	}
+	// A server error's plain text ("Internal Server Error"), or the
+	// connection failing: said as it is, so a report tells what happened.
+	if (typeof error === 'string' && error.trim() && error.length < 200 && !error.includes('<')) {
+		return `Something went wrong (${error.trim()}).`;
+	}
+	if (error instanceof Error && error.message) {
+		return `Something went wrong (${error.message}).`;
+	}
 	return 'Something went wrong.';
 }
 
