@@ -5,6 +5,7 @@ The upload is stored and imported by the worker; the page follows its
 progress. See docs/ingestion.md.
 """
 
+import logging
 import re
 import tempfile
 import uuid
@@ -32,6 +33,7 @@ from paperus.jobs import queue_import
 from paperus.models import Blob, Import, ImportPart, ImportStatus
 from paperus.storage import BlobStore, TooLarge
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["imports"])
 
 CHUNK_SIZE = 1024 * 1024
@@ -356,6 +358,8 @@ def start_folder_import(body: FolderIn, db: DB, access: CurrentAccess) -> Import
     )
     db.add(record)
     db.commit()
+    # Its name, from the folder the browser gave (#57).
+    log.info("folder import %s: %r", record.id, record.filename)
     return import_out(record)
 
 
