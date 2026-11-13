@@ -218,7 +218,11 @@ def set_config(
         ocr.switch(db, body.ocr)
     system.save_config(db, body)
     db.commit()
-    system.apply(body, request.app.state.http)
+    system.apply(
+        body,
+        request.app.state.http,
+        system.openalex_key(db, request.app.state.settings),
+    )
     if model_changed:
         queue_embedding_sweep(request.app.state.jobs)
     if body.ocr and not current.ocr:
@@ -389,6 +393,37 @@ def set_oidc_secret(body: Secret, db: DB, admin: Admin) -> None:
     """The OIDC login's client secret; never sent back."""
     system.save_oidc_secret(db, body.secret or None)
     db.commit()
+
+
+class OpenAlexKey(BaseModel):
+    set: bool
+    """One is set (it is never sent back)."""
+    from_environment: bool
+    """Set by ``PAPERUS_OPENALEX_API_KEY``: not to be changed here."""
+
+
+@router.get("/openalex")
+def get_openalex_key(request: Request, db: DB, admin: Admin) -> OpenAlexKey:
+    settings = request.app.state.settings
+    return OpenAlexKey(
+        set=system.openalex_key(db, settings) is not None,
+        from_environment=bool(settings.openalex_api_key),
+    )
+
+
+class Key(BaseModel):
+    key: str | None = Field(None, max_length=200)
+    """None or empty: none (OpenAlex's smaller budget without a key)."""
+
+
+@router.put("/openalex", status_code=204)
+def set_openalex_key(body: Key, request: Request, db: DB, admin: Admin) -> None:
+    """OpenAlex's API key, sent with every request to it; never sent back.
+    The worker takes it within a minute."""
+    system.save_openalex_key(db, (body.key or "").strip() or None)
+    db.commit()
+    settings = request.app.state.settings
+    system.use_openalex_key(system.openalex_key(db, settings))
 
 
 class ProviderCheck(BaseModel):

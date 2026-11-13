@@ -10,6 +10,9 @@
 		type DateFormat
 	} from '#lib/dates.svelte.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import { getOpenalexKey, setOpenalexKey } from '#lib/api/client.ts';
+	import type { OpenAlexKey } from '#lib/api/generated/types.gen.ts';
+	import { notify } from '#lib/toasts.svelte.ts';
 
 	const config = $derived(admin.config);
 	let publicUrl = $state('');
@@ -22,6 +25,21 @@
 	let findAuthors = $state(true);
 	let findCitations = $state(true);
 	let dates = $state<DateFormat>('browser');
+	// OpenAlex's key: kept apart, never sent back (set or not).
+	let keyInfo = $state<OpenAlexKey | null>(null);
+	let openalexKey = $state('');
+	async function loadKey() {
+		const { data } = await getOpenalexKey();
+		keyInfo = data ?? null;
+	}
+	$effect(() => {
+		loadKey();
+	});
+	async function removeKey() {
+		await setOpenalexKey({ body: { key: null } });
+		await loadKey();
+		notify({ kind: 'success', title: 'OpenAlex key removed' });
+	}
 	const now = new Date();
 	let saving = $state(false);
 
@@ -70,11 +88,17 @@
 				findErrata !== (config.find_errata ?? true) ||
 				findAuthors !== (config.find_authors ?? true) ||
 				findCitations !== (config.find_citations ?? true) ||
+				openalexKey !== '' ||
 				dates !== (config.date_format ?? 'browser'))
 	);
 
 	async function save() {
 		saving = true;
+		if (openalexKey) {
+			await setOpenalexKey({ body: { key: openalexKey } });
+			openalexKey = '';
+			await loadKey();
+		}
 		const saved = await saveConfig(
 			{
 				public_url: publicUrl.trim() || null,
@@ -138,6 +162,27 @@
 	>
 </SettingRow>
 <SettingRow
+	id="openalex-key"
+	title="OpenAlex key"
+	description={keyInfo?.from_environment
+		? 'Set on the server (PAPERUS_OPENALEX_API_KEY).'
+		: keyInfo?.set
+			? 'Set; type a new one to replace it. Never shown again.'
+			: 'Optional, free at openalex.org/settings/api: OpenAlex gives a day ten times as many lookups with one ($1 instead of $0.10: about 10,000 lists of papers instead of 1,000; a single paper by its DOI is free either way). For authors, published versions, your papers and times cited.'}
+>
+	<input
+		id="openalex-key"
+		type="password"
+		autocomplete="off"
+		bind:value={openalexKey}
+		disabled={keyInfo?.from_environment}
+		placeholder={keyInfo?.set ? '••••••••' : ''}
+	/>
+	{#if keyInfo?.set && !keyInfo.from_environment}
+		<button class="small" onclick={removeKey}>Remove</button>
+	{/if}
+</SettingRow>
+<SettingRow
 	id="find-citations"
 	title="Times cited"
 	description="How often each paper is cited, as OpenAlex counts: shown on its page and a way to sort the library; its authors here are congratulated when it passes 10, 50, 100… citations. Each paper when new, then each week, 50 to a request; only the papers' DOIs are sent."
@@ -190,6 +235,10 @@
 <SectionButtons {changed} {saving} onreset={reset} onsave={save} />
 
 <style>
+	.small {
+		flex: none;
+		padding: 6px 12px;
+	}
 	.check {
 		display: flex;
 		align-items: center;

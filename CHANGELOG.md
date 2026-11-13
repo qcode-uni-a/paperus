@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **OpenAlex key**: OpenAlex now gives each address a small daily budget
+  for its lists ($0.10, about 1,000) and ten times that with a free key.
+  An optional key under Administration → Settings → Server (or
+  `OPENALEX_API_KEY` in `.env`) is sent with every request to OpenAlex
+  (authors, published versions, your papers, times cited); never shown
+  again once set.
+- **Times cited for preprints too**: a preprint OpenAlex merged into its
+  journal version (often renamed on publication) was not found by its
+  arXiv DOI in a list; it is now asked for alone (free at OpenAlex).
+
 ## 0.1.4 (2026-11-13)
 
 *paperus now fetches your new papers by itself, throws a small party when they get published or cited, and keeps the site administrator's hands off your group.*

@@ -15,6 +15,9 @@ x-paperus-env: &paperus-env
   # The OIDC client's secret, if not entered under Administration →
   # Settings → Authentication (docs/operations.md, "OIDC login").
   PAPERUS_OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  # OpenAlex's free API key (ten times its daily budget), if not entered
+  # under Administration → Settings → Server.
+  PAPERUS_OPENALEX_API_KEY: ${OPENALEX_API_KEY:-}
   # Other PAPERUS_* settings (docs/operations.md) go here too: .env alone
   # does not reach the containers.
   # Prometheus metrics (see docs/operations.md, Monitoring):

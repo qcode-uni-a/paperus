@@ -9,7 +9,8 @@ import httpx2
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from paperus import citation_counts
+from paperus import citation_counts, metadata
+from paperus.config import Settings
 from paperus.models import Item, User
 from tests.people import Person
 
@@ -19,9 +20,16 @@ ORCID = "0000-0002-1825-0097"
 class FakeOpenAlex:
     def __init__(self) -> None:
         self.counts: dict[str, int] = {}
+        self.merged: dict[str, int] = {}
+        """Known only when asked one by one (merged into another work)."""
         self.asked: list[list[str]] = []
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if "/works/https://doi.org/" in request.url.path:
+            doi = request.url.path.split("/works/https://doi.org/")[1]
+            if doi in self.merged:
+                return httpx2.Response(200, json={"cited_by_count": self.merged[doi]})
+            return httpx2.Response(404)
         dois = request.url.params["filter"].removeprefix("doi:").split("|")
         self.asked.append(dois)
         results: list[dict[str, Any]] = [
@@ -108,3 +116,44 @@ def test_openalex_not_answering(client: TestClient, db: Session) -> None:
     assert citation_counts.check(db, down, citation_counts.waiting(db)) == 0
     # Waits for the next run.
     assert [i.title for i in citation_counts.waiting(db)] == ["Hail"]
+
+
+def test_a_merged_preprint_asked_one_by_one(client: TestClient, db: Session) -> None:
+    """A preprint OpenAlex merged into its journal version (renamed): the
+    list by DOIs misses it, asked by its DOI alone it is found."""
+    ada = Person(client, db, "ada")
+    preprint = paper(ada, "Poor man's Majorana", "10.48550/arxiv.2407.12088")
+    thesis = paper(ada, "A thesis", "10.26190/unsworks/3311")
+    openalex = FakeOpenAlex()
+    openalex.merged = {"10.48550/arxiv.2407.12088": 19}
+    http = httpx2.Client(transport=httpx2.MockTransport(openalex))
+    assert citation_counts.check(db, http, citation_counts.waiting(db)) == 1
+    counted = {i["id"]: i.get("cited_by_count") for i in ada.get("/api/items").json()}
+    assert (counted[preprint], counted[thesis]) == (19, None)
+
+
+def test_openalex_key(client: TestClient, db: Session) -> None:
+    """Sent with every request to OpenAlex (not to others); set by an
+    administrator, never sent back."""
+    root = Person(client, db, "root", admin=True)
+    assert root.get("/api/admin/openalex").json() == {
+        "set": False,
+        "from_environment": False,
+    }
+    assert root.put("/api/admin/openalex", {"key": " secret-key "}).status_code == 204
+    assert root.get("/api/admin/openalex").json()["set"] is True
+    assert "secret-key" not in root.get("/api/admin/config").text
+    seen: list[str | None] = []
+    http = metadata.make_http_client(Settings())
+    http._transport = httpx2.MockTransport(
+        lambda request: (
+            seen.append(request.headers.get("Authorization")),
+            httpx2.Response(200, json={}),
+        )[1]
+    )
+    http.get("https://api.openalex.org/works")
+    http.get("https://api.crossref.org/works")
+    assert seen == ["Bearer secret-key", None]
+    root.put("/api/admin/openalex", {"key": ""})
+    http.get("https://api.openalex.org/works")
+    assert seen[-1] is None

@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     # The OIDC login's client secret (else set in Administration →
     # Settings → Authentication, stored in the database).
     oidc_client_secret: str | None = None
+    # OpenAlex's API key (a free one raises its daily budget tenfold; else
+    # set in Administration → Settings, stored in the database).
+    openalex_api_key: str | None = None
     # Imports from other reference managers, files included.
     max_import_bytes: int = 20 * 1024 * 1024 * 1024
 

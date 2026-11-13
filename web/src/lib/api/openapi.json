@@ -6840,6 +6840,60 @@
         }
       }
     },
+    "/api/admin/openalex": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Openalex Key",
+        "operationId": "get_openalex_key",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenAlexKey"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Openalex Key",
+        "description": "OpenAlex's API key, sent with every request to it; never sent back.\nThe worker takes it within a minute.",
+        "operationId": "set_openalex_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Key"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/authentication/check": {
       "post": {
         "tags": [
@@ -13522,6 +13576,24 @@
         ],
         "title": "JournalOut"
       },
+      "Key": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "title": "Key"
+      },
       "KnownFile": {
         "properties": {
           "item_id": {
@@ -15360,6 +15432,24 @@
         ],
         "title": "OcrStatus",
         "description": "Pages without text (scans) are read by OCR in the ML service;\n``None``: the file has none."
+      },
+      "OpenAlexKey": {
+        "properties": {
+          "set": {
+            "type": "boolean",
+            "title": "Set"
+          },
+          "from_environment": {
+            "type": "boolean",
+            "title": "From Environment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "set",
+          "from_environment"
+        ],
+        "title": "OpenAlexKey"
       },
       "Options": {
         "properties": {

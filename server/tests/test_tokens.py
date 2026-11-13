@@ -211,6 +211,8 @@ ROUTES = {
     ("GET", "/api/admin/integrity"): None,
     ("POST", "/api/admin/jobs/{job}"): None,
     ("GET", "/api/admin/ml"): None,
+    ("GET", "/api/admin/openalex"): None,
+    ("PUT", "/api/admin/openalex"): None,
     ("DELETE", "/api/admin/ml/models/{name}"): None,
     ("POST", "/api/admin/ml/models/{name}/speed"): None,
     ("GET", "/api/admin/stats"): None,

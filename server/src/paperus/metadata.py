@@ -24,11 +24,28 @@ def user_agent(contact_email: str | None) -> str:
     return f"{agent} (mailto:{contact_email})" if contact_email else agent
 
 
+OPENALEX_HOST = "api.openalex.org"
+_openalex_key: str | None = None
+
+
+def use_openalex_key(key: str | None) -> None:
+    """OpenAlex's API key, sent with every request to it from here on (this
+    process's clients made by ``make_http_client``)."""
+    global _openalex_key
+    _openalex_key = key or None
+
+
+def _with_openalex_key(request: httpx2.Request) -> None:
+    if _openalex_key and request.url.host == OPENALEX_HOST:
+        request.headers["Authorization"] = f"Bearer {_openalex_key}"
+
+
 def make_http_client(settings: Settings) -> httpx2.Client:
     return httpx2.Client(
         headers={"User-Agent": user_agent(settings.contact_email)},
         timeout=20,
         follow_redirects=True,
+        event_hooks={"request": [_with_openalex_key]},
     )
 
 

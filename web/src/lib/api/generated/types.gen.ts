@@ -2417,6 +2417,16 @@ export type JournalOut = {
 };
 
 /**
+ * Key
+ */
+export type Key = {
+    /**
+     * Key
+     */
+    key?: string | null;
+};
+
+/**
  * KnownFile
  */
 export type KnownFile = {
@@ -3485,6 +3495,20 @@ export type Notifications = {
  * ``None``: the file has none.
  */
 export type OcrStatus = 'pending' | 'done' | 'skipped' | 'failed';
+
+/**
+ * OpenAlexKey
+ */
+export type OpenAlexKey = {
+    /**
+     * Set
+     */
+    set: boolean;
+    /**
+     * From Environment
+     */
+    from_environment: boolean;
+};
 
 /**
  * Options
@@ -9708,6 +9732,47 @@ export type SetOidcSecretResponses = {
 };
 
 export type SetOidcSecretResponse = SetOidcSecretResponses[keyof SetOidcSecretResponses];
+
+export type GetOpenalexKeyData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/openalex';
+};
+
+export type GetOpenalexKeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: OpenAlexKey;
+};
+
+export type GetOpenalexKeyResponse = GetOpenalexKeyResponses[keyof GetOpenalexKeyResponses];
+
+export type SetOpenalexKeyData = {
+    body: Key;
+    path?: never;
+    query?: never;
+    url: '/api/admin/openalex';
+};
+
+export type SetOpenalexKeyErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetOpenalexKeyError = SetOpenalexKeyErrors[keyof SetOpenalexKeyErrors];
+
+export type SetOpenalexKeyResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type SetOpenalexKeyResponse = SetOpenalexKeyResponses[keyof SetOpenalexKeyResponses];
 
 export type CheckProviderData = {
     body: ProviderCheck;

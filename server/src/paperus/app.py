@@ -82,7 +82,11 @@ def create_app(
         # folder of stored files marked as this library's if new.
         try:
             with app.state.sessionmaker() as db:
-                system.apply(system.load_config(db, settings), http)
+                system.apply(
+                    system.load_config(db, settings),
+                    http,
+                    system.openalex_key(db, settings),
+                )
                 claim_storage(db, app.state.blobs)
         except Exception:
             logging.getLogger(__name__).warning(

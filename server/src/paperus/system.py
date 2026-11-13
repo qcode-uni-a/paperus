@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from paperus import readable
 from paperus.config import Settings
-from paperus.metadata import user_agent
+from paperus.metadata import use_openalex_key, user_agent
 from paperus.models import SystemSetting
 
 KEY = "config"
@@ -233,6 +233,23 @@ def save_oidc_secret(db: Session, secret: str | None) -> None:
     _save(db, OIDC_SECRET_KEY, {"secret": secret})
 
 
+OPENALEX_KEY = "openalex_key"
+
+
+def openalex_key(db: Session, settings: Settings) -> str | None:
+    """OpenAlex's API key: from the environment (``PAPERUS_OPENALEX_API_KEY``)
+    or set in the administration. Kept apart from the settings, so it is
+    never sent to the website."""
+    if settings.openalex_api_key:
+        return settings.openalex_api_key
+    row = db.get(SystemSetting, OPENALEX_KEY)
+    return str(row.value["key"]) if row and row.value.get("key") else None
+
+
+def save_openalex_key(db: Session, key: str | None) -> None:
+    _save(db, OPENALEX_KEY, {"key": key})
+
+
 VECTORS_KEY = "vectors"
 
 
@@ -277,9 +294,12 @@ def save_backup_config(db: Session, config: BackupConfig) -> None:
     _save(db, BACKUPS_KEY, config.model_dump())
 
 
-def apply(config: SystemConfig, http: httpx2.Client) -> None:
+def apply(
+    config: SystemConfig, http: httpx2.Client, openalex: str | None = None
+) -> None:
     """Settings that act inside a running process (server or worker): the
-    log level and the contact sent to metadata services."""
+    log level, the contact sent to metadata services, OpenAlex's key."""
     level = getattr(logging, config.log_level.upper())
     logging.getLogger("paperus").setLevel(level)
     http.headers["User-Agent"] = user_agent(config.contact_email)
+    use_openalex_key(openalex)

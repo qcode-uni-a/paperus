@@ -7,7 +7,10 @@ where one starts: nothing is celebrated for what came before.
 
 OpenAlex counts citations by all papers it knows (not only this library's),
 a little behind and below Google Scholar's. A paper with several DOIs (its
-preprint's, its journal's) has the highest of their counts.
+preprint's, its journal's) has the highest of their counts. A paper a
+list by DOIs does not know (a preprint OpenAlex merged into its journal
+version) is asked for by its DOI alone, which is free at OpenAlex (a list
+costs its daily budget, ``openalex_key``).
 """
 
 import logging
@@ -97,6 +100,30 @@ def counts(
     return found
 
 
+def single(
+    http: httpx2.Client, doi: str, contact_email: str | None = None
+) -> int | None:
+    """OpenAlex's count for one DOI asked directly (free there), None if it
+    does not know it. A preprint OpenAlex merged into its journal version
+    is found so (a list by DOI misses it: the work has the journal's DOI).
+    Raises ``SourceUnavailable`` if it does not answer."""
+    item_references.PACERS.openalex()
+    params = {"select": "doi,cited_by_count"}
+    if contact_email:
+        params["mailto"] = contact_email
+    try:
+        response = http.get(
+            f"{OPENALEX}/https://doi.org/{doi}", params=params, timeout=30
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        count = response.json().get("cited_by_count")
+    except (httpx2.HTTPError, ValueError, AttributeError) as error:
+        raise SourceUnavailable(f"OpenAlex did not answer: {error}") from error
+    return count if isinstance(count, int) else None
+
+
 def check(
     db: Session,
     http: httpx2.Client,
@@ -139,6 +166,8 @@ def _count(
     for item, own in batch:
         values: dict[str, object] = {"citations_checked_at": now}
         new = max((found[d] for d in own if d in found), default=None)
+        if new is None:
+            new = _asked_one_by_one(http, own, contact_email)
         if new is not None:
             known += 1
             old = item.cited_by_count
@@ -150,3 +179,18 @@ def _count(
         db.execute(update(Item).where(Item.id == item.id).values(**values))
     db.commit()
     return known
+
+
+def _asked_one_by_one(
+    http: httpx2.Client, dois: list[str], contact_email: str | None
+) -> int | None:
+    """A paper the list did not know, asked by each of its DOIs (free)."""
+    for doi in dois:
+        try:
+            count = single(http, doi, contact_email)
+        except SourceUnavailable as error:
+            log.info("citation count of %s: %s", doi, error)
+            return None
+        if count is not None:
+            return count
+    return None

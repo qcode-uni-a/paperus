@@ -84,6 +84,7 @@ from paperus.system import (
     load_backup_config,
     load_config,
     max_upload_bytes,
+    openalex_key,
 )
 
 log = logging.getLogger(__name__)
@@ -887,10 +888,11 @@ async def run_workers(
         await asyncio.gather(*workers, return_exceptions=True)
 
 
-def _apply_here(config: SystemConfig) -> None:
-    """The worker's own share of the settings (log level, contact email)."""
+def _apply_here(config: SystemConfig, openalex: str | None = None) -> None:
+    """The worker's own share of the settings (log level, contact email,
+    OpenAlex's key)."""
     if _context is not None:
-        apply(config, _context.http)
+        apply(config, _context.http, openalex)
 
 
 # First in the queue: a restarted ML service should not wait behind hundreds
@@ -909,7 +911,7 @@ def configure_ml(timestamp: int) -> None:
 def send_ml_config(db: Session, settings: Settings, ml: MLClient) -> None:
     """The ML settings of the administration, to every ML service."""
     config = load_config(db, settings)
-    _apply_here(config)
+    _apply_here(config, openalex_key(db, settings))
     keep = [config.embedding_model]
     # The reranker too while search uses it ("auto": with a GPU).
     if config.rerank == "on":
