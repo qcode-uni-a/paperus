@@ -108,6 +108,10 @@
 	const filter = $derived(fromAddress(page.url.searchParams));
 	const sort = $derived(sortFromAddress(page.url.searchParams));
 	const filtered = $derived(!isEmpty(filter));
+	/** Whether the papers shown were listed with a filter: while a changed
+	 * filter's list loads, the page stays as it was (the filter's panel
+	 * open), not briefly an empty library's. */
+	let listedFiltered = $state(false);
 
 	// Collections have their own pages; older links still work.
 	$effect(() => {
@@ -126,6 +130,7 @@
 		if (before && loading) return;
 		const request = ++latest;
 		loading = true;
+		const asked = filtered;
 		const { data, response } = await listItems({
 			query: {
 				limit,
@@ -140,6 +145,7 @@
 		loading = false;
 		if (!data) return;
 		items = before ? [...items, ...data] : data;
+		listedFiltered = asked;
 		total = Number(response?.headers.get('X-Total-Count') ?? items.length);
 		more = data.length > 0 && items.length < total;
 		if (before) nearEnd.again();
@@ -330,9 +336,9 @@
 				{/each}
 			</ul>
 		{/if}
-	{:else if items.length === 0 && !filtered && starting}
+	{:else if items.length === 0 && !listedFiltered && starting}
 		<!-- The getting-started steps say how to add papers. -->
-	{:else if items.length === 0 && !filtered}
+	{:else if items.length === 0 && !listedFiltered}
 		<div class="empty">
 			<h2>Nothing in the library yet</h2>
 			<p class="muted">

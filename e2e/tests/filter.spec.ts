@@ -90,6 +90,8 @@ test.describe('on a phone', () => {
 });
 
 test('the panel stays open, with its rules, when no papers match', async ({ page }) => {
+	// A paper to come back (the library may be empty yet: tests run in any order).
+	await page.request.post('/api/items', { data: { metadata: { title: unique('Matched ') } } });
 	await page.goto(`/?${new URLSearchParams({ journal: 'No such journal' })}`);
 	await expect(page.getByText('No papers match the filter.')).toBeVisible();
 	await page.getByRole('button', { name: 'Filter', exact: true }).click();
