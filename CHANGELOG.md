@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-11-13)
+
+*"Select all" now actually selects all, and reading files no longer waits while arXiv does its three-second breathing exercises.*
 
 - **Reading files no longer waits behind lookups**: reference lists,
   open-access copies, journal versions and authors are looked up in
@@ -31,10 +33,35 @@
   list's own box above them selects all of its papers (a dash when some
   are picked; a click then clears). On a phone, Select as before.
 - **Select all** in the selection's bar ("Select all 1,429"): every paper
-  the list's filters match, also those not loaded yet, changed by the server in one go (up to
-  50,000). Before, only the rows loaded so far could be picked, and
-  changing more than 1,000 picked papers failed; now they are sent in
-  parts.
+  the list's filters match, also those not loaded yet, changed by the
+  server in one go (up to 50,000). Before, only the rows loaded so far
+  could be picked, and changing more than 1,000 picked papers failed; now
+  they are sent in parts.
+- **Whose papers the library lists, at hand**: a menu beside Sort and
+  Filter chooses All, Only mine or one of one's groups (for people in a
+  group).
+- **arXiv's versions of a preprint are versions of the paper**: a PDF
+  named with its arXiv version ("2401.12345v3.pdf") goes to the paper's
+  preprint labelled "v3" (made if there is none), instead of becoming a
+  second main file; the version cited is the published one, else arXiv's
+  newest. Uploads, the browser extension, open-access copies and imports
+  all count; existing preprints whose PDF names its version get the label
+  on the update.
+- **A paper's attachments in one row**: code, data, supplementary files
+  and slides, each chip saying what it is (before, links showed their long
+  names and supplementary files hid under "Details and files"); "+
+  Attachment" adds a link or uploads a file in that role.
+- **The search models in a table, with what they take in memory**: the
+  ML service measures each model once loaded (RAM, or the GPU's memory),
+  and the settings show it with the scores (English and multilingual),
+  size and release date, the speed here, and whether the models in use fit
+  together, with a warning when they do not. A model that does not fit is
+  loaded after the idle ones are unloaded; on the GPU a reranker or OCR
+  model then runs on the CPU.
+- Lists (library, collections, Recent) no longer stop loading at times
+  while scrolled to their end, with only "Show more".
+- A long group name wraps on a phone instead of pushing the group's
+  buttons off the screen.
 - **Recommended models, for a CPU and for a GPU**: choosing a model, the
   administration marks the ones to use where the ML service runs (setup
   too): arctic-embed-m-v2 for search and PP-OCRv6 for scans everywhere,
