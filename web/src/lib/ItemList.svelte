@@ -106,10 +106,6 @@
 		</div>
 		<div class="tools">
 			{#if total > 1}<SortControl />{/if}
-			{#if total > 0 && !selection.active}<button
-					class="select"
-					onclick={() => (selection.active = true)}>Select</button
-				>{/if}
 		</div>
 	</div>
 {/if}
@@ -145,16 +141,6 @@
 		display: flex;
 		gap: 8px;
 		margin-left: auto;
-	}
-	.select {
-		padding: 3px 12px;
-	}
-	/* With a mouse the rows' boxes and the list's are there; Select is for
-	   phones and tablets. */
-	@media (min-width: 761px) and (pointer: fine) {
-		.select {
-			display: none;
-		}
 	}
 	.counted {
 		position: relative;

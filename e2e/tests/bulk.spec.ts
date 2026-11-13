@@ -106,3 +106,43 @@ test('select all: every paper of the collection, also those not loaded yet', asy
 	await expect(bar).toBeHidden();
 	await context.close();
 });
+
+test.describe('on a phone', () => {
+	test.use({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+
+	test('a long press on a paper starts picking, taps pick more', async ({ page }) => {
+		const word = unique('Pressed');
+		const shelf = await (
+			await page.request.post('/api/collections', { data: { name: unique('Shelf') } })
+		).json();
+		const ids: string[] = [];
+		for (const n of ['one', 'two']) {
+			const added = await page.request.post('/api/items', {
+				data: { metadata: { title: `${word} ${n}` } }
+			});
+			ids.push((await added.json()).id);
+		}
+		await page.request.post(`/api/collections/${shelf.id}/items`, { data: { item_ids: ids } });
+
+		await page.goto(`/collections/${shelf.id}`);
+		await expect(page.getByRole('heading', { name: '2 items' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Select', exact: true })).toHaveCount(0);
+		const row = page.getByRole('listitem').filter({ hasText: `${word} one` });
+		const box = (await row.boundingBox())!;
+		const at = { clientX: box.x + 40, clientY: box.y + 20, pointerType: 'touch', button: 0 };
+		await row.dispatchEvent('pointerdown', at);
+		await page.waitForTimeout(700);
+		await row.dispatchEvent('pointerup', at);
+		await row.getByRole('link', { name: `${word} one` }).dispatchEvent('click');
+		const bar = page.getByRole('toolbar', { name: 'Selected papers' });
+		await expect(bar.getByText('1 selected')).toBeVisible();
+		await expect(page).toHaveURL(new RegExp(`/collections/${shelf.id}$`));
+		await page.getByRole('link', { name: `${word} two` }).tap();
+		await expect(bar.getByText('2 selected')).toBeVisible();
+		await page.keyboard.press('Escape');
+		await expect(bar).toBeHidden();
+		// Without a long press, a tap opens the paper.
+		await page.getByRole('link', { name: `${word} two` }).tap();
+		await expect(page).toHaveURL(new RegExp(`/items/${ids[1]}`));
+	});
+});

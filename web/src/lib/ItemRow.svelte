@@ -41,11 +41,46 @@
 	/** While picking, a click on the row (its title too) picks it; other
 	 * links and buttons do what they do. */
 	function pickRow(event: MouseEvent) {
+		if (pressed) {
+			// The click ending a long press: it picked the row already.
+			pressed = false;
+			event.preventDefault();
+			return;
+		}
 		if (!selection?.active) return;
 		const target = event.target as HTMLElement;
 		if (target.closest('input, button, a:not(.title)')) return;
 		event.preventDefault();
 		selection.toggle(item.id, event.shiftKey);
+	}
+
+	/** A long press on the row picks it, and so starts picking (on a phone,
+	 * where the rows have no boxes); a finger moving scrolls instead. */
+	const LONG_PRESS = 500;
+	let press: ReturnType<typeof setTimeout> | undefined;
+	let from = { x: 0, y: 0 };
+	let pressed = false;
+	function pressStart(event: PointerEvent) {
+		if (!selection || selection.active || event.button !== 0) return;
+		if ((event.target as HTMLElement).closest('input, button')) return;
+		from = { x: event.clientX, y: event.clientY };
+		pressed = false;
+		clearTimeout(press);
+		press = setTimeout(() => {
+			pressed = true;
+			selection.toggle(item.id);
+			navigator.vibrate?.(15);
+		}, LONG_PRESS);
+	}
+	function pressMove(event: PointerEvent) {
+		if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > 10) clearTimeout(press);
+	}
+	function pressEnd() {
+		clearTimeout(press);
+	}
+	/** No menu of the browser's for the long press (Android's for links). */
+	function noMenu(event: Event) {
+		if (pressed) event.preventDefault();
 	}
 
 	const authors = $derived(shortAuthors(item.authors));
@@ -61,6 +96,12 @@
 	class:picked
 	data-place={item.id}
 	onclick={pickRow}
+	onpointerdown={pressStart}
+	onpointermove={pressMove}
+	onpointerup={pressEnd}
+	onpointercancel={pressEnd}
+	onpointerleave={pressEnd}
+	oncontextmenu={noMenu}
 >
 	{#if selection}<input
 			type="checkbox"
@@ -176,6 +217,15 @@
 		}
 		li.picked {
 			box-shadow: none;
+		}
+	}
+	/* A long press picks the row: no text selected, no menu for its links
+	   (iOS). */
+	@media (pointer: coarse) {
+		li {
+			-webkit-user-select: none;
+			user-select: none;
+			-webkit-touch-callout: none;
 		}
 	}
 	.note {

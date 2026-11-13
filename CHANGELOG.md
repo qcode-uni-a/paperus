@@ -9,6 +9,9 @@
   wishes. Everyone in it is equal (adds people, renames it); these groups
   show under Groups in a section of their own, "Shared with people", and
   as owners everywhere else.
+- **On a phone, a long press picks a paper**: it starts picking (taps
+  then pick more), instead of the Select button above the list, which is
+  gone; the bar at the bottom stays.
 - **Search reads PDFs as fluent mode does**: a PDF's text now comes from
   its page layouts, in reading order across columns and pages: a
   paragraph over a page break is one passage, and running headers, page

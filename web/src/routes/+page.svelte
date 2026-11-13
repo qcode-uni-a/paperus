@@ -380,10 +380,6 @@
 			{(total ?? items.length) === 1 ? 'item' : 'items'}
 		</h1>
 	</div>
-	{#if items.length && !selection.active}<button
-			class="select"
-			onclick={() => (selection.active = true)}>Select</button
-		>{/if}
 {/snippet}
 
 <style>
@@ -444,17 +440,6 @@
 	.count.listed {
 		margin: 0;
 		white-space: nowrap;
-	}
-	.select {
-		margin-left: auto;
-		padding: 3px 12px;
-	}
-	/* With a mouse the rows' boxes and the list's are there; Select is for
-	   phones and tablets. */
-	@media (min-width: 761px) and (pointer: fine) {
-		.select {
-			display: none;
-		}
 	}
 	ul {
 		margin: 0;
