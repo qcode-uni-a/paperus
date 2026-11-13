@@ -7,7 +7,9 @@
   An optional key under Administration → Settings → Server (or
   `OPENALEX_API_KEY` in `.env`) is sent with every request to OpenAlex
   (authors, published versions, your papers, times cited); never shown
-  again once set.
+  again once set. When the day's budget is used up anyway, OpenAlex's
+  lookups wait until it renews (midnight UTC) and go on from there, with
+  one line in the log instead of a failure an hour.
 - **Times cited for preprints too**: a preprint OpenAlex merged into its
   journal version (often renamed on publication) was not found by its
   arXiv DOI in a list; it is now asked for alone (free at OpenAlex).

@@ -1,5 +1,7 @@
 """Bibliographic metadata from DOIs."""
 
+import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx2
@@ -24,6 +26,8 @@ def user_agent(contact_email: str | None) -> str:
     return f"{agent} (mailto:{contact_email})" if contact_email else agent
 
 
+log = logging.getLogger(__name__)
+
 OPENALEX_HOST = "api.openalex.org"
 _openalex_key: str | None = None
 
@@ -35,9 +39,53 @@ def use_openalex_key(key: str | None) -> None:
     _openalex_key = key or None
 
 
+class OpenAlexPaused(httpx2.TransportError):
+    """OpenAlex's daily budget is used up: no request until it renews (its
+    callers take it as OpenAlex not answering, and try again later)."""
+
+
+# Until when OpenAlex is not asked (its daily budget used up), in this
+# process.
+_openalex_paused_until: datetime | None = None
+
+
 def _with_openalex_key(request: httpx2.Request) -> None:
-    if _openalex_key and request.url.host == OPENALEX_HOST:
+    if request.url.host != OPENALEX_HOST:
+        return
+    paused = _openalex_paused_until
+    if paused is not None and datetime.now(UTC) < paused:
+        raise OpenAlexPaused(
+            f"OpenAlex's daily budget is used up until {paused:%H:%M} UTC",
+            request=request,
+        )
+    if _openalex_key:
         request.headers["Authorization"] = f"Bearer {_openalex_key}"
+
+
+def _openalex_budget(response: httpx2.Response) -> None:
+    """A 429 with no budget left: OpenAlex paused until its budget renews
+    (``X-RateLimit-Reset`` seconds, else midnight UTC). One for going too
+    fast is no pause."""
+    global _openalex_paused_until
+    if response.request.url.host != OPENALEX_HOST or response.status_code != 429:
+        return
+    if response.headers.get("X-RateLimit-Remaining") not in ("0", "0.0"):
+        return
+    now = datetime.now(UTC)
+    try:
+        until = now + timedelta(seconds=int(response.headers["X-RateLimit-Reset"]))
+    except (KeyError, ValueError):
+        until = (now + timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+    if _openalex_paused_until is None or _openalex_paused_until < now:
+        log.warning(
+            "OpenAlex's daily budget is used up; its lookups wait until %s UTC "
+            "(a free API key gives ten times as much: Administration → "
+            "Settings → Server)",
+            f"{until:%H:%M}",
+        )
+    _openalex_paused_until = until
 
 
 def make_http_client(settings: Settings) -> httpx2.Client:
@@ -45,7 +93,7 @@ def make_http_client(settings: Settings) -> httpx2.Client:
         headers={"User-Agent": user_agent(settings.contact_email)},
         timeout=20,
         follow_redirects=True,
-        event_hooks={"request": [_with_openalex_key]},
+        event_hooks={"request": [_with_openalex_key], "response": [_openalex_budget]},
     )
 
 

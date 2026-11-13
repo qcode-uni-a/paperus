@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx2
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -157,3 +158,45 @@ def test_openalex_key(client: TestClient, db: Session) -> None:
     root.put("/api/admin/openalex", {"key": ""})
     http.get("https://api.openalex.org/works")
     assert seen[-1] is None
+
+
+def test_openalex_budget_used_up_pauses_it(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 429 with no budget left: OpenAlex is not asked again until its
+    budget renews; its papers wait. One for going too fast pauses nothing."""
+    monkeypatch.setattr(metadata, "_openalex_paused_until", None)
+    ada = Person(client, db, "ada")
+    paper(ada, "Hail", "10.1000/hail")
+    answers: list[httpx2.Response] = [
+        httpx2.Response(429, headers={"X-RateLimit-Remaining": "12"}),
+        httpx2.Response(
+            429, headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": "3600"}
+        ),
+    ]
+    asked: list[str] = []
+
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request.url.host)
+        if request.url.host != metadata.OPENALEX_HOST:
+            return httpx2.Response(200, json={})
+        return answers.pop(0) if answers else httpx2.Response(200, json={"results": []})
+
+    http = metadata.make_http_client(Settings())
+    http._transport = httpx2.MockTransport(answer)
+    for _ in range(3):  # too fast, used up, then not asked at all
+        assert citation_counts.check(db, http, citation_counts.waiting(db)) == 0
+    assert asked == [metadata.OPENALEX_HOST] * 2
+    # Other services are asked as before; OpenAlex again once renewed.
+    http.get("https://api.crossref.org/works")
+    paused = metadata._openalex_paused_until
+    assert paused is not None
+    assert timedelta(minutes=59) < paused - datetime.now(UTC) <= timedelta(hours=1)
+    monkeypatch.setattr(metadata, "_openalex_paused_until", datetime.now(UTC))
+    assert citation_counts.check(db, http, citation_counts.waiting(db)) == 0
+    # (the list, then the paper alone: OpenAlex knew it in neither)
+    assert asked == [metadata.OPENALEX_HOST] * 2 + [
+        "api.crossref.org",
+        *[metadata.OPENALEX_HOST] * 2,
+    ]
+    assert [i.title for i in citation_counts.waiting(db)] == []
