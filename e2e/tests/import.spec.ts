@@ -31,8 +31,8 @@ test('import a whole folder, without zipping it', async ({ page }) => {
 	await expect(imported).toContainText('3 files');
 });
 
-// Papers already in a group one may only read: the import says where they
-// are and which files it left out, and the bell says the import is done.
+// A paper already in a group one may only read, with a file: added as
+// one's own, so the file comes too; the bell says the import is done.
 test('an import says what was there already, and where', async ({ page, browser }) => {
 	const kim = { username: unique('kim'), password: 'kim-password-e2e' };
 	const made = await page.request.post('/api/admin/users', { data: kim });
@@ -71,19 +71,14 @@ test('an import says what was there already, and where', async ({ page, browser 
 	const section = own.locator('section#import');
 	await section.locator('input[webkitdirectory]').setInputFiles(folder);
 	const imported = section.getByRole('listitem').filter({ hasText: 'Kim export' }).first();
+	await expect(imported).toContainText(`2 papers: 2 added, 0 already here.`, { timeout: 60_000 });
 	await expect(imported).toContainText(
-		`2 papers: 1 added, 0 already here, 1 already in ${lab.name}.`,
-		{ timeout: 60_000 }
-	);
-	await expect(imported).toContainText(
-		`1 file not added: its paper is already in ${lab.name}, which you can only read.`
+		`Of those added, 1 is also in ${lab.name}, which you can only read: added as your own, so its files could come too.`
 	);
 
 	await own.getByRole('button', { name: /Notifications/ }).click();
 	await expect(
-		own.getByText(
-			'Import of Kim export done: 1 paper added, 1 already in other libraries, 1 file not added (see why)'
-		)
+		own.getByText('Import of Kim export done: 2 papers added (1 also in a group, as your own)')
 	).toBeVisible();
 	await context.close();
 });

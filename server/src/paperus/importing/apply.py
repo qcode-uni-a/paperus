@@ -170,9 +170,9 @@ class Report:
     found_elsewhere: dict[str, int] = field(default_factory=dict)
     """Already in another library the person sees ("your library", a
     group's name): what the export brought was added there, not copied."""
-    files_not_added: dict[str, int] = field(default_factory=dict)
-    """Files left out, by library: their paper is there already, and the
-    person may only read it."""
+    own_copies: dict[str, int] = field(default_factory=dict)
+    """Papers added although a library the person may only read has them
+    (by its name), as their files could not go there."""
     files: int = 0
     notes: int = 0
     collections: int = 0
@@ -254,7 +254,7 @@ def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
         missing_files=[],
         problems=[],
         found_elsewhere=dict(run.report.found_elsewhere),
-        files_not_added=dict(run.report.files_not_added),
+        own_copies=dict(run.report.own_copies),
     )
     seen = dict(run.seen)
     missing = len(run.report.missing_files)
@@ -272,7 +272,7 @@ def _guarded(run: _Run, name: str, step: Callable[[], None]) -> None:
             "collections",
             "loose_pdfs",
             "found_elsewhere",
-            "files_not_added",
+            "own_copies",
         ):
             setattr(run.report, counter, getattr(counts, counter))
         del run.report.missing_files[missing:]
@@ -345,6 +345,13 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
     access, db = run.access, run.db
     stored = [s for f in paper.files if (s := _store(run, f)) is not None]
     item = _existing(run, paper, [sha for sha, _, _ in stored])
+    # In a library the person may only read, without the export's files:
+    # a paper of their own instead, with them (else the files were lost).
+    read_only = None
+    if item is not None and not access.can_write_item(item):
+        present = {f.blob_sha256 for v in item.versions for f in v.files}
+        if {sha for sha, _, _ in stored} - present:
+            read_only, item = item, None
     if item is None:
         item = library.create_item(
             db,
@@ -358,6 +365,9 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
         )
         run.report.added += 1
         run.added.add(item.id)
+        if read_only is not None:
+            name = _library_name(run, read_only.library_id)
+            run.report.own_copies[name] = run.report.own_copies.get(name, 0) + 1
     else:
         _found(run, item)
     for scheme, value in paper.identifiers:
@@ -367,13 +377,6 @@ def _paper(run: _Run, paper: ExportedPaper) -> None:
 
     if access.can_write_item(item):
         _attach_files(run, item, stored)
-    else:
-        present = {f.blob_sha256 for v in item.versions for f in v.files}
-        if left_out := len({sha for sha, _, _ in stored} - present):
-            name = _library_name(run, item.library_id)
-            run.report.files_not_added[name] = (
-                run.report.files_not_added.get(name, 0) + left_out
-            )
     if access.may_tag(run.owner, item):
         _tag(run, item, paper)
     for path in paper.collections:

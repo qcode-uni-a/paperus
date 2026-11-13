@@ -76,8 +76,9 @@ def test_papers_met_again(client: TestClient, db: Session, blobs: BlobStore) -> 
 def test_papers_in_a_group_already(
     client: TestClient, db: Session, blobs: BlobStore
 ) -> None:
-    """Found in a group: counted by the group's name; its files left out
-    where the person may only read, and said so."""
+    """Found in a group: counted by the group's name. Where the person may
+    only read, a paper of their own instead, with the export's files (said
+    so); without new files, the group's paper is all."""
     root = Person(client, db, "root", admin=True)
     ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
     lab, team = group(root, "Lab", bob), group(root, "Team", bob)
@@ -104,6 +105,7 @@ def test_papers_in_a_group_already(
         format="csl-json",
         papers=[
             paper("In the lab", "a.pdf", doi="10.1234/lab"),
+            paper("In the lab, without a file", doi="10.1234/lab"),
             paper("In the team", "b.pdf", doi="10.1234/team"),
             paper("Mine", doi="10.1234/mine"),
             paper("New", "c.pdf"),
@@ -113,16 +115,22 @@ def test_papers_in_a_group_already(
         db, blobs, access_of(db, ada), export, files,
         owner=uuid.UUID(ada.libraries()["Me"]["id"]), max_file_bytes=1000,
     )  # fmt: skip
-    assert (report.added, report.found) == (1, 1)
-    assert report.found_elsewhere == {"Lab": 1, "Team": 1}
-    assert report.files_not_added == {"Lab": 1}
+    assert (report.added, report.found) == (2, 2)
+    assert report.found_elsewhere == {"Team": 1}
+    assert report.own_copies == {"Lab": 1}
 
-    # The team's paper got the file; the lab's did not.
+    # The team's paper got the file; the lab's did not, ada's copy did.
     def files_in(library: dict[str, Any]) -> list[int]:
         listed = bob.get("/api/items", params={"library": library["library_id"]})
         return [len(i["files"]) for i in listed.json()]
 
     assert (files_in(team), files_in(lab)) == ([1], [0])
+    mine = ada.get("/api/items", params={"library": ada.libraries()["Me"]["id"]})
+    assert sorted((i["title"], len(i["files"])) for i in mine.json()) == [
+        ("In the lab", 1),
+        ("Mine", 0),
+        ("New", 1),
+    ]
 
 
 def test_an_ended_import_is_told(
@@ -146,7 +154,7 @@ def test_an_ended_import_is_told(
         "added": 1,
         "found": 0,
         "found_elsewhere": 0,
-        "files_not_added": 0,
+        "own_copies": 0,
         "problems": 0,
     }
 

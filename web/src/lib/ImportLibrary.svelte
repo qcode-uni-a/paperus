@@ -59,8 +59,8 @@
 		loose_pdfs?: number;
 		/** Already in other libraries one sees, by name ("your library", a group). */
 		found_elsewhere?: Record<string, number>;
-		/** Files left out, by library: the paper is there, and only to read. */
-		files_not_added?: Record<string, number>;
+		/** Added although a library one may only read has them (by name). */
+		own_copies?: Record<string, number>;
 		missing_files: string[];
 		problems: string[];
 	};
@@ -387,15 +387,12 @@
 							joining its paper once read (by its DOI).
 						{/if}
 					</p>
-					{#if total(report.files_not_added)}
-						{@const n = total(report.files_not_added)}
+					{#if total(report.own_copies)}
+						{@const n = total(report.own_copies)}
 						<p>
-							<strong>{count(n, 'file', 'files')} not added:</strong>
-							{n === 1 ? 'its paper is' : 'their papers are'} already in {listed(
-								report.files_not_added ?? {}
-							)}, which you can only read. Ask an editor of the group to add {n === 1
-								? 'it'
-								: 'them'}.
+							Of those added, {n}
+							{n === 1 ? 'is also' : 'are also'} in {listed(report.own_copies ?? {})}, which you can
+							only read: added as your own, so {n === 1 ? 'its files' : 'their files'} could come too.
 						</p>
 					{/if}
 					{#if report.missing_files?.length}

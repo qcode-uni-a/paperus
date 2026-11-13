@@ -169,7 +169,7 @@ def import_finished(db: Session, record: Import) -> None:
                 "added": report.get("added", 0),
                 "found": report.get("found", 0),
                 "found_elsewhere": sum(report.get("found_elsewhere", {}).values()),
-                "files_not_added": sum(report.get("files_not_added", {}).values()),
+                "own_copies": sum(report.get("own_copies", {}).values()),
                 "problems": len(report.get("problems", []))
                 + len(report.get("missing_files", [])),
             },

@@ -24,8 +24,8 @@ class NotificationOut(BaseModel):
     zip of one's export written (export_id, part, parts; the last part:
     the export is done); "export_failed": the export failed (export_id);
     "import": an import ended (import_id, filename, failed, and the
-    report's added, found, found_elsewhere, files_not_added and problems,
-    the last three as totals)."""
+    report's added, found, found_elsewhere, own_copies and problems, the
+    last three as totals)."""
     data: dict[str, Any]
     at: datetime
     read: bool
