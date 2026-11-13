@@ -1127,6 +1127,12 @@ def lookup_items(
 def get_item(
     item_id: uuid.UUID, response: Response, db: DB, access: CurrentAccess
 ) -> ItemDetail:
+    # The paper and its files from one snapshot: the worker commits a file's
+    # text and the title found in it together, and a page that saw the file
+    # read but the old title stopped waiting for the new one (#56; each
+    # statement sees what is committed by then).
+    db.commit()
+    db.connection(execution_options={"isolation_level": "REPEATABLE READ"})
     return item_detail(get_readable_item(db, access, item_id), access, response)
 
 

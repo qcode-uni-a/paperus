@@ -2,7 +2,10 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import object_session
 
+from paperus.api import items as items_api
 from paperus.metadata import csl_type
 from tests.conftest import FakeDOIRegistry
 
@@ -304,3 +307,23 @@ def test_lookup_by_identifiers(logged_in: TestClient) -> None:
         "doi:nonsense": None,
         "x:y": None,
     }
+
+
+def test_a_paper_is_read_from_one_snapshot(
+    logged_in: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Its title and its files' state from one moment (#56): the worker may
+    commit a file's text and the title found in it between two queries."""
+    item = logged_in.post("/api/items", json={"metadata": {"title": "Snap"}}).json()
+    seen: list[str] = []
+    detail = items_api.item_detail
+
+    def recording(found: Any, *args: Any) -> Any:  # noqa: ANN401 (passed on)
+        session = object_session(found)
+        assert session is not None
+        seen.append(str(session.scalar(text("SHOW transaction_isolation"))))
+        return detail(found, *args)
+
+    monkeypatch.setattr(items_api, "item_detail", recording)
+    assert logged_in.get(f"/api/items/{item['id']}").status_code == 200
+    assert seen == ["repeatable read"]
