@@ -53,7 +53,9 @@ def test_job_limits() -> None:
     config = SystemConfig(embedding_model="m", jobs_text=4, jobs_ml=2)
     assert job_limits(config) == {
         "text": 4,
-        "lookup": 2,
+        "arxiv": 1,
+        "crossref": 2,
+        "openalex": 2,
         "ml": 2,
         "ocr": 1,
         "layout": 4,
@@ -115,7 +117,9 @@ def test_workers_outlast_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     asyncio.run(main())
     defaults = [
         ("text", 2),
-        ("lookup", 2),
+        ("arxiv", 1),
+        ("crossref", 2),
+        ("openalex", 2),
         ("ml", 1),
         ("ocr", 1),
         ("layout", 2),

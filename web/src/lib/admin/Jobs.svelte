@@ -21,8 +21,9 @@
 			queue: 'lookup',
 			title: 'Looking things up',
 			description:
-				'Reference lists, open-access copies, journal versions and authors, from arXiv, Crossref, OpenAlex and publishers, with the pauses they ask for.',
-			color: 'var(--tag-amber-ink)'
+				'Reference lists, open-access copies, journal versions and authors: a queue per service, so none waits behind the pauses another asks for.',
+			color: 'var(--tag-amber-ink)',
+			queues: ['arxiv', 'crossref', 'openalex']
 		},
 		{
 			queue: 'ml',
@@ -70,7 +71,22 @@
 			// Storage may be blocked; the chart still shows for this visit.
 		}
 	}
-	const counts = (queue: string) => stats?.jobs[queue] ?? {};
+	/** A card's queues: its own, or the services' for lookups. */
+	const queuesOf = (q: { queue: string; queues?: readonly string[] }) => q.queues ?? [q.queue];
+	/** Jobs by status in these queues, added up. */
+	function counts(queues: readonly string[]): Record<string, number> {
+		const sum: Record<string, number> = {};
+		for (const queue of queues)
+			for (const [status, n] of Object.entries(stats?.jobs[queue] ?? {}))
+				sum[status] = (sum[status] ?? 0) + n;
+		return sum;
+	}
+	/** The services lookups ask, by their queues, with the pace they keep. */
+	const SERVICES = [
+		{ queue: 'arxiv', name: 'arXiv', pace: 'one at a time, 3 s apart' },
+		{ queue: 'crossref', name: 'Crossref', pace: 'two at a time' },
+		{ queue: 'openalex', name: 'OpenAlex and publishers', pace: 'two at a time' }
+	];
 	const total = (status: string) =>
 		Object.values(stats?.jobs ?? {}).reduce((sum, c) => sum + (c[status] ?? 0), 0);
 
@@ -156,7 +172,7 @@
 
 <div class="queues">
 	{#each QUEUES as q (q.queue)}
-		{@const c = counts(q.queue)}
+		{@const c = counts(queuesOf(q))}
 		<section class="card queue">
 			<div class="queue-head">
 				<h2><span class="dot" style:background={q.color}></span>{q.title}</h2>
@@ -173,7 +189,7 @@
 			</div>
 			<p class="muted">{q.description}</p>
 			{#if charts[q.queue]}
-				<QueueChart samples={history.samples} queue={q.queue} color={q.color} />
+				<QueueChart samples={history.samples} queues={queuesOf(q)} color={q.color} />
 			{/if}
 			<dl>
 				<div>
@@ -214,22 +230,37 @@
 						>
 					{/if}
 					<button onclick={() => run('text')}>Read waiting files now</button>
+					<button onclick={() => run('text-all')}>Read all files again</button>
+				</div>
+			{:else if q.queue === 'lookup' && stats}
+				<table class="services">
+					<tbody>
+						{#each SERVICES as s (s.queue)}
+							{@const sc = counts([s.queue])}
+							<tr>
+								<th scope="row">{s.name} <span class="muted small">{s.pace}</span></th>
+								<td>{(sc.todo ?? 0).toLocaleString()} waiting</td>
+								<td>{sc.doing ?? 0} running</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+				<div class="buttons">
+					<button
+						onclick={() => run('references')}
+						title="Find papers' reference lists: Crossref for journals' papers, arXiv's LaTeX sources for preprints, else the PDFs (a few dozen at a time)"
+						>Look for reference lists</button
+					>
 					<button
 						onclick={() => run('published')}
 						title="Ask arXiv and OpenAlex for the published versions of preprints (a few dozen at a time)"
 						>Look for published versions</button
 					>
 					<button
-						onclick={() => run('references')}
-						title="Find papers' reference lists: arXiv's LaTeX sources, Crossref, the PDFs (a few dozen at a time)"
-						>Look for reference lists</button
-					>
-					<button
 						onclick={() => run('authors')}
 						title="Link the authors of papers added or changed to people (it runs every 5 minutes by itself)"
 						>Link authors now</button
 					>
-					<button onclick={() => run('text-all')}>Read all files again</button>
 				</div>
 			{:else if q.queue === 'ml' && stats}
 				<progress value={stats.embedded} max={stats.chunks || 1}></progress>
@@ -375,6 +406,27 @@
 		border-left: 3px solid var(--danger);
 		background: color-mix(in srgb, var(--danger) 8%, var(--surface));
 		font-size: var(--step--1);
+	}
+	.services {
+		width: 100%;
+		margin: 2px 0 12px;
+		border-collapse: collapse;
+		font-size: var(--step--1);
+		font-variant-numeric: tabular-nums;
+	}
+	.services th {
+		padding: 4px 0;
+		font-weight: 600;
+		text-align: left;
+	}
+	.services th .small {
+		display: block;
+		font-weight: 400;
+	}
+	.services td {
+		padding: 4px 0 4px 12px;
+		text-align: right;
+		white-space: nowrap;
 	}
 	.buttons {
 		display: flex;

@@ -93,6 +93,11 @@ class SourceUnavailable(Exception):
     """arXiv or Crossref did not answer: the paper is looked at again later."""
 
 
+class NeedsArxiv(Exception):
+    """The list is to come from arXiv, not asked here: the job goes on in
+    the queue of arXiv's lookups (``paperus.jobs``), with its pauses."""
+
+
 @dataclass
 class Pacers:
     """Pauses between requests to arXiv (it asks for 3 s) and Crossref."""
@@ -476,16 +481,25 @@ def look(
     *,
     contact_email: str | None = None,
     pacers: Pacers | None = None,
+    arxiv: bool = True,
 ) -> tuple[str | None, list[Found]]:
-    """The paper's reference list and where it came from, best source
-    first; (None, []) if none is found. Raises ``SourceUnavailable``."""
+    """The paper's reference list and where it came from; (None, []) if
+    none is found. A journal's paper: Crossref first (on our papers as
+    complete as the LaTeX source, its references more often with a DOI,
+    and no 3 s pause or download); then arXiv's source, unless not
+    ``arxiv`` (then ``NeedsArxiv``); then the PDF's text. Raises
+    ``SourceUnavailable``."""
     pacers = pacers or PACERS
-    arxiv = _identifier(item, Scheme.ARXIV)
-    if arxiv and (found := from_arxiv(http, arxiv, pacers)):
-        return "arxiv", found
     doi = _identifier(item, Scheme.DOI)
-    if doi and (found := from_crossref(http, doi, pacers, contact_email)):
+    # arXiv's own DOIs (DataCite) have no reference lists at Crossref.
+    journal = doi if doi and not doi.lower().startswith("10.48550/") else None
+    if journal and (found := from_crossref(http, journal, pacers, contact_email)):
         return "crossref", found
+    if paper := _identifier(item, Scheme.ARXIV):
+        if not arxiv:
+            raise NeedsArxiv(paper)
+        if found := from_arxiv(http, paper, pacers):
+            return "arxiv", found
     if found := from_pdf(db, item):
         return "pdf", found
     return None, []
@@ -576,12 +590,15 @@ def check(
     *,
     contact_email: str | None = None,
     pacers: Pacers | None = None,
+    arxiv: bool = True,
 ) -> int | None:
     """Look for the paper's list and store it; the number of references
     found, None if a source did not answer (then it is looked at again
-    later)."""
+    later). ``NeedsArxiv`` if it is to come from arXiv, not ``arxiv``."""
     try:
-        source, found = look(db, http, item, contact_email=contact_email, pacers=pacers)
+        source, found = look(
+            db, http, item, contact_email=contact_email, pacers=pacers, arxiv=arxiv
+        )
     except SourceUnavailable as error:
         log.info("reference list of %s: %s", item.id, error)
         db.rollback()
@@ -621,23 +638,6 @@ def waiting(db: Session, limit: int = PER_RUN) -> list[Item]:
             .limit(limit)
         )
     )
-
-
-def check_waiting(
-    db: Session,
-    http: httpx2.Client,
-    *,
-    limit: int = PER_RUN,
-    contact_email: str | None = None,
-    pacers: Pacers | None = None,
-) -> tuple[int, int]:
-    """Look at up to ``limit`` waiting papers; (looked at, lists found)."""
-    items = waiting(db, limit)
-    lists = 0
-    for item in items:
-        if check(db, http, item, contact_email=contact_email, pacers=pacers):
-            lists += 1
-    return len(items), lists
 
 
 # --- reading: matched to the library ------------------------------------------

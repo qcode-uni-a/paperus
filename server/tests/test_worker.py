@@ -343,7 +343,8 @@ def test_open_access_copies_and_published_versions(
         "extract_text succeeded": 1,
         "page_layout succeeded": 1,
         "embed_file succeeded": 1,
-        "find_item_references succeeded": 1,
+        # Crossref's queue first, then arXiv's (a preprint).
+        "find_item_references succeeded": 2,
     }
     [preprint] = ada.get(f"/api/items/{paper['id']}").json()["versions"]
     assert len(preprint["files"]) == 1
@@ -628,7 +629,9 @@ def test_starting_the_worker(
     assert seen == [
         {
             "text": 3,
-            "lookup": 2,
+            "arxiv": 1,
+            "crossref": 2,
+            "openalex": 2,
             "ml": 1,
             "ocr": 1,
             "layout": 3,

@@ -12,6 +12,7 @@ paper. It is listed in the report ("Not recognised: …") instead.
 
 import logging
 import re
+import threading
 import time
 import unicodedata
 from typing import Any
@@ -79,11 +80,14 @@ class Pacer:
     def __init__(self, pause: float) -> None:
         self.pause = pause
         self.last: float | None = None
+        self._turn = threading.Lock()
 
     def __call__(self) -> None:
-        if self.last is not None:
-            time.sleep(max(0.0, self.last + self.pause - time.monotonic()))
-        self.last = time.monotonic()
+        # One caller at a time (jobs run side by side): each waits its turn.
+        with self._turn:
+            if self.last is not None:
+                time.sleep(max(0.0, self.last + self.pause - time.monotonic()))
+            self.last = time.monotonic()
 
 
 def _complete(paper: Reference, http: httpx2.Client, pacer: Pacer) -> None:

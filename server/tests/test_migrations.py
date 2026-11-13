@@ -184,16 +184,19 @@ def test_0014_labels_preprints_by_their_pdfs_arxiv_version(
     )
 
 
-def test_0015_moves_waiting_lookups_to_their_own_queue(
+def test_0015_0017_move_waiting_lookups_to_their_queues(
     db: Session, database_url: str
 ) -> None:
     """An installation of 0.1.0 updated with lookups waiting behind files to
-    read: they move to "lookup"; the files stay, as do lookups running."""
+    read: they move to "lookup" (0015), then to their service's queue
+    (0017); the files stay, as do lookups running."""
     config = Config(SERVER_DIR / "alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
     command.downgrade(config, "0014")
     rows = [
         ("paperus:find_item_references", "todo"),
+        ("paperus:find_new_published_versions", "todo"),
+        ("paperus:look_up_authors", "todo"),
         ("paperus:fetch_open_access", "doing"),
         ("paperus:extract_text", "todo"),
     ]
@@ -218,7 +221,20 @@ def test_0015_moves_waiting_lookups_to_their_own_queue(
         ).scalar_one()
         for job_id in ids
     ]
-    assert queues == ["lookup", "text", "text"]
+    assert queues == ["crossref", "arxiv", "openalex", "text", "text"]
+    # And back.
+    db.close()
+    command.downgrade(config, "0016")
+    queues = [
+        db.execute(
+            text("SELECT queue_name FROM procrastinate_jobs WHERE id = :id"),
+            {"id": job_id},
+        ).scalar_one()
+        for job_id in ids
+    ]
+    assert queues == ["lookup", "lookup", "lookup", "text", "text"]
+    db.close()
+    command.upgrade(config, "head")
     db.execute(
         text("DELETE FROM procrastinate_jobs WHERE id = ANY(:ids)"), {"ids": ids}
     )

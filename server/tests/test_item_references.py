@@ -475,6 +475,36 @@ def test_from_crossref(
         item_references.from_crossref(http, "10.1000/engines", NO_PAUSE)
 
 
+def test_a_journals_paper_asks_crossref_first(
+    client: TestClient, db: Session, sources: FakeSources, http: httpx2.Client
+) -> None:
+    """Published and on arXiv: Crossref's list, without arXiv's 3 s pause or
+    download; arXiv's source only if Crossref has none, and not where
+    arXiv may not be asked (the job then goes on in arXiv's queue)."""
+    ada = Person(client, db, "ada")
+    both = paper(ada, "Engines", doi="10.1000/engines", arxiv="2611.00001")
+    sources.e_prints["2611.00001"] = tar_gz({"main.bbl": BBL.encode()})
+    sources.works["10.1000/engines"] = [{"key": "r1", "DOI": LOVELACE_DOI}]
+    sources.asked.clear()
+    assert check(db, http, both) == 1
+    assert item_of(db, both).references_source == "crossref"
+    assert not [url for url in sources.asked if "arxiv" in url]
+
+    sources.works["10.1000/engines"] = []
+    with pytest.raises(item_references.NeedsArxiv):
+        item_references.check(db, http, item_of(db, both), pacers=NO_PAUSE, arxiv=False)
+    assert check(db, http, both) == 3
+    assert item_of(db, both).references_source == "arxiv"
+    # A preprint alone: arXiv straight away (its own DOI is DataCite's).
+    preprint = paper(ada, "Sketch", doi="10.48550/arXiv.2611.00002", arxiv="2611.00002")
+    sources.asked.clear()
+    with pytest.raises(item_references.NeedsArxiv):
+        item_references.check(
+            db, http, item_of(db, preprint), pacers=NO_PAUSE, arxiv=False
+        )
+    assert sources.asked == []
+
+
 def test_from_the_pdf(
     client: TestClient,
     db: Session,
@@ -560,13 +590,14 @@ def test_which_papers_wait(
     ada.delete(f"/api/items/{trashed['id']}")
     waiting = [str(i.id) for i in item_references.waiting(db)]
     assert waiting == [first["id"], second["id"]]
-    looked, found = item_references.check_waiting(db, http, pacers=NO_PAUSE)
-    assert (looked, found) == (2, 0)
+    for item in item_references.waiting(db):
+        assert item_references.check(db, http, item, pacers=NO_PAUSE) == 0
     assert item_references.waiting(db) == []
     # A paper without list gets a file: looked at again.
     attach_pdf(ada, db, blobs, first, make_pdf([REFERENCE_PAGE]))
-    assert [str(i.id) for i in item_references.waiting(db)] == [first["id"]]
-    assert item_references.check_waiting(db, http, pacers=NO_PAUSE) == (1, 1)
+    [again] = item_references.waiting(db)
+    assert str(again.id) == first["id"]
+    assert item_references.check(db, http, again, pacers=NO_PAUSE) == 3
     assert item_references.waiting(db) == []
 
 
@@ -822,7 +853,12 @@ def test_the_hourly_job(
     configure(db, settings, find_references=True)
     jobs.queue_reference_lists(worker)
     jobs.queue_reference_lists(worker)  # once is enough
-    assert run_jobs(worker) == {"find_reference_lists succeeded": 1}
+    # Each paper's own lookup, at Crossref's queue first: a preprint goes on
+    # in arXiv's (one job there, the list from its LaTeX source).
+    assert run_jobs(worker) == {
+        "find_reference_lists succeeded": 1,
+        "find_item_references succeeded": 2,
+    }
     assert item_of(db, preprint).references_source == "arxiv"
     # Readers of the paper may ask too; others not; not in the trash.
     bob = Person(client, db, "bob")

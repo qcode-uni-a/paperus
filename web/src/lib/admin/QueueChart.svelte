@@ -2,10 +2,14 @@
 	import type { Sample } from '#lib/admin/data.svelte.ts';
 	import { formatTime } from '#lib/dates.svelte.ts';
 
-	/** One queue over the last two minutes: jobs waiting or running (the
-	 * area) and jobs finished per minute (the dashed line), each on its own
-	 * scale (left and right), with times along the bottom. */
-	let { samples, queue, color }: { samples: Sample[]; queue: string; color: string } = $props();
+	/** Queues (one, or several added up) over the last two minutes: jobs
+	 * waiting or running (the area) and jobs finished per minute (the dashed
+	 * line), each on its own scale (left and right), with times along the
+	 * bottom. */
+	let { samples, queues, color }: { samples: Sample[]; queues: readonly string[]; color: string } =
+		$props();
+	/** A sample's count for the queues together. */
+	const sum = (by: Record<string, number>) => queues.reduce((n, q) => n + (by[q] ?? 0), 0);
 
 	const WINDOW = 2 * 60_000;
 	const W = 520;
@@ -21,11 +25,11 @@
 		const end = samples.at(-1)?.at ?? Date.now();
 		const shown = samples.filter((s) => s.at >= end - WINDOW);
 		const x = (at: number) => W - ((end - at) / WINDOW) * W;
-		const load = shown.map((s) => (s.waiting[queue] ?? 0) + (s.running[queue] ?? 0));
+		const load = shown.map((s) => sum(s.waiting) + sum(s.running));
 		const rate = shown.map((s) => {
 			const before = samples.find((b) => b.at >= s.at - 60_000);
 			if (!before || s.at - before.at < 5_000) return 0;
-			const finished = Math.max(0, (s.done[queue] ?? 0) - (before.done[queue] ?? 0));
+			const finished = Math.max(0, sum(s.done) - sum(before.done));
 			return (finished * 60_000) / (s.at - before.at);
 		});
 		const loadTop = nice(Math.max(0, ...load));

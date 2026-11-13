@@ -3,11 +3,16 @@
 ## Unreleased
 
 - **Reading files no longer waits behind lookups**: reference lists,
-  open-access copies, journal versions and authors are looked up in a
-  queue of their own ("Looking things up" under Jobs), so files are read
-  at full speed instead of between the pauses arXiv and others ask for
-  (after a large import, about 10 files a minute). Lookups waiting at the
-  update move there too, and "Reading files" counts only files.
+  open-access copies, journal versions and authors are looked up in
+  queues of their own, one per service (arXiv, Crossref, OpenAlex; under
+  Jobs as one card, "Looking things up"), so files are read at full speed
+  instead of between the pauses arXiv asks for (after a large import,
+  about 10 files a minute), and no service's lookups wait behind
+  another's. Lookups waiting at the update move there too, and "Reading
+  files" counts only files.
+- **Reference lists of journals' papers from Crossref first**: on our
+  papers as complete as arXiv's LaTeX sources, more often with DOIs, and
+  without arXiv's 3 s pause and download; preprints still from arXiv.
 - **"Last active" instead of "last login"** among the users: any use of
   paperus (website, app, extension, assistant), not only logging in,
   which happens every few weeks.

@@ -83,11 +83,14 @@ from paperus.system import (
 
 log = logging.getLogger(__name__)
 
-# Looking things up at arXiv, Crossref, OpenAlex and publishers (reference
-# lists, open-access copies, journal versions, authors): a queue of its
-# own, so files are not read only between the pauses those services ask
-# for.
-LOOKUP = "lookup"
+# Looking things up (reference lists, open-access copies, journal versions,
+# authors): a queue per service, apart from reading files, so neither waits
+# behind the pauses another service asks for. arXiv one at a time (3 s
+# apart: LaTeX sources, journal versions); Crossref (reference lists of
+# journals' papers) and OpenAlex (authors, open-access copies, details).
+ARXIV = "arxiv"
+CROSSREF = "crossref"
+OPENALEX = "openalex"
 
 tasks = Blueprint()
 
@@ -116,16 +119,20 @@ def _queue(
     task: str,
     lock: str,
     priority: int | None = None,
+    queue: str | None = None,
     **arguments: JSONValue,
 ) -> bool:
-    """Queue a job, unless one with the same lock is queued already; whether
-    it was queued.
+    """Queue a job (in its task's queue, or ``queue``), unless one with the
+    same lock is queued already; whether it was queued.
 
     By task name through ``app``: the blueprint's task objects are shared
     between apps (e.g. in tests).
     """
-    deferrer = app.configure_task(
-        f"paperus:{task}", queueing_lock=lock, priority=priority
+    name = f"paperus:{task}"
+    deferrer = (
+        app.configure_task(name, queueing_lock=lock, priority=priority, queue=queue)
+        if queue
+        else app.configure_task(name, queueing_lock=lock, priority=priority)
     )
     try:
         deferrer.defer(**arguments)
@@ -368,7 +375,7 @@ def queue_pending_files(job: JobContext, timestamp: int) -> None:
 
 
 # Papers without a file (Manage → Missing → Try all): one download each.
-@tasks.task(name="fetch_open_access", queue=LOOKUP, pass_context=True)
+@tasks.task(name="fetch_open_access", queue=OPENALEX, pass_context=True)
 def fetch_open_access(
     job: JobContext, item_id: str, user_id: str | None, section: str = "file"
 ) -> None:
@@ -423,7 +430,7 @@ NEW_PUBLISHED_PER_RUN = 500
 @tasks.periodic(cron="20 * * * *")
 @tasks.task(
     name="find_published_versions",
-    queue=LOOKUP,
+    queue=ARXIV,
     lock=PUBLISHED_LOCK,
     queueing_lock="find-published",
     pass_context=True,
@@ -438,7 +445,7 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
 @tasks.periodic(cron="*/5 * * * *")
 @tasks.task(
     name="find_new_published_versions",
-    queue=LOOKUP,
+    queue=ARXIV,
     lock=PUBLISHED_LOCK,
     queueing_lock="find-new-published",
     pass_context=True,
@@ -495,7 +502,7 @@ def new_preprints(db: Session, settings: Settings) -> bool:
 @tasks.periodic(cron="*/5 * * * *")
 @tasks.task(
     name="link_authors",
-    queue=LOOKUP,
+    queue=OPENALEX,
     lock="link-authors",
     queueing_lock="link-authors",
     pass_context=True,
@@ -513,7 +520,7 @@ def link_authors(job: JobContext, timestamp: int) -> None:
 @tasks.periodic(cron="50 * * * *")
 @tasks.task(
     name="look_up_authors",
-    queue=LOOKUP,
+    queue=OPENALEX,
     lock="link-authors",
     queueing_lock="look-up-authors",
     pass_context=True,
@@ -539,42 +546,42 @@ def queue_author_linking(app: App) -> None:
     _queue(app, "look_up_authors", "look-up-authors", timestamp=0)
 
 
-# Papers' reference lists (Administration → Settings → Server). One job at a
-# time (the lock), so the pauses between requests to arXiv hold.
-REFERENCES_LOCK = "find-references"
+# Papers' reference lists (Administration → Settings → Server): the pauses
+# between requests hold by the queues (arXiv's one job at a time) and the
+# shared pacers (``item_references.PACERS``).
 
 
 @tasks.periodic(cron="40 * * * *")
 @tasks.task(
     name="find_reference_lists",
-    queue=LOOKUP,
-    lock=REFERENCES_LOCK,
+    queue=OPENALEX,
     queueing_lock="find-reference-lists",
     pass_context=True,
 )
 def find_reference_lists(job: JobContext, timestamp: int) -> None:
-    """A few dozen papers an hour, never looked at first: their reference
-    lists from arXiv, Crossref or their PDFs (``paperus.item_references``)."""
+    """A few dozen papers an hour, never looked at first: each one's own
+    lookup queued (``find_item_references``), in the queue of the service
+    it asks."""
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
         if not config.find_references:
             return
-        looked, found = item_references.check_waiting(
-            db, context.http, contact_email=config.contact_email
-        )
-    log.info("reference lists: %d found for %d papers", found, looked)
+        waiting = [item.id for item in item_references.waiting(db)]
+    for item_id in waiting:
+        queue_references(job.app, item_id)
+    log.info("reference lists: %d papers to look at", len(waiting))
 
 
 @tasks.task(
     name="find_item_references",
-    queue=LOOKUP,
-    lock=REFERENCES_LOCK,
+    queue=CROSSREF,
     pass_context=True,
 )
 def find_item_references(job: JobContext, item_id: str, again: bool = False) -> None:
     """One paper's reference list: after its file was read (if it has none
-    yet, and the setting is on), or ``again`` when someone asks."""
+    yet, and the setting is on), or ``again`` when someone asks. Queued for
+    Crossref; one that needs arXiv's source goes on in arXiv's queue."""
     context = _worker_context()
     with context.sessions() as db:
         config = load_config(db, context.settings)
@@ -583,20 +590,31 @@ def find_item_references(job: JobContext, item_id: str, again: bool = False) -> 
             again or (config.find_references and item.references_source is None)
         ):
             return
-        item_references.check(
-            db, context.http, item, contact_email=config.contact_email
-        )
+        try:
+            item_references.check(
+                db,
+                context.http,
+                item,
+                contact_email=config.contact_email,
+                arxiv=job.job.queue == ARXIV,
+            )
+        except item_references.NeedsArxiv:
+            db.rollback()
+            queue_references(job.app, item.id, again=again, queue=ARXIV)
 
 
 def queue_reference_lists(app: App) -> None:
     _queue(app, "find_reference_lists", "find-reference-lists", timestamp=0)
 
 
-def queue_references(app: App, item_id: uuid.UUID, *, again: bool = False) -> None:
+def queue_references(
+    app: App, item_id: uuid.UUID, *, again: bool = False, queue: str = CROSSREF
+) -> None:
     _queue(
         app,
         "find_item_references",
         f"references-{item_id}",
+        queue=queue,
         item_id=str(item_id),
         again=again,
     )
@@ -610,7 +628,7 @@ OPEN_ACCESS_PER_SWEEP = 200
 @tasks.periodic(cron="*/10 * * * *")
 @tasks.task(
     name="queue_open_access_sweep",
-    queue=LOOKUP,
+    queue=OPENALEX,
     queueing_lock="open-access-sweep",
     pass_context=True,
 )
@@ -671,12 +689,14 @@ LIMITS_SECONDS = 30.0
 
 def job_limits(config: SystemConfig) -> dict[str, int]:
     """Jobs at once per queue (Administration → Settings → Job settings);
-    one maintenance job (backups, trash, integrity) at a time, and two
-    lookups (they mostly wait: for the services and the pauses they ask
-    for, which all lookups share)."""
+    one maintenance job (backups, trash, integrity) at a time; lookups by
+    service, arXiv's one at a time (they mostly wait: for the services and
+    the pauses they ask for)."""
     return {
         "text": config.jobs_text,
-        LOOKUP: 2,
+        ARXIV: 1,
+        CROSSREF: 2,
+        OPENALEX: 2,
         "ml": config.jobs_ml,
         "ocr": 1,
         "layout": config.jobs_text,
