@@ -9,8 +9,9 @@
 	import Icon from '#lib/Icon.svelte';
 
 	/** What happened that concerns the person (server: paperus.notifications):
-	 * papers added to their groups, published versions found, the zips of
-	 * their exports as they are written. The count of
+	 * papers added to their groups or shared with them, being added to a
+	 * group, published versions and corrections found, the zips of their
+	 * exports as they are written. The count of
 	 * unread ones on the bell; opening the list marks them read (they stay
 	 * marked as new while it is open). */
 	const WIDTH = 340;
@@ -26,6 +27,22 @@
 		if (!data) return;
 		notices = data.notifications;
 		unread = data.unread;
+		celebrate();
+	}
+
+	/** One's own paper published: a few sparkles round the bell, once in
+	 * this page while it is new, and a star on its line in the list. */
+	const yours = (notice: NotificationOut) =>
+		notice.kind === 'published' && Boolean((notice.data as Record<string, unknown>).yours);
+	const SPARKLING = 3200;
+	let sparkle = $state(false);
+	const celebrated = new Set<number>();
+	function celebrate() {
+		const news = notices.filter((n) => !n.read && yours(n) && !celebrated.has(n.id));
+		if (!news.length) return;
+		for (const notice of news) celebrated.add(notice.id);
+		sparkle = true;
+		setTimeout(() => (sparkle = false), SPARKLING);
 	}
 
 	// At once when the library changes (a paper added to a group, say).
@@ -76,19 +93,36 @@
 		const item = d.item_id ? resolve('/items/[id]', { id: String(d.item_id) }) : resolve('/');
 		if (notice.kind === 'added') {
 			const count = Number(d.count ?? 1);
-			return count === 1
-				? { text: `${d.actor} added “${d.title || 'a paper'}” to ${d.group}`, href: item }
-				: {
-						text: `${d.actor} added ${plural(count)} to ${d.group}`,
+			// In a group of people: shared with one (its name is just its people).
+			const what = count === 1 ? `“${d.title || 'a paper'}”` : plural(count);
+			const text = d.people
+				? `${d.actor} shared ${what} with you`
+				: `${d.actor} added ${what} to ${d.group}`;
+			return { text, href: count === 1 ? item : `${resolve('/')}?owner=${d.library_id}` };
+		}
+		if (notice.kind === 'joined') {
+			const papers = Number(d.papers ?? 0);
+			return d.people
+				? {
+						text: `${d.actor} shared ${plural(papers)} with you (${d.group})`,
 						href: `${resolve('/')}?owner=${d.library_id}`
+					}
+				: {
+						text: `${d.actor} added you to ${d.group}`,
+						href: `${resolve('/manage/groups')}?group=${d.group_id}`
 					};
+		}
+		if (notice.kind === 'erratum') {
+			return { text: `A correction to “${d.title}”: ${d.erratum}`, href: item };
 		}
 		if (notice.kind === 'published') {
 			const where = [d.journal, d.year ? `(${d.year})` : null].filter(Boolean).join(' ');
-			return {
-				text: `Published${where ? ` in ${where}` : ''}: “${d.title}”`,
-				href: item
-			};
+			if (d.yours)
+				return {
+					text: `Congratulations! Your paper is ${where ? `published in ${where}` : 'out'}: “${d.title}”`,
+					href: item
+				};
+			return { text: `Published${where ? ` in ${where}` : ''}: “${d.title}”`, href: item };
 		}
 		// An export's zip, to download: a link the browser follows itself
 		// (once the zip is gone, the server sends it on to the exports).
@@ -138,6 +172,7 @@
 >
 	<Icon path={mdiBellOutline} size={20} />
 	{#if unread}<span class="count" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>{/if}
+	{#if sparkle}<span class="sparkles" aria-hidden="true"><i></i><i></i><i></i></span>{/if}
 </button>
 <div
 	id="notifications"
@@ -156,9 +191,12 @@
 		<ul>
 			{#each notices as notice (notice.id)}
 				{@const { text, href, reload } = told(notice)}
-				<li class:new={fresh.has(notice.id)}>
+				<li class:new={fresh.has(notice.id)} class:yours={yours(notice)}>
+					{#if yours(notice)}<span class="sparkles round" aria-hidden="true"
+							><i></i><i></i><i></i><i></i></span
+						>{/if}
 					<a {href} data-sveltekit-reload={reload || undefined} onclick={() => menu?.hidePopover()}
-						>{text}</a
+						>{#if yours(notice)}<span class="star" aria-hidden="true"></span>{/if}{text}</a
 					>
 					<time datetime={notice.at}>{ago(notice.at)}</time>
 				</li>
@@ -166,8 +204,8 @@
 		</ul>
 	{:else}
 		<p class="muted">
-			Nothing yet. Papers others add to your groups, published versions found for your preprints,
-			and your exports as they are ready, are told here.
+			Nothing yet. Papers others add to your groups or share with you, published versions and
+			corrections found for your papers, and your exports as they are ready, are told here.
 		</p>
 	{/if}
 </div>
@@ -245,6 +283,116 @@
 	li a:hover {
 		color: var(--royal);
 		text-decoration: underline;
+	}
+	/* One's own paper published: gold sparkles, briefly. */
+	.sparkles {
+		position: absolute;
+		inset: -3px;
+		pointer-events: none;
+	}
+	.sparkles i,
+	.star {
+		display: block;
+		background: color-mix(in srgb, var(--highlighter) 55%, var(--tag-amber-ink));
+		clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+	}
+	.sparkles i {
+		position: absolute;
+		width: 9px;
+		height: 9px;
+		opacity: 0;
+		animation: twinkle 1.3s ease-in-out 2 both;
+	}
+	.sparkles i:nth-child(1) {
+		top: 0;
+		left: 1px;
+	}
+	.sparkles i:nth-child(2) {
+		top: 5px;
+		right: -3px;
+		width: 7px;
+		height: 7px;
+		animation-delay: 0.3s;
+	}
+	.sparkles i:nth-child(3) {
+		bottom: -1px;
+		left: 9px;
+		width: 6px;
+		height: 6px;
+		animation-delay: 0.6s;
+	}
+	@keyframes twinkle {
+		0% {
+			opacity: 0;
+			transform: scale(0.2) rotate(0);
+		}
+		45% {
+			opacity: 1;
+			transform: scale(1) rotate(45deg);
+		}
+		100% {
+			opacity: 0;
+			transform: scale(0.2) rotate(90deg);
+		}
+	}
+	li.yours {
+		position: relative;
+		background: color-mix(in srgb, var(--highlighter) 16%, transparent);
+	}
+	/* Round one's own published paper in the list, as the list opens. */
+	.sparkles.round {
+		inset: 0;
+	}
+	.round i:nth-child(1) {
+		top: -4px;
+		left: 14px;
+	}
+	.round i:nth-child(2) {
+		top: 6px;
+		right: 6px;
+		left: auto;
+		width: 8px;
+		height: 8px;
+	}
+	.round i:nth-child(3) {
+		bottom: -3px;
+		left: 45%;
+		width: 7px;
+		height: 7px;
+	}
+	.round i:nth-child(4) {
+		bottom: 10px;
+		left: -3px;
+		width: 6px;
+		height: 6px;
+		animation-delay: 0.9s;
+	}
+	.star {
+		display: inline-block;
+		width: 0.85em;
+		height: 0.85em;
+		margin-right: 6px;
+		vertical-align: -0.05em;
+		animation: shine 1.2s ease-out both;
+	}
+	@keyframes shine {
+		from {
+			transform: scale(0.3) rotate(-45deg);
+		}
+		60% {
+			transform: scale(1.2) rotate(10deg);
+		}
+		to {
+			transform: none;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.sparkles {
+			display: none;
+		}
+		.star {
+			animation: none;
+		}
 	}
 	time {
 		font-size: var(--step--1);

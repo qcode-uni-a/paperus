@@ -23,7 +23,7 @@ import httpx2
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from paperus import item_references, library, metadata
+from paperus import item_references, library, metadata, notifications
 from paperus.identifiers import Scheme, is_arxiv_doi, normalize
 from paperus.item_references import SourceUnavailable
 from paperus.models import Identifier, Item, MetadataSource, Version, VersionKind
@@ -267,4 +267,5 @@ def add(db: Session, http: httpx2.Client, item: Item, doi: str, cited: str) -> b
         log.info("erratum %s of %s is a paper of its own", value, item.id)
         return False
     log.info("erratum of %s: %s", item.id, value)
+    notifications.erratum(db, item, cited)
     return True

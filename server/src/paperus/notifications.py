@@ -1,12 +1,17 @@
-"""Notifications: what happened that concerns a person and that they did
-not do themselves, under the bell in the header. Papers added to one of
-their groups (by upload, DOI, the extension, an import, or given to the
+"""Notifications: what happened that concerns a person (mostly what they
+did not do themselves), under the bell in the header. Papers added to one
+of their groups (by upload, DOI, the extension, an import, or given to the
 group: one notification per person who added and group, counted up while
-unread for a few hours), a published version found for one of their
-preprints, each zip of their export as it is written (or the export
-failing), and the end of their imports, which may take long. Read ones go
-after ``KEEP_READ``, all after ``KEEP`` (the
-nightly tidy-up).
+unread for a few hours); a published version found for one of their
+preprints (told apart where it is their own paper: they are among its
+authors by their ORCID iD; their own paper is also told, to celebrate,
+when it comes less than a week after it came out, however it comes and
+whoever adds it); a correction (erratum) found for one of their papers;
+being added to a group by someone else (to a group of people: once it has
+papers, else the papers' own notice says it); each zip of their export as
+it is written (or the export failing); and the end of their imports,
+which may take long. Read ones go after ``KEEP_READ``, all after ``KEEP``
+(the nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
 so every way of adding them counts; the person who did it is the one who
@@ -14,14 +19,18 @@ added a new paper, or for a paper given to the group the one acting
 (``db.info["paperus_actor"]``, set per request).
 """
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from itertools import chain
 from typing import Any
 
 from sqlalchemy import delete, event, func, insert, inspect, or_, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.models import (
+    Author,
+    Authorship,
     Group,
     Import,
     ImportStatus,
@@ -35,6 +44,9 @@ from paperus.models import (
 
 KEEP_READ = timedelta(days=30)
 KEEP = timedelta(days=90)
+FRESH = timedelta(days=7)
+"""A paper out less than this long ago, when it comes: one's own is
+celebrated (``_fresh``)."""
 ONE_NOTICE = timedelta(hours=6)
 """Papers added by the same person to the same group within this, while
 unread, are one notification."""
@@ -44,6 +56,8 @@ PUBLISHED = "published"
 EXPORT = "export"
 EXPORT_FAILED = "export_failed"
 IMPORT = "import"
+ERRATUM = "erratum"
+JOINED = "joined"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -112,13 +126,15 @@ def _added(
                     "count": len(items),
                     "item_id": str(first.id),
                     "title": first.title,
+                    "people": group.people,
                 },
             )
         )
 
 
 def published(db: Session, item: Item, version: Version) -> None:
-    """A published version found for the paper: for everyone it concerns."""
+    """A published version found for the paper: for everyone it concerns;
+    for those among its authors as their own paper (once a paper)."""
     csl: dict[str, Any] = version.csl
     journal = csl.get("container-title")
     if isinstance(journal, list):
@@ -130,8 +146,134 @@ def published(db: Session, item: Item, version: Version) -> None:
         "journal": journal,
         "year": issued[0][0] if issued and issued[0] else None,
     }
+    people = people_of(db, item.library_id)
+    yours = _authors_here(db, item, people, [version])
+    for user_id in people:
+        db.add(
+            Notification(
+                user_id=user_id,
+                kind=PUBLISHED,
+                data={**data, "yours": True} if user_id in yours else data,
+            )
+        )
+
+
+def _authors_here(
+    db: Session, item: Item, people: list[uuid.UUID], versions: list[Version]
+) -> set[uuid.UUID]:
+    """Those of ``people`` among the paper's authors (by their ORCID iD),
+    not yet told it is their own paper."""
+    authors = _orcids(db, item, versions)
+    if not authors:
+        return set()
+    told = select(Notification.user_id).where(
+        Notification.kind == PUBLISHED,
+        Notification.data["item_id"].astext == str(item.id),
+        Notification.data["yours"].as_boolean(),
+    )
+    return set(
+        db.scalars(
+            select(User.id).where(
+                User.id.in_(people), User.orcid.in_(authors), User.id.not_in(told)
+            )
+        )
+    )
+
+
+def _fresh(db: Session, item: Item) -> None:
+    """A paper out less than ``FRESH`` ago, by its exact date, now in a
+    library: for those among its authors, their own paper published (also
+    for whoever added it: it is to be celebrated)."""
+    people = people_of(db, item.library_id)
+    yours = _authors_here(db, item, people, list(item.versions))
+    connection = db.connection()
+    for user_id in yours:
+        connection.execute(
+            insert(Notification).values(
+                user_id=user_id,
+                kind=PUBLISHED,
+                data={
+                    "item_id": str(item.id),
+                    "title": item.title,
+                    "journal": item.journal,
+                    "year": item.year,
+                    "yours": True,
+                    "fresh": True,
+                },
+            )
+        )
+
+
+_ORCID = re.compile(r"\d{4}-\d{4}-\d{4}-\d{3}[\dX]")
+
+
+def _orcids(db: Session, item: Item, versions: list[Version]) -> set[str]:
+    """The ORCID iDs of the paper's authors: of the people linked to its
+    authorships, the authorships' own, and the versions' author lists
+    (before their authors are linked)."""
+    found = set(
+        db.scalars(
+            select(Author.orcid)
+            .join(Authorship, Authorship.author_id == Author.id)
+            .where(Authorship.item_id == item.id, Author.orcid.is_not(None))
+        )
+    )
+    found |= set(
+        db.scalars(
+            select(Authorship.orcid).where(
+                Authorship.item_id == item.id, Authorship.orcid.is_not(None)
+            )
+        )
+    )
+    for version in versions:
+        for author in version.csl.get("author") or []:
+            if isinstance(author, dict) and (
+                match := _ORCID.search(str(author.get("ORCID") or ""))
+            ):
+                found.add(match.group())
+    return {orcid for orcid in found if orcid}
+
+
+def erratum(db: Session, item: Item, cited: str) -> None:
+    """A correction found for the paper (``errata``): for everyone it
+    concerns; ``cited``: how it is cited ("Erratum: Phys. Rev. B 96, …")."""
+    data = {"item_id": str(item.id), "title": item.title, "erratum": cited}
     for user_id in people_of(db, item.library_id):
-        db.add(Notification(user_id=user_id, kind=PUBLISHED, data=data))
+        db.add(Notification(user_id=user_id, kind=ERRATUM, data=data))
+
+
+def _joined(db: Session, membership: Membership) -> None:
+    group = db.get(Group, membership.group_id)
+    who = db.get(User, membership.added_by) if membership.added_by else None
+    if group is None or who is None:
+        return
+    connection = db.connection()
+    library_id = connection.scalar(
+        select(Library.id).where(Library.group_id == group.id)
+    )
+    papers = connection.scalar(
+        select(func.count())
+        .select_from(Item)
+        .where(Item.library_id == library_id, Item.deleted_at.is_(None))
+    )
+    # A group of people just made for a paper: its paper's notice says it.
+    if group.people and not papers:
+        return
+    connection.execute(
+        insert(Notification).values(
+            user_id=membership.user_id,
+            kind=JOINED,
+            data={
+                "group_id": str(group.id),
+                "library_id": str(library_id),
+                "group": group.name,
+                "people": group.people,
+                "papers": papers or 0,
+                "actor_id": str(who.id),
+                "actor": who.display_name or who.username,
+            },
+        )
+    )
 
 
 def export_ready(
@@ -197,9 +339,29 @@ def prune(db: Session, now: datetime | None = None) -> int:
 def _note_additions(db: Session, flush: UOWTransaction, instances: object) -> None:
     """Papers new in a library, or given to another: noted, with who did it."""
     pending = db.info.setdefault("paperus_added", [])
+    joined = db.info.setdefault("paperus_joined", [])
+    fresh = db.info.setdefault("paperus_fresh", [])
+    today = datetime.now(UTC).date()
+    for obj in chain(db.new, db.dirty):
+        # Out a few days ago (its exact day), new here or dated now.
+        if (
+            isinstance(obj, Item)
+            and obj.issued_from is not None
+            and obj.issued_from == obj.issued_to
+            and today - FRESH <= obj.issued_from <= today + timedelta(days=1)
+            and (obj in db.new or inspect(obj).attrs.issued_from.history.has_changes())
+        ):
+            fresh.append(obj)
     for obj in db.new:
         if isinstance(obj, Item) and obj.added_by is not None:
             pending.append((obj, obj.added_by))
+        # Added to a group by someone else.
+        if (
+            isinstance(obj, Membership)
+            and obj.added_by is not None
+            and obj.added_by != obj.user_id
+        ):
+            joined.append(obj)
     actor = db.info.get("paperus_actor")
     if actor is None:
         return
@@ -213,6 +375,14 @@ def _note_additions(db: Session, flush: UOWTransaction, instances: object) -> No
 
 @event.listens_for(Session, "after_flush_postexec")
 def _notify_additions(db: Session, flush: UOWTransaction) -> None:
+    joined: list[Membership] = db.info.pop("paperus_joined", [])
+    fresh: list[Item] = db.info.pop("paperus_fresh", [])
+    with db.no_autoflush:
+        for membership in joined:
+            _joined(db, membership)
+        for item in fresh:
+            if inspect(item).persistent and item.library_id is not None:
+                _fresh(db, item)
     pending: list[tuple[Item, uuid.UUID]] = db.info.pop("paperus_added", [])
     batches: dict[tuple[uuid.UUID, uuid.UUID], list[Item]] = {}
     for item, actor in pending:
@@ -226,3 +396,5 @@ def _notify_additions(db: Session, flush: UOWTransaction) -> None:
 @event.listens_for(Session, "after_rollback")
 def _forget(db: Session) -> None:
     db.info.pop("paperus_added", None)
+    db.info.pop("paperus_joined", None)
+    db.info.pop("paperus_fresh", None)

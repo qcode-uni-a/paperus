@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Your paper is published: congratulations!** When one of your own
+  papers (you are among its authors by your ORCID iD, set under Settings)
+  is published, the bell says so with a few sparkles: when its published
+  version is found for your preprint, or when the paper comes into a
+  library less than a week after it came out, however it comes and
+  whoever adds it. Once a paper.
+- **More under the bell**: a paper shared with you ("Ann shared “…” with
+  you"), being added to a group by someone ("Ann added you to Lab"; to a
+  group of people, what is shared with you there), and a correction
+  (erratum) found for one of your papers.
 - **Saving an edit no longer fails now and then**: saving a paper's
   details (Edit) while paperus was still working on the same paper (just
   after its upload: its reference list, its authors) could end in

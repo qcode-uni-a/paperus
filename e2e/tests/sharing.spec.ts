@@ -76,13 +76,17 @@ test('a paper shared with a group is seen by its members only', async ({ page, b
 
 	// bob, in the group, finds the shared paper but not the private one.
 	const asBob = await logIn(browser, bob.username, bob.password);
-	// He is told, under the bell: the administrator added the paper.
-	const bell = asBob.page.getByRole('button', { name: 'Notifications: 1 new' });
+	// He is told, under the bell: the administrator added him to the group,
+	// and the paper.
+	const bell = asBob.page.getByRole('button', { name: 'Notifications: 2 new' });
 	await expect(bell).toBeVisible();
 	await bell.click();
 	const notices = asBob.page.getByRole('dialog', { name: 'Notifications' });
 	await expect(
 		notices.getByRole('link', { name: `admin added “${paper.title}” to ${groupName}` })
+	).toBeVisible();
+	await expect(
+		notices.getByRole('link', { name: `admin added you to ${groupName}` })
 	).toBeVisible();
 	await asBob.page.keyboard.press('Escape');
 	await expect(
@@ -182,8 +186,17 @@ test('a paper shared with a single person', async ({ page, browser }) => {
 		a.page.getByText('Shared with Ann Lee & Ben Ott').filter({ visible: true })
 	).toBeVisible();
 
-	// Ben sees it, and the two of them under Groups, apart.
+	// Ben is told under the bell, and sees it; the two of them under
+	// Groups, apart.
 	await b.page.goto('/');
+	const bell = b.page.getByRole('button', { name: 'Notifications: 1 new' });
+	await bell.click();
+	await expect(
+		b.page
+			.getByRole('dialog', { name: 'Notifications' })
+			.getByRole('link', { name: `Ann Lee shared “${title}” with you` })
+	).toBeVisible();
+	await b.page.keyboard.press('Escape');
 	await expect(b.page.getByRole('link', { name: title })).toBeVisible();
 	await b.page.goto('/manage/groups');
 	await expect(b.page.getByRole('heading', { name: 'Shared with people' })).toBeVisible();

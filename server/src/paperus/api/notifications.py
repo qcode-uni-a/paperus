@@ -19,8 +19,13 @@ class NotificationOut(BaseModel):
     id: int
     kind: str
     """"added": papers added to a group (``data``: group, library_id,
-    actor, count, item_id and title of the first); "published": a
-    published version found (item_id, title, journal, year); "export": a
+    actor, count, item_id and title of the first, people: a group of
+    people's, i.e. shared with one); "published": a published version
+    found (item_id, title, journal, year; yours: the person is among its
+    authors); "erratum": a correction found
+    (item_id, title, erratum: how it is cited); "joined": added to a group
+    by someone (group_id, library_id, group, people, papers: how many it
+    has, actor); "export": a
     zip of one's export written (export_id, part, parts; the last part:
     the export is done); "export_failed": the export failed (export_id);
     "import": an import ended (import_id, filename, failed, and the

@@ -927,7 +927,8 @@ class Notification(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(32))
-    """"added", "published", "export" or "export_failed"."""
+    """"added", "published", "erratum", "joined", "export", "export_failed"
+    or "import"."""
     data: Mapped[dict[str, Any]] = mapped_column(JSONB)
     """What to say: the paper, the group, who, how many; the export and
     which part."""

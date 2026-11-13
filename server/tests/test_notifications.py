@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from paperus import notifications
-from paperus.models import Item, Notification
+from paperus.models import Item, Notification, User
 from tests.people import Person, group
 
 
@@ -28,8 +28,9 @@ def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
     ada.add("Ada's own notes")  # her own library: nobody else's business
 
     found = listed(bob)
-    assert found["unread"] == 1
-    [notice] = found["notifications"]
+    assert found["unread"] == 2
+    [notice, joined] = found["notifications"]
+    assert (joined["kind"], joined["data"]["papers"]) == ("joined", 0)
     assert notice["kind"] == "added"
     assert notice["data"] == {
         "library_id": lab["library_id"],
@@ -39,8 +40,11 @@ def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
         "count": 2,
         "item_id": first["id"],
         "title": "Rainfall records",
+        "people": False,
     }
-    assert listed(ada) == {"notifications": [], "unread": 0}
+    # Hers: only that root made her the group's admin.
+    assert [n["kind"] for n in listed(ada)["notifications"]] == ["joined"]
+    bob.post("/api/me/notifications/read", {"ids": [joined["id"]]})
 
     # Read: the next addition is a notification of its own.
     assert (
@@ -50,8 +54,9 @@ def test_papers_added_to_a_group(client: TestClient, db: Session) -> None:
     ada.add("Hail records", lab["library_id"])
     found = listed(bob)
     assert found["unread"] == 1
-    assert [n["data"]["count"] for n in found["notifications"]] == [1, 2]
-    assert [n["read"] for n in found["notifications"]] == [False, True]
+    added = [n for n in found["notifications"] if n["kind"] == "added"]
+    assert [n["data"]["count"] for n in added] == [1, 2]
+    assert [n["read"] for n in added] == [False, True]
 
 
 def test_papers_given_to_a_group_and_groups_inside(
@@ -75,14 +80,14 @@ def test_papers_given_to_a_group_and_groups_inside(
     )
     assert response.status_code == 200, response.text
     for person in (bob, eve):
-        [notice] = listed(person)["notifications"]
+        [notice, _] = listed(person)["notifications"]
         assert (notice["data"]["group"], notice["data"]["count"]) == ("Team", 2)
-    assert listed(ada)["unread"] == 0
+    assert [n["kind"] for n in listed(ada)["notifications"]] == ["joined"]
 
     # All read at once.
     bob.post("/api/me/notifications/read", {})
     assert listed(bob)["unread"] == 0
-    assert listed(eve)["unread"] == 1
+    assert listed(eve)["unread"] == 2
 
 
 def test_a_published_version_found(client: TestClient, db: Session) -> None:
@@ -106,6 +111,159 @@ def test_a_published_version_found(client: TestClient, db: Session) -> None:
             "title": "Edge states of rainfall",
             "journal": "Phys. Rev. B",
             "year": 2024,
+        },
+    )
+
+
+def test_ones_own_paper_published(client: TestClient, db: Session) -> None:
+    """Among its authors by one's ORCID iD (here from the published
+    version's author list): told as one's own paper."""
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    lab = group(root, "Lab", ada)
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "member"})
+    paper = ada.add("Hail on qubits", lab["library_id"])
+    user = db.get(User, uuid.UUID(ada.id))
+    assert user is not None
+    user.orcid = "0000-0002-1825-0097"
+    item = db.get(Item, uuid.UUID(paper["id"]))
+    assert item is not None
+    version = item.versions[0]
+    version.csl = {
+        **version.csl,
+        "author": [
+            {
+                "family": "Lovelace",
+                "given": "Ada",
+                "ORCID": "https://orcid.org/0000-0002-1825-0097",
+            },
+            {"family": "Babbage", "given": "Charles"},
+        ],
+    }
+    notifications.published(db, item, version)
+    db.commit()
+
+    def published(person: Person) -> dict:
+        [notice] = [
+            n for n in listed(person)["notifications"] if n["kind"] == "published"
+        ]
+        return notice["data"]
+
+    assert published(ada)["yours"] is True
+    assert "yours" not in published(bob)
+
+
+def test_ones_own_fresh_paper_added(client: TestClient, db: Session) -> None:
+    """One's own paper added less than a week after it came out, by
+    anyone (oneself too): celebrated, once a paper."""
+    ada = Person(client, db, "ada")
+    user = db.get(User, uuid.UUID(ada.id))
+    assert user is not None
+    user.orcid = "0000-0002-1825-0097"
+    db.commit()
+
+    def add(title: str, days: int) -> str:
+        day = datetime.now(UTC).date() - timedelta(days=days)
+        metadata = {
+            "title": title,
+            "container-title": "Phys. Rev. Lett.",
+            "issued": {"date-parts": [[day.year, day.month, day.day]]},
+            "author": [
+                {"family": "Lovelace", "given": "Ada", "ORCID": "0000-0002-1825-0097"}
+            ],
+        }
+        response = ada.post("/api/items", {"metadata": metadata})
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    fresh = add("Hail on qubits", 2)
+    add("Old hail", 30)
+    [notice] = listed(ada)["notifications"]
+    assert notice["kind"] == "published"
+    assert notice["data"] == {
+        "item_id": fresh,
+        "title": "Hail on qubits",
+        "journal": "Phys. Rev. Lett.",
+        "year": (datetime.now(UTC).date() - timedelta(days=2)).year,
+        "yours": True,
+        "fresh": True,
+    }
+    # Found published again later: not twice.
+    item = db.get(Item, uuid.UUID(fresh))
+    assert item is not None
+    notifications.published(db, item, item.versions[0])
+    db.commit()
+    published = [n for n in listed(ada)["notifications"] if n["data"].get("yours")]
+    assert len(published) == 1
+
+
+def test_a_paper_shared_with_one(client: TestClient, db: Session) -> None:
+    """Shared with a person (#16): told as shared with them, once (the
+    small group made for it says nothing of its own while empty)."""
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    paper = ada.add("Drizzle")
+    two = ada.post("/api/groups/people", {"user_ids": [bob.id]}).json()
+    assert listed(bob)["unread"] == 0
+    moved = ada.put(
+        f"/api/items/{paper['id']}/owner", {"library_id": two["library_id"]}
+    )
+    assert moved.status_code == 200, moved.text
+    [notice] = listed(bob)["notifications"]
+    assert notice["kind"] == "added"
+    assert notice["data"]["people"] is True
+    assert (notice["data"]["actor"], notice["data"]["title"]) == ("ada", "Drizzle")
+    assert listed(ada)["unread"] == 0
+
+    # Someone more in it later: told what is shared with them now.
+    eve = Person(client, db, "eve")
+    ada.put(f"/api/groups/{two['id']}/members/{eve.id}", {"role": "admin"})
+    [joined] = listed(eve)["notifications"]
+    assert joined["kind"] == "joined"
+    assert {k: joined["data"][k] for k in ("people", "papers", "actor")} == {
+        "people": True,
+        "papers": 1,
+        "actor": "ada",
+    }
+
+
+def test_added_to_a_group(client: TestClient, db: Session) -> None:
+    root = Person(client, db, "root", admin=True)
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    lab = group(root, "Lab", ada)
+    ada.add("Rain", lab["library_id"])
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "reader"})
+    [joined] = listed(bob)["notifications"]
+    assert (joined["kind"], joined["data"]) == (
+        "joined",
+        {
+            "group_id": lab["id"],
+            "library_id": lab["library_id"],
+            "group": "Lab",
+            "people": False,
+            "papers": 1,
+            "actor_id": ada.id,
+            "actor": "ada",
+        },
+    )
+    # A new role is no news.
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "member"})
+    assert listed(bob)["unread"] == 1
+
+
+def test_an_erratum_found(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Edge states of hail")
+    item = db.get(Item, uuid.UUID(paper["id"]))
+    assert item is not None
+    notifications.erratum(db, item, "Erratum: Phys. Rev. B 96, 199902 (2017)")
+    db.commit()
+    [notice] = listed(ada)["notifications"]
+    assert (notice["kind"], notice["data"]) == (
+        "erratum",
+        {
+            "item_id": paper["id"],
+            "title": "Edge states of hail",
+            "erratum": "Erratum: Phys. Rev. B 96, 199902 (2017)",
         },
     )
 
