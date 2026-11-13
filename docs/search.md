@@ -342,3 +342,38 @@ ultrastrong coupling; three papers on gate-based spin readout in silicon,
 the question's "industrial transistor" the only difference), and the
 rerankers miss different ones: what is left are fine distinctions, not a
 reranker that cannot keep up. The question set now accepts both reviews.
+
+### 200 questions (2026-11-13)
+
+100 more questions on papers not asked about yet, mostly German and vague
+ones: now 94 by meaning, 37 vague, 36 German, 20 by keyword, 13 on a detail
+inside a paper. Right paper first / in the top five / MRR@10, and German
+and vague questions first, without and with bge-reranker-v2-m3:
+
+| model                     | without            | German / vague | with reranking     | German / vague |
+| ------------------------- | ------------------ | -------------- | ------------------ | -------------- |
+| **arctic-embed-m-v2**     | 0.91 / 0.99 / 0.94 | 0.94 / 0.81    | 0.92 / 0.99 / 0.95 | 0.86 / 0.89    |
+| multilingual-e5-small     | 0.79 / 0.94 / 0.85 | 0.64 / 0.70    | 0.91 / 0.98 / 0.94 | 0.81 / 0.84    |
+| bge-m3                    | 0.83 / 0.98 / 0.89 | 0.75 / 0.81    | 0.91 / 0.99 / 0.95 | 0.83 / 0.89    |
+| qwen3-embedding-0.6b      | 0.83 / 0.99 / 0.90 | 0.78 / 0.78    | 0.92 / 0.99 / 0.95 | 0.83 / 0.89    |
+| embeddinggemma-2          | 0.81 / 0.99 / 0.89 | 0.78 / 0.78    |                    |                |
+
+(EmbeddingGemma 2 with reranking was not run.) Compared question by
+question (sign test: of the questions only one of two puts first, how
+many each wins, and how likely so uneven a split is between two equally
+good ones):
+
+- Without reranking arctic-embed-m-v2 beats every other model: 20 : 5
+  against Qwen3-Embedding, 21 : 6 against bge-m3, 22 : 4 against
+  EmbeddingGemma 2, 30 : 7 against e5-small (p ≤ 0.01 each). The others
+  do not differ from each other.
+- With reranking all four are the same (184, 183, 182, 181 first; p ≥ 0.55
+  for every pair).
+- The reranker barely helps arctic-embed-m-v2 (181 → 184 first; 14 : 11,
+  p = 0.69) and costs it German questions (34 → 31 of 36 first) while
+  helping vague ones (30 → 33 of 37). arctic without reranking is as good
+  as any model with it.
+
+So arctic-embed-m-v2 stays the default, and a server without a GPU, which
+does not rerank by default ("auto"), loses little with it. The reranker
+matters for the weaker models (e5-small 158 → 181 first).
