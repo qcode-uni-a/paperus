@@ -239,6 +239,28 @@ One question is 0.023. Compared question by question with the default:
 Not adopted yet: overlap (50–100 words) is the candidate, to be confirmed
 with real questions from the group, more of them vague and German.
 
+### Passages from page layouts (#43, 2026-11-14)
+
+The 200 questions on the same library cut both ways, multilingual-e5-small
+on a CPU, hybrid search without reranking: passages cut page by page
+(a copy of the model trials' database) and from the page layouts (the dev
+library after #43 and #53: one flow across columns and pages, without
+running headers and figures' labels, captions apart, a passage per
+section). Right paper first / in the top five / MRR@10:
+
+| passages      | all                | detail (13)        | German (36)        | vague (37)         |
+| ------------- | ------------------ | ------------------ | ------------------ | ------------------ |
+| by page       | 0.79 / 0.94 / 0.85 | 0.92 / 1.00 / 0.95 | 0.58 / 0.78 / 0.68 | 0.70 / 0.95 / 0.81 |
+| from layouts  | 0.78 / 0.94 / 0.85 | 0.69 / 0.92 / 0.78 | 0.56 / 0.86 / 0.67 | 0.81 / 0.92 / 0.87 |
+
+Question by question the layouts put 11 papers first that pages did not
+and 13 the other way (sign test p = 0.84): no difference. Vague questions
+gained, three detail questions lost a few places (rank 1 → 3, 5, 7); in
+the one looked at, the sentence asked about is in both cuts word for word,
+in a passage of other surroundings. So the cleaner text costs search
+nothing; what it brings is passages that read whole (no headers or plot
+labels in mid-sentence, a paragraph over a page break in one).
+
 ### Vector index (#37, 2026-11-07)
 
 Search by meaning compares the question with every visible passage's
