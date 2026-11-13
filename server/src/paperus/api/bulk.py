@@ -5,23 +5,26 @@ person may not change this way are skipped, with the reason."""
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from sqlalchemy import delete
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 
 from paperus import library, organize
 from paperus.access import Access, Forbidden
 from paperus.api.deps import DB, CurrentAccess
-from paperus.api.items import get_readable_item
+from paperus.api.items import ItemFilter, get_readable_item, item_conditions
 from paperus.api.organize import Name, _collection, _not_smart, _tag
 from paperus.models import Favourite, Item
 
 router = APIRouter(tags=["items"])
 
 MAX_ITEMS = 1000
+# Papers a filter may match (a whole library, "Select all"): one request
+# changes them all, each in its own savepoint.
+MAX_MATCHING = 50_000
 
 
 class Trash(BaseModel):
@@ -99,8 +102,17 @@ Action = Annotated[
 
 
 class BulkIn(BaseModel):
-    item_ids: list[uuid.UUID] = Field(min_length=1, max_length=MAX_ITEMS)
+    item_ids: list[uuid.UUID] | None = Field(None, min_length=1, max_length=MAX_ITEMS)
+    matching: ItemFilter | None = None
+    """Instead of ``item_ids``: every paper a list with these filters shows
+    (``GET /api/items``), however many ("Select all")."""
     action: Action
+
+    @model_validator(mode="after")
+    def one_way(self) -> Self:
+        if (self.item_ids is None) == (self.matching is None):
+            raise ValueError("give item_ids or matching, one of them")
+        return self
 
 
 class Skipped(BaseModel):
@@ -120,9 +132,10 @@ def bulk(body: BulkIn, db: DB, access: CurrentAccess) -> BulkOut:
     change so (or cannot see) are skipped with the reason, the others are
     changed together."""
     change = _change(db, access, body.action)
+    item_ids = body.item_ids or _matching(db, access, body.matching)
     done: list[uuid.UUID] = []
     skipped: list[Skipped] = []
-    for item_id in dict.fromkeys(body.item_ids):
+    for item_id in dict.fromkeys(item_ids):
         try:
             with db.begin_nested():
                 change(item_id)
@@ -133,6 +146,25 @@ def bulk(body: BulkIn, db: DB, access: CurrentAccess) -> BulkOut:
             done.append(item_id)
     db.commit()
     return BulkOut(done=done, skipped=skipped)
+
+
+def _matching(db: DB, access: Access, matching: ItemFilter | None) -> list[uuid.UUID]:
+    """The papers the filter matches, oldest first; 413 for more than
+    ``MAX_MATCHING``."""
+    assert matching is not None
+    found = list(
+        db.scalars(
+            select(Item.id)
+            .where(*item_conditions(db, access, matching))
+            .order_by(Item.id)
+            .limit(MAX_MATCHING + 1)
+        )
+    )
+    if len(found) > MAX_MATCHING:
+        raise HTTPException(
+            413, f"More than {MAX_MATCHING:,} papers match; filter the list further."
+        )
+    return found
 
 
 def _change(db: DB, access: Access, action: Action) -> Callable[[uuid.UUID], None]:

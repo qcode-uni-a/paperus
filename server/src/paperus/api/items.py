@@ -656,6 +656,90 @@ def require_readable(
         raise HTTPException(404, f"no such {model.__name__.lower()}")
 
 
+class ItemFilter(BaseModel):
+    """Which papers a list shows (the filters of ``GET /api/items``, which
+    says what each means), also for changing all of them at once
+    (``POST /api/items/bulk``)."""
+
+    trashed: bool = False
+    archived: bool = False
+    tag: list[uuid.UUID] = []
+    tag_any: list[uuid.UUID] = []
+    tag_none: list[uuid.UUID] = []
+    type: list[str] = []
+    published_from: date | None = None
+    published_to: date | None = None
+    owner: list[uuid.UUID] = []
+    added_days: int | None = Field(None, ge=1, le=36500)
+    author: str | None = Field(None, max_length=300)
+    author_id: list[uuid.UUID] = []
+    collection: uuid.UUID | None = None
+    nested: bool = True
+    title: str | None = Field(None, max_length=200)
+    title_words: str | None = Field(None, max_length=200)
+    library: uuid.UUID | None = None
+    unsorted: bool = False
+    favourite: bool = False
+    id: list[uuid.UUID] = Field([], max_length=200)
+
+
+def _libraries(access: Access, library_id: uuid.UUID | None) -> list[uuid.UUID]:
+    if library_id is None:
+        return access.readable
+    return [library_id] if access.can_read(library_id) else []
+
+
+def item_conditions(db: Session, access: Access, f: ItemFilter) -> list[Any]:
+    """The conditions on ``Item`` for the papers the filter matches, of those
+    the person can read; 404 for someone else's private tag or collection."""
+    require_readable(db, access, Tag, [*f.tag, *f.tag_any, *f.tag_none])
+    require_readable(db, access, Collection, [f.collection] if f.collection else [])
+    conditions = [
+        access.item_filter(_libraries(access, f.library)),
+        Item.deleted_at.is_not(None) if f.trashed else Item.deleted_at.is_(None),
+    ]
+    if f.archived:
+        conditions.append(Item.archived_at.is_not(None))
+    elif not f.trashed and not f.id:
+        conditions.append(Item.archived_at.is_(None))
+    conditions += rule_conditions(
+        Rules(
+            tags_all=f.tag,
+            tags_any=f.tag_any,
+            tags_none=f.tag_none,
+            types=f.type,
+            published_from=f.published_from,
+            published_to=f.published_to,
+            owners=f.owner,
+            added_days=f.added_days,
+            authors=f.author_id,
+        )
+    )
+    if f.author and f.author.strip():
+        conditions.append(by_author(f.author))
+    if f.collection is not None:
+        conditions.append(Item.id.in_(item_ids_in(db, f.collection, nested=f.nested)))
+    for word in (f.title or "").split():
+        conditions.append(Item.title.icontains(word, autoescape=True))
+    if f.title_words and f.title_words.strip():
+        words = db.scalar(select(duplicates.title_words(literal(f.title_words))))
+        if words:
+            conditions.append(
+                duplicates.title_words(Item.title).op("@>")(cast(words, ARRAY(Text)))
+            )
+    if f.id:
+        conditions.append(Item.id.in_(f.id))
+    if f.favourite:
+        conditions.append(
+            Item.id.in_(
+                select(Favourite.item_id).where(Favourite.user_id == access.user.id)
+            )
+        )
+    if f.unsorted:
+        conditions.extend(unsorted_conditions())
+    return conditions
+
+
 @router.get("/api/items")
 def list_items(
     response: Response,
@@ -725,63 +809,39 @@ def list_items(
     is the number to pass as ``since`` next time.
     """
     response.headers["Last-Change"] = str(changes.current_change(db))
-    tags = [*(tag or []), *(tag_any or []), *(tag_none or [])]
-    require_readable(db, access, Tag, tags)
-    require_readable(db, access, Collection, [collection] if collection else [])
-    libraries = access.readable
-    if library_id is not None:
-        libraries = [library_id] if access.can_read(library_id) else []
-    in_libraries = access.item_filter(libraries)
+    matching = ItemFilter(
+        trashed=trashed,
+        archived=archived,
+        tag=tag or [],
+        tag_any=tag_any or [],
+        tag_none=tag_none or [],
+        type=type or [],
+        published_from=published_from,
+        published_to=published_to,
+        owner=owner or [],
+        added_days=added_days,
+        author=author,
+        author_id=author_id or [],
+        collection=collection,
+        nested=nested,
+        title=title,
+        title_words=title_words,
+        library=library_id,
+        unsorted=unsorted,
+        favourite=favourite,
+        id=id or [],
+    )
     if since is not None:
         query = (
             select(Item)
-            .where(in_libraries, Item.change > since)
+            .where(
+                access.item_filter(_libraries(access, library_id)),
+                Item.change > since,
+            )
             .order_by(Item.change, Item.id)
         )
         return [item_out(item, access) for item in db.scalars(query)]
-    conditions = [
-        in_libraries,
-        Item.deleted_at.is_not(None) if trashed else Item.deleted_at.is_(None),
-    ]
-    if archived:
-        conditions.append(Item.archived_at.is_not(None))
-    elif not trashed and not id:
-        conditions.append(Item.archived_at.is_(None))
-    conditions += rule_conditions(
-        Rules(
-            tags_all=tag or [],
-            tags_any=tag_any or [],
-            tags_none=tag_none or [],
-            types=type or [],
-            published_from=published_from,
-            published_to=published_to,
-            owners=owner or [],
-            added_days=added_days,
-            authors=author_id or [],
-        )
-    )
-    if author and author.strip():
-        conditions.append(by_author(author))
-    if collection is not None:
-        conditions.append(Item.id.in_(item_ids_in(db, collection, nested=nested)))
-    for word in (title or "").split():
-        conditions.append(Item.title.icontains(word, autoescape=True))
-    if title_words and title_words.strip():
-        words = db.scalar(select(duplicates.title_words(literal(title_words))))
-        if words:
-            conditions.append(
-                duplicates.title_words(Item.title).op("@>")(cast(words, ARRAY(Text)))
-            )
-    if id:
-        conditions.append(Item.id.in_(id))
-    if favourite:
-        conditions.append(
-            Item.id.in_(
-                select(Favourite.item_id).where(Favourite.user_id == access.user.id)
-            )
-        )
-    if unsorted:
-        conditions.extend(unsorted_conditions())
+    conditions = item_conditions(db, access, matching)
     total = db.scalar(select(func.count()).select_from(Item).where(*conditions)) or 0
     response.headers["X-Total-Count"] = str(total)
     if sort in ("recent", "opened"):

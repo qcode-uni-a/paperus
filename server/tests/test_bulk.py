@@ -2,9 +2,12 @@
 
 from typing import Any
 
+import httpx2
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus.api import bulk as bulk_api
 from tests.people import Person, group
 
 
@@ -64,6 +67,47 @@ def test_tags_and_collections(client: TestClient, db: Session) -> None:
         },
     )
     assert response.status_code == 409
+
+
+def matching(person: Person, filters: dict[str, Any], **action: str) -> httpx2.Response:
+    return person.post("/api/items/bulk", json={"matching": filters, "action": action})
+
+
+def test_every_paper_a_filter_matches(client: TestClient, db: Session) -> None:
+    """ "Select all": the list's filters instead of the ids, however many."""
+    ada, bob = Person(client, db, "ada"), Person(client, db, "bob")
+    ids = [ada.add(t)["id"] for t in ("Rain on Mars", "Rain in Spain", "Snow")]
+    bob.add("Rain for Bob")
+
+    result = matching(ada, {"title": "rain"}, kind="tag", name="wet").json()
+    assert sorted(result["done"]) == sorted(ids[:2])
+    tag = ada.get("/api/tags").json()[0]
+    assert ada.titles(tag=tag["id"]) == ["Rain in Spain", "Rain on Mars"]
+    # The whole library (bob's paper is not ada's to see).
+    assert matching(ada, {}, kind="archive").json()["done"] == ids
+    assert ada.titles() == []
+    # The archive, as its list shows it.
+    assert matching(ada, {"archived": True}, kind="unarchive").json()["done"] == ids
+    # Someone else's tag answers as if it did not exist.
+    assert matching(bob, {"tag": [tag["id"]]}, kind="star").status_code == 404
+    # One way or the other, not both or neither.
+    for body in ({"item_ids": ids, "matching": {}}, {}):
+        response = ada.post(
+            "/api/items/bulk", json={**body, "action": {"kind": "star"}}
+        )
+        assert response.status_code == 422
+
+
+def test_too_many_matching(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ada = Person(client, db, "ada")
+    for t in ("Rain", "Snow"):
+        ada.add(t)
+    monkeypatch.setattr(bulk_api, "MAX_MATCHING", 1)
+    response = matching(ada, {}, kind="star")
+    assert response.status_code == 413
+    assert ada.titles(favourite="true") == []
 
 
 def test_papers_one_may_not_change_are_skipped(client: TestClient, db: Session) -> None:

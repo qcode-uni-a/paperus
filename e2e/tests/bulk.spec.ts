@@ -25,7 +25,9 @@ test('pick papers in a collection, tag them, trash them, undo', async ({ page })
 	// A click on a row picks it while picking; Shift picks the rows between.
 	await page.getByRole('link', { name: `${word} three` }).click();
 	await expect(page).toHaveURL(new RegExp(`/collections/${shelf.id}$`));
-	await page.getByRole('checkbox', { name: `Select “${word} two”` }).click({ modifiers: ['Shift'] });
+	await page
+		.getByRole('checkbox', { name: `Select “${word} two”` })
+		.click({ modifiers: ['Shift'] });
 	await expect(bar.getByText('2 selected')).toBeVisible();
 
 	await bar.getByRole('button', { name: 'Tag' }).click();
@@ -44,4 +46,41 @@ test('pick papers in a collection, tag them, trash them, undo', async ({ page })
 	// Esc lets go.
 	await page.keyboard.press('Escape');
 	await expect(bar).toBeHidden();
+});
+
+test('select all: every paper of the collection, also those not loaded yet', async ({ page }) => {
+	const word = unique('Many');
+	const tag = unique('all');
+	const shelf = await (
+		await page.request.post('/api/collections', { data: { name: unique('Shelf') } })
+	).json();
+	// More than the list loads at first (50).
+	const ids: string[] = [];
+	for (let n = 0; n < 60; n++) {
+		const added = await page.request.post('/api/items', {
+			data: { metadata: { title: `${word} ${n}` } }
+		});
+		ids.push((await added.json()).id);
+	}
+	await page.request.post(`/api/collections/${shelf.id}/items`, { data: { item_ids: ids } });
+
+	await page.goto(`/collections/${shelf.id}`);
+	await expect(page.getByRole('heading', { name: '60 items' })).toBeVisible();
+	await page.getByRole('button', { name: 'Select all' }).click();
+	const bar = page.getByRole('toolbar', { name: 'Selected papers' });
+	await expect(bar.getByText('60 selected')).toBeVisible();
+
+	await bar.getByRole('button', { name: 'Tag' }).click();
+	await page.getByLabel('Add a tag').fill(tag);
+	await page.getByLabel('Add a tag').press('Enter');
+	await expect(bar.getByRole('status')).toHaveText(`Tagged 60 papers “${tag}”.`);
+	const tags = await (await page.request.get('/api/tags')).json();
+	const made = tags.find((t: { name: string }) => t.name === tag);
+	const tagged = await page.request.get(`/api/items?tag=${made.id}&limit=1`);
+	expect(tagged.headers()['x-total-count']).toBe('60');
+
+	// Unticking one: back to picking by hand, the rows shown.
+	await page.getByRole('checkbox', { name: `Select “${word} 59”` }).click();
+	await expect(bar.getByText(/^\d+ selected$/)).not.toHaveText('60 selected');
+	await expect(bar.getByRole('button', { name: 'Select all 60' })).toBeVisible();
 });

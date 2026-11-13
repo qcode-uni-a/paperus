@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enterSubmits } from '#lib/enterSubmits.ts';
 	import { bulk, errorMessage, type Item } from '#lib/api/client.ts';
-	import type { BulkIn, BulkOut } from '#lib/api/generated/types.gen.ts';
+	import type { BulkIn, BulkOut, ItemFilter } from '#lib/api/generated/types.gen.ts';
 	import { copyCitations, downloadCitations } from '#lib/citations.ts';
 	import { closeOnScroll } from '#lib/dismiss.ts';
 	import {
@@ -16,26 +16,63 @@
 
 	/** What to do with the papers picked in a list: tag, collect, give to
 	 * another owner, star, archive, trash, export. ``items``: the rows
-	 * loaded (their tags and stars); ``collection``: the one shown, which
-	 * they can leave; ``onchange``: reload the list. */
+	 * loaded (their tags and stars); ``total``: how many the list has;
+	 * ``matching``: its filters, for changing all of them ("Select all");
+	 * ``collection``: the one shown, which they can leave; ``onchange``:
+	 * reload the list. */
 	let {
 		selection,
 		items,
+		total,
+		matching,
 		collection,
 		onchange
 	}: {
 		selection: Selection;
 		items: Item[];
+		total: number;
+		matching: ItemFilter;
 		collection?: Collection;
 		onchange: () => unknown;
 	} = $props();
 
 	// The citation export takes the papers in its address: not too many.
 	const MOST_TO_EXPORT = 200;
+	/** Papers per request (the API's ``MAX_ITEMS``, api/bulk.py): a larger
+	 * selection is sent in parts, one after the other. */
+	const PER_REQUEST = 1000;
+
+	/** One action on all of the papers, in parts; when a part fails, what
+	 * the parts before did, and the error. */
+	async function bulkInParts(
+		ids: string[],
+		action: BulkIn['action']
+	): Promise<{ data: BulkOut; error: unknown }> {
+		const data: BulkOut = { done: [], skipped: [] };
+		for (let at = 0; at < ids.length; at += PER_REQUEST) {
+			const part = await bulk({ body: { item_ids: ids.slice(at, at + PER_REQUEST), action } });
+			if (!part.data) return { data, error: part.error };
+			data.done.push(...part.data.done);
+			data.skipped.push(...part.data.skipped);
+		}
+		return { data, error: null };
+	}
+
+	/** One action on the picked papers: all the list's filters match
+	 * ("Select all", in one request), or those picked one by one. */
+	async function send(action: BulkIn['action']): Promise<{ data: BulkOut; error: unknown }> {
+		if (!selection.everything) return bulkInParts([...selection.ids], action);
+		const { data, error } = await bulk({ body: { matching, action } });
+		return { data: data ?? { done: [], skipped: [] }, error: data ? null : error };
+	}
 
 	const id = $props.id();
 	const picked = $derived(items.filter((item) => selection.has(item.id)));
-	const count = $derived(selection.size);
+	const count = $derived(selection.everything ? total : selection.size);
+	/** The picked papers' ids, when all are loaded (for the export). */
+	const pickedIds = $derived(
+		selection.everything ? items.map((item) => item.id) : [...selection.ids]
+	);
 	const allStarred = $derived(picked.length > 0 && picked.every((item) => item.favourite));
 	/** Tags on the picked papers, the most used first (to take off). */
 	const theirTags = $derived.by(() => {
@@ -117,16 +154,19 @@
 		message = '';
 		skipped = [];
 		trashed = [];
-		const { data, error } = await bulk({ body: { item_ids: [...selection.ids], action } });
+		const { data, error } = await send(action);
 		busy = false;
-		if (!data) {
+		if (error && !data.done.length) {
 			message = errorMessage(error);
 			return null;
 		}
-		message = done(data.done.length);
+		message = error
+			? `${done(data.done.length)} The others failed: ${errorMessage(error)}`
+			: done(data.done.length);
 		skipped = why(data);
 		await onchange();
-		if (leaves) for (const each of data.done) selection.ids.delete(each);
+		if (leaves && selection.everything) selection.clear();
+		else if (leaves) for (const each of data.done) selection.ids.delete(each);
 		selection.keepShown();
 		return data;
 	}
@@ -149,7 +189,7 @@
 	async function undoTrash() {
 		const back = trashed;
 		trashed = [];
-		const { error } = await bulk({ body: { item_ids: back, action: { kind: 'restore' } } });
+		const { error } = await bulkInParts(back, { kind: 'restore' });
 		message = error ? errorMessage(error) : `${papers(back.length)} back from the trash.`;
 		skipped = [];
 		await onchange();
@@ -188,10 +228,10 @@
 		);
 	}
 
-	const exportable = $derived(count <= MOST_TO_EXPORT);
+	const exportable = $derived(count <= MOST_TO_EXPORT && pickedIds.length === count);
 	let copied = $state(false);
 	async function copy() {
-		copied = await copyCitations({ items: [...selection.ids] });
+		copied = await copyCitations({ items: pickedIds });
 		message = copied ? `BibTeX of ${papers(count)} copied.` : '';
 	}
 </script>
@@ -208,8 +248,8 @@
 				title="Clear (Esc)">×</button
 			>
 			<strong>{count.toLocaleString()} selected</strong>
-			{#if count < items.length}<button class="link" onclick={() => selection.all()}
-					>Select all {items.length.toLocaleString()} shown</button
+			{#if count < total}<button class="link" onclick={() => selection.everyMatching()}
+					>Select all {total.toLocaleString()}</button
 				>{/if}
 		</div>
 		<div class="actions">
@@ -335,7 +375,7 @@
 			<button
 				onclick={() => {
 					hide('export');
-					downloadCitations({ items: [...selection.ids] }, 'bibtex');
+					downloadCitations({ items: pickedIds }, 'bibtex');
 				}}>Download BibTeX</button
 			>
 			<button
@@ -347,7 +387,7 @@
 			<button
 				onclick={() => {
 					hide('export');
-					downloadCitations({ items: [...selection.ids] }, 'csl-json');
+					downloadCitations({ items: pickedIds }, 'csl-json');
 				}}>Download CSL-JSON</button
 			>
 		{:else}

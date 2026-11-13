@@ -109,7 +109,7 @@
 			{#if total > 0 && !selection.active}<button
 					class="select"
 					onclick={() => (selection.active = true)}>Select</button
-				>{/if}
+				><button class="select" onclick={() => selection.everyMatching()}>Select all</button>{/if}
 		</div>
 	</div>
 {/if}
@@ -122,6 +122,8 @@
 <BulkBar
 	{selection}
 	{items}
+	total={total ?? items.length}
+	matching={{ collection, nested }}
 	collection={organize.collections.find((c) => c.id === collection)}
 	onchange={() => loadUpTo(items.length)}
 />
@@ -141,11 +143,14 @@
 	}
 	.tools {
 		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: 8px;
 		margin-left: auto;
 	}
 	.select {
 		padding: 3px 12px;
+		white-space: nowrap;
 	}
 	.count {
 		font-family: var(--sans);

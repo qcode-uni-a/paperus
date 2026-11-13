@@ -624,7 +624,8 @@ export type BulkIn = {
     /**
      * Item Ids
      */
-    item_ids: Array<string>;
+    item_ids?: Array<string> | null;
+    matching?: ItemFilter | null;
     /**
      * Action
      */
@@ -2062,6 +2063,96 @@ export type ItemDetail = {
      * Links
      */
     links?: Array<ItemLink>;
+};
+
+/**
+ * ItemFilter
+ *
+ * Which papers a list shows (the filters of ``GET /api/items``, which
+ * says what each means), also for changing all of them at once
+ * (``POST /api/items/bulk``).
+ */
+export type ItemFilter = {
+    /**
+     * Trashed
+     */
+    trashed?: boolean;
+    /**
+     * Archived
+     */
+    archived?: boolean;
+    /**
+     * Tag
+     */
+    tag?: Array<string>;
+    /**
+     * Tag Any
+     */
+    tag_any?: Array<string>;
+    /**
+     * Tag None
+     */
+    tag_none?: Array<string>;
+    /**
+     * Type
+     */
+    type?: Array<string>;
+    /**
+     * Published From
+     */
+    published_from?: string | null;
+    /**
+     * Published To
+     */
+    published_to?: string | null;
+    /**
+     * Owner
+     */
+    owner?: Array<string>;
+    /**
+     * Added Days
+     */
+    added_days?: number | null;
+    /**
+     * Author
+     */
+    author?: string | null;
+    /**
+     * Author Id
+     */
+    author_id?: Array<string>;
+    /**
+     * Collection
+     */
+    collection?: string | null;
+    /**
+     * Nested
+     */
+    nested?: boolean;
+    /**
+     * Title
+     */
+    title?: string | null;
+    /**
+     * Title Words
+     */
+    title_words?: string | null;
+    /**
+     * Library
+     */
+    library?: string | null;
+    /**
+     * Unsorted
+     */
+    unsorted?: boolean;
+    /**
+     * Favourite
+     */
+    favourite?: boolean;
+    /**
+     * Id
+     */
+    id?: Array<string>;
 };
 
 /**
