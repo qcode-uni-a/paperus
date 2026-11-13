@@ -395,7 +395,7 @@
 								report.files_not_added ?? {}
 							)}, which you can only read. Ask an editor of the group to add {n === 1
 								? 'it'
-								: 'them'}, or import into your own library.
+								: 'them'}.
 						</p>
 					{/if}
 					{#if report.missing_files?.length}
