@@ -11145,6 +11145,36 @@ export type GetAutomationsResponses = {
 
 export type GetAutomationsResponse = GetAutomationsResponses[keyof GetAutomationsResponses];
 
+export type GetLibraryAutomationsData = {
+    body?: never;
+    path: {
+        /**
+         * Library Id
+         */
+        library_id: string;
+    };
+    query?: never;
+    url: '/api/libraries/{library_id}/automations';
+};
+
+export type GetLibraryAutomationsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetLibraryAutomationsError = GetLibraryAutomationsErrors[keyof GetLibraryAutomationsErrors];
+
+export type GetLibraryAutomationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: LibraryAutomations;
+};
+
+export type GetLibraryAutomationsResponse = GetLibraryAutomationsResponses[keyof GetLibraryAutomationsResponses];
+
 export type SetAutomationsData = {
     body: AutomationsIn;
     path: {

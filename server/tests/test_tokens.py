@@ -358,6 +358,7 @@ ROUTES = {
     ("POST", "/api/items/{item_id}/versions"): "papers.write",
     ("POST", "/api/items/{item_id}/viewed"): None,
     ("GET", "/api/libraries"): "groups.read",
+    ("GET", "/api/libraries/{library_id}/automations"): "groups.read",
     ("PUT", "/api/libraries/{library_id}/automations"): None,
     ("GET", "/api/automations"): None,
     ("PUT", "/api/me/default-library"): None,

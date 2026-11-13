@@ -146,6 +146,9 @@ def test_switches_per_library(client: TestClient, db: Session, job_app: App) -> 
     url = f"/api/libraries/{lab['library_id']}/automations"
     assert bob.put(url, {"published": False}).status_code == 403
     assert root.put(f"/api/libraries/{mine}/automations", {}).status_code == 404
+    # The site administrator manages groups without being in them.
+    assert root.get(url).json()["can_change"] is True
+    assert Person(client, db, "eve").get(url).status_code == 404
     switched = ada.put(url, {"published": False, "open_access": False})
     assert switched.status_code == 200, switched.text
     assert (switched.json()["published"], switched.json()["own_papers"]) == (

@@ -106,6 +106,25 @@ def get_automations(request: Request, db: DB, access: CurrentAccess) -> Automati
     )
 
 
+def _library(db: DB, access: Access, library_id: uuid.UUID) -> Library:
+    """The library, if one is in it or may change its switches (a group's
+    admins, site administrators: also without being members)."""
+    library = db.get(Library, library_id)
+    if library is None or not (
+        library_id in access.readable or _can_change(access, library)
+    ):
+        raise HTTPException(404, "library not found")
+    return library
+
+
+@router.get("/api/libraries/{library_id}/automations")
+def get_library_automations(
+    library_id: uuid.UUID, db: DB, access: CurrentAccess
+) -> LibraryAutomations:
+    """One library's switches (its page under Groups)."""
+    return _out(_library(db, access, library_id), access)
+
+
 @router.put("/api/libraries/{library_id}/automations")
 def set_automations(
     library_id: uuid.UUID,
@@ -115,9 +134,7 @@ def set_automations(
     access: CurrentAccess,
 ) -> LibraryAutomations:
     """Switch a library's automations (its person; a group's admins)."""
-    library = db.get(Library, library_id)
-    if library is None or library_id not in access.readable:
-        raise HTTPException(404, "library not found")
+    library = _library(db, access, library_id)
     if not _can_change(access, library):
         raise HTTPException(403, "only the library's owner can change this")
     before = automations.of(library)

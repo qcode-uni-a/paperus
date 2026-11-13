@@ -9,6 +9,7 @@
 		errorMessage,
 		findUsers,
 		getAutomations,
+		getLibraryAutomations,
 		leaveGroup,
 		listGroups,
 		listMembers,
@@ -16,7 +17,8 @@
 		setMember
 	} from '#lib/api/client.ts';
 	import type {
-		Automations,
+		LibraryAutomations as Switches,
+		ServerAutomations,
 		GroupOut,
 		MemberOut,
 		Role,
@@ -62,14 +64,21 @@
 		loaded = true;
 	}
 
-	// The group's automations (its members see them, its admins switch them).
-	let automations = $state<Automations | null>(null);
+	// The group's automations (its members see them; its admins, and site
+	// administrators also without being members, switch them).
+	let server = $state<ServerAutomations | null>(null);
+	let switches = $state<Switches | null>(null);
 	$effect(() => {
-		getAutomations().then(({ data }) => (automations = data ?? null));
+		getAutomations().then(({ data }) => (server = data?.server ?? null));
 	});
-	const automated = $derived(
-		automations?.libraries.findIndex((l) => l.library_id === selected?.library_id) ?? -1
-	);
+	$effect(() => {
+		const library_id = selected?.library_id;
+		switches = null;
+		if (!library_id) return;
+		getLibraryAutomations({ path: { library_id } }).then(({ data }) => {
+			if (selected?.library_id === library_id) switches = data ?? null;
+		});
+	});
 
 	$effect(() => {
 		load();
@@ -317,12 +326,9 @@
 				{/if}
 			{/if}
 
-			{#if automations && automated >= 0}
+			{#if switches && server}
 				<h3>Automations</h3>
-				<LibraryAutomations
-					bind:automations={automations.libraries[automated]}
-					server={automations.server}
-				/>
+				<LibraryAutomations bind:automations={switches} {server} />
 			{/if}
 		</section>
 	</div>

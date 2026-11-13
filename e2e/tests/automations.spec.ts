@@ -9,7 +9,11 @@ test('automations: one’s own switched, a group’s on its page', async ({ page
 	const made = await page.request.post('/api/admin/users', { data: lu });
 	expect(made.status()).toBe(201);
 	const lab = unique('Lab ');
-	await page.request.post('/api/groups', { data: { name: lab, admin_id: (await made.json()).id } });
+	const group = await (
+		await page.request.post('/api/groups', {
+			data: { name: lab, admin_id: (await made.json()).id }
+		})
+	).json();
 	const context = await browser.newContext({ storageState: LOGGED_OUT });
 	const own = await context.newPage();
 	await own.goto('/login');
@@ -39,4 +43,9 @@ test('automations: one’s own switched, a group’s on its page', async ({ page
 	await theirs.uncheck();
 	await expect(own.getByText('Saved.')).toBeVisible();
 	await context.close();
+
+	// The site administrator, not a member, sees and may switch them too.
+	await page.goto(`/manage/groups?group=${group.id}`);
+	await expect(page.getByRole('checkbox', { name: /Published versions/ })).not.toBeChecked();
+	await expect(page.getByRole('checkbox', { name: /Published versions/ })).toBeEnabled();
 });

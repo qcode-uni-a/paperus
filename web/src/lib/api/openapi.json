@@ -9061,6 +9061,48 @@
       }
     },
     "/api/libraries/{library_id}/automations": {
+      "get": {
+        "tags": [
+          "automations"
+        ],
+        "summary": "Get Library Automations",
+        "description": "One library's switches (its page under Groups).",
+        "operationId": "get_library_automations",
+        "parameters": [
+          {
+            "name": "library_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Library Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryAutomations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "automations"
