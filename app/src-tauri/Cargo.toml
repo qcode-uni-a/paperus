@@ -1,6 +1,6 @@
 [package]
 name = "paperus-app"
-version = "0.1.1"
+version = "0.1.2"
 description = "paperus as an app: a paperus server's website in a window of its own"
 authors = ["paperus contributors"]
 license = "Apache-2.0"

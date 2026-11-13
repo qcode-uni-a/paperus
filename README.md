@@ -27,7 +27,7 @@ look around in: uploads, changes and search by meaning don't work there).
   <img src="site/screenshots/library.png" alt="paperus in the browser: a group's library with papers, tags and collections">
 </picture>
 
-> Status: beta (0.1.1), in a pilot. It works, with private papers and
+> Status: beta (0.1.2), in a pilot. It works, with private papers and
 > nested groups, but the data format may still change. See the
 > [changelog](CHANGELOG.md) for what is there and what is missing.
 
