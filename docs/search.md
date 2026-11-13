@@ -47,7 +47,8 @@ scope.
 ## Models
 
 - Chunk embeddings: open model on the server, configurable, multilingual
-  default (BGE-M3 or Qwen3-Embedding). CPU is fine at group scale.
+  default (arctic-embed-m-v2; see the trials below). CPU is fine at group
+  scale.
   Optional OpenAI-compatible endpoint for admins (e.g. a university service).
 - Store the model ID with every vector; a model change triggers a background
   re-index.
@@ -265,3 +266,60 @@ indexed"). On the 44 questions, without reranking:
 Weighting matches by meaning too lets summaries (which match many questions
 loosely) push the passage that answers down; weighting keyword matches only
 is better or equal on every kind of question, and kept.
+
+### Embedding models and rerankers (2026-11-12)
+
+100 questions now (56 more, again written from the same library, now 408
+papers, 38,000 passages; 9 in German, 18 vague), hybrid search, the library
+embedded on the GPU (RTX 2080 SUPER, fp16). Right paper first / in the top
+five / MRR@10, without and with bge-reranker-v2-m3:
+
+| model (licence)                    | without            | with reranking     | German first, without | GPU, whole library | CPU (int8, 20 threads) |
+| ---------------------------------- | ------------------ | ------------------ | --------------------- | ------------------ | ---------------------- |
+| **arctic-embed-m-v2** (Apache-2.0) | 0.89 / 1.00 / 0.94 | 0.89 / 0.98 / 0.93 | 8 of 9                | 4 min              | 5.5 passages/s         |
+| multilingual-e5-small (MIT)        | 0.78 / 0.94 / 0.85 | 0.90 / 1.00 / 0.94 | 5 of 9                | 2 min              | 16.6 passages/s        |
+| bge-m3 (MIT)                       | 0.84 / 0.99 / 0.90 | 0.90 / 0.98 / 0.94 | 6 of 9                |                    | 3.1 passages/s         |
+| qwen3-embedding-0.6b (Apache-2.0)  | 0.82 / 1.00 / 0.90 | 0.92 / 0.99 / 0.95 | 7 of 9                | 13 min             | 2.1 passages/s         |
+| embeddinggemma-2 (Apache-2.0)      | 0.78 / 0.99 / 0.87 | 0.91 / 0.98 / 0.94 | 7 of 9                | 6 min              | 4.0 passages/s         |
+| embeddinggemma-300m (Gemma terms)  | 0.76 / 0.95 / 0.85 | 0.83 / 0.96 / 0.89 | 5 of 9                | 9 min              |                        |
+| Qwen3-VL-Embedding-2B (Apache-2.0) | 0.84 / 0.98 / 0.90 | 0.91 / 0.99 / 0.94 | 5 of 9                | 30 min             |                        |
+
+The last two were scored before the question set accepted a second paper
+for one question (below); the others after. The same model scored twice
+differs by up to 0.02, so differences below about 0.04 mean nothing.
+
+- arctic-embed-m-v2, the default, is the best without reranking, and on a
+  CPU faster than any other but multilingual-e5-small (a library this size
+  in 2 hours, e5-small 40 minutes, EmbeddingGemma 2 2.6 hours,
+  Qwen3-Embedding 5 hours).
+- With reranking the reranker evens the models out: all land between 0.89
+  and 0.92 first. Kept: arctic-embed-m-v2 as the default; the new ones
+  stay choices, none better.
+- EmbeddingGemma 300m is worse than its successor and under Gemma's own
+  terms; dropped. Qwen3-VL-Embedding (text and images in one space; our own
+  ONNX export of its language model) is no better on text, worse in
+  German, and three times the size of Qwen3-Embedding; worth it only for
+  searching figures.
+
+Rerankers on two of the new models (before the question set's change; time
+for the questions relative to bge-reranker-v2-m3 on the GPU):
+
+| reranker (licence)                          | on Qwen3-Embedding | on EmbeddingGemma 2 | German first | time |
+| ------------------------------------------- | ------------------ | ------------------- | ------------ | ---- |
+| bge-reranker-v2-m3 (Apache-2.0)             | 0.91 / 0.99 / 0.94 | 0.89 / 0.98 / 0.92  | 7–8 of 9     | 1    |
+| gte-multilingual-reranker-base (Apache-2.0) | 0.89 / 0.99 / 0.93 | 0.86 / 0.99 / 0.92  | 7 of 9       | 0.87 |
+| Qwen3-Reranker-0.6B (Apache-2.0)            | 0.88 / 0.99 / 0.93 | 0.85 / 1.00 / 0.91  | 9 of 9       | 1.3  |
+
+Qwen3-Reranker is a language model that answers "yes" or "no"; a
+conversion to a classifier with one score (`tomaarsen/…-seq-cls`, in ONNX
+by a third party) runs as an ordinary reranker, given its prompt template
+and padding with its own pad token (the model scores the last token that
+is not padding). It puts every German question first, the others no
+better; not adopted.
+
+All rerankers stop near 0.9 first. The misses are mostly second or third
+place behind a paper that fits nearly as well (two 2019 reviews of
+ultrastrong coupling; three papers on gate-based spin readout in silicon,
+the question's "industrial transistor" the only difference), and the
+rerankers miss different ones: what is left are fine distinctions, not a
+reranker that cannot keep up. The question set now accepts both reviews.

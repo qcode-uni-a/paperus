@@ -272,7 +272,9 @@ MODELS = {
                 "Instruct: Given a web search query, retrieve relevant passages"
                 " that answer the query\nQuery:"
             ),
-            description="Qwen3-Embedding 0.6B: many languages, long texts.",
+            description=(
+                "Qwen3-Embedding 0.6B: many languages, long texts; slow on a CPU."
+            ),
             licence="Apache-2.0",
             download_mb=620,
         ),
@@ -293,7 +295,10 @@ MODELS = {
             max_tokens=1024,
             query_prefix="task: search result | query: ",
             passage_prefix="title: none | text: ",
-            description="EmbeddingGemma 2: text and images in one space.",
+            description=(
+                "EmbeddingGemma 2: many languages; slower than the recommended "
+                "one on a CPU."
+            ),
             licence="Apache-2.0",
             download_mb=330,
         ),
