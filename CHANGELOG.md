@@ -22,6 +22,11 @@
   background, a few at a time (Administration → Jobs shows how far);
   search keeps working meanwhile, and passages whose text stayed keep
   their vectors.
+- **Fluent mode reads tables across the page whole**: a table over both
+  columns (between full-width rules, as REVTeX and booktabs draw them)
+  was read in halves, its left half joining the left column's text; now
+  row by row. A contents page's page numbers, standing apart at the right,
+  are no longer taken for a margin note and left out.
 
 ## 0.1.2 (2026-11-13)
 

@@ -197,3 +197,43 @@ def test_a_few_column_lines_under_a_figure_are_columns() -> None:
     lines(50, 562, 760, 784)
     _, pieces = lay_out(ink, False, sizes)
     assert all(p["wide"] for p in pieces)
+
+
+def test_a_contents_pages_numbers_are_no_margin_note() -> None:
+    """A contents page's numbers stand apart at the right (narrower than a
+    margin note), in the body's type size, one on each line: kept. Line
+    numbers, in small type, are left out."""
+
+    def page(size: float) -> list[Any]:
+        ink = np.zeros((800, 600), dtype=bool)
+        sizes = np.zeros((800, 600), dtype=np.float32)
+        for y in range(100, 600, 14):
+            ink[y : y + 8, 80:420] = (np.arange(80, 420) % 4 != 0)[None, :]
+            sizes[y : y + 8, 80:420] = 10
+            ink[y : y + 8, 500:512] = (np.arange(500, 512) % 4 != 0)[None, :]
+            sizes[y : y + 8, 500:512] = size
+        return lay_out(ink, False, sizes)[1]
+
+    assert max(p["x"] + p["width"] for p in page(10)) > 505
+    assert max(p["x"] + p["width"] for p in page(6)) < 470
+
+
+def test_a_tables_rules_make_no_figure() -> None:
+    """Long thin rules (a table's) are no drawing; a plot's frame is."""
+    ink = np.zeros((400, 600), dtype=bool)
+    text = np.zeros((400, 600), dtype=bool)
+    for y in (100, 103, 300, 303):
+        ink[y, 50:550] = True
+    for y in range(120, 290, 14):
+        ink[y : y + 6, 60:120] = True
+        text[y : y + 6, 60:120] = True
+    assert page_layout.figures(ink, text) == []
+    # Framed, with a curve inside: a plot.
+    ink[:] = text[:] = False
+    for y in (100, 300):
+        ink[y, 50:550] = True
+    ink[100:301, 50] = ink[100:301, 549] = True
+    for x in range(52, 548):
+        ink[300 - (x - 52) * 195 // 496, x] = True
+    [plot] = page_layout.figures(ink, text)
+    assert plot["x"] <= 52 and plot["y"] == 100 and plot["width"] >= 490

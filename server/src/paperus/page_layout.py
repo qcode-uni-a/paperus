@@ -27,12 +27,14 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 8
+VERSION = 9
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
 # numbers), not the page's body.
 MARGIN_NOTE = 30
+# ... unless a contents page's numbers: at least this many.
+CONTENTS_NUMBERS = 5
 # Blank space that separates ink across the page (points).
 SIDE_GAP = 8
 # The gap between columns is at least this wide.
@@ -71,6 +73,10 @@ WIDE_TICK = 3
 # width long.
 RULE_ACROSS = 0.2
 RULE_ACROSS_MOST = 0.8
+# A table across the page: between rules across this share of the body at
+# least, the first two at most this far apart (points).
+TABLE_RULE = 0.9
+TABLE_RULES_GAP = 20
 # A stretch of two columns is at least this tall (a few lines).
 MIN_COLUMNS = 36
 # Columns only in stretches of fewer lines than this on either side,
@@ -222,6 +228,35 @@ def without_uprights(ink: np.ndarray) -> np.ndarray:
     return out
 
 
+def _rules(ink: np.ndarray) -> np.ndarray:
+    """Where a page has rules: thin lines of ink across, at least
+    ``FIGURE_WIDTH`` long, with no upright line at their ends (a table's;
+    not a plot's frame)."""
+    out = np.zeros_like(ink)
+    height = ink.shape[0]
+
+    def upright(x: int, y: int) -> bool:
+        return any(
+            ink[max(0, y - FIGURE_HEIGHT) : y, x].all()
+            or ink[y + 1 : min(height, y + 1 + FIGURE_HEIGHT), x].all()
+            for x in range(max(0, x - 2), min(ink.shape[1], x + 3))
+        )
+
+    for y in map(int, np.flatnonzero(ink.sum(axis=1) >= FIGURE_WIDTH)):
+        for x0, x1 in runs(ink[y]):
+            if x1 - x0 + 1 < FIGURE_WIDTH or upright(x0, y) or upright(x1, y):
+                continue
+            # Thin: little ink a few points above and below along it.
+            beside = 0
+            if y >= 3:
+                beside += int(ink[y - 3, x0 : x1 + 1].sum())
+            if y + 3 < ink.shape[0]:
+                beside += int(ink[y + 3, x0 : x1 + 1].sum())
+            if beside < (x1 - x0 + 1) * 0.4:
+                out[y, x0 : x1 + 1] = True
+    return out
+
+
 def longest(row: np.ndarray) -> int:
     """The longest unbroken stretch of ink in a row."""
     return max((b - a + 1 for a, b in runs(row)), default=0)
@@ -247,6 +282,8 @@ class _Band:
     y0: int
     y1: int
     wide: bool
+    table: bool = False
+    """A table across the page: read across, never in columns of its own."""
 
 
 @dataclass
@@ -309,7 +346,33 @@ def lay_out(
     note_right = width
     while len(across) > 1 and across[0][1] - across[0][0] < MARGIN_NOTE:
         note_left = across.pop(0)[1]
-    while len(across) > 1 and across[-1][1] - across[-1][0] < MARGIN_NOTE:
+
+    def page_numbers(strip: Run) -> bool:
+        """A narrow strip at the right that is a contents page's page
+        numbers (a few at least, in the body's type size, each on a line of
+        the body), not a margin note (line numbers are smaller)."""
+        if sizes is None:
+            return False
+        beside = ink[:, : max(0, strip[0] - SIDE_GAP)].any(axis=1)
+        lines = runs(ink[:, strip[0] : strip[1] + 1].any(axis=1))
+        if (
+            len(lines) < CONTENTS_NUMBERS
+            or sum(bool(beside[a : b + 1].any()) for a, b in lines) < len(lines) * 0.9
+        ):
+            return False
+        own = sizes[:, strip[0] : strip[1] + 1]
+        body = sizes[:, : max(0, strip[0] - SIDE_GAP)]
+        return (
+            bool((own > 0).any() and (body > 0).any())
+            and float(np.median(own[own > 0]))
+            >= float(np.median(body[body > 0])) * 0.85
+        )
+
+    while (
+        len(across) > 1
+        and across[-1][1] - across[-1][0] < MARGIN_NOTE
+        and not page_numbers(across[-1])
+    ):
         note_right = across.pop()[0]
     if not across:
         return False, []
@@ -712,6 +775,52 @@ def lay_out(
             spans.append((top, y1))
         return spans
 
+    def table_spans(y0: int, y1: int, x0: int, x1: int) -> list[tuple[int, int]]:
+        """Tables set across the page: from two rules across the whole body
+        close together (REVTeX's double rule, booktabs' top and middle
+        rules) down to the last such rule that follows without blank space
+        in between (its rows run on to it), to be read across (their
+        columns' gap may run on through them)."""
+        found: list[Run] = []
+        for y in range(y0, y1 + 1):
+            if not longest(ink[y, x0 : x1 + 1]) >= (x1 - x0 + 1) * TABLE_RULE:
+                continue
+            if found and y - found[-1][1] <= 1:
+                found[-1][1] = y
+            else:
+                found.append([y, y])
+        rules = [r for r in found if r[1] - r[0] + 1 <= RULE_ROWS]
+
+        def runs_on(a: Run, b: Run) -> bool:
+            """No blank space between two rules (a table's rows)."""
+            between = rows_in(x0, x1)[a[1] + 1 : b[0]]
+            return not any(
+                e - s + 1 >= BLOCK_SPLIT for s, e in runs([not r for r in between])
+            )
+
+        spans: list[tuple[int, int]] = []
+        i = 0
+        while i < len(rules):
+            # A double rule drawn as one (its lines a point apart), or two
+            # rules close together.
+            double = rules[i][1] - rules[i][0] + 1 >= 3
+            j = i
+            while j + 1 < len(rules) and runs_on(rules[j], rules[j + 1]):
+                j += 1
+            if j > i and (
+                double or rules[i + 1][0] - rules[i][1] - 1 <= TABLE_RULES_GAP
+            ):
+                spans.append((rules[i][0], rules[j][1]))
+                i = j + 1
+            elif j == len(rules) - 1 and double and runs_on(rules[j], [y1 + 1, y1]):
+                # Its closing rule at the page's foot, taken for a footer's
+                # (and cut away with what is below it).
+                spans.append((rules[i][0], y1))
+                i = j + 1
+            else:
+                i += 1
+        return spans
+
     def bands_of(
         y0: int,
         y1: int,
@@ -769,7 +878,8 @@ def lay_out(
                 continue
             if not any(rule_at(y0 + i) for i in range(a, b + 1)):
                 crosses[a : b + 1] = [False] * (b - a + 1)
-        for top, bottom in wide_spans(y0, y1, gutter, x0, x1):
+        tables = table_spans(y0, y1, x0, x1)
+        for top, bottom in wide_spans(y0, y1, gutter, x0, x1) + tables:
             crosses[top - y0 : bottom - y0 + 1] = [True] * (bottom - top + 1)
         last_row = len(crosses) - 1
         for a, b in runs(crosses):
@@ -1009,6 +1119,9 @@ def lay_out(
             if band.y1 < band.y0:
                 continue
             last_y = band.y1
+            band.table = band.wide and any(
+                top <= band.y1 and bottom >= band.y0 for top, bottom in tables
+            )
             kept.append(band)
         return kept
 
@@ -1097,7 +1210,7 @@ def lay_out(
                             part.span = widest
                         found.append(part)
                     continue
-            if main and not drawn(left, right, band.y0, band.y1):
+            if main and not band.table and not drawn(left, right, band.y0, band.y1):
                 own = gutter_of(band.y0, band.y1)
                 if own and (not gutter or own[1] < gutter[0] or own[0] > gutter[1]):
                     place(band.y0, band.y1, own, False)
@@ -1229,8 +1342,9 @@ def figures(ink: np.ndarray, text: np.ndarray) -> list[Figure]:
     """Where a page has drawings (plots, diagrams, pictures): stretches of
     ink outside its text, near each other, mostly drawn and not small."""
     height, width = ink.shape
+    rules = _rules(ink)
     ink = without_uprights(ink)
-    drawn = ink & ~text
+    drawn = ink & ~text & ~rules
     rows, columns = -(-height // FIGURE_CELL), -(-width // FIGURE_CELL)
     padded = np.zeros((rows * FIGURE_CELL, columns * FIGURE_CELL), dtype=bool)
     padded[:height, :width] = drawn
