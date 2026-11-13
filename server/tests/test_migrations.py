@@ -1,16 +1,17 @@
 """The migrations give the schema the models describe."""
 
 import uuid
+from datetime import UTC, datetime
 
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
-from paperus.models import Base, Chunk, Item, ItemChunk, Version
+from paperus.models import Base, Chunk, Item, ItemChunk, User, Version
 from tests.conftest import SERVER_DIR
 
 
@@ -181,3 +182,75 @@ def test_0014_labels_preprints_by_their_pdfs_arxiv_version(
         db.scalars(select(Version.label).where(Version.item_id == item_id)).one()
         == "v2"
     )
+
+
+def test_0015_moves_waiting_lookups_to_their_own_queue(
+    db: Session, database_url: str
+) -> None:
+    """An installation of 0.1.0 updated with lookups waiting behind files to
+    read: they move to "lookup"; the files stay, as do lookups running."""
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.downgrade(config, "0014")
+    rows = [
+        ("paperus:find_item_references", "todo"),
+        ("paperus:fetch_open_access", "doing"),
+        ("paperus:extract_text", "todo"),
+    ]
+    ids = [
+        db.execute(
+            text(
+                "INSERT INTO procrastinate_jobs (queue_name, task_name, status,"
+                " args) VALUES ('text', :task, :status, '{}') RETURNING id"
+            ),
+            {"task": task, "status": status},
+        ).scalar_one()
+        for task, status in rows
+    ]
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+
+    queues = [
+        db.execute(
+            text("SELECT queue_name FROM procrastinate_jobs WHERE id = :id"),
+            {"id": job_id},
+        ).scalar_one()
+        for job_id in ids
+    ]
+    assert queues == ["lookup", "text", "text"]
+    db.execute(
+        text("DELETE FROM procrastinate_jobs WHERE id = ANY(:ids)"), {"ids": ids}
+    )
+    db.commit()
+
+
+def test_0016_last_active_from_logins_and_tokens(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """Updated: "last active" starts as the later of the last login and the
+    last use of one's access tokens; using paperus keeps it current."""
+    made = logged_in.post(
+        "/api/me/tokens", json={"name": "Script", "scopes": ["papers.read"]}
+    ).json()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0015")
+    used = datetime(2026, 11, 1, tzinfo=UTC)
+    db.execute(
+        text("UPDATE users SET last_login_at = :at - interval '3 days'"),
+        {"at": used},
+    )
+    db.execute(text("UPDATE access_tokens SET last_used_at = :at"), {"at": used})
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+
+    [active] = db.scalars(select(User.last_active_at)).all()
+    assert active == used
+    db.close()
+    # Using it with the token: now.
+    logged_in.get("/api/items", headers={"Authorization": f"Bearer {made['token']}"})
+    [active] = db.scalars(select(User.last_active_at)).all()
+    assert active is not None and active > used

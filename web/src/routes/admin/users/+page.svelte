@@ -100,7 +100,12 @@
 			<th>Name</th>
 			<th class="number wide">Groups</th>
 			<th class="number wide">Own papers</th>
-			<th class="wide">Last login</th>
+			<th
+				class="wide"
+				title="Last used paperus: the website, the app, the extension or an assistant"
+			>
+				Last active
+			</th>
 			<th><span class="visually-hidden">Actions</span></th>
 		</tr>
 	</thead>
@@ -120,7 +125,7 @@
 				<td class="number wide">{user.groups}</td>
 				<td class="number wide">{user.papers}</td>
 				<td class="wide muted">
-					{user.last_login_at ? ago(user.last_login_at) : 'never'}
+					{user.last_active_at ? ago(user.last_active_at) : 'never'}
 				</td>
 				<td class="actions">
 					<button class="link" onclick={() => openReset(user)}>New password</button>

@@ -38,10 +38,9 @@
 		const last = shown.at(-1) ? x(shown.at(-1)!.at).toFixed(1) : String(W);
 		const ticks = [];
 		for (let at = end - (end % 30_000); at >= end - WINDOW; at -= 30_000) {
-			ticks.push({
-				x: x(at),
-				label: formatTime(at, { seconds: true })
-			});
+			// Grid lines every 30 s; times only at full minutes, without
+			// seconds, so they never crowd each other.
+			ticks.push({ x: x(at), at, label: at % 60_000 === 0 ? formatTime(at) : '' });
 		}
 		return {
 			enough: shown.length > 1,
@@ -72,7 +71,7 @@
 				{#each [0, 0.5, 1] as level (level)}
 					<line x1="0" x2={W} y1={H - level * (H - 6)} y2={H - level * (H - 6)} class="grid" />
 				{/each}
-				{#each chart.ticks as tick (tick.label)}
+				{#each chart.ticks as tick (tick.at)}
 					<line x1={tick.x} x2={tick.x} y1="0" y2={H} class="grid" />
 				{/each}
 				<polygon points={chart.area} style:fill={color} class="area" />
@@ -84,7 +83,7 @@
 			</div>
 		</div>
 		<div class="times" aria-hidden="true">
-			{#each chart.ticks as tick (tick.label)}
+			{#each chart.ticks.filter((tick) => tick.label) as tick (tick.at)}
 				<span style:left="{(tick.x / W) * 100}%">{tick.label}</span>
 			{/each}
 		</div>

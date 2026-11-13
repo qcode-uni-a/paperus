@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Reading files no longer waits behind lookups**: reference lists,
+  open-access copies, journal versions and authors are looked up in a
+  queue of their own ("Looking things up" under Jobs), so files are read
+  at full speed instead of between the pauses arXiv and others ask for
+  (after a large import, about 10 files a minute). Lookups waiting at the
+  update move there too, and "Reading files" counts only files.
+- **"Last active" instead of "last login"** among the users: any use of
+  paperus (website, app, extension, assistant), not only logging in,
+  which happens every few weeks.
+- The jobs charts' times no longer overlap: full minutes only.
 - **Imports say where papers were already**: besides "already here",
   how many are in other libraries one sees ("1 already in Lab"), and the
   files left out because their paper is in a group one may only read

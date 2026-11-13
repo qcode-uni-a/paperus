@@ -5184,6 +5184,10 @@ export type UserRow = {
      */
     last_login_at: string | null;
     /**
+     * Last Active At
+     */
+    last_active_at?: string | null;
+    /**
      * Deactivated At
      */
     deactivated_at: string | null;

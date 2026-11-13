@@ -83,6 +83,12 @@ from paperus.system import (
 
 log = logging.getLogger(__name__)
 
+# Looking things up at arXiv, Crossref, OpenAlex and publishers (reference
+# lists, open-access copies, journal versions, authors): a queue of its
+# own, so files are not read only between the pauses those services ask
+# for.
+LOOKUP = "lookup"
+
 tasks = Blueprint()
 
 
@@ -362,7 +368,7 @@ def queue_pending_files(job: JobContext, timestamp: int) -> None:
 
 
 # Papers without a file (Manage → Missing → Try all): one download each.
-@tasks.task(name="fetch_open_access", queue="text", pass_context=True)
+@tasks.task(name="fetch_open_access", queue=LOOKUP, pass_context=True)
 def fetch_open_access(
     job: JobContext, item_id: str, user_id: str | None, section: str = "file"
 ) -> None:
@@ -417,7 +423,7 @@ NEW_PUBLISHED_PER_RUN = 500
 @tasks.periodic(cron="20 * * * *")
 @tasks.task(
     name="find_published_versions",
-    queue="text",
+    queue=LOOKUP,
     lock=PUBLISHED_LOCK,
     queueing_lock="find-published",
     pass_context=True,
@@ -432,7 +438,7 @@ def find_published_versions(job: JobContext, timestamp: int) -> None:
 @tasks.periodic(cron="*/5 * * * *")
 @tasks.task(
     name="find_new_published_versions",
-    queue="text",
+    queue=LOOKUP,
     lock=PUBLISHED_LOCK,
     queueing_lock="find-new-published",
     pass_context=True,
@@ -489,7 +495,7 @@ def new_preprints(db: Session, settings: Settings) -> bool:
 @tasks.periodic(cron="*/5 * * * *")
 @tasks.task(
     name="link_authors",
-    queue="text",
+    queue=LOOKUP,
     lock="link-authors",
     queueing_lock="link-authors",
     pass_context=True,
@@ -507,7 +513,7 @@ def link_authors(job: JobContext, timestamp: int) -> None:
 @tasks.periodic(cron="50 * * * *")
 @tasks.task(
     name="look_up_authors",
-    queue="text",
+    queue=LOOKUP,
     lock="link-authors",
     queueing_lock="look-up-authors",
     pass_context=True,
@@ -541,7 +547,7 @@ REFERENCES_LOCK = "find-references"
 @tasks.periodic(cron="40 * * * *")
 @tasks.task(
     name="find_reference_lists",
-    queue="text",
+    queue=LOOKUP,
     lock=REFERENCES_LOCK,
     queueing_lock="find-reference-lists",
     pass_context=True,
@@ -562,7 +568,7 @@ def find_reference_lists(job: JobContext, timestamp: int) -> None:
 
 @tasks.task(
     name="find_item_references",
-    queue="text",
+    queue=LOOKUP,
     lock=REFERENCES_LOCK,
     pass_context=True,
 )
@@ -604,7 +610,7 @@ OPEN_ACCESS_PER_SWEEP = 200
 @tasks.periodic(cron="*/10 * * * *")
 @tasks.task(
     name="queue_open_access_sweep",
-    queue="text",
+    queue=LOOKUP,
     queueing_lock="open-access-sweep",
     pass_context=True,
 )
@@ -665,9 +671,12 @@ LIMITS_SECONDS = 30.0
 
 def job_limits(config: SystemConfig) -> dict[str, int]:
     """Jobs at once per queue (Administration → Settings → Job settings);
-    one maintenance job (backups, trash, integrity) at a time."""
+    one maintenance job (backups, trash, integrity) at a time, and two
+    lookups (they mostly wait: for the services and the pauses they ask
+    for, which all lookups share)."""
     return {
         "text": config.jobs_text,
+        LOOKUP: 2,
         "ml": config.jobs_ml,
         "ocr": 1,
         "layout": config.jobs_text,

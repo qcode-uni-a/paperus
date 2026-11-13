@@ -30,6 +30,8 @@ class UserRow(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login_at: datetime | None
+    last_active_at: datetime | None = None
+    """Last used paperus in any way (website, app, extension, assistant)."""
     deactivated_at: datetime | None
     groups: int
     """Groups the person is directly in."""
@@ -79,6 +81,7 @@ def _rows(db: DB, only: uuid.UUID | None = None) -> list[UserRow]:
             is_admin=user.is_admin,
             created_at=user.created_at,
             last_login_at=user.last_login_at,
+            last_active_at=user.last_active_at,
             deactivated_at=user.deactivated_at,
             groups=groups.get(user.id, 0),
             papers=papers.get(user.id, 0),

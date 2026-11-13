@@ -626,7 +626,15 @@ def test_starting_the_worker(
     monkeypatch.setattr(jobs, "run_workers", run_workers)
     jobs.run_worker(settings)
     assert seen == [
-        {"text": 3, "ml": 1, "ocr": 1, "layout": 3, "import": 1, "backup": 1}
+        {
+            "text": 3,
+            "lookup": 2,
+            "ml": 1,
+            "ocr": 1,
+            "layout": 3,
+            "import": 1,
+            "backup": 1,
+        }
     ]
     context = jobs._worker_context()
     assert context.settings is settings

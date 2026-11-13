@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, Request
@@ -44,10 +45,22 @@ def current_user(request: Request, db: DB) -> User:
         if not tokens.allows(token, request.method, request.url.path):
             raise HTTPException(403, "this token may not do that")
         request.state.access_token = token
-        return user
+        return _active(db, user)
     user = user_for_token(db, raw) if raw else None
     if user is None:
         raise HTTPException(401, "not logged in")
+    return _active(db, user)
+
+
+# How often "last active" is written (not on every request).
+ACTIVE_EVERY = timedelta(minutes=5)
+
+
+def _active(db: Session, user: User) -> User:
+    now = datetime.now(UTC)
+    if user.last_active_at is None or now - user.last_active_at > ACTIVE_EVERY:
+        user.last_active_at = now
+        db.commit()
     return user
 
 

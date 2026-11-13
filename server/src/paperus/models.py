@@ -66,6 +66,9 @@ class User(Record, Base):
     )
     """Tutorial hints the person has seen (so they show once, on any device)."""
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    """When the person last used paperus in any way (the website, the app,
+    the extension, an assistant), to a few minutes."""
     deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     """Deactivated people cannot log in; their papers and memberships stay."""
     oidc_subject: Mapped[str | None] = mapped_column(String(500), unique=True)

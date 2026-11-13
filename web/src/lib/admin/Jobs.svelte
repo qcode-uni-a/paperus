@@ -18,6 +18,13 @@
 			color: 'var(--royal)'
 		},
 		{
+			queue: 'lookup',
+			title: 'Looking things up',
+			description:
+				'Reference lists, open-access copies, journal versions and authors, from arXiv, Crossref, OpenAlex and publishers, with the pauses they ask for.',
+			color: 'var(--tag-amber-ink)'
+		},
+		{
 			queue: 'ml',
 			title: 'Search by meaning',
 			description: 'Vectors for passages, from the ML service.',
