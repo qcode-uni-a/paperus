@@ -2,8 +2,10 @@
 
 import hashlib
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
+import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -14,6 +16,15 @@ from sqlalchemy.orm import Session
 
 from paperus.models import Base, Chunk, Item, ItemChunk, User, Version
 from tests.conftest import SERVER_DIR
+
+
+@pytest.fixture(autouse=True)
+def fresh_connections(engine: Engine) -> Iterator[None]:
+    """Going down and up again makes the database's types anew: connections
+    kept in the pool would know them by their old ids ("cache lookup failed
+    for type" in the next test of this worker)."""
+    yield
+    engine.dispose()
 
 
 def include_name(name: str | None, type_: str, parent_names: object) -> bool:
