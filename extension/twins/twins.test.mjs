@@ -12,82 +12,181 @@
 // fetch unless its step says "cors": true, as browsers do. "expectPdf"
 // says how it ends: {"pdf": true}, {"next": address} (left to the
 // extension) or {"error": …, "at": address}.
-import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { JSDOM } from 'jsdom';
-import { fetchPdf, namesPaper, pageIds, readPage } from '../src/page.ts';
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { test } from "node:test";
+import { JSDOM } from "jsdom";
+import { extrasOf } from "../src/extras.ts";
+import {
+  fetchPdf,
+  namesPaper,
+  pageIds,
+  pageLinks,
+  readPage,
+} from "../src/page.ts";
 
-const pages = new URL('pages/', import.meta.url);
-const PDF = '%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n';
+const pages = new URL("pages/", import.meta.url);
+const PDF =
+  "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n";
 const ROBOT_CHECK =
-	'<!doctype html><title>Security verification</title><form id="challenge-form"></form>';
-const NOT_FOUND = { status: 404, html: '<!doctype html><title>Not found</title>' };
+  '<!doctype html><title>Security verification</title><form id="challenge-form"></form>';
+const NOT_FOUND = {
+  status: 404,
+  html: "<!doctype html><title>Not found</title>",
+};
 
 /** A fetch that plays the chain for a page at ``origin``. */
 function network(chain, origin) {
-	return async (input) => {
-		let url = new URL(String(input)).href;
-		for (let hops = 0; hops < 10; hops++) {
-			const step = chain[url] ?? {};
-			const answer = step.fetch ?? NOT_FOUND;
-			if (answer.redirect) {
-				url = new URL(answer.redirect, url).href;
-				continue;
-			}
-			if (new URL(url).origin !== origin && !step.cors)
-				throw new TypeError('NetworkError when attempting to fetch resource.');
-			const pdf = answer === 'pdf';
-			const response = new Response(
-				pdf ? PDF : answer === 'robot-check' ? ROBOT_CHECK : answer.html,
-				{
-					status: answer.status ?? 200,
-					headers: { 'content-type': pdf ? 'application/pdf' : 'text/html; charset=utf-8' }
-				}
-			);
-			// Where it ended up, as a browser's answer says.
-			Object.defineProperty(response, 'url', { value: url });
-			return response;
-		}
-		throw new TypeError('Too many redirects.');
-	};
+  return async (input) => {
+    let url = new URL(String(input)).href;
+    for (let hops = 0; hops < 10; hops++) {
+      const step = chain[url] ?? {};
+      const answer = step.fetch ?? NOT_FOUND;
+      if (answer.redirect) {
+        url = new URL(answer.redirect, url).href;
+        continue;
+      }
+      if (new URL(url).origin !== origin && !step.cors)
+        throw new TypeError("NetworkError when attempting to fetch resource.");
+      const pdf = answer === "pdf";
+      const response = new Response(
+        pdf ? PDF : answer === "robot-check" ? ROBOT_CHECK : answer.html,
+        {
+          status: answer.status ?? 200,
+          headers: {
+            "content-type": pdf
+              ? "application/pdf"
+              : "text/html; charset=utf-8",
+          },
+        },
+      );
+      // Where it ended up, as a browser's answer says.
+      Object.defineProperty(response, "url", { value: url });
+      return response;
+    }
+    throw new TypeError("Too many redirects.");
+  };
 }
 
 for (const name of readdirSync(pages).sort()) {
-	const folder = new URL(`${name}/`, pages);
-	const spec = JSON.parse(readFileSync(new URL('expect.json', folder), 'utf8'));
-	/** The twin, open as in a tab: what the page's functions see. */
-	const open = () => {
-		const { window } = new JSDOM(readFileSync(new URL('page.html', folder), 'utf8'), {
-			url: spec.url
-		});
-		Object.assign(globalThis, { document: window.document, location: window.location, Node: window.Node });
-	};
+  const folder = new URL(`${name}/`, pages);
+  const spec = JSON.parse(readFileSync(new URL("expect.json", folder), "utf8"));
+  /** The twin, open as in a tab: what the page's functions see. */
+  const open = () => {
+    const { window } = new JSDOM(
+      readFileSync(new URL("page.html", folder), "utf8"),
+      {
+        url: spec.url,
+      },
+    );
+    Object.assign(globalThis, {
+      document: window.document,
+      location: window.location,
+      Node: window.Node,
+    });
+  };
 
-	test(`${name}: ${spec.about}`, async () => {
-		open();
-		const page = await readPage();
-		for (const [key, expected] of Object.entries(spec.expect)) {
-			const found = key === 'mode' ? (namesPaper(page, spec.url) ? 'paper' : 'list') : page[key];
-			assert.deepEqual(found, expected, key);
-		}
-		// What marks a paper one has when its page opens: the same IDs.
-		const ids = pageIds();
-		assert.equal(ids.doi, page.doi, 'pageIds: doi');
-		assert.equal(ids.arxiv, page.arxiv, 'pageIds: arxiv');
-	});
+  test(`${name}: ${spec.about}`, async () => {
+    open();
+    const page = await readPage();
+    for (const [key, expected] of Object.entries(spec.expect)) {
+      const found =
+        key === "mode"
+          ? namesPaper(page, spec.url)
+            ? "paper"
+            : "list"
+          : page[key];
+      assert.deepEqual(found, expected, key);
+    }
+    // What marks a paper one has when its page opens: the same IDs.
+    const ids = pageIds();
+    assert.equal(ids.doi, page.doi, "pageIds: doi");
+    assert.equal(ids.arxiv, page.arxiv, "pageIds: arxiv");
+  });
 
-	if (spec.chain)
-		test(`${name}: its PDF, fetched in the page`, async (t) => {
-			open();
-			const page = await readPage();
-			t.mock.method(globalThis, 'fetch', network(spec.chain, new URL(spec.url).origin));
-			const pdf = await fetchPdf(page.pdfUrl, 10_000_000);
-			if (spec.expectPdf.pdf) {
-				assert.ok('base64' in pdf, `no PDF: ${JSON.stringify(pdf).slice(0, 300)}`);
-				assert.equal(atob(pdf.base64), PDF);
-				return;
-			}
-			for (const [key, expected] of Object.entries(spec.expectPdf)) assert.equal(pdf[key], expected, key);
-		});
+  if (spec.extras)
+    test(`${name}: its supplementary files and links, each as what it is`, async () => {
+      open();
+      const page = await readPage();
+      assert.deepEqual(
+        extrasOf(pageLinks(), [spec.url, page.pdfUrl]),
+        spec.extras,
+      );
+    });
+
+  if (spec.chain)
+    test(`${name}: its PDF, fetched in the page`, async (t) => {
+      open();
+      const page = await readPage();
+      t.mock.method(
+        globalThis,
+        "fetch",
+        network(spec.chain, new URL(spec.url).origin),
+      );
+      const pdf = await fetchPdf(page.pdfUrl, 10_000_000);
+      if (spec.expectPdf.pdf) {
+        assert.ok(
+          "base64" in pdf,
+          `no PDF: ${JSON.stringify(pdf).slice(0, 300)}`,
+        );
+        assert.equal(atob(pdf.base64), PDF);
+        return;
+      }
+      for (const [key, expected] of Object.entries(spec.expectPdf))
+        assert.equal(pdf[key], expected, key);
+    });
 }
+
+test("extrasOf: published reviews on a page of their own, and what files are", () => {
+  const at = "https://journals.plosish.org/physics/article?id=10.5555/x.1";
+  const link = (url, text, heading = "", context = "") => ({
+    url,
+    text,
+    heading,
+    context,
+    abstract: false,
+  });
+  const extras = extrasOf(
+    [
+      link(
+        "https://journals.plosish.org/physics/article/peerReview?id=10.5555/x.1",
+        "Peer Review History",
+      ),
+      link(
+        "https://journals.plosish.org/physics/s/peer-review-policy",
+        "Peer review policy",
+      ),
+      link(`${at}#peer-review`, "Peer review"),
+      link(
+        "https://example.org/files/x/mmc2.xlsx",
+        "Source data",
+        "Supplementary material",
+      ),
+      link(
+        "https://example.org/files/x/mmc3.pdf",
+        "Reviewer reports",
+        "Supplementary material",
+      ),
+      link(
+        "https://example.org/files/x/figures.pdf",
+        "Link",
+        "Supplementary material",
+      ),
+    ],
+    [at],
+  );
+  assert.deepEqual(extras.links, [
+    {
+      url: "https://journals.plosish.org/physics/article/peerReview?id=10.5555/x.1",
+      kind: "peer_review",
+    },
+  ]);
+  assert.deepEqual(
+    extras.files.map((f) => [f.name, f.role]),
+    [
+      ["Source data.xlsx", "data"],
+      ["Reviewer reports.pdf", "peer_review"],
+      ["figures.pdf", "supplementary"],
+    ],
+  );
+});

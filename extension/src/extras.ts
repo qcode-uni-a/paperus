@@ -13,10 +13,13 @@ export interface PageLink {
   abstract: boolean;
 }
 
-export type LinkKind = "code" | "data" | "other";
+export type LinkKind = "code" | "data" | "peer_review" | "other";
+/** What a supplementary file is: paperus has only its name afterwards, so
+ * the page says it (the link's text, its section, its file name). */
+export type FileRole = "supplementary" | "peer_review" | "code" | "data";
 
 export interface Extras {
-  files: { url: string; name: string }[];
+  files: { url: string; name: string; role: FileRole }[];
   links: { url: string; kind: LinkKind }[];
 }
 
@@ -76,7 +79,29 @@ function address(url: string): URL | null {
   }
 }
 
-/** The file's name: Wiley's file=…, else the address's last part. */
+/** Referees' reports and the authors' replies, as pages call them. */
+const PEER_REVIEW =
+  /\bpeer[\s-]*reviews?\b|\breferee(s|['’]s)?\s+reports?\b|\breviewer(s|['’]s?)?\s+(reports?|comments?)\b|\breview\s+(history|file|reports?)\b/i;
+/** The journal's, not the paper's: its policy, its process. */
+const ABOUT_REVIEWING =
+  /\b(policy|policies|process|guidelines?|ethics|editorial|for reviewers)\b/i;
+/** Publishers' names for files that say nothing (Springer Nature's
+ * …_MOESM2_ESM.pdf, Elsevier's mmc1.pdf, bioRxiv's media-1.pdf). */
+export const OPAQUE_NAME =
+  /(_MOESM\d+_ESM|^mmc\d+|-mmc\d+|^media-\d+|_suppdata?|^suppl?\d*|^sm\d*|^S\d+_File)\b/i;
+const CODE_FILE = /\.(py|ipynb|m|r|jl|c|cpp|f90|nb)$/i;
+const DATA_FILE =
+  /\.(csv|tsv|xlsx?|h5|hdf5|nc|mat|npz|json|cif|pdb|fasta|fa)$/i;
+
+/** The link's own words, if they say something ("Peer Review File"). */
+function wordsOf(text: string): string {
+  const words = text.replace(/\s+/g, " ").trim().slice(0, 100);
+  return GENERIC_TEXT.test(words) || /^link$/i.test(words) ? "" : words;
+}
+
+/** The file's name: Wiley's file=…, else the address's last part; one
+ * that says nothing (…_MOESM2_ESM.pdf) as the link says it, with its
+ * ending ("Peer Review File.pdf"). */
 function nameOf(url: URL, text: string): string {
   const given = url.searchParams.get("file");
   let last = given ?? url.pathname.split("/").filter(Boolean).at(-1) ?? "";
@@ -85,10 +110,31 @@ function nameOf(url: URL, text: string): string {
   } catch {
     // As it is.
   }
-  if (FILE_EXTENSION.test(last)) return last;
-  return (
-    text.replace(/\s+/g, " ").trim().slice(0, 100) || last || "supplementary"
-  );
+  const words = wordsOf(text)
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .trim();
+  if (FILE_EXTENSION.test(last)) {
+    const ending = last.match(/\.\w+$/)?.[0] ?? "";
+    return OPAQUE_NAME.test(last) && words
+      ? `${words.replace(new RegExp(`\\${ending}$`, "i"), "")}${ending}`
+      : last;
+  }
+  return words || last || "supplementary";
+}
+
+/** What a supplementary file is, from what the page says of it. */
+export function roleOf(link: PageLink, name: string): FileRole {
+  const said = `${link.text} ${name}`;
+  if (PEER_REVIEW.test(said) && !ABOUT_REVIEWING.test(link.text))
+    return "peer_review";
+  if (CODE_FILE.test(name) || /\b(source\s+)?code\b/i.test(link.text))
+    return "code";
+  if (
+    DATA_FILE.test(name) ||
+    /\b(source|supplementary)\s+data\b|\bdata\s*set\b/i.test(link.text)
+  )
+    return "data";
+  return "supplementary";
 }
 
 function isSupplement(link: PageLink, url: URL): boolean {
@@ -140,10 +186,24 @@ export function extrasOf(
   );
   for (const link of links) {
     const url = address(link.url);
-    if (!url || own.has(url.href) || ELSEWHERE.test(link.heading)) continue;
+    if (!url || ELSEWHERE.test(link.heading)) continue;
+    // Not the page itself, nor a place on it ("#peer-review").
+    if (own.has(url.href) || own.has(url.href.replace(/#.*$/, ""))) continue;
     if (isSupplement(link, url)) {
-      if (extras.files.length < MAX_FILES)
-        extras.files.push({ url: url.href, name: nameOf(url, link.text) });
+      if (extras.files.length < MAX_FILES) {
+        const name = nameOf(url, link.text);
+        extras.files.push({ url: url.href, name, role: roleOf(link, name) });
+      }
+      continue;
+    }
+    // The paper's published reviews, on a page of their own.
+    if (
+      PEER_REVIEW.test(link.text) &&
+      !ABOUT_REVIEWING.test(link.text) &&
+      extras.links.length < MAX_LINKS &&
+      !extras.links.some((known) => known.url === url.href)
+    ) {
+      extras.links.push({ url: url.href, kind: "peer_review" });
       continue;
     }
     const kind = kindOf(link, url);

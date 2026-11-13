@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Peer review files**: a new kind of attachment, "Peer review", for
+  referees' reports and the authors' replies. The browser extension
+  recognises them on the page and saves them as such (Nature's "Peer
+  Review File", reviewer reports), and links to a paper's published
+  reviews (PLOS's, eLife's); before, Nature's came in as an anonymous
+  supplement. Supplementary files saved by the extension now say what they
+  are (supplement, code, data, peer review) and are named as the page's
+  link reads when the site's own name says nothing ("Peer Review
+  File.pdf", not "…_MOESM2_ESM.pdf").
 - **A more compact library filter**: one line per rule, its name beside
   it (above it on a phone). The tags are one line: "has", "has any of" or
   "has not" and "Add a tag…", the tags chosen as chips ("or", "not"); the

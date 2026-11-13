@@ -11,8 +11,10 @@ What it sends to your paperus, and when:
   and the paper's PDF, downloaded in your browser with your own access
   (in Firefox's PDF viewer: by the extension, from the website you allowed
   it to). Also the paper's supplementary files the page links (downloaded
-  the same way, up to 100 MB each) and the links to its code and data
-  (GitHub, Zenodo, …) named in the article.
+  the same way, up to 100 MB each, each with what it is and, where the
+  site's file name says nothing, the link's text as its name) and the
+  links to its code and data (GitHub, Zenodo, …) and to its published
+  reviews named in the article.
 - **When the page lists papers or files** (or is a Google Scholar
   profile): the list's DOIs, arXiv IDs or titles, to mark those you have;
   on saving, the ticked files (downloaded with your access) or the papers'

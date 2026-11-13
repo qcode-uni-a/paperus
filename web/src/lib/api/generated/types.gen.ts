@@ -1512,7 +1512,7 @@ export type FileOut = {
 /**
  * FileRole
  */
-export type FileRole = 'main' | 'supplementary' | 'code' | 'data' | 'slides' | 'transcript' | 'recording' | 'other';
+export type FileRole = 'main' | 'supplementary' | 'code' | 'data' | 'slides' | 'peer_review' | 'transcript' | 'recording' | 'other';
 
 /**
  * FileSource
@@ -2472,7 +2472,7 @@ export type LinkChange = {
  *
  * What a paper's link leads to.
  */
-export type LinkKind = 'code' | 'data' | 'other';
+export type LinkKind = 'code' | 'data' | 'peer_review' | 'other';
 
 /**
  * LogEntryOut

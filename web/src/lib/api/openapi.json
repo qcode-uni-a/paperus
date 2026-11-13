@@ -11593,6 +11593,7 @@
           "code",
           "data",
           "slides",
+          "peer_review",
           "transcript",
           "recording",
           "other"
@@ -13376,6 +13377,7 @@
         "enum": [
           "code",
           "data",
+          "peer_review",
           "other"
         ],
         "title": "LinkKind",

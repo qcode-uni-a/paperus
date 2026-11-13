@@ -13,8 +13,10 @@ import {
 import {
   type Extras,
   extrasOf,
+  type FileRole,
   type Listed,
   listedOn,
+  OPAQUE_NAME,
   type PageLink,
   scholarListed,
 } from "./extras";
@@ -77,7 +79,13 @@ type Saved = {
 
 /** A supplementary file the paper's page links (``inPaperus``: the paper
  * has a file of that name), for the popup. */
-type Supplement = { url: string; name: string; inPaperus?: boolean };
+type Supplement = {
+  url: string;
+  name: string;
+  /** What it is (the page says it; paperus gets only the file). */
+  role?: FileRole;
+  inPaperus?: boolean;
+};
 /** How saving one went. */
 type SupplementOutcome = Supplement & {
   state: "saved" | "failed" | "too-large";
@@ -1131,8 +1139,13 @@ async function saveSupplement(
       : why(fetched.error);
   try {
     const form = new FormData();
-    form.append("upload", fetched.blob, fetched.name);
-    form.append("role", "supplementary");
+    // The page's name for it when the site's says nothing (…_MOESM2_ESM).
+    const name =
+      OPAQUE_NAME.test(fetched.name) && !OPAQUE_NAME.test(file.name)
+        ? file.name
+        : fetched.name;
+    form.append("upload", fetched.blob, name);
+    form.append("role", file.role ?? "supplementary");
     const { status } = await call<Api.UploadToItemData>(
       "/api/items/{item_id}/files",
       { method: "POST", path: { item_id: itemId }, form },

@@ -316,6 +316,9 @@ class FileRole(StrEnum):
     CODE = "code"
     DATA = "data"
     SLIDES = "slides"
+    PEER_REVIEW = "peer_review"
+    """Referees' reports and the authors' replies (Nature's "Peer Review
+    File"), as the browser extension recognises them on the page."""
     TRANSCRIPT = "transcript"
     RECORDING = "recording"
     OTHER = "other"
@@ -326,6 +329,9 @@ class LinkKind(StrEnum):
 
     CODE = "code"
     DATA = "data"
+    PEER_REVIEW = "peer_review"
+    """The paper's published reviews, on a page of their own (eLife's,
+    PLOS's, SciPost's)."""
     OTHER = "other"
 
 

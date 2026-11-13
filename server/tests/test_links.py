@@ -120,6 +120,8 @@ def test_code_and_data_files(client: TestClient, db: Session) -> None:
     for name, role, data in (
         ("analysis.py", "code", b"x = 1\n"),
         ("counts.csv", "data", b"x,1\n"),
+        # Recognised as such by the browser extension on Nature's page.
+        ("Peer Review File.txt", "peer_review", b"Reviewer 1: ...\n"),
     ):
         response = ada.client.post(
             f"/api/items/{paper['id']}/files",
@@ -129,6 +131,18 @@ def test_code_and_data_files(client: TestClient, db: Session) -> None:
         )
         assert response.status_code == 201, response.text
         assert response.json()["role"] == role
+
+
+def test_a_link_to_the_papers_reviews(client: TestClient, db: Session) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.add("Spin qubits")
+    url = "https://journals.plos.org/physics/article/peerReview?id=10.1371/x.1"
+    response = ada.post(
+        f"/api/items/{paper['id']}/links", {"url": url, "kind": "peer_review"}
+    )
+    assert response.status_code < 300, response.text
+    links = ada.get(f"/api/items/{paper['id']}").json()["links"]
+    assert [(link["url"], link["kind"]) for link in links] == [(url, "peer_review")]
 
 
 def test_the_same_file_twice_is_kept_once(client: TestClient, db: Session) -> None:

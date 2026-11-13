@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		mdiCodeBraces,
+		mdiCommentCheckOutline,
 		mdiDatabaseOutline,
 		mdiFileDocumentOutline,
 		mdiFileOutline,
@@ -21,7 +22,8 @@
 
 	/** A paper's attachments in one line: links to its code, data and more,
 	 * and its files besides the paper itself (supplementary material, code,
-	 * data, slides); each says what it is, its name in its tooltip. Those
+	 * data, slides, peer review); each says what it is, its name in its
+	 * tooltip. Those
 	 * who may change the paper add and remove them. */
 	let {
 		item,
@@ -49,6 +51,13 @@
 			role: 'supplementary'
 		},
 		{ kind: 'slides', name: 'Slides', icon: mdiPresentation, link: 'other', role: 'slides' },
+		{
+			kind: 'peer_review',
+			name: 'Peer review',
+			icon: mdiCommentCheckOutline,
+			link: 'peer_review',
+			role: 'peer_review'
+		},
 		{ kind: 'other', name: 'Other', icon: mdiLinkVariant, link: 'other', role: 'other' }
 	];
 	const BY_KIND = Object.fromEntries(KINDS.map((k) => [k.kind, k]));

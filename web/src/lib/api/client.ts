@@ -96,6 +96,7 @@ export const FILE_ROLES: FileRole[] = [
 	'code',
 	'data',
 	'slides',
+	'peer_review',
 	'transcript',
 	'recording',
 	'other'

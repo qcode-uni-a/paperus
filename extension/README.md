@@ -29,7 +29,12 @@ does the same; a full one with a check means you have it already.
   of their own), and links to its code and data (GitHub, Zenodo, Figshare, …,
   where the article says they are its own: in its abstract, a "Code
   availability" section, "the data are available at …") are shown on its
-  page. Not the references' links, nor the site's own.
+  page. Not the references' links, nor the site's own. Each file goes in
+  as what the page says it is (paperus gets only the file): a supplement,
+  code, data or the peer review file (Nature's "Peer Review File",
+  reviewer reports), named as the link reads when the site's name says
+  nothing ("Peer Review File.pdf", not "…_MOESM2_ESM.pdf"); a page of the
+  paper's published reviews (PLOS's, eLife's) as a link.
 - **Pages that list papers or files** (a course's lecture notes, a
   publication list, a journal's contents): the popup lists the files the
   page links (PDFs, slides, …) and the papers it links by DOI or arXiv ID,
