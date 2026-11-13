@@ -13,6 +13,7 @@ its title matches the preprint's.
 import logging
 import re
 import time
+import uuid
 from datetime import UTC, datetime, timedelta
 from difflib import SequenceMatcher
 
@@ -143,6 +144,32 @@ def _alike(a: str, b: str) -> bool:
     words = {w for w in first.split() if len(w) >= 4}
     others = {w for w in second.split() if len(w) >= 4}
     return len(words & others) >= SHARED_WORDS * max(1, len(words | others))
+
+
+def preprint_of(db: Session, libraries: list[uuid.UUID], title: str) -> Item | None:
+    """A preprint in these libraries (with an arXiv ID, no journal version
+    yet) whose title is this journal paper's (``_alike``)."""
+    with_arxiv = (
+        select(Version.item_id)
+        .join(Identifier)
+        .where(Identifier.scheme == Scheme.ARXIV)
+    )
+    journal = select(Version.item_id).where(Version.kind.in_(JOURNAL))
+    return next(
+        (
+            item
+            for item in db.scalars(
+                select(Item).where(
+                    Item.deleted_at.is_(None),
+                    Item.library_id.in_(libraries),
+                    Item.id.in_(with_arxiv),
+                    Item.id.not_in(journal),
+                )
+            )
+            if _alike(title, item.title)
+        ),
+        None,
+    )
 
 
 def add_published(

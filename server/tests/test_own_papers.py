@@ -194,3 +194,33 @@ def test_a_group_first(client: TestClient, db: Session) -> None:
         own_papers.add_new(db, http, library)
     assert titles(db, lab["library_id"]) == ["New hail"]
     assert titles(db, ada.libraries()["Me"]["id"]) == []
+
+
+def test_a_renamed_journal_version_joins_its_preprint(
+    client: TestClient, db: Session
+) -> None:
+    """OpenAlex lists the journal paper apart (renamed on publication):
+    it becomes the preprint's published version, celebrated, not a paper
+    of its own."""
+    ada = Person(client, db, "ada")
+    with_orcid(db, ada)
+    own = ada.libraries()["Me"]["id"]
+    preprint = ada.post(
+        "/api/items",
+        {
+            "metadata": {"title": "Hail on qubits", "type": "article"},
+            "identifiers": [{"scheme": "arxiv", "value": "2401.12345"}],
+        },
+    ).json()["id"]
+    http = openalex_and_doi(
+        ["10.1103/hail"], {"10.1103/hail": csl("Hail on superconducting qubits", 30)}
+    )
+    assert own_papers.add_new(db, http, library_of(db, own)) == []
+    db.expire_all()
+    item = db.get(Item, uuid.UUID(preprint))
+    assert item is not None
+    assert "published" in [v.kind for v in item.versions]
+    assert titles(db, own) == ["Hail on superconducting qubits"]
+    [notice] = ada.get("/api/me/notifications").json()["notifications"]
+    assert (notice["kind"], notice["data"]["yours"]) == ("published", True)
+    assert "10.1103/hail" in library_of(db, own).own_papers_seen

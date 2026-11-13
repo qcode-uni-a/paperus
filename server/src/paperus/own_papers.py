@@ -6,7 +6,8 @@ the library by DOI (its details from its registry), as "Add" under Manage
 → Missing does, as added by them. A work is handled once per library
 (``libraries.own_papers_seen``): one removed stays removed. A paper wanted
 by a group and by its member goes to the group (groups come first), not
-twice. A few dozen a
+twice; the journal version of a preprint there (renamed, so listed apart)
+becomes its published version (``published``), not a paper of its own. A few dozen a
 day each, so a long list comes over a few days. The people are told under
 the bell; a paper out in the last week is celebrated (``notifications``)."""
 
@@ -17,7 +18,14 @@ import httpx2
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import automations, library, metadata, notifications, works
+from paperus import (
+    automations,
+    library,
+    metadata,
+    notifications,
+    published,
+    works,
+)
 from paperus.access import Access
 from paperus.identifiers import Scheme, implied_by_doi
 from paperus.models import (
@@ -86,6 +94,16 @@ def _add(
         return None
     except metadata.MetadataUnavailable as error:
         raise works.Unavailable(str(error)) from error
+    # The journal version of a preprint here (renamed on publication, so
+    # OpenAlex lists it apart): added to it, not as a paper of its own.
+    if kind in published.JOURNAL and (
+        preprint := published.preprint_of(
+            db, Access.of(db, user).readable, metadata.csl_title(csl)
+        )
+    ):
+        published.add_published(db, http, preprint, doi, "OpenAlex (ORCID iD)")
+        db.commit()
+        return None
     try:
         with db.begin_nested():
             item = library.create_item(
