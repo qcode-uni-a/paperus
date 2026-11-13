@@ -36,10 +36,11 @@
 		celebrate();
 	}
 
-	/** One's own paper published: a few sparkles round the bell, once in
-	 * this page while it is new, and a star on its line in the list. */
+	/** One's own paper published, or cited: a few sparkles round the bell,
+	 * once in this page while it is new, and a star on its line in the list. */
 	const yours = (notice: NotificationOut) =>
-		notice.kind === 'published' && Boolean((notice.data as Record<string, unknown>).yours);
+		notice.kind === 'cited' ||
+		(notice.kind === 'published' && Boolean((notice.data as Record<string, unknown>).yours));
 	const SPARKLING = 3200;
 	let sparkle = $state(false);
 	const celebrated = new Set<number>();
@@ -137,6 +138,16 @@
 						text: `${plural(count)} of yours were added to ${where}, from OpenAlex`,
 						href: `${resolve('/')}?owner=${d.library_id}`
 					};
+		}
+		if (notice.kind === 'cited') {
+			const count = Number(d.count ?? 1);
+			return {
+				text:
+					count === 1
+						? `Cited! “${d.title}” cites your paper “${d.cited_title}”`
+						: `Cited! “${d.title}” cites ${count} of your papers`,
+				href: item
+			};
 		}
 		if (notice.kind === 'erratum') {
 			return { text: `A correction to “${d.title}”: ${d.erratum}`, href: item };

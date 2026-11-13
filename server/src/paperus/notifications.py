@@ -6,7 +6,8 @@ unread for a few hours); a published version found for one of their
 preprints (told apart where it is their own paper: they are among its
 authors by their ORCID iD; their own paper is also told, to celebrate,
 when it comes less than a week after it came out, however it comes and
-whoever adds it); a correction (erratum) found for one of their papers;
+whoever adds it); a paper new here citing one of their own (celebrated
+too); a correction (erratum) found for one of their papers;
 being added to a group by someone else (to a group of people: once it has
 papers, else the papers' own notice says it); their own papers added from
 OpenAlex by the daily job (to their library or a group's); each zip of their export as
@@ -29,10 +30,12 @@ from typing import Any
 from sqlalchemy import delete, event, func, insert, inspect, or_, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
+from paperus.access import Access
 from paperus.models import (
     Author,
     Authorship,
     Group,
+    Identifier,
     Import,
     ImportStatus,
     Item,
@@ -45,6 +48,9 @@ from paperus.models import (
 
 KEEP_READ = timedelta(days=30)
 KEEP = timedelta(days=90)
+CITING_NEW = timedelta(days=30)
+"""Only papers added this recently are told as citing one's own (older
+ones would come all at once, when reference lists are looked for anew)."""
 FRESH = timedelta(days=7)
 """A paper out less than this long ago, when it comes: one's own is
 celebrated (``_fresh``)."""
@@ -60,6 +66,7 @@ IMPORT = "import"
 ERRATUM = "erratum"
 JOINED = "joined"
 OWN_ADDED = "own_added"
+CITED = "cited"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -180,6 +187,72 @@ def _authors_here(
             )
         )
     )
+
+
+def cited(db: Session, citing: Item, dois: set[str], arxivs: set[str]) -> None:
+    """A paper new in the library whose references (``dois``, ``arxivs``)
+    name papers of people here (by their ORCID iDs): told to each of them
+    who can read both, once a citing paper; not for their own papers."""
+    added = citing.created_at
+    if added is None or added < datetime.now(UTC) - CITING_NEW:
+        return
+    if not dois and not arxivs:
+        return
+    cited_ids = set(
+        db.scalars(
+            select(Version.item_id)
+            .join(Identifier, Identifier.version_id == Version.id)
+            .join(Item, Item.id == Version.item_id)
+            .where(
+                or_(
+                    (Identifier.scheme == "doi") & Identifier.value.in_(dois),
+                    (Identifier.scheme == "arxiv") & Identifier.value.in_(arxivs),
+                ),
+                Item.deleted_at.is_(None),
+                Item.id != citing.id,
+            )
+        )
+    )
+    if not cited_ids:
+        return
+    own_authors = _orcids(db, citing, list(citing.versions))
+    told = set(
+        db.scalars(
+            select(Notification.user_id).where(
+                Notification.kind == CITED,
+                Notification.data["item_id"].astext == str(citing.id),
+            )
+        )
+    )
+    yours: dict[uuid.UUID, list[Item]] = {}
+    for item in db.scalars(select(Item).where(Item.id.in_(cited_ids))):
+        authors = _orcids(db, item, list(item.versions)) - own_authors
+        if not authors:
+            continue
+        for user in db.scalars(
+            select(User).where(User.orcid.in_(authors), User.deactivated_at.is_(None))
+        ):
+            access = Access.of(db, user)
+            if (
+                user.id not in told
+                and access.can_read_item(citing)
+                and access.can_read_item(item)
+            ):
+                yours.setdefault(user.id, []).append(item)
+    for user_id, items in yours.items():
+        db.add(
+            Notification(
+                user_id=user_id,
+                kind=CITED,
+                data={
+                    "item_id": str(citing.id),
+                    "title": citing.title,
+                    "cited_id": str(items[0].id),
+                    "cited_title": items[0].title,
+                    "count": len(items),
+                },
+            )
+        )
 
 
 def _fresh(db: Session, item: Item) -> None:

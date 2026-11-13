@@ -25,7 +25,9 @@ class NotificationOut(BaseModel):
     authors); "erratum": a correction found
     (item_id, title, erratum: how it is cited); "joined": added to a group
     by someone (group_id, library_id, group, people, papers: how many it
-    has, actor); "own_added": one's papers added by their ORCID iD
+    has, actor); "cited": a paper new here cites one's own (item_id and
+    title of the citing paper, cited_id and cited_title of the first of
+    one's own, count); "own_added": one's papers added by their ORCID iD
     (count, item_id and title of the first, library_id, group: the group's
     name, or none for one's own library); "export": a
     zip of one's export written (export_id, part, parts; the last part:

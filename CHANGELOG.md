@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Cited!** When a paper new in the library cites one of yours (you are
+  among its authors by your ORCID iD), the bell says so, with a star and
+  a few sparkles: "“…” cites your paper “…”". Once a citing paper; only
+  where you can read both; not for your own papers citing each other.
 - **Groups are run by their own admins**: a site administrator creates
   top-level groups and sees every group (its admins, how many people and
   papers), but no longer runs other people's groups: no adding or

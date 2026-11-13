@@ -38,7 +38,7 @@ import httpx2
 from sqlalchemy import and_, delete, exists, insert, or_, select, update
 from sqlalchemy.orm import Session
 
-from paperus import library
+from paperus import library, notifications
 from paperus.access import Access
 from paperus.identifiers import (
     InvalidIdentifier,
@@ -583,6 +583,15 @@ def store(
         )
         values["references_source"] = source
     db.execute(update(Item).where(Item.id == item_id).values(**values))
+    citing = db.get(Item, item_id) if found else None
+    if citing is not None:
+        # Papers of people here it cites: celebrated (a paper new here).
+        notifications.cited(
+            db,
+            citing,
+            {r.doi for r in found if r.doi},
+            {r.arxiv for r in found if r.arxiv},
+        )
     db.commit()
 
 

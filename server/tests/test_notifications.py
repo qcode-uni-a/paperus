@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from paperus import notifications
+from paperus import item_references, notifications
 from paperus.models import Item, Notification, User
 from tests.people import Person, group
 
@@ -195,6 +195,57 @@ def test_ones_own_fresh_paper_added(client: TestClient, db: Session) -> None:
     db.commit()
     published = [n for n in listed(ada)["notifications"] if n["data"].get("yours")]
     assert len(published) == 1
+
+
+def test_ones_paper_cited(client: TestClient, db: Session) -> None:
+    """A paper new in the library citing one's own: celebrated, once, to
+    those of its authors who can read both; not one's own citing it."""
+    root = Person(client, db, "root", admin=True)
+    ada, bob, eve = (Person(client, db, n) for n in ("ada", "bob", "eve"))
+    lab = group(root, "Lab", ada)
+    ada.put(f"/api/groups/{lab['id']}/members/{bob.id}", {"role": "member"})
+    orcid = "0000-0002-1825-0097"
+    user = db.get(User, uuid.UUID(ada.id))
+    assert user is not None
+    user.orcid = orcid
+    db.commit()
+
+    def paper(
+        person: Person, title: str, doi: str, library: str | None, *ids: str
+    ) -> str:
+        metadata = {
+            "title": title,
+            "author": [{"family": "X", "given": "Y", "ORCID": i} for i in ids],
+        }
+        response = person.post(
+            "/api/items",
+            {
+                "metadata": metadata,
+                "identifiers": [{"scheme": "doi", "value": doi}],
+                "library_id": library,
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    hers = paper(ada, "Hail on qubits", "10.1000/hail", lab["library_id"], orcid)
+    citing = paper(bob, "More hail", "10.1000/more", lab["library_id"])
+    elsewhere = paper(eve, "Hail elsewhere", "10.1000/else", None)
+    own = paper(ada, "My hail again", "10.1000/again", lab["library_id"], orcid)
+    cites = [item_references.Found("Hail on qubits", doi="10.1000/hail")]
+    for item_id in (citing, elsewhere, own, citing):  # the first twice
+        item_references.store(db, uuid.UUID(item_id), "crossref", cites)
+    [notice] = [n for n in listed(ada)["notifications"] if n["kind"] == "cited"]
+    assert (notice["kind"], notice["data"]) == (
+        "cited",
+        {
+            "item_id": citing,
+            "title": "More hail",
+            "cited_id": hers,
+            "cited_title": "Hail on qubits",
+            "count": 1,
+        },
+    )
 
 
 def test_a_paper_shared_with_one(client: TestClient, db: Session) -> None:
