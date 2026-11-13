@@ -175,6 +175,10 @@ function kindOf(link: PageLink, url: URL): LinkKind | null {
   if (CODE_HOSTS.test(host)) return path.length >= 2 ? "code" : null;
   if (!doi && !DATA_HOSTS.test(host)) return null;
   if (!doi && path.length < 1) return null;
+  // Sites of many databases (EBI's, NCBI's): an entry (its accession has
+  // digits), not a database's front page ("deposited in the EMDB").
+  if (!doi && /(^|\.)(ebi\.ac\.uk|ncbi\.nlm\.nih\.gov)$/.test(host) && !/\d/.test(url.pathname))
+    return null;
   if (/^(www\.)?huggingface\.co$/.test(host) && path[0] !== "datasets")
     return "code"; // a model
   // Zenodo and Figshare keep code too: what the sentence says.

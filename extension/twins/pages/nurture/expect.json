@@ -37,7 +37,6 @@
 			}
 		],
 		"links": [
-			{ "url": "https://www.ebi.ac.uk/pdbe/emdb", "kind": "data" },
 			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000006", "kind": "data" },
 			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000007", "kind": "data" },
 			{ "url": "http://www.ebi.ac.uk/pdbe/entry/emdb/EMD-9000008", "kind": "data" },
