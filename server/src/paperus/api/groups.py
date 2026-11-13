@@ -68,11 +68,16 @@ class GroupOut(BaseModel):
     """The person's role (direct or inherited); ``None`` for site
     administrators who are not members."""
     can_manage: bool
-    """Whether the person may change the group, its members and subgroups."""
+    """Whether the person may change the group, its members and subgroups
+    (its admins)."""
+    can_rescue: bool = False
+    """A site administrator, the group without an active admin: they may
+    name one."""
     members: int
     """Direct members (people inherited from groups above not counted)."""
     items: int | None
-    """Items in the group's library; only for its members."""
+    """Items in the group's library; for its members and site
+    administrators."""
     created_at: datetime
 
 
@@ -131,7 +136,26 @@ def _library_of(db: DB, group_id: uuid.UUID) -> uuid.UUID:
 
 
 def _can_manage(access: Access, group_id: uuid.UUID) -> bool:
-    return access.site_admin or access.is_group_admin(group_id)
+    """A group is run by its admins (here or in a group above) alone: site
+    administrators create top-level groups and see them, but do not run
+    other people's (except to name an admin for one without, ``_rescue``)."""
+    return access.is_group_admin(group_id)
+
+
+def _without_admin(db: DB, group: Group) -> bool:
+    """No active admin here or in a group above (all left, deactivated or
+    deleted)."""
+    chain = [group.id, *(g.id for g in _ancestors(db, group))]
+    return not db.scalar(
+        select(func.count())
+        .select_from(Membership)
+        .join(User, User.id == Membership.user_id)
+        .where(
+            Membership.group_id.in_(chain),
+            Membership.role == Role.ADMIN,
+            User.deactivated_at.is_(None),
+        )
+    )
 
 
 def _visible_group(db: DB, access: Access, group_id: uuid.UUID) -> Group:
@@ -229,7 +253,7 @@ def _group_out(db: DB, access: Access, group: Group) -> GroupOut:
     members = db.scalar(select(func.count()).where(Membership.group_id == group.id))
     role = access.roles.get(group.id)
     items = None
-    if role is not None:
+    if role is not None or access.site_admin:
         items = db.scalar(
             select(func.count()).where(
                 Item.library_id == library_id, Item.deleted_at.is_(None)
@@ -244,6 +268,9 @@ def _group_out(db: DB, access: Access, group: Group) -> GroupOut:
         people=group.people,
         role=role,
         can_manage=_can_manage(access, group.id),
+        can_rescue=access.site_admin
+        and not _can_manage(access, group.id)
+        and _without_admin(db, group),
         members=members or 0,
         items=items,
         created_at=group.created_at,
@@ -455,9 +482,13 @@ def list_members(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> list[Mem
             and ROLE_RANK[member.direct_role] >= ROLE_RANK[member.role]
         ):
             member.inherited_from = None
-    return sorted(
+    found = sorted(
         members.values(), key=lambda m: (-ROLE_RANK[m.role], m.username.lower())
     )
+    if group.id not in access.roles:
+        # A site administrator outside the group: its admins only.
+        return [m for m in found if m.role == Role.ADMIN]
+    return found
 
 
 @router.put("/api/groups/{group_id}/members/{user_id}")
@@ -470,9 +501,14 @@ def set_member(
 ) -> list[MemberOut]:
     """Add someone to the group, or change their role here. A role lower than
     one inherited from a group above has no effect (inherited roles win).
-    In a group of people everyone is an admin."""
-    group = _managed_group(db, access, group_id)
-    if db.get(User, user_id) is None:
+    In a group of people everyone is an admin. A site administrator names
+    an admin for a group without an active one (and nothing else there)."""
+    group = _visible_group(db, access, group_id)
+    rescue = access.site_admin and _without_admin(db, group)
+    if not _can_manage(access, group_id) and not (rescue and body.role == Role.ADMIN):
+        raise HTTPException(403, "only the group's admins can change it")
+    user = db.get(User, user_id)
+    if user is None or user.deactivated_at is not None:
         raise HTTPException(404, "user not found")
     membership = db.get(Membership, (group_id, user_id))
     if membership is None:
@@ -496,10 +532,13 @@ def remove_member(
     membership = db.get(Membership, (group_id, user_id))
     if membership is None:
         raise HTTPException(404, "not a direct member of this group")
-    if membership.role == Role.ADMIN:
+    if membership.role == Role.ADMIN and not _empty_but(db, group_id, user_id):
         _keep_an_admin(db, group_id, user_id)
     db.delete(membership)
+    _gone_if_empty(db, group_id)
     db.commit()
+    if db.get(Group, group_id) is None:
+        return []
     return list_members(group_id, db, access)
 
 
@@ -520,11 +559,45 @@ def leave_group(group_id: uuid.UUID, db: DB, access: CurrentAccess) -> Response:
         )
         where = f"through {above.name}; leave that group" if above else "not directly"
         raise HTTPException(409, f"you are in this group {where} instead")
-    if membership.role == Role.ADMIN:
+    if membership.role == Role.ADMIN and not _empty_but(db, group_id, access.user.id):
         _keep_an_admin(db, group_id, access.user.id)
     db.delete(membership)
+    _gone_if_empty(db, group_id)
     db.commit()
     return Response(status_code=204)
+
+
+def _has_content(db: DB, group_id: uuid.UUID) -> bool:
+    """Papers or notes (in its trash too), or groups inside."""
+    library_id = _library_of(db, group_id)
+    return bool(
+        db.scalar(select(func.count()).where(Group.parent_id == group_id))
+        or db.scalar(select(func.count()).where(Item.library_id == library_id))
+        or db.scalar(select(func.count()).where(Note.library_id == library_id))
+    )
+
+
+def _empty_but(db: DB, group_id: uuid.UUID, leaving: uuid.UUID) -> bool:
+    """Nothing in the group and nobody but the one leaving: it may go (a
+    top-level group: ``_keep_an_admin`` is for those)."""
+    others = db.scalar(
+        select(func.count()).where(
+            Membership.group_id == group_id, Membership.user_id != leaving
+        )
+    )
+    return not others and not _has_content(db, group_id)
+
+
+def _gone_if_empty(db: DB, group_id: uuid.UUID) -> None:
+    """A top-level group without members, papers, notes or groups inside is
+    deleted (a group inside has its people from above)."""
+    db.flush()
+    group = db.get(Group, group_id)
+    if group is None or group.parent_id is not None:
+        return
+    members = db.scalar(select(func.count()).where(Membership.group_id == group_id))
+    if not members and not _has_content(db, group_id):
+        db.delete(group)
 
 
 def _keep_an_admin(db: DB, group_id: uuid.UUID, leaving: uuid.UUID) -> None:

@@ -44,8 +44,9 @@ test('automations: one’s own switched, a group’s on its page', async ({ page
 	await expect(own.getByText('Saved.')).toBeVisible();
 	await context.close();
 
-	// The site administrator, not a member, sees and may switch them too.
+	// The site administrator, not in the group, sees it but does not run it.
 	await page.goto(`/manage/groups?group=${group.id}`);
-	await expect(page.getByRole('checkbox', { name: /Published versions/ })).not.toBeChecked();
-	await expect(page.getByRole('checkbox', { name: /Published versions/ })).toBeEnabled();
+	await expect(page.getByText('its admins run it')).toBeVisible();
+	await expect(page.getByRole('combobox', { name: 'Person to add' })).toHaveCount(0);
+	await expect(page.getByRole('checkbox', { name: /Published versions/ })).toHaveCount(0);
 });

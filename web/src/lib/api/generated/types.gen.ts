@@ -1738,6 +1738,10 @@ export type GroupOut = {
      */
     can_manage: boolean;
     /**
+     * Can Rescue
+     */
+    can_rescue?: boolean;
+    /**
      * Members
      */
     members: number;

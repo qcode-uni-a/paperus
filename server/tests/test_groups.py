@@ -167,7 +167,9 @@ def test_creating_groups_and_keeping_an_admin(client: TestClient, db: Session) -
     assert [u["username"] for u in ada.get("/api/users", params={"q": "b"}).json()] == [
         "bob"
     ]
-    # The only admin of a top-level group cannot leave or step down.
+    # The only admin of a top-level group with papers cannot leave or step
+    # down (an empty one would go with her).
+    ada.add("Rain", chair["library_id"])
     assert ada.delete(f"/api/groups/{chair['id']}/members/{ada.id}").status_code == 409
     assert (
         ada.put(
@@ -178,12 +180,13 @@ def test_creating_groups_and_keeping_an_admin(client: TestClient, db: Session) -
     ada.put(f"/api/groups/{chair['id']}/members/{bob.id}", json={"role": "admin"})
     assert ada.delete(f"/api/groups/{chair['id']}/members/{ada.id}").status_code == 200
     assert ada.titles() == []
-    # Site administrators manage groups they are not in, without reading them.
+    # Site administrators see groups they are not in (how many papers), but
+    # neither read nor run them.
     listed = root.get("/api/groups").json()
-    assert [(g["name"], g["role"], g["items"]) for g in listed] == [
-        ("Chair", None, None)
+    assert [(g["name"], g["role"], g["items"], g["can_manage"]) for g in listed] == [
+        ("Chair", None, 1, False)
     ]
-    assert root.delete(f"/api/groups/{chair['id']}").status_code == 204
+    assert root.delete(f"/api/groups/{chair['id']}").status_code == 403
 
 
 def test_default_owner_and_known_papers(

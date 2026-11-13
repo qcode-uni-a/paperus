@@ -148,7 +148,7 @@
 		await changed(
 			await setMember({
 				path: { group_id: selected.id, user_id: person.id },
-				body: { role: newRole }
+				body: { role: selected.can_rescue ? 'admin' : newRole }
 			})
 		);
 	}
@@ -224,8 +224,8 @@
 						{#if selected.people}Shared with people: everyone in it may share papers in it, add
 							people and rename it.
 						{:else if selected.role}You are {selected.role === 'admin' ? 'an' : 'a'}
-							{roleLabel(selected.role).toLowerCase()}.{:else}You manage groups but are not a
-							member.{/if}
+							{roleLabel(selected.role).toLowerCase()}.{:else}You see this group as the server’s
+							administrator; its admins run it.{/if}
 						{#if selected.items !== null}
 							{selected.items}
 							{selected.items === 1 ? 'paper' : 'papers'}.{/if}
@@ -310,7 +310,13 @@
 				{/each}
 			</ul>
 
-			{#if selected.can_manage}
+			{#if selected.can_rescue}
+				<p class="licence">
+					This group has no admin left (they left or were deactivated). Name one: they then run it,
+					as its admins do.
+				</p>
+			{/if}
+			{#if selected.can_manage || selected.can_rescue}
 				<form class="add" onsubmit={addPerson}>
 					<input
 						bind:value={newPerson}
@@ -323,14 +329,14 @@
 						autocomplete="off"
 						required
 					/>
-					{#if !selected.people}
+					{#if !selected.people && !selected.can_rescue}
 						<select bind:value={newRole} aria-label="Role">
 							{#each ROLES as role (role.value)}
 								<option value={role.value}>{role.label}: {role.help}</option>
 							{/each}
 						</select>
 					{/if}
-					<button>Add</button>
+					<button>{selected.can_rescue ? 'Name as admin' : 'Add'}</button>
 				</form>
 				{#if people.length}
 					<div class="found" id="group-people" role="listbox" aria-label="People found">
@@ -353,7 +359,8 @@
 						: ' and those of the groups inside it'}. Make sure the licences of these papers allow
 					sharing them with these people.
 				</p>
-
+			{/if}
+			{#if selected.can_manage}
 				{#if !selected.people}<h3>Groups inside</h3>{/if}
 				{#if childrenOf(selected.id).length}
 					<ul class="subgroups">

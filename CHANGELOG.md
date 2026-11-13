@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Groups are run by their own admins**: a site administrator creates
+  top-level groups and sees every group (its admins, how many people and
+  papers), but no longer runs other people's groups: no adding or
+  removing people (themselves neither), renaming, deleting or switching.
+  For a group whose admins are all gone, they may name a new admin. A
+  group left by its last member, with nothing in it, is deleted.
+- **People to add, found as you type**: under Groups, from two letters
+  on, people are suggested by name or username (a group's admin who is
+  no site administrator saw no suggestions before).
 - **Automations, and your papers by themselves**: a new section under
   Settings, "Automations", shows what paperus does by itself, and lets
   each owner choose. "Add my papers" (yours alone, on): each morning, the

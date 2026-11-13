@@ -7990,7 +7990,7 @@
           "groups"
         ],
         "summary": "Set Member",
-        "description": "Add someone to the group, or change their role here. A role lower than\none inherited from a group above has no effect (inherited roles win).\nIn a group of people everyone is an admin.",
+        "description": "Add someone to the group, or change their role here. A role lower than\none inherited from a group above has no effect (inherited roles win).\nIn a group of people everyone is an admin. A site administrator names\nan admin for a group without an active one (and nothing else there).",
         "operationId": "set_member",
         "parameters": [
           {
@@ -12219,6 +12219,11 @@
           "can_manage": {
             "type": "boolean",
             "title": "Can Manage"
+          },
+          "can_rescue": {
+            "type": "boolean",
+            "title": "Can Rescue",
+            "default": false
           },
           "members": {
             "type": "integer",

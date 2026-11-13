@@ -106,19 +106,28 @@ because of it; they need a membership like everyone else.
 
 ## Groups
 
-| Action | Not a member | Reader or member | Admin (or admin of a group above) | Site administrator |
+| Action | Not a member | Reader or member | Admin (or admin of a group above) | Site administrator (not in the group) |
 | --- | --- | --- | --- | --- |
-| See the group and its members | no | yes | yes | yes |
+| See the group, its numbers of members and papers | no | yes | yes | yes |
+| See its members | no | yes | yes | its admins only |
 | Create a top-level group | no | no | no | yes, naming its first admin |
-| Create a group inside | no | no | yes | yes |
-| Rename, describe | no | no | yes | yes |
-| Delete (only without papers and subgroups) | no | no | yes | yes |
-| Add people, change roles, remove people | no | no | yes | yes |
+| Create a group inside | no | no | yes | no |
+| Rename, describe | no | no | yes | no |
+| Delete (only without papers and subgroups) | no | no | yes | no |
+| Add people, change roles, remove people | no | no | yes | no (not themselves either) |
+| Name an admin for a group without an active one | no | no | — | yes, an admin only |
 | Look up users to add | by name (2 letters on), to share with | by name | yes | yes |
 | Leave (only a group one was added to directly) | — | yes | yes, unless the last admin | — |
-| Move into another group (admin of both) or to the top (site administrators) | no | no | yes, into groups one administers | yes |
+| Move into another group (admin of both) or to the top (site administrators who are its admins) | no | no | yes, into groups one administers | no |
+| Switch its automations | no | no | yes | no |
 
-- A top-level group always keeps at least one admin of its own.
+- Site administrators create top-level groups and see all groups, but do
+  not run other people's: only the group's admins do. The one exception:
+  a group with no active admin left (they left, were deactivated or
+  deleted) may get one named by a site administrator.
+- A top-level group always keeps at least one admin of its own while it
+  has papers, notes or groups inside; its last member may leave an empty
+  one, which is then deleted.
 - Who is in a group through a group above leaves it there.
 - When adding people, the website reminds that the group's licences must
   allow sharing its PDFs.

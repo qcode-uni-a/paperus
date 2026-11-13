@@ -146,9 +146,10 @@ def test_switches_per_library(client: TestClient, db: Session, job_app: App) -> 
     url = f"/api/libraries/{lab['library_id']}/automations"
     assert bob.put(url, {"published": False}).status_code == 403
     assert root.put(f"/api/libraries/{mine}/automations", {}).status_code == 404
-    # The site administrator manages groups without being in them.
-    assert root.get(url).json()["can_change"] is True
-    assert Person(client, db, "eve").get(url).status_code == 404
+    # Its admins only; not the site administrator, outside the group.
+    assert ada.get(url).json()["can_change"] is True
+    for outside in (root, Person(client, db, "eve")):
+        assert outside.get(url).status_code == 404
     switched = ada.put(url, {"published": False, "open_access": False})
     assert switched.status_code == 200, switched.text
     assert (switched.json()["published"], switched.json()["own_papers"]) == (
@@ -229,8 +230,8 @@ def test_ones_papers_where_one_chooses(client: TestClient, db: Session) -> None:
     assert titles(db, lab["library_id"]) == ["New hail"]
     # A reader there now (another admin keeps the group): her own library.
     eve = Person(client, db, "eve")
-    root.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "admin"})
-    demoted = root.put(f"/api/groups/{lab['id']}/members/{ada.id}", {"role": "reader"})
+    ada.put(f"/api/groups/{lab['id']}/members/{eve.id}", {"role": "admin"})
+    demoted = eve.put(f"/api/groups/{lab['id']}/members/{ada.id}", {"role": "reader"})
     assert demoted.status_code == 200, demoted.text
     assert target() == uuid.UUID(own)
     # Switched off: hers are not looked for.

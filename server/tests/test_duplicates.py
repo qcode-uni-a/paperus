@@ -207,7 +207,7 @@ def test_readers_cannot_dismiss_for_the_group(client: TestClient, db: Session) -
     db.execute(update(Item).values(library_id=uuid.UUID(ada.libraries()["Me"]["id"])))
     db.commit()
     ada.note("Group note", chair["library_id"])
-    assert root.delete(f"/api/groups/{chair['id']}").status_code == 409
+    assert ada.delete(f"/api/groups/{chair['id']}").status_code == 409
 
 
 def test_same_title_by_other_authors_is_no_duplicate(

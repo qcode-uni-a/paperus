@@ -26,7 +26,7 @@ def test_display_name_and_orcid(client: TestClient, db: Session) -> None:
     )
     # Others see the display name: among the group's members, as who added
     # a paper, when looking people up.
-    members = root.get(f"/api/groups/{chair['id']}/members").json()
+    members = bob.get(f"/api/groups/{chair['id']}/members").json()
     assert [m["display_name"] for m in members] == ["Ada Lovelace", None]
     paper = ada.add("Notes on the engine", chair["library_id"])
     added = bob.get(f"/api/items/{paper['id']}").json()["added_by"]

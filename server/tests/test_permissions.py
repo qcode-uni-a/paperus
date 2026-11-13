@@ -579,8 +579,38 @@ def test_collections_given_to_me_keep_papers_where_they_are(w: World) -> None:
 def test_groups_see_the_group_and_its_members(w: World) -> None:
     url = f"/api/groups/{w.chair['id']}/members"
     assert w.outsider.get(url).status_code == 404
-    for person in (w.reader, w.member, w.admin, w.root):
-        assert person.get(url).status_code == 200
+    for person in (w.reader, w.member, w.admin):
+        assert len(person.get(url).json()) == 3
+    # Site administrators see every group with its admins, not its people.
+    assert [m["username"] for m in w.root.get(url).json()] == ["admin"]
+    [chair] = [g for g in w.root.get("/api/groups").json() if g["name"] == "Chair"]
+    assert (chair["members"], chair["items"], chair["can_manage"]) == (3, 0, False)
+
+
+def test_groups_name_an_admin_for_one_without(w: World, db: Session) -> None:
+    """A group whose admins are all gone (deactivated): a site
+    administrator names an admin, and does nothing else there."""
+    url = f"/api/groups/{w.chair['id']}/members/{w.member.id}"
+    assert w.root.put(url, json={"role": "admin"}).status_code == 403
+    deactivated = w.root.patch(f"/api/admin/users/{w.admin.id}", json={"active": False})
+    assert deactivated.status_code == 200, deactivated.text
+    [chair] = [g for g in w.root.get("/api/groups").json() if g["name"] == "Chair"]
+    assert chair["can_rescue"] is True
+    assert w.root.put(url, json={"role": "member"}).status_code == 403
+    assert w.root.put(url, json={"role": "admin"}).status_code == 200
+    assert w.root.put(url, json={"role": "admin"}).status_code == 403  # one now
+
+
+def test_groups_without_anyone_or_anything_go(w: World) -> None:
+    """A top-level group whose last member leaves, with nothing in it, is
+    deleted; with papers, its last admin stays."""
+    empty = w.root.post(
+        "/api/groups", json={"name": "Empty", "admin_id": w.outsider.id}
+    ).json()
+    assert w.outsider.post(f"/api/groups/{empty['id']}/leave").status_code == 204
+    assert "Empty" not in [g["name"] for g in w.root.get("/api/groups").json()]
+    w.paper()
+    assert w.admin.post(f"/api/groups/{w.chair['id']}/leave").status_code == 409
 
 
 def test_groups_create_a_top_level_group(w: World) -> None:
@@ -594,8 +624,9 @@ def test_groups_create_a_group_inside(w: World) -> None:
     assert w.outsider.post("/api/groups", json=body).status_code == 404
     for person in (w.reader, w.member):
         assert person.post("/api/groups", json=body).status_code == 403
-    for person in (w.admin, w.root):
-        assert person.post("/api/groups", json=body).status_code == 201
+    assert w.admin.post("/api/groups", json=body).status_code == 201
+    # Site administrators do not run other people's groups.
+    assert w.root.post("/api/groups", json=body).status_code == 403
 
 
 def test_groups_rename_and_describe(w: World) -> None:
@@ -604,10 +635,9 @@ def test_groups_rename_and_describe(w: World) -> None:
         {"name": "Chair", "description": "Ours."},
     )
     assert w.outsider.patch(url, json=body).status_code == 404
-    for person in (w.reader, w.member):
+    for person in (w.reader, w.member, w.root):
         assert person.patch(url, json=body).status_code == 403
-    for person in (w.admin, w.root):
-        assert person.patch(url, json=body).status_code == 200
+    assert w.admin.patch(url, json=body).status_code == 200
 
 
 def test_groups_delete_only_empty(w: World) -> None:
@@ -622,8 +652,8 @@ def test_groups_delete_only_empty(w: World) -> None:
     assert w.outsider.delete(f"/api/groups/{first}").status_code == 404
     for person in (w.reader, w.member):
         assert person.delete(f"/api/groups/{first}").status_code == 403
+    assert w.root.delete(f"/api/groups/{first}").status_code == 403
     assert w.admin.delete(f"/api/groups/{first}").status_code == 204
-    assert w.root.delete(f"/api/groups/{project()}").status_code == 204
     w.paper()  # the Chair is not empty
     assert w.admin.delete(f"/api/groups/{w.chair['id']}").status_code == 409
 
@@ -631,13 +661,15 @@ def test_groups_delete_only_empty(w: World) -> None:
 def test_groups_add_change_remove_people(w: World) -> None:
     url = f"/api/groups/{w.chair['id']}/members/{w.outsider.id}"
     assert w.outsider.put(url, json={"role": "admin"}).status_code == 404
-    for person in (w.reader, w.member):
+    for person in (w.reader, w.member, w.root):
         assert person.put(url, json={"role": "reader"}).status_code == 403
         assert person.delete(url).status_code in (403, 404)
-    for person in (w.admin, w.root):
-        assert person.put(url, json={"role": "reader"}).status_code == 200
-        assert person.put(url, json={"role": "member"}).status_code == 200
-        assert person.delete(url).status_code == 200
+    # Not even themselves, as admins.
+    mine = f"/api/groups/{w.chair['id']}/members/{w.root.id}"
+    assert w.root.put(mine, json={"role": "admin"}).status_code == 403
+    assert w.admin.put(url, json={"role": "reader"}).status_code == 200
+    assert w.admin.put(url, json={"role": "member"}).status_code == 200
+    assert w.admin.delete(url).status_code == 200
 
 
 def test_groups_look_up_users(w: World) -> None:
@@ -690,8 +722,12 @@ def test_groups_move(w: World) -> None:
         "/api/groups", json={"name": "Inner", "parent_id": project["id"]}
     )
     assert w.admin.patch(url, json={"parent_id": inner.json()["id"]}).status_code == 409
-    # To the top: site administrators only.
+    # To the top: site administrators only, who are its admins too.
     assert w.admin.patch(url, json={"parent_id": None}).status_code == 403
+    assert w.root.patch(url, json={"parent_id": None}).status_code == 403
+    w.admin.put(
+        f"/api/groups/{w.lab['id']}/members/{w.root.id}", json={"role": "admin"}
+    )
     assert w.root.patch(url, json={"parent_id": None}).json()["parent_id"] is None
 
 

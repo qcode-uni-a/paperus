@@ -73,9 +73,7 @@ class AutomationsIn(BaseModel):
 def _can_change(access: Access, library: Library) -> bool:
     if library.user_id is not None:
         return library.id == access.own_library
-    return access.site_admin or (
-        library.group_id is not None and access.is_group_admin(library.group_id)
-    )
+    return library.group_id is not None and access.is_group_admin(library.group_id)
 
 
 def _out(library: Library, access: Access) -> LibraryAutomations:
@@ -108,7 +106,7 @@ def get_automations(request: Request, db: DB, access: CurrentAccess) -> Automati
 
 def _library(db: DB, access: Access, library_id: uuid.UUID) -> Library:
     """The library, if one is in it or may change its switches (a group's
-    admins, site administrators: also without being members)."""
+    admins through a group above: also without being members here)."""
     library = db.get(Library, library_id)
     if library is None or not (
         library_id in access.readable or _can_change(access, library)

@@ -1758,7 +1758,8 @@ export const removeMember = <ThrowOnError extends boolean = false>(options: Opti
  *
  * Add someone to the group, or change their role here. A role lower than
  * one inherited from a group above has no effect (inherited roles win).
- * In a group of people everyone is an admin.
+ * In a group of people everyone is an admin. A site administrator names
+ * an admin for a group without an active one (and nothing else there).
  */
 export const setMember = <ThrowOnError extends boolean = false>(options: Options<SetMemberData, ThrowOnError>): RequestResult<SetMemberResponses, SetMemberErrors, ThrowOnError> => (options.client ?? client).put<SetMemberResponses, SetMemberErrors, ThrowOnError>({
     url: '/api/groups/{group_id}/members/{user_id}',
