@@ -94,10 +94,11 @@ WITH q AS
    WHERE %(use_keyword)s
      AND c.tsv @@ q.tsq
    ORDER BY rank
-   LIMIT %(candidates)s),
-                near AS MATERIALIZED
+   LIMIT %(candidates)s), -- As the vector indexes are made (``vector_index``): through them if
+ -- there are.
+ near AS MATERIALIZED
   (SELECT chunk_sha256,
-          embedding <=> CAST(%(vector)s AS halfvec) AS distance
+          embedding::halfvec(16) <=> CAST(%(vector)s AS halfvec(16)) AS distance
    FROM embeddings
    WHERE %(use_meaning)s
      AND model = %(model)s
@@ -106,7 +107,7 @@ WITH q AS
   (SELECT blob_sha256,
           page,
           label,
-          embedding <=> CAST(%(vector)s AS halfvec) AS distance
+          embedding::halfvec(16) <=> CAST(%(vector)s AS halfvec(16)) AS distance
    FROM figure_embeddings
    WHERE %(use_meaning)s
      AND model = %(model)s
@@ -463,5 +464,7 @@ JOIN login_sessions ON login_sessions.user_id = users.id
 WHERE login_sessions.token_hash = %(token_hash_1)s
   AND login_sessions.expires_at > %(expires_at_1)s::TIMESTAMP WITH TIME ZONE
   AND users.deactivated_at IS NULL;
+
+SET LOCAL hnsw.ef_search = 1000;
 
 SET LOCAL plan_cache_mode = force_custom_plan;

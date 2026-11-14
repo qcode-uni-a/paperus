@@ -46,6 +46,7 @@ from paperus import (
     storage,
     system,
     trash,
+    vector_index,
     works,
 )
 from paperus import export as exports
@@ -393,6 +394,10 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
         )
         for sha256 in pdfs:
             queue_figures(job.app, sha256)
+        # Indexes for search once there are enough vectors (none to do:
+        # two quick looks).
+        if vector_index.needed(db, vectors) or vector_index.stale(db, [vectors]):
+            _queue(job.app, "index_vectors", "index-vectors", model=vectors)
         anew = system.reembedding(db)
         done = not (files or notes or details or pdfs)
         if anew and anew.get("model") == model and done:
@@ -404,6 +409,23 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
             notifications.reembedded(db, model, anew["since"], passages or 0)
             system.end_reembedding(db)
             db.commit()
+
+
+@tasks.task(name="index_vectors", queue="backup", queueing_lock="index-vectors")
+def index_vectors(model: str) -> None:
+    """Build the HNSW indexes ``model``'s vectors want and drop those of
+    vectors no longer in use (``vector_index``); in the background queue:
+    a large library's index takes minutes."""
+    context = _worker_context()
+    with context.sessions() as db:
+        tables = vector_index.needed(db, model)
+        old = vector_index.stale(db, [model])
+        engine = db.get_bind()
+    assert isinstance(engine, Engine)
+    for name in old:
+        vector_index.drop(engine, name)
+    for table in tables:
+        vector_index.build(engine, table, model)
 
 
 def queue_embedding_sweep(app: App) -> None:

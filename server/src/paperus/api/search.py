@@ -1,5 +1,6 @@
 """Search: by keyword, by meaning, or both (hybrid, the default)."""
 
+import functools
 import logging
 import time
 import uuid
@@ -8,10 +9,10 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import select, text, tuple_
+from sqlalchemy import TextClause, select, text, tuple_
 from sqlalchemy.orm import Session
 
-from paperus import figures, library, metrics, page_layout
+from paperus import figures, library, metrics, page_layout, vector_index
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
@@ -169,8 +170,7 @@ them are among those (else it does that)."""
 # Keyword and meaning candidates are ranked separately, then fused by
 # reciprocal rank (scores of the two methods are not comparable). Text is
 # HTML-escaped before ts_headline adds <mark>, so snippets are safe as HTML.
-_SEARCH = text(
-    f"""
+_SEARCH = f"""
     WITH q AS (SELECT websearch_to_tsquery('simple', :query) AS tsq),
     visible AS NOT MATERIALIZED ({_ALL}    ),
     keyword AS (
@@ -181,15 +181,20 @@ _SEARCH = text(
         WHERE :use_keyword AND c.tsv @@ q.tsq
         ORDER BY rank LIMIT :candidates
     ),
+    -- As the vector indexes are made (``vector_index``): through them if
+    -- there are.
     near AS MATERIALIZED (
-        SELECT chunk_sha256, embedding <=> CAST(:vector AS halfvec) AS distance
+        SELECT chunk_sha256,
+               embedding::halfvec(DIMENSIONS)
+               <=> CAST(:vector AS halfvec(DIMENSIONS)) AS distance
         FROM embeddings
         WHERE :use_meaning AND model = :model
         ORDER BY distance LIMIT :nearest
     ),
     near_figures AS MATERIALIZED (
         SELECT blob_sha256, page, label,
-               embedding <=> CAST(:vector AS halfvec) AS distance
+               embedding::halfvec(DIMENSIONS)
+               <=> CAST(:vector AS halfvec(DIMENSIONS)) AS distance
         FROM figure_embeddings
         WHERE :use_meaning AND model = :model
         ORDER BY distance LIMIT :nearest
@@ -286,7 +291,13 @@ _SEARCH = text(
     ORDER BY fused.score DESC, vis.source_id, vis.position
     LIMIT :limit
     """
-)
+
+
+@functools.cache
+def _search(dimensions: int) -> TextClause:
+    """The search for query vectors of so many dimensions (in the SQL: the
+    vector indexes are on the vectors cast to them)."""
+    return text(_SEARCH.replace("DIMENSIONS", str(dimensions)))
 
 
 def _query_vector(ml: MLClient, model: str, query: str) -> tuple[str, str] | None:
@@ -350,9 +361,11 @@ def run_search(
     # after a few runs, and PostgreSQL's generic plan for it (not knowing
     # the vector, the filters) took 0.47 s instead of 0.06 s.
     db.execute(text("SET LOCAL plan_cache_mode = force_custom_plan"))
+    db.execute(text(f"SET LOCAL hnsw.ef_search = {vector_index.EF_SEARCH}"))
+    dimensions = vector.count(",") + 1 if vector is not None else 1
     rows = (
         db.execute(
-            _SEARCH,
+            _search(dimensions),
             {
                 "query": q,
                 "limit": limit,

@@ -3,6 +3,7 @@ Procrastinate's in-memory stand-in), with the fake ML service and web."""
 
 import uuid
 from collections import Counter
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -13,10 +14,21 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Engine, func, select, text, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from paperus import figures, integrity, item_references, jobs, ml, readable, system
+from paperus import (
+    figures,
+    integrity,
+    item_references,
+    jobs,
+    ml,
+    readable,
+    system,
+    vector_index,
+)
+from paperus.api import search
 from paperus.backup import list_backups
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
@@ -814,3 +826,145 @@ def test_figures_embedded_by_a_model_that_takes_images(
     assert sha is not None
     defer(worker, "embed_figures", sha256=sha.hex())
     assert run_jobs(worker)["embed_figures succeeded"] == 1
+
+
+@pytest.fixture
+def vector_indexes(engine: Engine, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Indexes from a few vectors on; dropped afterwards (emptying the
+    tables keeps indexes)."""
+    monkeypatch.setattr(vector_index, "MIN_VECTORS", 1)
+    yield
+    with engine.connect() as connection:
+        names = connection.scalars(
+            text("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'ix_hnsw_%'")
+        ).all()
+    for name in names:
+        vector_index.drop(engine, name)
+
+
+def test_vector_indexes_made_used_and_dropped(
+    client: TestClient,
+    db: Session,
+    engine: Engine,
+    worker: App,
+    fake_ml: FakeML,
+    vector_indexes: None,
+) -> None:
+    """Enough vectors: the sweep has their indexes built (passages', and
+    figures' once there are), the search takes its nearest through them;
+    those of vectors no longer in use are dropped."""
+    root = Person(client, db, "root", admin=True)
+    ada = Person(client, db, "ada")
+    upload(ada, make_pdf([[TYPED]]))
+    run_jobs(worker)
+    db.commit()  # building waits for open transactions
+    root.post("/api/admin/jobs/embeddings")
+    assert run_jobs(worker)["index_vectors succeeded"] == 1
+    passages = vector_index.index_name("embeddings", "bge-m3")
+    assert vector_index.stale(db, ["bge-m3"]) == []
+    assert db.scalar(text(f"SELECT '{passages}'::regclass IS NOT NULL"))
+    # The search's nearest passages come through it (the planner would
+    # read the few rows instead: told not to).
+    db.execute(text("SET LOCAL enable_seqscan = off"))
+    vector = "[" + ",".join(["0.25"] * FakeML.DIMENSIONS) + "]"
+    plan = db.execute(
+        text("EXPLAIN " + search._search(FakeML.DIMENSIONS).text),
+        {
+            "query": "words",
+            "limit": 10,
+            "vector": vector,
+            "model": "bge-m3",
+            "use_keyword": False,
+            "use_meaning": True,
+            "types": [],
+            "libraries": [],
+            "item": None,
+            "archived": False,
+            "figures": False,
+            "per_item": 10,
+            "candidates": 50,
+            "nearest": 1000,
+        },
+    ).scalars()
+    assert any(passages in line for line in plan)
+    db.rollback()
+    # Nothing more to build: no job.
+    root.post("/api/admin/jobs/embeddings")
+    assert "index_vectors succeeded" not in run_jobs(worker)
+    # Another model file: the old index goes, the new vectors get theirs
+    # (the job runs after they are embedded).
+    fake_ml.variant = "fp16"
+    db.commit()
+    root.post("/api/admin/jobs/embeddings")
+    assert run_jobs(worker)["index_vectors succeeded"] == 1
+    assert vector_index.stale(db, ["bge-m3@fp16"]) == []
+    names = db.scalars(
+        text("SELECT indexname FROM pg_indexes WHERE indexname LIKE 'ix_hnsw_%'")
+    ).all()
+    assert names == [vector_index.index_name("embeddings", "bge-m3@fp16")]
+
+
+def test_vector_indexes_only_ours(db: Session, engine: Engine) -> None:
+    """Names that cannot be an index's condition, other tables, models
+    without vectors, other indexes: left alone."""
+    assert vector_index.needed(db, "a model'; DROP TABLE items; --") == []
+    assert not vector_index.build(engine, "items", "bge-m3")
+    assert not vector_index.build(engine, "embeddings", "no-vectors-yet")
+    vector_index.drop(engine, "items_pkey")
+    assert db.scalar(text("SELECT 'items_pkey'::regclass IS NOT NULL"))
+
+
+class _Connection:
+    """Stands in for a database connection that fails the first CREATE
+    INDEX with ``error``."""
+
+    def __init__(self, error: str) -> None:
+        self.error = error
+        self.sent: list[str] = []
+
+    def __enter__(self) -> "_Connection":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        pass
+
+    def execution_options(self, **options: object) -> "_Connection":
+        return self
+
+    def scalar(self, statement: object, params: object = None) -> int:
+        return 2048
+
+    def execute(self, statement: object, params: object = None) -> None:
+        sql = str(statement)
+        self.sent.append(sql)
+        if (
+            sql.startswith("CREATE")
+            and sum(s.startswith("CREATE") for s in self.sent) == 1
+        ):
+            raise OperationalError(sql, {}, Exception(self.error))
+
+
+class _Engine:
+    def __init__(self, connection: _Connection) -> None:
+        self.connection = connection
+
+    def connect(self) -> _Connection:
+        return self.connection
+
+
+def test_vector_index_built_without_parallel_workers_if_needed() -> None:
+    """Too little shared memory for a parallel build: again, without; any
+    other failure is not hidden."""
+    short = _Connection("could not resize shared memory segment")
+    assert vector_index.build(_Engine(short), "embeddings", "bge-m3")  # ty: ignore[invalid-argument-type]
+    assert [s.split(" ")[0] for s in short.sent] == [
+        "SET",
+        "DROP",
+        "CREATE",
+        "DROP",
+        "SET",
+        "CREATE",
+    ]
+    assert short.sent[4] == "SET max_parallel_maintenance_workers = 0"
+    with pytest.raises(OperationalError):
+        vector_index.build(_Engine(_Connection("disk full")), "embeddings", "bge-m3")  # ty: ignore[invalid-argument-type]

@@ -21,6 +21,16 @@
   a GPU), search by meaning covers more and more of the library while the
   worker embeds it again; administrators now get a notification when it
   covers all of it, with how long that took.
+- **Quicker search, also for large libraries**: search by meaning first
+  takes the nearest passages of all, then those one may read (the same
+  hits); a search of all text took 0.35 s on a test library, now 0.15 s,
+  figures only 0.06 s. A reranker now reorders as many of the best hits
+  as it reads in half a second (5 to 20, as quick as it measures itself)
+  instead of always 40: about 1 s instead of 3 s with the large
+  multimodal reranker. From 100,000 passages per model (about 1,000
+  papers), the worker builds a vector index for search in the
+  background. The periodic look for what still needs embedding no longer
+  reads all passages (milliseconds whatever the library's size).
 - **Similar papers, better and at once**: they now weigh a paper's title
   and abstract too, besides all its text: on a test library the paper's
   closest related one (by citations) comes first more often (56 % of
