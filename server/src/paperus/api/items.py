@@ -20,6 +20,7 @@ from paperus.api.files import FileOut, file_out
 from paperus.api.organize import ItemTagOut, item_tags
 from paperus.authors import fold
 from paperus.avatars import avatar_url
+from paperus.db import absent
 from paperus.identifiers import InvalidIdentifier, Scheme, implied_by_doi, normalize
 from paperus.importing import by_title
 from paperus.models import (
@@ -605,15 +606,17 @@ def unsorted_conditions() -> list[ColumnElement[bool]]:
     """Papers with a PDF whose details could not be found: all guessed from
     the file, and none still being read (Manage → Unsorted)."""
     return [
-        Item.id.not_in(
+        absent(
+            Item.id,
             select(Version.item_id).where(
                 Version.metadata_source != MetadataSource.FILE
-            )
+            ),
         ),
-        Item.id.not_in(
+        absent(
+            Item.id,
             select(Version.item_id)
             .join(File)
-            .where(File.text_status == TextStatus.PENDING, File.deleted_at.is_(None))
+            .where(File.text_status == TextStatus.PENDING, File.deleted_at.is_(None)),
         ),
         Item.id.in_(
             select(Version.item_id)

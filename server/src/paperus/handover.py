@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from paperus import organize
+from paperus.db import absent
 from paperus.library import set_owner
 from paperus.models import (
     Collection,
@@ -109,7 +110,7 @@ def hand_over(db: Session, source: uuid.UUID, target: uuid.UUID) -> Private:
         tagged = select(ItemTag.item_id).where(ItemTag.tag_id == same.id)
         for link in db.scalars(
             select(ItemTag).where(
-                ItemTag.tag_id == tag.id, ItemTag.item_id.not_in(tagged)
+                ItemTag.tag_id == tag.id, absent(ItemTag.item_id, tagged)
             )
         ):
             link.tag_id = same.id

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import ColumnElement, Select, func, select
 from sqlalchemy.orm import Session
 
+from paperus.db import absent
 from paperus.models import (
     Authorship,
     Collection,
@@ -271,7 +272,7 @@ def rule_conditions(rules: Rules) -> list[ColumnElement[bool]]:
     if rules.tags_any:
         conditions.append(Item.id.in_(tagged(rules.tags_any)))
     if rules.tags_none:
-        conditions.append(Item.id.not_in(tagged(rules.tags_none)))
+        conditions.append(absent(Item.id, tagged(rules.tags_none)))
     if rules.types:
         conditions.append(Item.type.in_(rules.types))
     start, end = published_between(rules)

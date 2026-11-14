@@ -1,7 +1,27 @@
 """Database engine and sessions."""
 
-from sqlalchemy import Engine, create_engine, text
+from typing import Any
+
+from sqlalchemy import (
+    ColumnElement,
+    ColumnExpressionArgument,
+    Engine,
+    Select,
+    create_engine,
+    text,
+)
 from sqlalchemy.orm import Session, sessionmaker
+
+
+def absent(
+    column: ColumnExpressionArgument[Any], query: Select[Any]
+) -> ColumnElement[bool]:
+    """``column NOT IN (query)`` written as ``NOT EXISTS``: PostgreSQL looks
+    each value up (an anti-join), where for ``NOT IN`` it collects the whole
+    subquery's result on every run (and compares row by row once that no
+    longer fits in memory)."""
+    [selected] = query.selected_columns
+    return ~query.where(selected == column).exists()
 
 
 def make_engine(database_url: str) -> Engine:

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus.db import absent
 from paperus.ml import MLClient
 from paperus.models import (
     Chunk,
@@ -39,7 +40,7 @@ def missing_chunks(db: Session, file_id: uuid.UUID, model: str) -> list[Chunk]:
             .where(
                 FileChunk.file_id == file_id,
                 FileChunk.in_references.is_(False),
-                Chunk.sha256.not_in(has_vector),
+                absent(Chunk.sha256, has_vector),
             )
             .distinct()
         )
@@ -63,7 +64,7 @@ def embed_note(db: Session, ml: MLClient, model: str, note_id: uuid.UUID) -> int
         db.scalars(
             select(Chunk)
             .join(NoteChunk, NoteChunk.chunk_sha256 == Chunk.sha256)
-            .where(NoteChunk.note_id == note_id, Chunk.sha256.not_in(has_vector))
+            .where(NoteChunk.note_id == note_id, absent(Chunk.sha256, has_vector))
             .distinct()
         )
     )
@@ -111,7 +112,7 @@ def files_missing_embeddings(
                 File.text_status == TextStatus.DONE,
                 file_outside_trash(),
                 FileChunk.in_references.is_(False),
-                FileChunk.chunk_sha256.not_in(has_vector),
+                absent(FileChunk.chunk_sha256, has_vector),
             )
             .group_by(File.id)
             .order_by(File.id)
@@ -129,7 +130,9 @@ def notes_missing_embeddings(
         db.scalars(
             select(Note.id)
             .join(NoteChunk, NoteChunk.note_id == Note.id)
-            .where(Note.deleted_at.is_(None), NoteChunk.chunk_sha256.not_in(has_vector))
+            .where(
+                Note.deleted_at.is_(None), absent(NoteChunk.chunk_sha256, has_vector)
+            )
             .group_by(Note.id)
             .order_by(Note.id)
             .limit(limit)
@@ -147,7 +150,7 @@ def details_missing_embeddings(
             select(Chunk)
             .join(ItemChunk, ItemChunk.chunk_sha256 == Chunk.sha256)
             .join(Item, Item.id == ItemChunk.item_id)
-            .where(Item.deleted_at.is_(None), Chunk.sha256.not_in(has_vector))
+            .where(Item.deleted_at.is_(None), absent(Chunk.sha256, has_vector))
             .distinct()
             .limit(limit)
         )

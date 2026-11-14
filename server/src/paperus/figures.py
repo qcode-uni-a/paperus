@@ -9,7 +9,7 @@ import logging
 import time
 from typing import cast
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, exists, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -121,15 +121,18 @@ def embed(
     from ``model``'s current file; how many were embedded."""
     draw(db, blobs, sha256)
     vectors = ml.vectors_name(model)
-    has_vector = select(FigureEmbedding.page, FigureEmbedding.label).where(
-        FigureEmbedding.blob_sha256 == sha256, FigureEmbedding.model == vectors
+    has_vector = exists().where(
+        FigureEmbedding.blob_sha256 == Figure.blob_sha256,
+        FigureEmbedding.page == Figure.page,
+        FigureEmbedding.label == Figure.label,
+        FigureEmbedding.model == vectors,
     )
     figures = list(
         db.scalars(
             select(Figure)
             .where(
                 Figure.blob_sha256 == sha256,
-                func.row(Figure.page, Figure.label).not_in(has_vector),
+                ~has_vector,
             )
             .order_by(Figure.page, Figure.label)
         )

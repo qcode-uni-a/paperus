@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from paperus import library, metadata, open_access
+from paperus.db import absent
 from paperus.identifiers import Scheme, implied_by_doi, is_arxiv_doi, normalize
 from paperus.models import (
     Blob,
@@ -67,7 +68,7 @@ def conditions(
         Item.file_wanted.is_(wanted),
     ]
     if section == "file":
-        return [*found, Item.id.not_in(_with_files())]
+        return [*found, absent(Item.id, _with_files())]
     return [
         *found,
         Item.id.in_(_with_files()),
@@ -81,7 +82,7 @@ def hidden_conditions() -> list[ColumnElement[bool]]:
         Item.deleted_at.is_(None),
         Item.archived_at.is_(None),
         Item.file_wanted.is_(False),
-        or_(Item.id.not_in(_with_files()), Item.id.in_(_journal_without_file())),
+        or_(absent(Item.id, _with_files()), Item.id.in_(_journal_without_file())),
     ]
 
 

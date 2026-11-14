@@ -22,6 +22,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from paperus import library, metadata, notifications
+from paperus.db import absent
 from paperus.identifiers import Scheme, implied_by_doi, is_arxiv_doi, normalize
 from paperus.importing.references import Pacer
 from paperus.models import (
@@ -77,7 +78,7 @@ def waiting(
             .where(
                 Item.deleted_at.is_(None),
                 Item.id.in_(with_arxiv),
-                Item.id.not_in(journal),
+                absent(Item.id, journal),
                 never if new else or_(never, Item.published_checked_at < now - RECHECK),
                 *([Item.library_id.in_(libraries)] if libraries is not None else []),
             )
@@ -169,7 +170,7 @@ def preprint_of(db: Session, libraries: list[uuid.UUID], title: str) -> Item | N
                     Item.deleted_at.is_(None),
                     Item.library_id.in_(libraries),
                     Item.id.in_(with_arxiv),
-                    Item.id.not_in(journal),
+                    absent(Item.id, journal),
                 )
             )
             if _alike(title, item.title)
