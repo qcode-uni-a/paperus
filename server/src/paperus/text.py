@@ -77,6 +77,8 @@ class TextChunk:
     page: int | None
     references: bool = False
     """Part of a reference list: kept for keyword search, not embedded."""
+    caption: bool = False
+    """A figure's or table's caption."""
 
 
 def extract_pdf_pages(path: Path) -> list[str]:
@@ -184,7 +186,9 @@ def chunk_pages(pages: list[str]) -> list[TextChunk]:
     return [c for t, page, r in _sections(numbered) for c in chunk_text(t, page, r)]
 
 
-def _cut(words: list[tuple[str, int]], references: bool) -> list[TextChunk]:
+def _cut(
+    words: list[tuple[str, int]], references: bool, caption: bool = False
+) -> list[TextChunk]:
     """A section's words (each with its page) in passages: sentences joined
     up to TARGET_WORDS, longer ones cut at MAX_WORDS."""
     chunks: list[TextChunk] = []
@@ -193,7 +197,9 @@ def _cut(words: list[tuple[str, int]], references: bool) -> list[TextChunk]:
     def close(upto: int) -> None:
         nonlocal current
         part, current = current[:upto], current[upto:]
-        chunks.append(TextChunk(" ".join(w for w, _ in part), part[0][1], references))
+        chunks.append(
+            TextChunk(" ".join(w for w, _ in part), part[0][1], references, caption)
+        )
 
     sentence: list[tuple[str, int]] = []
     for index, word in enumerate(words):
@@ -319,5 +325,5 @@ def chunk_flow(parts: list[tuple[str, int, Flow]]) -> list[TextChunk]:
             chunks += _cut(words, references)
         # (A part apart goes with the line of the flow before it.)
         for _, own in (a for a in apart if start <= max(0, a[0] - 1) < end):
-            chunks += _cut(own, references)
+            chunks += _cut(own, references, caption=not references)
     return chunks

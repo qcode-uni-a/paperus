@@ -3684,6 +3684,14 @@ export type Passage = {
      */
     in_references: boolean;
     /**
+     * Caption
+     */
+    caption?: boolean;
+    /**
+     * Figure
+     */
+    figure?: string | null;
+    /**
      * Reranked
      */
     reranked?: boolean;
@@ -8184,6 +8192,10 @@ export type SearchData = {
          * Archived
          */
         archived?: boolean;
+        /**
+         * Figures
+         */
+        figures?: boolean;
     };
     url: '/api/search';
 };

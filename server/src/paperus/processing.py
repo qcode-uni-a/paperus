@@ -168,6 +168,7 @@ def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
                 chunk_sha256=sha256,
                 page=chunk.page,
                 in_references=chunk.references,
+                caption=chunk.caption,
             )
         )
     db.add_all(rows)
@@ -196,6 +197,7 @@ def _copy_manifest(db: Session, file: File) -> bool:
                 chunk_sha256=row.chunk_sha256,
                 page=row.page,
                 in_references=row.in_references,
+                caption=row.caption,
             )
         )
     return True

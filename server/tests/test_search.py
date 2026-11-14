@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
+from tests.test_page_text import paper as two_columns
 
 PAPER = make_pdf(
     [
@@ -214,3 +215,21 @@ def test_results_name_authors_and_year(
     [hit] = search(logged_in, "SPEI")
     assert hit["item_authors"] == ["Vicente-Serrano, Sergio", "Beguería, Santiago"]
     assert hit["item_year"] == 2010
+
+
+def test_figures_found_by_their_captions(
+    logged_in: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    """A figure's caption is a passage of its own, marked: found as that
+    figure, and alone with ``figures=true``."""
+    item_id = add_item(logged_in, "Columns")
+    assert process(db, blobs, upload(logged_in, item_id, two_columns())) == "done"
+    found = logged_in.get(
+        "/api/search", params={"q": "figure of tests", "mode": "keyword"}
+    ).json()
+    [figure] = [p for p in found if p["caption"]]
+    assert (figure["figure"], figure["page"]) == ("FIG. 1", 1)
+    only = logged_in.get(
+        "/api/search", params={"q": "tests", "mode": "keyword", "figures": True}
+    ).json()
+    assert [p["passage_id"] for p in only] == [figure["passage_id"]]

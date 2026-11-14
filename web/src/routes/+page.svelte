@@ -42,7 +42,8 @@
 				limit: 50,
 				mode,
 				type: types.length ? types : undefined,
-				archived: archived || undefined
+				archived: archived || undefined,
+				figures: figures || undefined
 			}
 		});
 		loadingMore = null;
@@ -62,6 +63,7 @@
 	);
 	const types = $derived(page.url.searchParams.getAll('type'));
 	const archived = $derived(page.url.searchParams.has('archived'));
+	const figures = $derived(page.url.searchParams.has('figures'));
 	let passages = $state<Passage[] | null>(null);
 	/** Papers with all the searched words in their titles: first, apart. */
 	const IN_TITLES = 5;
@@ -204,7 +206,8 @@
 		const options = {
 			mode,
 			type: types.length ? types : undefined,
-			archived: archived || undefined
+			archived: archived || undefined,
+			figures: figures || undefined
 		};
 		allOf = {};
 		if (!q) {
@@ -214,15 +217,17 @@
 		}
 		const key = page.url.search;
 		titled = null;
-		listItems({
-			query: { title_words: q, limit: IN_TITLES, type: options.type, archived: options.archived }
-		}).then(({ data, response }) => {
-			if (key !== untrack(() => page.url.search) || !data) return;
-			titled = {
-				items: data,
-				total: Number(response?.headers.get('X-Total-Count') ?? data.length)
-			};
-		});
+		// Papers by their titles: not when looking for figures.
+		if (!options.figures)
+			listItems({
+				query: { title_words: q, limit: IN_TITLES, type: options.type, archived: options.archived }
+			}).then(({ data, response }) => {
+				if (key !== untrack(() => page.url.search) || !data) return;
+				titled = {
+					items: data,
+					total: Number(response?.headers.get('X-Total-Count') ?? data.length)
+				};
+			});
 		searching = search({
 			query: { q, limit: SEARCH_PASSAGES, per_item: PER_PAPER, ...options }
 		}).then(({ data }) => {
@@ -313,6 +318,9 @@
 										>
 											{passage.page ? `Page ${passage.page}` : 'Open'}
 										</a>
+									{/if}
+									{#if passage.caption}
+										<span class="badge figure">{passage.figure ?? 'Figure'}</span>
 									{/if}
 									{#if passage.in_references}
 										<span class="badge">In the references</span>
@@ -501,6 +509,10 @@
 	}
 	.passages .badge {
 		justify-self: start;
+	}
+	.badge.figure {
+		background: var(--tag-teal-bg, var(--rail));
+		color: var(--tag-teal-ink, var(--ink));
 	}
 	.passages blockquote {
 		grid-column: 1 / -1;

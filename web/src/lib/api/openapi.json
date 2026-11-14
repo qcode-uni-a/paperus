@@ -4283,7 +4283,7 @@
           "search"
         ],
         "summary": "Search",
-        "description": "Passages for ``q`` in the libraries the person can read (or one\n``library``): its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items.\n``per_item`` keeps the best few per paper or note, so more papers fit;\n``item`` searches within one paper; ``archived=true`` includes the\narchive. The ``X-Search-Mode`` header says\nwhat was used: without the ML service, hybrid search falls back to\nkeywords.",
+        "description": "Passages for ``q`` in the libraries the person can read (or one\n``library``): its words (quotes for phrases, ``-`` to exclude), its\nmeaning, or both; ``type`` (repeatable, CSL types) limits the items.\n``per_item`` keeps the best few per paper or note, so more papers fit;\n``item`` searches within one paper; ``archived=true`` includes the\narchive; ``figures=true`` finds figures and tables only (by their\ncaptions). The ``X-Search-Mode`` header says\nwhat was used: without the ML service, hybrid search falls back to\nkeywords.",
         "operationId": "search",
         "parameters": [
           {
@@ -4403,6 +4403,16 @@
               "type": "boolean",
               "default": false,
               "title": "Archived"
+            }
+          },
+          {
+            "name": "figures",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Figures"
             }
           }
         ],
@@ -15764,6 +15774,22 @@
           "in_references": {
             "type": "boolean",
             "title": "In References"
+          },
+          "caption": {
+            "type": "boolean",
+            "title": "Caption",
+            "default": false
+          },
+          "figure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure"
           },
           "reranked": {
             "type": "boolean",

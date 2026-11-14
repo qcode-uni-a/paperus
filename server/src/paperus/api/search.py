@@ -1,6 +1,7 @@
 """Search: by keyword, by meaning, or both (hybrid, the default)."""
 
 import logging
+import re
 import time
 import uuid
 from typing import Annotated, Literal
@@ -65,6 +66,11 @@ class Passage(BaseModel):
     """How the passage was found: by its words, its meaning, or both."""
     in_references: bool
     """From the item's reference list (found by words only)."""
+    caption: bool = False
+    """A figure's or table's caption."""
+    figure: str | None = None
+    """For a caption: what it labels, as the paper writes it ("FIG. 3",
+    "Table I")."""
     reranked: bool = False
     """Ordered by the reranker (``score`` is then its score)."""
 
@@ -78,7 +84,7 @@ _SEARCH = text(
     visible AS NOT MATERIALIZED (
         SELECT 'paper' AS kind, fc.file_id AS source_id, fc.position, fc.page,
                fc.chunk_sha256, fc.in_references, f.version_id,
-               i.id AS item_id, i.title AS item_title
+               i.id AS item_id, i.title AS item_title, fc.caption
         FROM file_chunks fc
              JOIN files f ON f.id = fc.file_id
              JOIN versions v ON v.id = f.version_id
@@ -92,19 +98,22 @@ _SEARCH = text(
                OR i.type = ANY(CAST(:types AS text[])))
           -- Within one paper only, if asked.
           AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
+          -- Figures (their captions) only, if asked.
+          AND (NOT :figures OR fc.caption)
         UNION ALL
         SELECT 'note', nc.note_id, nc.position, NULL, nc.chunk_sha256, false,
-               NULL, NULL, n.title
+               NULL, NULL, n.title, false
         FROM note_chunks nc JOIN notes n ON n.id = nc.note_id
         WHERE n.deleted_at IS NULL
           AND n.library_id = ANY(CAST(:libraries AS uuid[]))
           AND (cardinality(CAST(:types AS text[])) = 0
                OR 'note' = ANY(CAST(:types AS text[])))
           AND CAST(:item AS uuid) IS NULL
+          AND NOT :figures
         UNION ALL
         -- A paper's details: its title and abstract, with or without a file.
         SELECT 'details', i.id, 0, NULL, ic.chunk_sha256, false,
-               NULL, i.id, i.title
+               NULL, i.id, i.title, false
         FROM item_chunks ic JOIN items i ON i.id = ic.item_id
         WHERE i.deleted_at IS NULL
           AND (i.archived_at IS NULL OR :archived OR CAST(:item AS uuid) IS NOT NULL)
@@ -112,6 +121,7 @@ _SEARCH = text(
           AND (cardinality(CAST(:types AS text[])) = 0
                OR i.type = ANY(CAST(:types AS text[])))
           AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
+          AND NOT :figures
     ),
     keyword AS (
         SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
@@ -155,7 +165,7 @@ _SEARCH = text(
         FROM fused JOIN visible vis USING (source_id, position)
     )
     SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
-           c.text AS chunk_text,
+           vis.caption, c.text AS chunk_text,
            vis.version_id,
            vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
@@ -182,6 +192,18 @@ _SEARCH = text(
     LIMIT :limit
     """
 )
+
+
+_FIGURE = re.compile(
+    r"^\W*((?:fig(?:ure)?|table|tab|abb(?:ildung)?)\.?\s*(?:\d+|[IVX]+)[a-z]?)",
+    re.IGNORECASE,
+)
+
+
+def figure_label(caption: str) -> str | None:
+    """What a caption labels, as written: "FIG. 3", "Table I"."""
+    match = _FIGURE.match(caption)
+    return " ".join(match.group(1).split()) if match else None
 
 
 def _query_vector(ml: MLClient, model: str, query: str) -> tuple[str, str] | None:
@@ -213,12 +235,14 @@ def run_search(
     item_id: uuid.UUID | None = None,
     rerank: bool | None = None,
     archived: bool = False,
+    figures: bool = False,
 ) -> tuple[Mode, list[Passage]]:
     """Passages for ``q`` that the person may read, and the mode used
     (hybrid falls back to keywords without the ML service). ``per_item``:
     at most that many per paper or note (more candidates are looked at, so
     more papers fill the list); ``item_id``: within that paper only;
-    ``archived``: archived papers too;
+    ``archived``: archived papers too; ``figures``: figures' and tables'
+    captions only;
     ``rerank``: overrides the administration's setting (for evaluating)."""
     started = time.perf_counter()
     config = load_config(db, settings)
@@ -252,6 +276,7 @@ def run_search(
                 "libraries": libraries,
                 "item": item_id,
                 "archived": archived,
+                "figures": figures,
                 "per_item": per_item or limit,
                 "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
             },
@@ -274,6 +299,8 @@ def run_search(
             snippet=row["snippet"],
             score=float(row["score"]),
             in_references=row["in_references"],
+            caption=row["caption"],
+            figure=figure_label(row["chunk_text"]) if row["caption"] else None,
             matched=[
                 m
                 for m, hit in (
@@ -371,13 +398,15 @@ def search(
     per_item: Annotated[int | None, Query(ge=1, le=100)] = None,
     item: uuid.UUID | None = None,
     archived: bool = False,
+    figures: bool = False,
 ) -> list[Passage]:
     """Passages for ``q`` in the libraries the person can read (or one
     ``library``): its words (quotes for phrases, ``-`` to exclude), its
     meaning, or both; ``type`` (repeatable, CSL types) limits the items.
     ``per_item`` keeps the best few per paper or note, so more papers fit;
     ``item`` searches within one paper; ``archived=true`` includes the
-    archive. The ``X-Search-Mode`` header says
+    archive; ``figures=true`` finds figures and tables only (by their
+    captions). The ``X-Search-Mode`` header says
     what was used: without the ML service, hybrid search falls back to
     keywords."""
     used, passages = run_search(
@@ -393,6 +422,7 @@ def search(
         per_item=per_item,
         item_id=item,
         archived=archived,
+        figures=figures,
     )
     response.headers["X-Search-Mode"] = used
     return passages

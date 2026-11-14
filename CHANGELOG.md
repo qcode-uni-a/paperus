@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Figures in search**: a figure's or table's caption is now found as
+  that figure, marked with its number on the result ("Fig. 3",
+  "Table 2"), and "Figures and tables only" in the search options finds
+  nothing else. Assistants over MCP get the same (`figures` in `search`).
+  Papers read before are marked by the update itself.
+
 ## 0.1.5 (2026-11-14)
 
 *paperus now carries an OpenAlex key, waits politely when the day's budget runs dry, and finds your preprints' citations even after the journal renamed them.*

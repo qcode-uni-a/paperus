@@ -20,13 +20,16 @@
 		words: mode !== 'meaning',
 		meaning: mode !== 'keyword',
 		types: params.getAll('type'),
-		archived: params.has('archived')
+		archived: params.has('archived'),
+		figures: params.has('figures')
 	});
 
 	/** What the search options say, in the empty field: "Search preprints
 	 * by meaning"; short when both ways are on (phones have little room). */
 	const placeholder = $derived.by(() => {
 		const both = filters.words && filters.meaning;
+		if (filters.figures)
+			return `Search figures${both ? '' : filters.words ? ' by words' : ' by meaning'}`;
 		if (both && !filters.types.length) return 'Search the library';
 		const how = both ? '' : filters.words ? 'by words' : 'by meaning';
 		const kinds = filters.types.map(plural);
@@ -50,6 +53,7 @@
 		else if (!next.words) search.set('mode', 'meaning');
 		for (const type of next.types) search.append('type', type);
 		if (next.archived) search.set('archived', '1');
+		if (next.figures) search.set('figures', '1');
 		const text = search.toString();
 		return text ? `${library}?${text}` : library;
 	}

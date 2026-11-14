@@ -881,6 +881,8 @@ class FileChunk(Base):
     page: Mapped[int | None]
     in_references: Mapped[bool] = mapped_column(server_default=text("false"))
     """In the file's reference list: found by keywords, not by meaning."""
+    caption: Mapped[bool] = mapped_column(server_default=text("false"))
+    """A figure's or table's caption (found by search as a figure)."""
 
 
 class Embedding(Base):

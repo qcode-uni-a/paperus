@@ -882,7 +882,8 @@ export const annotatedFile = <ThrowOnError extends boolean = false>(options: Opt
  * meaning, or both; ``type`` (repeatable, CSL types) limits the items.
  * ``per_item`` keeps the best few per paper or note, so more papers fit;
  * ``item`` searches within one paper; ``archived=true`` includes the
- * archive. The ``X-Search-Mode`` header says
+ * archive; ``figures=true`` finds figures and tables only (by their
+ * captions). The ``X-Search-Mode`` header says
  * what was used: without the ML service, hybrid search falls back to
  * keywords.
  */

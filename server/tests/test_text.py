@@ -164,12 +164,14 @@ def test_captions_and_pages_alone() -> None:
         ("A scanned page.", 2, "page"),
         ("More text.", 3, "text"),
     ]
-    assert [(c.page, c.text) for c in chunk_flow(parts)] == [
+    chunks = chunk_flow(parts)
+    assert [(c.page, c.text) for c in chunks] == [
         (1, "The text before the figure goes on after it."),
         (1, "FIG. 1. A figure."),
         (2, "A scanned page."),
         (3, "More text."),
     ]
+    assert [c.caption for c in chunks] == [False, True, False, False]
 
 
 def test_a_reference_list_in_the_flow() -> None:

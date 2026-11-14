@@ -8,6 +8,8 @@
 		types: string[];
 		/** Archived papers too. */
 		archived: boolean;
+		/** Figures and tables only (by their captions). */
+		figures: boolean;
 	}
 
 	let { filters, onchange }: { filters: Filters; onchange: (next: Filters) => void } = $props();
@@ -20,7 +22,11 @@
 	});
 
 	const changed = $derived(
-		!filters.words || !filters.meaning || filters.types.length > 0 || filters.archived
+		!filters.words ||
+			!filters.meaning ||
+			filters.types.length > 0 ||
+			filters.archived ||
+			filters.figures
 	);
 
 	/** At least one way of searching stays on. */
@@ -38,7 +44,7 @@
 	}
 
 	function reset() {
-		onchange({ words: true, meaning: true, types: [], archived: false });
+		onchange({ words: true, meaning: true, types: [], archived: false, figures: false });
 	}
 </script>
 
@@ -109,6 +115,19 @@
 					{/each}
 				</div>
 				<p class="hint">{filters.types.length ? 'Only the chosen types.' : 'All types.'}</p>
+			</fieldset>
+
+			<fieldset>
+				<legend>Figures</legend>
+				<div class="chips">
+					<button
+						class="chip small"
+						aria-pressed={filters.figures}
+						onclick={() => onchange({ ...filters, figures: !filters.figures })}
+						>Figures and tables only</button
+					>
+				</div>
+				<p class="hint">Found by their captions.</p>
 			</fieldset>
 
 			<fieldset>

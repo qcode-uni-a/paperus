@@ -330,3 +330,46 @@ def test_0018_finds_the_covers_of_files_read_before(
         {"id": file["id"]},
     ).scalars()
     assert (covers, list(left)) == ([1], [2, 3])
+
+
+def test_0023_marks_the_captions_of_files_read_before(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """Updated: passages that are captions ("FIG. 2.", "Table I.") are
+    marked; the text and a reference list's entry are not."""
+    made = logged_in.post("/api/items", json={"metadata": {"title": "Floquet"}})
+    file = logged_in.post(
+        f"/api/items/{made.json()['id']}/files",
+        files={"upload": ("p.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")},
+    ).json()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0022")
+    passages = [
+        ("The text, about Fig. 2 and more.", False),
+        ("FIG. 2. Quasienergies of the driven chain.", False),
+        ("Table I: Parameters used.", False),
+        ("Fig. 3 in [12] shows the same.", True),
+    ]
+    for position, (words, references) in enumerate(passages):
+        sha = hashlib.sha256(words.encode()).digest()
+        db.execute(
+            text("INSERT INTO chunks (sha256, text) VALUES (:sha, :text)"),
+            {"sha": sha, "text": words},
+        )
+        db.execute(
+            text(
+                "INSERT INTO file_chunks (file_id, position, chunk_sha256, page,"
+                " in_references) VALUES (:file, :n, :sha, 1, :refs)"
+            ),
+            {"file": file["id"], "n": position, "sha": sha, "refs": references},
+        )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+    marked = db.execute(
+        text("SELECT caption FROM file_chunks WHERE file_id = :id ORDER BY position"),
+        {"id": file["id"]},
+    ).scalars()
+    assert list(marked) == [False, True, True, False]
