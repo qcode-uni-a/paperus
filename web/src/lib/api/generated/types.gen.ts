@@ -2756,6 +2756,10 @@ export type MlModel = {
      * Memory Bytes
      */
     memory_bytes?: number | null;
+    /**
+     * Images
+     */
+    images?: boolean;
 };
 
 /**
@@ -3144,6 +3148,50 @@ export type MovePreview = {
      * Not In Library
      */
     not_in_library: number;
+};
+
+/**
+ * Multimodal
+ */
+export type Multimodal = {
+    /**
+     * On
+     */
+    on: boolean;
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Gpu
+     */
+    gpu: boolean;
+    /**
+     * Gpu Memory
+     */
+    gpu_memory?: number | null;
+    /**
+     * Recommended
+     */
+    recommended: boolean;
+    /**
+     * Embedding Model
+     */
+    embedding_model?: string | null;
+    /**
+     * Rerank Model
+     */
+    rerank_model?: string | null;
+};
+
+/**
+ * MultimodalIn
+ */
+export type MultimodalIn = {
+    /**
+     * On
+     */
+    on: boolean;
 };
 
 /**
@@ -4851,6 +4899,18 @@ export type SystemConfig = {
      * Ocr Model
      */
     ocr_model?: string;
+    /**
+     * Multimodal
+     */
+    multimodal?: boolean;
+    /**
+     * Text Embedding Model
+     */
+    text_embedding_model?: string | null;
+    /**
+     * Text Rerank Model
+     */
+    text_rerank_model?: string | null;
     /**
      * Public Url
      */
@@ -9620,6 +9680,47 @@ export type SetConfigResponses = {
 };
 
 export type SetConfigResponse = SetConfigResponses[keyof SetConfigResponses];
+
+export type GetMultimodalData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/admin/multimodal';
+};
+
+export type GetMultimodalResponses = {
+    /**
+     * Successful Response
+     */
+    200: Multimodal;
+};
+
+export type GetMultimodalResponse = GetMultimodalResponses[keyof GetMultimodalResponses];
+
+export type SetMultimodalData = {
+    body: MultimodalIn;
+    path?: never;
+    query?: never;
+    url: '/api/admin/multimodal';
+};
+
+export type SetMultimodalErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetMultimodalError = SetMultimodalErrors[keyof SetMultimodalErrors];
+
+export type SetMultimodalResponses = {
+    /**
+     * Successful Response
+     */
+    200: SystemConfig;
+};
+
+export type SetMultimodalResponse = SetMultimodalResponses[keyof SetMultimodalResponses];
 
 export type MlStatusData = {
     body?: never;

@@ -85,8 +85,27 @@
 	let ocr = $state(true);
 	let ocrModel = $state('');
 	const answers = $derived(ml?.services.some((s) => s.ok) ?? false);
-	const embedders = $derived(ml?.models.filter((m) => m.task === 'embedding') ?? []);
-	const rerankers = $derived(ml?.models.filter((m) => m.task === 'rerank') ?? []);
+	/** Multimodal search (figures found by what they show): offered when the
+	 * ML service has the models, ticked when its GPU is big enough. */
+	let multimodal = $state<boolean | null>(null);
+	const imageModels = $derived(ml?.models.filter((m) => m.images) ?? []);
+	const offersMultimodal = $derived(
+		imageModels.some((m) => m.task === 'embedding') && imageModels.some((m) => m.task === 'rerank')
+	);
+	const bigGpu = $derived(
+		ml?.service?.device === 'cuda' && (ml.service.gpu_memory?.total ?? 0) >= 6 * 2 ** 30
+	);
+	const multimodalOn = $derived(multimodal ?? (offersMultimodal && bigGpu));
+	const fits = (m: MlModel) => Boolean(m.images) === multimodalOn;
+	const embedders = $derived(ml?.models.filter((m) => m.task === 'embedding' && fits(m)) ?? []);
+	const rerankers = $derived(ml?.models.filter((m) => m.task === 'rerank' && fits(m)) ?? []);
+	// The chosen models follow the switch: the first (recommended) of their kind.
+	$effect(() => {
+		if (embedders.length && !embedders.some((m) => m.name === embeddingModel))
+			embeddingModel = (embedders.find((m) => m.recommended) ?? embedders[0]).name;
+		if (rerankers.length && !rerankers.some((m) => m.name === rerankModel))
+			rerankModel = (rerankers.find((m) => m.recommended) ?? rerankers[0]).name;
+	});
 	const readers = $derived(ml?.models.filter((m) => m.task === 'ocr') ?? []);
 	/** A model's name with its download size and whether it is
 	 * recommended, for the lists. */
@@ -128,6 +147,7 @@
 		const { error: failure } = await setConfig({
 			body: {
 				...config,
+				multimodal: multimodalOn,
 				embedding_model: embeddingModel,
 				rerank,
 				rerank_model: rerankModel,
@@ -352,6 +372,21 @@
 						</p>
 					{/if}
 				</div>
+				{#if config && offersMultimodal}
+					<label class="inline"
+						><input
+							type="checkbox"
+							checked={multimodalOn}
+							onchange={(event) => (multimodal = event.currentTarget.checked)}
+						/> Multimodal search: figures found by what they show</label
+					>
+					<p class="muted small">
+						One model reads passages and figures alike, another reranks both. Needs the ML service
+						on a GPU with about 6 GB{bigGpu
+							? ', as here'
+							: '; on a CPU every search would take several seconds'}.
+					</p>
+				{/if}
 				{#if config && embedders.length}
 					<label
 						>Model for search by meaning

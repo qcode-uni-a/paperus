@@ -74,7 +74,8 @@ def test_found_by_what_it_shows(
 ) -> None:
     file_id, sha = read(admin, db, blobs)
     ml = fake_ml.client()
-    use(admin, embedding_model=MULTIMODAL, rerank="off")
+    use(admin, rerank="off")
+    admin.put("/api/admin/multimodal", json={"on": True})
 
     def first(query: str) -> dict[str, Any] | None:
         found = admin.get("/api/search", params={"q": query, "mode": "meaning"})
@@ -102,12 +103,8 @@ def test_reranked_looking_at_the_figure(
 ) -> None:
     file_id, sha = read(admin, db, blobs)
     ml = fake_ml.client()
-    use(
-        admin,
-        embedding_model=MULTIMODAL,
-        rerank="on",
-        rerank_model="qwen3-vl-reranker-2b",
-    )
+    use(admin, rerank="on")
+    admin.put("/api/admin/multimodal", json={"on": True})
     embed_file(db, ml, MULTIMODAL, file_id)
     figures.embed(db, ml, MULTIMODAL, blobs, sha)
     hits = admin.get("/api/search", params={"q": "crimson ring tests"}).json()
@@ -115,10 +112,6 @@ def test_reranked_looking_at_the_figure(
     [body] = fake_ml.reranked[-1:]
     [image] = body["images"]
     assert image["text"].startswith("FIG. 1.")
-    # A reranker for text only gets the caption as text.
-    use(admin, rerank_model="bge-reranker-v2-m3")
-    admin.get("/api/search", params={"q": "crimson ring tests"})
-    assert "images" not in fake_ml.reranked[-1]
 
 
 @pytest.fixture(autouse=True)
@@ -146,6 +139,7 @@ def test_fallbacks(
     assert figures.draw(db, blobs, b"\0" * 32) == 0
     file = upload(admin, add_item(admin, "Plain"))
     process_file(db, blobs, uuid.UUID(file["id"]))
-    use(admin, rerank="on", rerank_model="qwen3-vl-reranker-2b")
+    use(admin, rerank="on")
+    admin.put("/api/admin/multimodal", json={"on": True})
     admin.get("/api/search", params={"q": "drought"})
     assert "images" not in fake_ml.reranked[-1]

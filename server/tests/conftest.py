@@ -183,9 +183,20 @@ class FakeML:
         if request.url.path == "/config":
             if request.method == "PUT":
                 self.config = json.loads(request.content)
+            gpu = (
+                {"total": 8 * 2**30, "free": 6 * 2**30}
+                if self.device == "cuda"
+                else None
+            )
             return httpx2.Response(
                 200,
-                json={**self.config, "cores": 8, "loaded": [], "device": self.device},
+                json={
+                    **self.config,
+                    "cores": 8,
+                    "loaded": [],
+                    "device": self.device,
+                    "gpu_memory": gpu,
+                },
             )
         if request.url.path == "/rerank":
             body = json.loads(request.content)

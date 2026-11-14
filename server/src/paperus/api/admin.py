@@ -82,6 +82,8 @@ class MLModel(BaseModel):
     memory_bytes: int | None = None
     """What it took once loaded on the ML service (RAM, or GPU memory there),
     as measured when it last loaded; None if never loaded there."""
+    images: bool = False
+    """Takes images too (multimodal search)."""
 
 
 class MLSpeed(BaseModel):
@@ -176,6 +178,23 @@ def _models(ml: MLClient) -> list[MLModel]:
     return [MLModel.model_validate(m) for m in ml.models()]
 
 
+def _check_multimodal(body: system.SystemConfig, take_images: set[str]) -> None:
+    """With multimodal search on, models that take images; off, models that
+    take only text (a mix would put passages and figures in other spaces)."""
+    chosen = [body.embedding_model] + (
+        [body.rerank_model] if body.rerank != "off" else []
+    )
+    for name in chosen:
+        if body.multimodal and name not in take_images:
+            raise HTTPException(
+                422, f"multimodal search needs models that take images, not {name!r}"
+            )
+        if not body.multimodal and name in take_images:
+            raise HTTPException(
+                422, f"{name!r} is for multimodal search: turn that on to use it"
+            )
+
+
 @router.get("/config")
 def get_config(request: Request, db: DB, admin: Admin) -> system.SystemConfig:
     return system.load_config(db, request.app.state.settings)
@@ -195,13 +214,21 @@ def set_config(
         current.rerank_model,
     )
     ocr_model_changed = body.ocr and body.ocr_model != current.ocr_model
-    if model_changed or (rerank_changed and body.rerank != "off") or ocr_model_changed:
+    multimodal_changed = body.multimodal != current.multimodal
+    if (
+        model_changed
+        or (rerank_changed and body.rerank != "off")
+        or ocr_model_changed
+        or multimodal_changed
+    ):
         try:
-            known = [(m.name, m.task) for m in _models(_ml(request))]
+            offered = _models(_ml(request))
         except (MLUnavailable, MLRejected) as error:
             raise HTTPException(
                 503, "ML service unreachable; cannot check the model"
             ) from error
+        known = [(m.name, m.task) for m in offered]
+        _check_multimodal(body, {m.name for m in offered if m.images})
         if model_changed and (body.embedding_model, "embedding") not in known:
             raise HTTPException(
                 422, f"the ML service has no model {body.embedding_model!r}"
@@ -238,6 +265,106 @@ def set_config(
         # The worker sends it at once (first in its queue), and every minute.
         queue_ml_configuration(request.app.state.jobs)
     return body
+
+
+RECOMMENDED_GPU_BYTES = 6 * 2**30
+"""Multimodal search is recommended from this much GPU memory (both 2B
+models take about 3.7 GB, searches need some more for a moment)."""
+
+
+class Multimodal(BaseModel):
+    on: bool
+    available: bool
+    """The ML service offers an embedding model and a reranker that take
+    images."""
+    gpu: bool
+    """Its models run on a GPU."""
+    gpu_memory: int | None = None
+    """The GPU's memory, bytes."""
+    recommended: bool
+    """Worth turning on here: a GPU with enough memory."""
+    embedding_model: str | None = None
+    rerank_model: str | None = None
+    """The models it uses (or would)."""
+
+
+class MultimodalIn(BaseModel):
+    on: bool
+
+
+def _image_models(models: list[MLModel], task: str) -> str | None:
+    """The recommended (else the first) model of ``task`` that takes images."""
+    found = [m for m in models if m.task == task and m.images]
+    found.sort(key=lambda m: not m.recommended)
+    return found[0].name if found else None
+
+
+@router.get("/multimodal")
+def get_multimodal(request: Request, db: DB, admin: Admin) -> Multimodal:
+    """Multimodal search here: on or off, offered, recommended."""
+    config = system.load_config(db, request.app.state.settings)
+    ml = _ml(request)
+    try:
+        models = _models(ml)
+        service = MLServiceState.model_validate(ml.service_config())
+    except (MLUnavailable, MLRejected, ValueError):
+        return Multimodal(
+            on=config.multimodal, available=False, gpu=False, recommended=False
+        )
+    embedding = _image_models(models, "embedding")
+    reranker = _image_models(models, "rerank")
+    gpu = service.device == "cuda"
+    memory = service.gpu_memory.total if service.gpu_memory else None
+    return Multimodal(
+        on=config.multimodal,
+        available=embedding is not None and reranker is not None,
+        gpu=gpu,
+        gpu_memory=memory,
+        recommended=gpu and (memory or 0) >= RECOMMENDED_GPU_BYTES,
+        embedding_model=config.embedding_model if config.multimodal else embedding,
+        rerank_model=config.rerank_model if config.multimodal else reranker,
+    )
+
+
+@router.put("/multimodal")
+def set_multimodal(
+    body: MultimodalIn, request: Request, db: DB, admin: Admin
+) -> system.SystemConfig:
+    """Turn multimodal search on (models that take images, the text models
+    kept for later) or off (back to them); the library is embedded anew in
+    the background either way."""
+    current = system.load_config(db, request.app.state.settings)
+    if body.on == current.multimodal:
+        return current
+    try:
+        models = _models(_ml(request))
+    except (MLUnavailable, MLRejected) as error:
+        raise HTTPException(503, "ML service unreachable") from error
+    if body.on:
+        embedding = _image_models(models, "embedding")
+        reranker = _image_models(models, "rerank")
+        if embedding is None or reranker is None:
+            raise HTTPException(422, "the ML service offers no models that take images")
+        changed = current.model_copy(
+            update={
+                "multimodal": True,
+                "embedding_model": embedding,
+                "rerank_model": reranker,
+                "text_embedding_model": current.embedding_model,
+                "text_rerank_model": current.rerank_model,
+            }
+        )
+    else:
+        defaults = system.defaults(request.app.state.settings)
+        changed = current.model_copy(
+            update={
+                "multimodal": False,
+                "embedding_model": current.text_embedding_model
+                or defaults.embedding_model,
+                "rerank_model": current.text_rerank_model or defaults.rerank_model,
+            }
+        )
+    return set_config(changed, request, db, admin)
 
 
 @router.get("/ml")

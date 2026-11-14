@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
@@ -182,3 +183,74 @@ def test_date_format_for_everyone(client: TestClient, db: Session) -> None:
     assert login.json()["user"]["date_format"] == "europe"
     removed = ada.delete("/api/me/avatar")
     assert removed.json()["date_format"] == "europe"
+
+
+def test_multimodal_search_switched(
+    admin: TestClient, db: Session, settings: Settings, job_app: App, fake_ml: FakeML
+) -> None:
+    """On: models that take images, the text ones kept; off: back to them.
+    Recommended with a GPU of enough memory; models of the other kind refused."""
+    state = admin.get("/api/admin/multimodal").json()
+    assert state == {
+        "on": False,
+        "available": True,
+        "gpu": False,
+        "gpu_memory": None,
+        "recommended": False,
+        "embedding_model": "qwen3-vl-embedding-2b",
+        "rerank_model": "qwen3-vl-reranker-2b",
+    }
+    fake_ml.device = "cuda"
+    state = admin.get("/api/admin/multimodal").json()
+    assert (state["gpu"], state["recommended"]) == (True, True)
+
+    config = admin.get("/api/admin/config").json()
+    mixed = admin.put(
+        "/api/admin/config", json={**config, "embedding_model": "qwen3-vl-embedding-2b"}
+    )
+    assert mixed.status_code == 422 and "turn that on" in mixed.text
+
+    on = admin.put("/api/admin/multimodal", json={"on": True})
+    assert on.status_code == 200, on.text
+    saved = load_config(db, settings)
+    assert (saved.multimodal, saved.embedding_model, saved.rerank_model) == (
+        True,
+        "qwen3-vl-embedding-2b",
+        "qwen3-vl-reranker-2b",
+    )
+    assert (saved.text_embedding_model, saved.text_rerank_model) == (
+        "bge-m3",
+        "bge-reranker-v2-m3",
+    )
+    assert (system.reembedding(db) or {}).get("model") == "qwen3-vl-embedding-2b"
+    assert "paperus:queue_missing_embeddings" in queued(job_app)
+    # Again: nothing changes. A text reranker refused while on.
+    assert admin.put("/api/admin/multimodal", json={"on": True}).status_code == 200
+    text_reranker = admin.put(
+        "/api/admin/config",
+        json={**on.json(), "rerank_model": "bge-reranker-v2-m3"},
+    )
+    assert text_reranker.status_code == 422 and "take images" in text_reranker.text
+
+    off = admin.put("/api/admin/multimodal", json={"on": False})
+    assert off.status_code == 200, off.text
+    db.expire_all()
+    saved = load_config(db, settings)
+    assert (saved.multimodal, saved.embedding_model, saved.rerank_model) == (
+        False,
+        "bge-m3",
+        "bge-reranker-v2-m3",
+    )
+
+
+def test_multimodal_without_an_ml_service(
+    admin: TestClient, fake_ml: FakeML, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake_ml.down = True
+    state = admin.get("/api/admin/multimodal").json()
+    assert (state["available"], state["recommended"]) == (False, False)
+    assert admin.put("/api/admin/multimodal", json={"on": True}).status_code == 503
+    fake_ml.down = False
+    monkeypatch.setattr(FakeML, "TAKE_IMAGES", set())
+    refused = admin.put("/api/admin/multimodal", json={"on": True})
+    assert refused.status_code == 422 and "no models that take images" in refused.text

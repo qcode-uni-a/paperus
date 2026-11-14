@@ -213,6 +213,8 @@ ROUTES = {
     ("GET", "/api/admin/ml"): None,
     ("GET", "/api/admin/openalex"): None,
     ("PUT", "/api/admin/openalex"): None,
+    ("GET", "/api/admin/multimodal"): None,
+    ("PUT", "/api/admin/multimodal"): None,
     ("DELETE", "/api/admin/ml/models/{name}"): None,
     ("POST", "/api/admin/ml/models/{name}/speed"): None,
     ("GET", "/api/admin/stats"): None,

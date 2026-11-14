@@ -6657,6 +6657,68 @@
         }
       }
     },
+    "/api/admin/multimodal": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Multimodal",
+        "description": "Multimodal search here: on or off, offered, recommended.",
+        "operationId": "get_multimodal",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Multimodal"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Set Multimodal",
+        "description": "Turn multimodal search on (models that take images, the text models\nkept for later) or off (back to them); the library is embedded anew in\nthe background either way.",
+        "operationId": "set_multimodal",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultimodalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/ml": {
       "get": {
         "tags": [
@@ -14166,6 +14228,11 @@
               }
             ],
             "title": "Memory Bytes"
+          },
+          "images": {
+            "type": "boolean",
+            "title": "Images",
+            "default": false
           }
         },
         "type": "object",
@@ -14880,6 +14947,80 @@
         ],
         "title": "MovePreview",
         "description": "What moving a collection (with those inside) into a library does."
+      },
+      "Multimodal": {
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "title": "On"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "gpu": {
+            "type": "boolean",
+            "title": "Gpu"
+          },
+          "gpu_memory": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu Memory"
+          },
+          "recommended": {
+            "type": "boolean",
+            "title": "Recommended"
+          },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model"
+          },
+          "rerank_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "on",
+          "available",
+          "gpu",
+          "recommended"
+        ],
+        "title": "Multimodal"
+      },
+      "MultimodalIn": {
+        "properties": {
+          "on": {
+            "type": "boolean",
+            "title": "On"
+          }
+        },
+        "type": "object",
+        "required": [
+          "on"
+        ],
+        "title": "MultimodalIn"
       },
       "NameChoice": {
         "properties": {
@@ -17874,6 +18015,33 @@
             "type": "string",
             "title": "Ocr Model",
             "default": "pp-ocrv6-small"
+          },
+          "multimodal": {
+            "type": "boolean",
+            "title": "Multimodal",
+            "default": false
+          },
+          "text_embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Embedding Model"
+          },
+          "text_rerank_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Rerank Model"
           },
           "public_url": {
             "anyOf": [

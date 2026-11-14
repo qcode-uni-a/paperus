@@ -3,11 +3,13 @@
 	import {
 		deleteMlModel,
 		errorMessage,
+		getMultimodal,
 		measureMlSpeed,
 		runJob,
-		setConfig
+		setConfig,
+		setMultimodal
 	} from '#lib/api/client.ts';
-	import type { MlModel, MlSpeed } from '#lib/api/generated/types.gen.ts';
+	import type { MlModel, MlSpeed, Multimodal } from '#lib/api/generated/types.gen.ts';
 
 	let message = $state('');
 	let error = $state('');
@@ -17,9 +19,55 @@
 
 	const config = $derived(admin.config);
 	const current = $derived(config?.embedding_model ?? '');
-	const models = $derived(admin.ml?.models.filter((m) => m.task === 'embedding') ?? []);
+	/** Models of the kind multimodal search asks for (images too, or text
+	 * only): the other kind cannot be chosen. */
+	const multimodalOn = $derived(config?.multimodal ?? false);
+	const fits = (m: MlModel) => Boolean(m.images) === multimodalOn;
+	const models = $derived(admin.ml?.models.filter((m) => m.task === 'embedding' && fits(m)) ?? []);
 	const passages = $derived(admin.stats?.chunks ?? 0);
-	const rerankers = $derived(admin.ml?.models.filter((m) => m.task === 'rerank') ?? []);
+	const rerankers = $derived(admin.ml?.models.filter((m) => m.task === 'rerank' && fits(m)) ?? []);
+
+	let multimodal = $state<Multimodal | null>(null);
+	async function loadMultimodal() {
+		const { data } = await getMultimodal();
+		multimodal = data ?? null;
+	}
+	$effect(() => {
+		void loadMultimodal();
+	});
+	const gigabytes = (bytes: number | null | undefined) =>
+		bytes ? `${Math.round(bytes / 2 ** 30)} GB` : '';
+
+	async function switchMultimodal(on: boolean) {
+		if (!multimodal) return;
+		const cpu = on && !multimodal.gpu;
+		const ok = confirm(
+			(on
+				? `Turn on multimodal search with ${multimodal.embedding_model} and ${multimodal.rerank_model}?\n\n` +
+					'Both models are downloaded (about 3 GB each). All ' +
+					`${passages.toLocaleString()} passages get new vectors and every figure is drawn and ` +
+					'embedded, in the background: on a GPU about an hour for a few hundred papers.'
+				: 'Turn off multimodal search?\n\nSearch goes back to the text models it used before; ' +
+					'their vectors are computed again where missing.') +
+				'\n\nUntil then, search by meaning finds only what is done; search by words works as always.' +
+				(cpu
+					? '\n\nThe ML service runs on the CPU: every search would take several seconds, and ' +
+						'reading the figures many hours.'
+					: '')
+		);
+		if (!ok) return;
+		saving = true;
+		error = message = '';
+		const { error: failure } = await setMultimodal({ body: { on } });
+		saving = false;
+		if (failure) error = errorMessage(failure);
+		else
+			message = on
+				? 'Multimodal search is on; passages and figures get their vectors in the background.'
+				: 'Multimodal search is off; back to the text models.';
+		await loadAdmin();
+		await loadMultimodal();
+	}
 	const onGpu = $derived(admin.ml?.service?.device === 'cuda');
 	/** The machine's GPU the ML service can use (or could, with its -cuda image). */
 	const gpuName = $derived(admin.ml?.service?.gpus?.find((gpu) => gpu.supported)?.name);
@@ -247,6 +295,44 @@
 
 {#if message}<p class="muted">{message}</p>{/if}
 {#if error}<p class="error">{error}</p>{/if}
+
+<section class="part">
+	<h3>Multimodal search</h3>
+	<p class="muted">
+		Finds figures by what they show (“a heatmap with a white ring”, “two stacked panels of
+		spectra”), not only by their captions: one model reads passages and figures alike, another
+		reranks both. On our test questions it put the right figure first for 62 % of descriptions
+		instead of 9 %, and text search did a little better too.
+	</p>
+	{#if multimodal && !multimodal.available}
+		<p class="muted">The ML service offers no models for it (paperus-ml 0.2 or newer has them).</p>
+	{:else if multimodal}
+		<p class="device">
+			{#if multimodal.on}
+				On: {multimodal.embedding_model} and {multimodal.rerank_model}.
+			{:else if multimodal.recommended}
+				Recommended here: the GPU has {gigabytes(multimodal.gpu_memory)}, both models need about 4
+				GB.
+			{:else if multimodal.gpu}
+				The GPU has {gigabytes(multimodal.gpu_memory)}; both models need about 4 GB, and some more
+				while searching.
+			{:else}
+				Off. It needs the ML service on a GPU.
+			{/if}
+		</p>
+		{#if !multimodal.on && !multimodal.gpu}
+			<p class="warning" role="note">
+				The ML service runs on the CPU: with multimodal search every search would take several
+				seconds, and reading the library's figures many hours.
+			</p>
+		{/if}
+		<div>
+			<button onclick={() => switchMultimodal(!multimodal?.on)} disabled={saving}
+				>{multimodal.on ? 'Turn off' : 'Turn on'}</button
+			>
+		</div>
+	{/if}
+</section>
 
 <section class="part">
 	<h3>Search by meaning</h3>

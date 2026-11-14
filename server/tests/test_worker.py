@@ -799,10 +799,7 @@ def test_figures_embedded_by_a_model_that_takes_images(
     root.post("/api/admin/jobs/embeddings")
     assert "embed_figures succeeded" not in run_jobs(worker)  # bge-m3: text only
 
-    config = root.get("/api/admin/config").json()
-    root.put(
-        "/api/admin/config", {**config, "embedding_model": "qwen3-vl-embedding-2b"}
-    )
+    root.put("/api/admin/multimodal", {"on": True})
     ran = run_jobs(worker)
     assert ran["embed_figures succeeded"] == 1
     assert db.scalar(select(func.count()).select_from(FigureEmbedding)) == 1
@@ -811,7 +808,7 @@ def test_figures_embedded_by_a_model_that_takes_images(
     [notice] = root.get("/api/me/notifications").json()["notifications"]
     assert notice["data"]["model"] == "qwen3-vl-embedding-2b"
     # A figure job for a text model (queued before a switch) does nothing.
-    root.put("/api/admin/config", {**config, "embedding_model": "bge-m3"})
+    root.put("/api/admin/multimodal", {"on": False})
     run_jobs(worker)
     sha = db.scalar(select(File.blob_sha256))
     assert sha is not None

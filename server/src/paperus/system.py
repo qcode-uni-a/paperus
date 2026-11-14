@@ -45,6 +45,13 @@ class SystemConfig(BaseModel):
     """Read the text of scanned pages and images (OCR), in the background:
     a few seconds per page on a CPU."""
     ocr_model: str = "pp-ocrv6-small"
+    multimodal: bool = False
+    """Multimodal search: embedding model and reranker take images too, so
+    figures are found by what they show (#36); needs a GPU."""
+    text_embedding_model: str | None = None
+    text_rerank_model: str | None = None
+    """The text models in use when multimodal search was turned on, used
+    again when it is turned off."""
 
     # Server
     public_url: HttpUrl | None = None
