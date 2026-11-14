@@ -173,6 +173,10 @@ RERANK_SYSTEM = (
 )
 MAX_TEXT_TOKENS = 1024
 """A text's tokens kept (passages are a few hundred)."""
+MAX_BATCH_TOKENS = 4096
+"""Tokens in one batch at most (padding counted): a 2B model's attention
+for more does not fit next to both models on an 8 GB card (the service's
+setting is for small text models)."""
 
 
 @dataclass
@@ -404,7 +408,7 @@ class MultimodalEncoder:
             spec.onnx_file_for(device),
             intra_op_threads=intra_op_threads,
             device=device,
-            max_batch_tokens=max_batch_tokens,
+            max_batch_tokens=min(max_batch_tokens, MAX_BATCH_TOKENS),
             shared_key=(spec.repo, spec.revision, str(intra_op_threads), device),
         )
         self.device = self.runtime.device
@@ -444,7 +448,7 @@ class MultimodalReranker:
             spec.onnx_file_for(device),
             intra_op_threads=intra_op_threads,
             device=device,
-            max_batch_tokens=max_batch_tokens,
+            max_batch_tokens=min(max_batch_tokens, MAX_BATCH_TOKENS),
             shared_key=(spec.repo, spec.revision, str(intra_op_threads), device),
         )
         self.device = self.runtime.device

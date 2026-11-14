@@ -303,3 +303,11 @@ def test_the_pair_shares_its_vision_encoder(tmp_path: Path) -> None:
     del encoder, ranker
     gc.collect()
     assert key not in q._shared
+
+
+def test_batches_kept_small(tmp_path: Path) -> None:
+    """The service's batch size is for small text models; a 2B model takes
+    at most MAX_BATCH_TOKENS at once."""
+    embedding, _ = write_tiny_qwen3_vl(tmp_path)
+    encoder = q.MultimodalEncoder(embedding, tmp_path, max_batch_tokens=16384)
+    assert encoder.runtime.max_batch_tokens == q.MAX_BATCH_TOKENS
