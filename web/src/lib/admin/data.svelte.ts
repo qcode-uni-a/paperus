@@ -84,7 +84,7 @@ export const SETTINGS: {
 	{
 		slug: 'ml',
 		title: 'Machine learning',
-		subtitle: 'Search by meaning: the model, its speed, the CPU cores it uses',
+		subtitle: 'Search by meaning and multimodal search: the models, their speed, the CPU cores',
 		icon: mdiBrain,
 		status: (c) => c.embedding_model
 	},
