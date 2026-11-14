@@ -33,6 +33,11 @@ TEMPORAL = 2
 FACTOR = PATCH * MERGE
 MIN_PIXELS = 4096
 MAX_PIXELS = 1_310_720
+RERANK_PIXELS = 200_704
+"""An image for the reranker at most this large (about 200 tokens): a
+large figure would cost it as much as several passages. Most figures (drawn
+at 768 px for the text width) are smaller anyway; on 91 figure questions it
+ranked the same as with the images as drawn."""
 GRID_SIDE = 48
 """The learned position embeddings: a 48 by 48 grid, resampled to each image."""
 MAX_ASPECT = 200
@@ -53,15 +58,17 @@ class Image:
         return self.grid[0] * self.grid[1] // (MERGE * MERGE)
 
 
-def smart_resize(height: int, width: int) -> tuple[int, int]:
+def smart_resize(
+    height: int, width: int, max_pixels: int = MAX_PIXELS
+) -> tuple[int, int]:
     """The size an image is resized to: both sides multiples of ``FACTOR``,
-    its area within ``MIN_PIXELS`` and ``MAX_PIXELS``, its shape kept."""
+    its area within ``MIN_PIXELS`` and ``max_pixels``, its shape kept."""
     if max(height, width) / max(min(height, width), 1) > MAX_ASPECT:
         raise ValueError(f"an image at most {MAX_ASPECT} times as long as wide")
     h = round(height / FACTOR) * FACTOR
     w = round(width / FACTOR) * FACTOR
-    if h * w > MAX_PIXELS:
-        beta = math.sqrt(height * width / MAX_PIXELS)
+    if h * w > max_pixels:
+        beta = math.sqrt(height * width / max_pixels)
         h = max(FACTOR, math.floor(height / beta / FACTOR) * FACTOR)
         w = max(FACTOR, math.floor(width / beta / FACTOR) * FACTOR)
     elif h * w < MIN_PIXELS:
@@ -71,10 +78,10 @@ def smart_resize(height: int, width: int) -> tuple[int, int]:
     return h, w
 
 
-def prepare(rgb: npt.NDArray[np.uint8]) -> Image:
+def prepare(rgb: npt.NDArray[np.uint8], max_pixels: int = MAX_PIXELS) -> Image:
     """An RGB image (height by width by 3) as the vision encoder's patches."""
     height, width = rgb.shape[:2]
-    h, w = smart_resize(height, width)
+    h, w = smart_resize(height, width, max_pixels)
     if (h, w) != (height, width):
         # Area averaging when shrinking (no aliasing), cubic when enlarging.
         shrinking = h * w < height * width
@@ -379,13 +386,15 @@ QUERY_INSTRUCTION = (
 default)."""
 
 
-def decode(data: bytes) -> Image:
-    """An image file (PNG, JPEG, …) ready for the vision encoder; ValueError
-    if it is none."""
+def decode(data: bytes, max_pixels: int = MAX_PIXELS) -> Image:
+    """An image file (PNG, JPEG, …) ready for the vision encoder, at most
+    ``max_pixels`` large; ValueError if it is none."""
     found = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
     if found is None:
         raise ValueError("not an image")
-    return prepare(np.ascontiguousarray(found[:, :, ::-1], dtype=np.uint8))  # to RGB
+    return prepare(
+        np.ascontiguousarray(found[:, :, ::-1], dtype=np.uint8), max_pixels
+    )  # to RGB
 
 
 class MultimodalEncoder:

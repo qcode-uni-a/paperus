@@ -38,6 +38,8 @@ def test_sizes_keep_the_shape_in_multiples_of_32() -> None:
     assert q.smart_resize(10, 10) == (64, 64)
     h, w = q.smart_resize(4000, 3000)
     assert h * w <= q.MAX_PIXELS and h % 32 == w % 32 == 0 and h > w
+    # The reranker's images: smaller still.
+    assert q.smart_resize(1000, 1000, q.RERANK_PIXELS) == (448, 448)
     with pytest.raises(ValueError, match="200 times"):
         q.smart_resize(10, 3000)
 

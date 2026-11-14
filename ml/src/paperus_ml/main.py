@@ -36,7 +36,14 @@ from paperus_ml.manager import (
 )
 from paperus_ml.models import MODELS, SCORES, Kind
 from paperus_ml.ocr import NotAnImage, Reader
-from paperus_ml.qwen3_vl import Item, MultimodalEncoder, MultimodalReranker, decode
+from paperus_ml.qwen3_vl import (
+    MAX_PIXELS,
+    RERANK_PIXELS,
+    Item,
+    MultimodalEncoder,
+    MultimodalReranker,
+    decode,
+)
 from paperus_ml.rerank import Reranker
 from paperus_ml.samples import sample_page, sample_passages
 
@@ -101,12 +108,14 @@ class RerankResponse(BaseModel):
     (only the order means something)."""
 
 
-def _items(images: list[ImageIn]) -> list[Item]:
-    """The request's images, decoded; 422 for one that is none."""
+def _items(images: list[ImageIn], max_pixels: int = MAX_PIXELS) -> list[Item]:
+    """The request's images, decoded (at most ``max_pixels`` large); 422 for
+    one that is none."""
     items = []
     for index, image in enumerate(images):
         try:
-            items.append(Item(text=image.text, image=decode(b64decode(image.data))))
+            picture = decode(b64decode(image.data), max_pixels)
+            items.append(Item(text=image.text, image=picture))
         except (ValueError, binascii.Error) as error:
             raise HTTPException(422, f"images[{index}]: {error}") from error
     return items
@@ -451,7 +460,9 @@ def create_app(
         if body.images:
             if not isinstance(model, MultimodalReranker):
                 raise HTTPException(422, f"{body.model!r} takes no images")
-            items = [Item(text=p) for p in body.passages] + _items(body.images)
+            items = [Item(text=p) for p in body.passages] + _items(
+                body.images, RERANK_PIXELS
+            )
             scores = model.score_items(body.query, items)
         else:
             scores = model.score(body.query, body.passages)
