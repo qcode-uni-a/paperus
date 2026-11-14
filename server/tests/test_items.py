@@ -14,6 +14,7 @@ from paperus.db import make_sessionmaker
 from paperus.metadata import csl_type
 from paperus.models import Item
 from tests.conftest import FakeDOIRegistry
+from tests.test_files import upload
 
 DOI = "10.1038/s41586-020-2649-2"
 PREPRINT_DOI = "10.48550/arxiv.2006.10256"
@@ -117,12 +118,16 @@ def test_preprint_and_published_versions(
     assert {"scheme": "arxiv", "value": "2006.10256"} in preprint["identifiers"]
     assert item["title"] == "Array Programming with NumPy"
 
+    preprint_pdf = upload(logged_in, item["id"])
     item = post(logged_in, f"/api/items/{item['id']}/versions", {"doi": DOI}, 201)
     published = item["versions"][1]
     assert published["kind"] == "published"
     assert item["preferred_version_id"] == published["id"]
     assert item["title"] == "Array programming with NumPy"
     assert item["container_title"] == "Nature"
+    # The journal version without its PDF: the list offers the preprint's.
+    [listed] = logged_in.get("/api/items").json()
+    assert [f["id"] for f in listed["files"]] == [preprint_pdf["id"]]
 
     # The arXiv ID now finds the same item.
     again = post(

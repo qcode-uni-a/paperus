@@ -228,8 +228,16 @@ def _author_ids(item: Item, csl: dict[str, Any]) -> list[uuid.UUID | None] | Non
 
 
 def _files(item: Item) -> list[FileLink]:
-    version = library.preferred_version(item)
-    files = [f for f in version.files if f.deleted_at is None] if version else []
+    """The shown version's files, else those of the next version that has
+    any (a journal version without its PDF: the preprint's; as the item's
+    page reads it), not an erratum's."""
+    versions = [v for v in item.versions if v.kind != VersionKind.ERRATUM]
+    files: list[File] = []
+    while versions and not files:
+        version = library.preferred_of(versions)
+        assert version is not None
+        files = [f for f in version.files if f.deleted_at is None]
+        versions.remove(version)
     files.sort(key=lambda f: (f.role != FileRole.MAIN, f.media_type != PDF_TYPE))
     return [
         FileLink(id=f.id, media_type=f.media_type, filename=f.filename) for f in files
