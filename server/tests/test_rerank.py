@@ -3,10 +3,12 @@ puts passages with FakeML.FAVOURITE first)."""
 
 import uuid
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from paperus.api import search as search_api
 from paperus.config import Settings
 from paperus.embedding import embed_file
 from paperus.jobs import send_ml_config
@@ -27,6 +29,12 @@ def library(client: TestClient, db: Session, blobs: BlobStore, ml: FakeML) -> No
         file_id = uuid.UUID(add_file(client, title, text)["id"])
         process_file(db, blobs, file_id)
         embed_file(db, ml.client(), MODEL, file_id)
+
+
+@pytest.fixture(autouse=True)
+def unmeasured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each test starts with rerankers of unknown speed."""
+    monkeypatch.setattr(search_api, "_seconds_each", {})
 
 
 def set_rerank(
@@ -56,8 +64,9 @@ def test_auto_reranks_only_on_a_gpu(
     assert len(hits) == 2
     assert all(h["reranked"] for h in hits)
     # It had more hits to choose from than were asked for (each paper's
-    # passage and its details, title and abstract).
-    assert len(fake_ml.reranked[-1]["passages"]) == 6
+    # passage and its details, title and abstract), as many as it reads in
+    # its time (not measured yet: the fewest).
+    assert len(fake_ml.reranked[-1]["passages"]) == search_api.RERANK_FEWEST
 
 
 def test_on_off_and_failures(
@@ -94,3 +103,31 @@ def test_reranker_stays_loaded_while_used(
     fake_ml.device = "cuda"
     send_ml_config(db, settings, fake_ml.client())
     assert fake_ml.config["keep"] == [settings.embedding_model, "bge-reranker-v2-m3"]
+
+
+def test_as_many_hits_as_fit_the_time(
+    admin: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    fake_ml: FakeML,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reranker = "bge-reranker-v2-m3"
+    pool = search_api.rerank_pool
+    assert pool(reranker) == search_api.RERANK_FEWEST  # not measured yet
+    search_api._seconds_each[reranker] = 0.05  # a large model on a GPU
+    assert pool(reranker) == 10
+    search_api._seconds_each[reranker] = 0.001
+    assert pool(reranker) == search_api.RERANK_MOST
+    search_api._seconds_each[reranker] = 2.0  # on a CPU
+    assert pool(reranker) == search_api.RERANK_FEWEST
+
+    # A slow reranker: only the best hits reordered, the others after them
+    # in the usual order; its speed measured as it goes.
+    monkeypatch.setattr(search_api, "RERANK_FEWEST", 2)
+    library(admin, db, blobs, fake_ml)
+    assert set_rerank(admin, "on") == 200
+    hits, _ = search(admin, "rain")
+    assert len(fake_ml.reranked[-1]["passages"]) == 2
+    assert [h["reranked"] for h in hits] == [True, True] + [False] * (len(hits) - 2)
+    assert search_api._seconds_each[reranker] < 2.0

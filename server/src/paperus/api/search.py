@@ -29,13 +29,22 @@ Match = Literal["keyword", "meaning"]
 CANDIDATES = 50
 RRF_K = 60
 QUERY_TIMEOUT = 30.0
-# Hits the reranker reorders (then cut to what was asked), and how long a
-# search waits for it before showing them in the usual order.
-RERANK_POOL = 40
+RERANK_BUDGET = 0.5
+"""Seconds a search gives the reranker: it reorders as many of the best hits
+as it reads in that time at its speed measured so far (``rerank_pool``),
+the others follow in the usual order. Qwen3-VL-Reranker on an RTX 2080
+takes 60-80 ms a passage, about 60 ms a figure; a small reranker a quarter
+of that. Measured on 200 questions: the right paper first 0.90 without
+reranking, 0.94 reranking 5 hits, 0.96 reranking 10 or 20, no better
+with 40."""
+RERANK_FEWEST = 5
+RERANK_MOST = 20
 RERANK_TIMEOUT = 15.0
-RERANK_FIGURES = 8
-"""At most so many hits reranked by their figure's image (the others by
-their text): images take the reranker longer."""
+"""How long a search waits for the reranker before showing the hits in the
+usual order."""
+
+_seconds_each: dict[str, float] = {}
+"""The rerankers' measured seconds per hit (a moving average), by model."""
 # A match in a paper's title or abstract (its details) counts this much more
 # than one in a passage of some text.
 DETAILS_WEIGHT = 2.0
@@ -266,9 +275,10 @@ def run_search(
     if rerank is not None:
         reranker = config.rerank_model if rerank and used != "keyword" else None
     asked, per_paper = limit, per_item
+    pool = rerank_pool(reranker) if reranker else 0
     if reranker:
         # More hits, and more per paper, for the reranker to choose from.
-        limit = max(limit, RERANK_POOL)
+        limit = max(limit, pool)
         per_item = per_item + 1 if per_item else None
     libraries = access.readable
     if library_id is not None:
@@ -331,8 +341,9 @@ def run_search(
     ]
     texts = [row["chunk_text"] for row in rows]
     if reranker and passages:
-        drawn = _figures_to_rerank(db, ml, reranker, rows)
-        passages = _rerank(ml, reranker, q, passages, texts, per_paper, drawn)
+        drawn = _figures_to_rerank(db, ml, reranker, rows[:pool])
+        reranked = _rerank(ml, reranker, q, passages[:pool], texts, drawn)
+        passages = _per_item(reranked + passages[pool:], per_paper)
     passages = passages[:asked]
     _add_authors(db, passages)
     _add_figures(db, passages)
@@ -354,18 +365,34 @@ def _reranker(config: SystemConfig, ml: MLClient) -> str | None:
         return None
 
 
+def rerank_pool(model: str) -> int:
+    """How many of the best hits ``model`` reranks: as many as it reads in
+    ``RERANK_BUDGET`` at its measured speed (``RERANK_FEWEST`` until
+    measured)."""
+    each = _seconds_each.get(model)
+    if each is None:
+        return RERANK_FEWEST
+    return max(RERANK_FEWEST, min(RERANK_MOST, int(RERANK_BUDGET / max(each, 1e-6))))
+
+
+def _measured(model: str, seconds: float, hits: int) -> None:
+    each = seconds / hits
+    known = _seconds_each.get(model)
+    _seconds_each[model] = each if known is None else 0.7 * known + 0.3 * each
+
+
 def _figures_to_rerank(
     db: Session, ml: MLClient, reranker: str, rows: Sequence[Any]
 ) -> dict[int, tuple[bytes, str]]:
-    """For a reranker that takes images: the best few captions' figures (by
-    their place in ``rows``), drawn, with the caption's text."""
+    """For a reranker that takes images: the captions' figures (by their
+    place in ``rows``), drawn, with the caption's text."""
     if not figures.takes_images(ml, reranker):
         return {}
     wanted = [
         (n, (row["blob_sha256"], row["page"], row["figure_label"]))
         for n, row in enumerate(rows)
         if row["caption"] and row["figure_label"] and row["blob_sha256"]
-    ][:RERANK_FIGURES]
+    ]
     if not wanted:
         return {}
     keys = {key for _, key in wanted}
@@ -386,12 +413,11 @@ def _rerank(
     query: str,
     passages: list[Passage],
     texts: list[str],
-    per_item: int | None,
     drawn: dict[int, tuple[bytes, str]] | None = None,
 ) -> list[Passage]:
-    """The hits in the reranker's order, at most ``per_item`` per paper or
-    note; in the usual order if the reranker fails or takes too long.
-    ``drawn``: hits reranked by their figure (image and caption), by place."""
+    """The hits in the reranker's order; in the usual order if the reranker
+    fails or takes too long. ``drawn``: hits reranked by their figure (image
+    and caption), by place."""
     drawn = drawn or {}
     plain = [n for n in range(len(passages)) if n not in drawn]
     pictured = sorted(drawn)
@@ -409,16 +435,22 @@ def _rerank(
         return passages
     by_place = dict(zip(plain + pictured, found, strict=True))
     scores = [by_place[n] for n in range(len(passages))]
-    metrics.ML_SECONDS.labels("rerank").observe(time.perf_counter() - started)
+    seconds = time.perf_counter() - started
+    metrics.ML_SECONDS.labels("rerank").observe(seconds)
+    _measured(model, seconds, len(passages))
     for passage, score in zip(passages, scores, strict=True):
         passage.score = score
         passage.reranked = True
-    ordered = sorted(passages, key=lambda p: p.score, reverse=True)
+    return sorted(passages, key=lambda p: p.score, reverse=True)
+
+
+def _per_item(passages: list[Passage], per_item: int | None) -> list[Passage]:
+    """At most ``per_item`` hits per paper or note, in their order."""
     if per_item is None:
-        return ordered
+        return passages
     taken: dict[uuid.UUID | None, int] = {}
     result = []
-    for passage in ordered:
+    for passage in passages:
         source = passage.item_id or passage.note_id
         if taken.get(source, 0) < per_item:
             taken[source] = taken.get(source, 0) + 1
