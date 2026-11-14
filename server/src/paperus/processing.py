@@ -15,7 +15,7 @@ from paperus import abstracts, annotations, layouts, pdf
 from paperus.covers import cover_pages
 from paperus.identify import identify
 from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
-from paperus.page_layout import Part
+from paperus.page_layout import Part, figure_label
 from paperus.storage import BlobStore
 from paperus.text import (
     Flow,
@@ -169,6 +169,7 @@ def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
                 page=chunk.page,
                 in_references=chunk.references,
                 caption=chunk.caption,
+                figure=figure_label(chunk.text) if chunk.caption else None,
             )
         )
     db.add_all(rows)
@@ -198,6 +199,7 @@ def _copy_manifest(db: Session, file: File) -> bool:
                 page=row.page,
                 in_references=row.in_references,
                 caption=row.caption,
+                figure=row.figure,
             )
         )
     return True

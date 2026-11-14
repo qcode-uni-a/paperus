@@ -3,19 +3,20 @@
 import logging
 import time
 import uuid
+from collections.abc import Sequence
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import select, text, tuple_
 from sqlalchemy.orm import Session
 
-from paperus import library, metrics, page_layout
+from paperus import figures, library, metrics, page_layout
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
 from paperus.ml import MLClient, MLRejected, MLUnavailable
-from paperus.models import File, Item, PageLayouts
+from paperus.models import Figure, File, Item, PageLayouts
 from paperus.system import SystemConfig, load_config
 
 log = logging.getLogger(__name__)
@@ -32,6 +33,9 @@ QUERY_TIMEOUT = 30.0
 # search waits for it before showing them in the usual order.
 RERANK_POOL = 40
 RERANK_TIMEOUT = 15.0
+RERANK_FIGURES = 8
+"""At most so many hits reranked by their figure's image (the others by
+their text): images take the reranker longer."""
 # A match in a paper's title or abstract (its details) counts this much more
 # than one in a passage of some text.
 DETAILS_WEIGHT = 2.0
@@ -94,7 +98,8 @@ _SEARCH = text(
     visible AS NOT MATERIALIZED (
         SELECT 'paper' AS kind, fc.file_id AS source_id, fc.position, fc.page,
                fc.chunk_sha256, fc.in_references, f.version_id,
-               i.id AS item_id, i.title AS item_title, fc.caption
+               i.id AS item_id, i.title AS item_title, fc.caption,
+               f.blob_sha256, fc.figure
         FROM file_chunks fc
              JOIN files f ON f.id = fc.file_id
              JOIN versions v ON v.id = f.version_id
@@ -112,7 +117,7 @@ _SEARCH = text(
           AND (NOT :figures OR fc.caption)
         UNION ALL
         SELECT 'note', nc.note_id, nc.position, NULL, nc.chunk_sha256, false,
-               NULL, NULL, n.title, false
+               NULL, NULL, n.title, false, NULL, NULL
         FROM note_chunks nc JOIN notes n ON n.id = nc.note_id
         WHERE n.deleted_at IS NULL
           AND n.library_id = ANY(CAST(:libraries AS uuid[]))
@@ -123,7 +128,7 @@ _SEARCH = text(
         UNION ALL
         -- A paper's details: its title and abstract, with or without a file.
         SELECT 'details', i.id, 0, NULL, ic.chunk_sha256, false,
-               NULL, i.id, i.title, false
+               NULL, i.id, i.title, false, NULL, NULL
         FROM item_chunks ic JOIN items i ON i.id = ic.item_id
         WHERE i.deleted_at IS NULL
           AND (i.archived_at IS NULL OR :archived OR CAST(:item AS uuid) IS NOT NULL)
@@ -142,13 +147,20 @@ _SEARCH = text(
         ORDER BY rank LIMIT :candidates
     ),
     meaning AS (
+        -- A caption by the better of its text's vector and its figure's
+        -- (a model that takes images: multimodal search).
         SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
-                   ORDER BY e.embedding <=> CAST(:vector AS halfvec),
-                            vis.source_id, vis.position
+                   ORDER BY least(
+                       e.embedding <=> CAST(:vector AS halfvec),
+                       coalesce(fe.embedding <=> CAST(:vector AS halfvec), 2)),
+                   vis.source_id, vis.position
                ) AS rank
         FROM visible vis
              JOIN embeddings e
                ON e.chunk_sha256 = vis.chunk_sha256 AND e.model = :model
+             LEFT JOIN figure_embeddings fe
+               ON fe.blob_sha256 = vis.blob_sha256 AND fe.page = vis.page
+                  AND fe.label = vis.figure AND fe.model = :model
         WHERE :use_meaning AND NOT vis.in_references
         ORDER BY rank LIMIT :candidates
     ),
@@ -175,7 +187,8 @@ _SEARCH = text(
         FROM fused JOIN visible vis USING (source_id, position)
     )
     SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
-           vis.caption, c.text AS chunk_text,
+           vis.caption, vis.blob_sha256, vis.figure AS figure_label,
+           c.text AS chunk_text,
            vis.version_id,
            vis.item_id,
            vis.item_title, fused.score, fused.by_keyword, fused.by_meaning,
@@ -314,7 +327,8 @@ def run_search(
     ]
     texts = [row["chunk_text"] for row in rows]
     if reranker and passages:
-        passages = _rerank(ml, reranker, q, passages, texts, per_paper)
+        drawn = _figures_to_rerank(db, ml, reranker, rows)
+        passages = _rerank(ml, reranker, q, passages, texts, per_paper, drawn)
     passages = passages[:asked]
     _add_authors(db, passages)
     _add_figures(db, passages)
@@ -336,6 +350,32 @@ def _reranker(config: SystemConfig, ml: MLClient) -> str | None:
         return None
 
 
+def _figures_to_rerank(
+    db: Session, ml: MLClient, reranker: str, rows: Sequence[Any]
+) -> dict[int, tuple[bytes, str]]:
+    """For a reranker that takes images: the best few captions' figures (by
+    their place in ``rows``), drawn, with the caption's text."""
+    if not figures.takes_images(ml, reranker):
+        return {}
+    wanted = [
+        (n, (row["blob_sha256"], row["page"], row["figure_label"]))
+        for n, row in enumerate(rows)
+        if row["caption"] and row["figure_label"] and row["blob_sha256"]
+    ][:RERANK_FIGURES]
+    if not wanted:
+        return {}
+    keys = {key for _, key in wanted}
+    drawn = {
+        (f.blob_sha256, f.page, f.label): f.png
+        for f in db.scalars(
+            select(Figure).where(
+                tuple_(Figure.blob_sha256, Figure.page, Figure.label).in_(keys)
+            )
+        )
+    }
+    return {n: (drawn[key], rows[n]["chunk_text"]) for n, key in wanted if key in drawn}
+
+
 def _rerank(
     ml: MLClient,
     model: str,
@@ -343,15 +383,28 @@ def _rerank(
     passages: list[Passage],
     texts: list[str],
     per_item: int | None,
+    drawn: dict[int, tuple[bytes, str]] | None = None,
 ) -> list[Passage]:
     """The hits in the reranker's order, at most ``per_item`` per paper or
-    note; in the usual order if the reranker fails or takes too long."""
+    note; in the usual order if the reranker fails or takes too long.
+    ``drawn``: hits reranked by their figure (image and caption), by place."""
+    drawn = drawn or {}
+    plain = [n for n in range(len(passages)) if n not in drawn]
+    pictured = sorted(drawn)
     started = time.perf_counter()
     try:
-        scores = ml.rerank(query, texts, model=model, timeout=RERANK_TIMEOUT)
+        found = ml.rerank(
+            query,
+            [texts[n] for n in plain],
+            model=model,
+            timeout=RERANK_TIMEOUT,
+            figures=[drawn[n] for n in pictured],
+        )
     except (MLUnavailable, MLRejected) as error:
         log.warning("reranking unavailable, usual order: %s", error)
         return passages
+    by_place = dict(zip(plain + pictured, found, strict=True))
+    scores = [by_place[n] for n in range(len(passages))]
     metrics.ML_SECONDS.labels("rerank").observe(time.perf_counter() - started)
     for passage, score in zip(passages, scores, strict=True):
         passage.score = score

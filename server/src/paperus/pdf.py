@@ -144,10 +144,13 @@ def render(path: Path, index: int) -> bytes:
     return _run(_render, path, index)
 
 
-def figure(path: Path, index: int, box: page_layout.Figure) -> bytes:
+def figure(
+    path: Path, index: int, box: page_layout.Figure, scale: float | None = None
+) -> bytes:
     """A part of page ``index`` (from 0; ``box`` in points from its top
-    left, as in its layout) as a colour PNG, for the screen."""
-    return _run(_figure, path, index, box)
+    left, as in its layout) as a colour PNG, for the screen; ``scale``:
+    pixels per point (else ``FIGURE_SCALE``), at most ``FIGURE_MAX_SIDE``."""
+    return _run(_figure, path, index, box, scale)
 
 
 @dataclass
@@ -269,7 +272,9 @@ def _render(path: str, index: int) -> bytes:
         return image
 
 
-def _figure(path: str, index: int, box: page_layout.Figure) -> bytes:
+def _figure(
+    path: str, index: int, box: page_layout.Figure, scale: float | None = None
+) -> bytes:
     with _open(path) as pdf:
         page = pdf[index]
         try:
@@ -283,7 +288,7 @@ def _figure(path: str, index: int, box: page_layout.Figure) -> bytes:
             bottom = max(height - box["y"] - box["height"] - m, 0)
             side = max(width - left - right, height - top - bottom, 1)
             bitmap = page.render(
-                scale=min(FIGURE_SCALE, FIGURE_MAX_SIDE / side),
+                scale=min(scale or FIGURE_SCALE, FIGURE_MAX_SIDE / side),
                 crop=(left, bottom, right, top),
                 rev_byteorder=True,
                 may_draw_forms=False,

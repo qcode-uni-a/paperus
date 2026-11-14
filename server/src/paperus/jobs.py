@@ -32,6 +32,7 @@ from paperus import (
     changes,
     citation_counts,
     errata,
+    figures,
     integrity,
     item_references,
     layouts,
@@ -295,6 +296,31 @@ def embed(file_id: str) -> None:
 
 
 @tasks.task(
+    name="embed_figures",
+    queue="ml",
+    retry=RetryStrategy(
+        max_attempts=10, exponential_wait=2, retry_exceptions={MLUnavailable}
+    ),
+)
+def embed_pdf_figures(sha256: str) -> None:
+    """A PDF's captioned figures drawn and embedded, for an embedding model
+    that takes images (multimodal search; ``paperus.figures``)."""
+    context = _worker_context()
+    with context.sessions() as db:
+        model = load_config(db, context.settings).embedding_model
+        if not figures.takes_images(context.ml, model):
+            return
+        count = figures.embed(
+            db, context.ml, model, context.blobs, bytes.fromhex(sha256)
+        )
+    log.info("embedded %d figures of %s", count, sha256[:12])
+
+
+def queue_figures(app: App, sha256: bytes) -> None:
+    _queue(app, "embed_figures", f"figures-{sha256.hex()}", sha256=sha256.hex())
+
+
+@tasks.task(
     name="embed_note",
     queue="ml",
     retry=RetryStrategy(
@@ -359,8 +385,17 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
             queue_note_embedding(job.app, note_id)
         if details:
             _queue(job.app, "embed_details", "embed-details")
+        # Figures too, for a model that takes images (multimodal search).
+        pdfs = (
+            figures.missing(db, vectors)
+            if figures.takes_images(context.ml, model)
+            else []
+        )
+        for sha256 in pdfs:
+            queue_figures(job.app, sha256)
         anew = system.reembedding(db)
-        if anew and anew.get("model") == model and not (files or notes or details):
+        done = not (files or notes or details or pdfs)
+        if anew and anew.get("model") == model and done:
             passages = db.scalar(
                 select(func.count())
                 .select_from(Embedding)

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import page_layout, pdf
+from paperus import figures, page_layout, pdf
 from paperus.models import File, PageLayouts
 from paperus.storage import BlobStore
 
@@ -40,8 +40,10 @@ def make(db: Session, blobs: BlobStore, sha256: bytes) -> pdf.Read | None:
 def store(
     db: Session, sha256: bytes, pages: list[page_layout.PageLayout] | None
 ) -> None:
-    """Keep the layouts of a PDF's pages (``None``: it has none)."""
+    """Keep the layouts of a PDF's pages (``None``: it has none); its figures
+    drawn from older ones go (drawn again from these)."""
     pages = pages or []
+    figures.forget(db, sha256)
     db.execute(
         insert(PageLayouts)
         .values(blob_sha256=sha256, version=page_layout.VERSION, pages=pages)

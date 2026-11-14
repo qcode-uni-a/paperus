@@ -5,8 +5,10 @@ first and a failing one is skipped for a while, so a GPU
 machine can be added in front of a local fallback.
 """
 
+import base64
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -113,6 +115,20 @@ class MLClient:
         # Services before 0.0.11 do not say: their vectors are the model's.
         return Embedded(body.get("vectors") or model, body["embeddings"])
 
+    def embed_images(
+        self, images: list[bytes], *, model: str, timeout: float | None = None
+    ) -> Embedded:
+        """One vector per image (PNG), for a model that takes images, in
+        the same space as its passages'."""
+        figures = [{"data": base64.b64encode(i).decode()} for i in images]
+        body = self._post(
+            "embed",
+            "/embed",
+            json={"model": model, "kind": "passage", "images": figures},
+            timeout=timeout,
+        ).json()
+        return Embedded(body.get("vectors") or model, body["embeddings"])
+
     def status(self) -> list[tuple[str, str | None]]:
         """Each address with None if it answers, else the error."""
         result: list[tuple[str, str | None]] = []
@@ -125,15 +141,27 @@ class MLClient:
         return result
 
     def rerank(
-        self, query: str, passages: list[str], *, model: str, timeout: float
+        self,
+        query: str,
+        passages: list[str],
+        *,
+        model: str,
+        timeout: float,
+        figures: Sequence[tuple[bytes, str]] = (),
     ) -> list[float]:
-        """How well each passage answers the query (higher fits better), from
-        the first service that answers; raises MLUnavailable, MLLoading or
-        MLRejected."""
+        """How well each passage (then each figure: its image, its caption)
+        answers the query (higher fits better), from the first service that
+        answers; raises MLUnavailable, MLLoading or MLRejected."""
+        body: dict[str, Any] = {"model": model, "query": query, "passages": passages}
+        if figures:
+            body["images"] = [
+                {"data": base64.b64encode(png).decode(), "text": caption}
+                for png, caption in figures
+            ]
         response = self._post(
             "rerank",
             "/rerank",
-            json={"model": model, "query": query, "passages": passages},
+            json=body,
             timeout=timeout,
             # Search times the reranking itself, with its fallback.
             timed=False,

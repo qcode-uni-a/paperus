@@ -16,7 +16,7 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import Engine, func, select, update
 from sqlalchemy.orm import Session
 
-from paperus import integrity, item_references, jobs, ml, readable, system
+from paperus import figures, integrity, item_references, jobs, ml, readable, system
 from paperus.backup import list_backups
 from paperus.config import Settings
 from paperus.db import make_sessionmaker
@@ -25,6 +25,7 @@ from paperus.item_references import Pacers
 from paperus.jobs import WorkerContext, tasks
 from paperus.models import (
     Embedding,
+    FigureEmbedding,
     File,
     Import,
     ImportStatus,
@@ -37,6 +38,7 @@ from paperus.system import BackupConfig, load_config, save_backup_config, save_c
 from tests.conftest import FakeDOIRegistry, FakeML
 from tests.pdfs import make_pdf
 from tests.people import Person
+from tests.test_page_text import paper as two_columns
 
 TYPED = "A typed first page about rain gauges, long enough to count as text."
 HALF_SCANNED = make_pdf([[TYPED], []])
@@ -782,3 +784,36 @@ def test_a_folder_uploaded_file_by_file(
         headers=ada.headers,
     )
     assert ada.delete(f"/api/imports/{dropped['id']}").status_code == 204
+
+
+def test_figures_embedded_by_a_model_that_takes_images(
+    client: TestClient, db: Session, worker: App, fake_ml: FakeML
+) -> None:
+    """Multimodal search: the sweep queues each PDF's figures; they are
+    drawn and embedded, and the library counts as embedded anew only with
+    them. A text model leaves figures alone."""
+    figures._models = (0.0, {})
+    root = Person(client, db, "root", admin=True)
+    upload(Person(client, db, "ada"), two_columns())
+    run_jobs(worker)
+    root.post("/api/admin/jobs/embeddings")
+    assert "embed_figures succeeded" not in run_jobs(worker)  # bge-m3: text only
+
+    config = root.get("/api/admin/config").json()
+    root.put(
+        "/api/admin/config", {**config, "embedding_model": "qwen3-vl-embedding-2b"}
+    )
+    ran = run_jobs(worker)
+    assert ran["embed_figures succeeded"] == 1
+    assert db.scalar(select(func.count()).select_from(FigureEmbedding)) == 1
+    root.post("/api/admin/jobs/embeddings")
+    run_jobs(worker)
+    [notice] = root.get("/api/me/notifications").json()["notifications"]
+    assert notice["data"]["model"] == "qwen3-vl-embedding-2b"
+    # A figure job for a text model (queued before a switch) does nothing.
+    root.put("/api/admin/config", {**config, "embedding_model": "bge-m3"})
+    run_jobs(worker)
+    sha = db.scalar(select(File.blob_sha256))
+    assert sha is not None
+    defer(worker, "embed_figures", sha256=sha.hex())
+    assert run_jobs(worker)["embed_figures succeeded"] == 1

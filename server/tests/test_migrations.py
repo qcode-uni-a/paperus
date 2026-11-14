@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
+from paperus import page_layout
 from paperus.models import Base, Chunk, Item, ItemChunk, User, Version
 from tests.conftest import SERVER_DIR
 
@@ -373,3 +374,52 @@ def test_0023_marks_the_captions_of_files_read_before(
         {"id": file["id"]},
     ).scalars()
     assert list(marked) == [False, True, True, False]
+
+
+def test_0024_labels_the_captions_of_files_read_before(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """Updated: a caption passage gets what it labels, as figure_label
+    writes it (spaces collapsed); a caption's continuation and the text none."""
+    made = logged_in.post("/api/items", json={"metadata": {"title": "Floquet"}})
+    file = logged_in.post(
+        f"/api/items/{made.json()['id']}/files",
+        files={"upload": ("p.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")},
+    ).json()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0023")
+    passages = [
+        ("The text, about Fig. 2 and more.", False),
+        ("FIG. 2. Quasienergies of the driven chain.", True),
+        ("Table  I: Parameters used.", True),
+        ("Abbildung 4b | Der Aufbau.", True),
+        ("and the rest of a long caption.", True),
+    ]
+    for position, (words, caption) in enumerate(passages):
+        sha = hashlib.sha256(words.encode()).digest()
+        db.execute(
+            text("INSERT INTO chunks (sha256, text) VALUES (:sha, :text)"),
+            {"sha": sha, "text": words},
+        )
+        db.execute(
+            text(
+                "INSERT INTO file_chunks (file_id, position, chunk_sha256, page,"
+                " caption) VALUES (:file, :n, :sha, 1, :caption)"
+            ),
+            {"file": file["id"], "n": position, "sha": sha, "caption": caption},
+        )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+    labels = db.execute(
+        text("SELECT figure FROM file_chunks WHERE file_id = :id ORDER BY position"),
+        {"id": file["id"]},
+    ).scalars()
+    assert list(labels) == [None, "FIG. 2", "Table I", "Abbildung 4b", None]
+    assert [page_layout.figure_label(w) for w, _ in passages[1:4]] == [
+        "FIG. 2",
+        "Table I",
+        "Abbildung 4b",
+    ]

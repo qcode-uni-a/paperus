@@ -159,8 +159,16 @@ class FakeML:
         norm = math.sqrt(sum(x * x for x in vector)) or 1.0
         return [x / norm for x in vector]
 
-    MODELS: ClassVar[list[str]] = ["bge-m3", "multilingual-e5-small"]
-    RERANKERS: ClassVar[list[str]] = ["bge-reranker-v2-m3"]
+    MODELS: ClassVar[list[str]] = [
+        "bge-m3",
+        "multilingual-e5-small",
+        "qwen3-vl-embedding-2b",
+    ]
+    RERANKERS: ClassVar[list[str]] = ["bge-reranker-v2-m3", "qwen3-vl-reranker-2b"]
+    TAKE_IMAGES: ClassVar[set[str]] = {"qwen3-vl-embedding-2b", "qwen3-vl-reranker-2b"}
+    PICTURE = "crimson ring"
+    """What every image the fake sees shows (its vector, what its reranker
+    puts first)."""
     FAVOURITE = "drizzle"
     """The fake reranker puts passages with this word first."""
     OCR_MODELS: ClassVar[list[str]] = ["pp-ocrv6-small"]
@@ -186,7 +194,15 @@ class FakeML:
             if body["model"] not in self.RERANKERS:
                 return httpx2.Response(422, json={"detail": "not a reranker"})
             self.reranked.append(body)
-            scores = [float(self.FAVOURITE in p.lower()) for p in body["passages"]]
+            scores = [
+                float(self.FAVOURITE in p.lower()) for p in body.get("passages", [])
+            ]
+            if body.get("images") and body["model"] not in self.TAKE_IMAGES:
+                return httpx2.Response(422, json={"detail": "takes no images"})
+            scores += [
+                2.0 * (self.PICTURE in body["query"].lower())
+                for _ in body.get("images", [])
+            ]
             return httpx2.Response(200, json={"model": body["model"], "scores": scores})
         if request.url.path.startswith("/ocr/"):
             model = request.url.path.split("/")[2]
@@ -232,6 +248,7 @@ class FakeML:
                         "max_tokens": 512,
                         "loaded": False,
                         "cached_bytes": None,
+                        "images": name in self.TAKE_IMAGES,
                     }
                     for name in self.MODELS
                 ]
@@ -244,6 +261,7 @@ class FakeML:
                         "max_tokens": 512,
                         "loaded": False,
                         "cached_bytes": None,
+                        "images": name in self.TAKE_IMAGES,
                     }
                     for name in self.RERANKERS
                 ]
@@ -268,7 +286,11 @@ class FakeML:
         if body.get("model") not in self.MODELS:
             return httpx2.Response(404, json={"detail": "unknown model"})
         self.requests.append(body)
-        vectors = [self.vector(t) for t in body["texts"]]
+        images = body.get("images", [])
+        if images and body["model"] not in self.TAKE_IMAGES:
+            return httpx2.Response(422, json={"detail": "takes no images"})
+        vectors = [self.vector(t) for t in body.get("texts", [])]
+        vectors += [self.vector(self.PICTURE) for _ in images]
         return httpx2.Response(
             200,
             json={

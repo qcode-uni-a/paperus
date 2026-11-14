@@ -14,6 +14,7 @@ from sqlalchemy import (
     Computed,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Identity,
     Index,
     Integer,
@@ -883,6 +884,47 @@ class FileChunk(Base):
     """In the file's reference list: found by keywords, not by meaning."""
     caption: Mapped[bool] = mapped_column(server_default=text("false"))
     """A figure's or table's caption (found by search as a figure)."""
+    figure: Mapped[str | None] = mapped_column(String(40))
+    """For a caption: what it labels ("FIG. 3", ``page_layout.figure_label``),
+    joining it to its figure."""
+
+
+class Figure(Base):
+    """A figure of a PDF's content (by page and its caption's label), drawn
+    as a small image for the models that take images (multimodal search)."""
+
+    __tablename__ = "figures"
+
+    blob_sha256: Mapped[bytes] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="CASCADE"), primary_key=True
+    )
+    page: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(40), primary_key=True)
+    width: Mapped[int]
+    height: Mapped[int]
+    png: Mapped[bytes]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class FigureEmbedding(Base):
+    """A figure's vector from one model (in the same space as passages')."""
+
+    __tablename__ = "figure_embeddings"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["blob_sha256", "page", "label"],
+            ["figures.blob_sha256", "figures.page", "figures.label"],
+            ondelete="CASCADE",
+        ),
+    )
+
+    blob_sha256: Mapped[bytes] = mapped_column(primary_key=True)
+    page: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(String(40), primary_key=True)
+    model: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    embedding: Mapped[list[float]] = mapped_column(HALFVEC())
 
 
 class Embedding(Base):
