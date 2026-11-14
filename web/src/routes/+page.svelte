@@ -29,6 +29,9 @@
 	// this paper" fetches the rest of that one.
 	const SEARCH_PASSAGES = 60;
 	const PER_PAPER = 3;
+	/** A figure at least this many times as high as wide stands beside its
+	 * caption on a wider screen. */
+	const UPRIGHT = 0.8;
 
 	/** A passage in its paper: at its page, marked there. */
 	function passageHref(id: string, passage: Passage): string {
@@ -331,8 +334,9 @@
 									{#if passage.figure_image && passage.file_id && passage.page && passage.figure}
 										{@const width = passage.figure_width ?? 4}
 										{@const height = passage.figure_height ?? 3}
-										<!-- A tall figure beside its caption, a wide one above it. -->
-										<div class="figure-passage" class:tall={height > width}>
+										<!-- Beside its caption if squarish or taller (on a wider
+										     screen; on a phone above it, as wide ones always). -->
+										<div class="figure-passage" class:upright={height >= UPRIGHT * width}>
 											<a class="figure-image" href={passageHref(group.id, passage)}>
 												<img
 													src={apiHref(
@@ -548,8 +552,10 @@
 		gap: 8px 16px;
 		align-items: start;
 	}
-	.figure-passage.tall {
-		grid-template-columns: fit-content(45%) minmax(0, 72ch);
+	@media (min-width: 721px) {
+		.figure-passage.upright {
+			grid-template-columns: fit-content(45%) minmax(0, 72ch);
+		}
 	}
 	.passages .figure-passage blockquote {
 		grid-column: auto;
@@ -571,7 +577,7 @@
 		width: auto;
 		height: auto;
 	}
-	.tall .figure-image img {
+	.upright .figure-image img {
 		max-height: 440px;
 	}
 	blockquote {

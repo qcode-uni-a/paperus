@@ -8,8 +8,8 @@
   nothing else. Assistants over MCP get the same (`figures` in `search`).
   Papers read before are marked by the update itself.
 - **…and shown**: the figure itself appears with its caption in the
-  results, a tall one beside it and a wide one above it (a click opens
-  the paper at its page), as the page's layout
+  results, beside it if squarish or taller (on a phone always above it;
+  a click opens the paper at its page), as the page's layout
   found it, labels and stacked panels with it; drawn from the PDF when
   asked, nothing stored. Assistants see it with `get_figure`. Tables
   still show only their caption. PDFs' layouts are measured again once
