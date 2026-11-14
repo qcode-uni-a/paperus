@@ -245,6 +245,32 @@ another name (`arctic-embed-m-v2@fp16`) and a switch between CPU and GPU
 re-embeds the library like a change of model (minutes on a GPU). All
 addresses in `PAPERUS_ML_URLS` should run on the same kind of hardware.
 
+### Multimodal search (figures)
+
+Administration → Settings → Machine learning → Multimodal search ("Find
+figures by what they show") switches to a pair of models that read text
+and images in one space: Qwen3-VL-Embedding-2B and Qwen3-VL-Reranker-2B
+(our ONNX export with 8-bit weights,
+huggingface.co/headtrick/Qwen3-VL-2B-Retrieval-ONNX, 4.1 GB to download).
+Figures are then found by what they show (a colour map, a circuit, a
+bar chart), not only by their captions; the reranker looks at them.
+Switched off, the text models are used again. The model lists show only
+the models of the chosen kind.
+
+- **A GPU is needed**: on by default when the setup finds one with at
+  least 6 GB; both models loaded take 3.7 GB (RTX 2080 SUPER: a query 45
+  ms, reranking about 60 ms a hit). On a CPU the switch warns: reading a
+  library takes days, a search seconds.
+- **Switching re-embeds the library** (its passages, and with the pair
+  each PDF's captioned figures, drawn once from the PDF): search by
+  meaning covers more and more of it meanwhile; the administrators get a
+  notification when it covers all of it. On the dev library (400 papers,
+  39,000 passages, 3,200 figures) about 50 minutes on that card.
+- **Batches**: at most 4,096 tokens a batch for the pair (more did not
+  fit next to both models on an 8 GB card); `PAPERUS_ML_MAX_BATCH_TOKENS`
+  in the ML service's environment can make them smaller, for a smaller
+  card or one shared with other programs.
+
 ### On another machine
 
 The ML service can run elsewhere, for example on a workstation with an
@@ -299,9 +325,12 @@ files again".
 
 ### Reranking
 
-A reranker reads the question with each of the best 40 hits and puts the
-best answers first (Administration → Settings → Machine learning →
-Reranking). On our 200 test questions (docs/search.md) bge-reranker-v2-m3
+A reranker reads the question with the best hits and puts the best
+answers first (Administration → Settings → Machine learning →
+Reranking): as many as it reads in half a second at its measured speed,
+5 to 20 (bge-reranker-v2-m3 on a GPU about 20, Qwen3-VL-Reranker about
+7); the others follow in the usual order. Reranking more than 10 never
+ranked better (docs/search.md). On our 200 test questions (docs/search.md) bge-reranker-v2-m3
 helps weaker search models most (the right paper first 181 times instead
 of 158 with multilingual-e5-small) and the recommended arctic-embed-m-v2
 little (184 instead of 181). A search then takes about 0.6 s on an RTX
@@ -526,8 +555,15 @@ without end:
   deleted. Without this, the job table grows by about 1,500 rows and 4,500
   events a day.
 
-Search by meaning has no vector index yet (exact search; fine at pilot size,
-see issue #37).
+Search by meaning compares with all of a model's vectors (exact) until a
+model has 100,000 of them (about 1,000 papers); then the worker builds a
+vector index (HNSW) for it in the background (`CREATE INDEX
+CONCURRENTLY`: search and imports go on; minutes for a large library) and
+drops those of models no longer used. Its build keeps the index's graph
+in shared memory: the compose file gives Postgres 1 GB (`shm_size`); with
+less, paperus builds without parallel workers (slower). The index should
+fit in Postgres's memory (`shared_buffers`, 128 MB by default: raise it
+for a large library, to about a quarter of the RAM). See issue #61.
 
 ## Updating
 

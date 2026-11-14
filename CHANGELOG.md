@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Multimodal search: figures by what they show**: with a GPU, one
+  switch (Administration → Settings → Machine learning → Multimodal
+  search; offered at setup when a GPU of 6 GB or more is found) moves
+  search to a pair of models that read text and images in one space,
+  Qwen3-VL-Embedding and Qwen3-VL-Reranker (our ONNX export, 4.1 GB to
+  download, 3.7 GB of GPU memory). Figures are then found by how they
+  look, "two stacked colour maps, the top one striped", not only by their
+  captions: on a test library the right figure came first for 46 % of
+  such questions instead of 9 %, and its reranker looks at the figures
+  themselves. Text search is as good or better (the right paper first for
+  96 % of 200 test questions). Switching re-embeds the library in the
+  background, figures included; on a CPU the switch warns (days, not
+  minutes). The model lists show only the models of the chosen kind.
 - **Figures in search**: a figure's or table's caption is now found as
   that figure, marked with its number on the result ("Fig. 3",
   "Table 2"), and "Figures and tables only" in the search options finds

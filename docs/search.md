@@ -48,7 +48,14 @@ their vectors.
 
 1. Hybrid: Postgres full-text search + pgvector, merged with reciprocal rank
    fusion. Exact terms (gene names, acronyms, dataset names) need keywords.
-2. Rerank the top ~50 with a cross-encoder (e.g. bge-reranker).
+   By meaning: the nearest passages (and figures) of all first, then those
+   the person may read; every passage they may read when too few of the
+   nearest are theirs (the same hits either way). From 100,000 vectors per
+   model through a vector index (HNSW), built in the background.
+2. Rerank the best hits with a cross-encoder: as many as it reads in half
+   a second at its measured speed (5 to 20); the others follow in the
+   usual order. With multimodal search, figures go to it as images with
+   their caption.
 3. Return passages with stable IDs (file UUID + chunk position, e.g.
    `0194f3c2-…#p5.para3`; not the bare chunk hash, which several files can
    share), page, snippet, score
@@ -66,18 +73,23 @@ scope.
   Optional OpenAI-compatible endpoint for admins (e.g. a university service).
 - Store the model ID with every vector; a model change triggers a background
   re-index.
-- Paper-level vectors for "similar papers": SPECTER2. Fetch precomputed ones
-  from Semantic Scholar by DOI (`embedding.specter_v2`; check licence terms for
-  bulk data), compute locally for papers it does not know.
+- Multimodal search (an administrator's switch): Qwen3-VL-Embedding-2B and
+  Qwen3-VL-Reranker-2B in our own ONNX export, for passages and figures in
+  one space; needs a GPU.
+- Paper-level vectors for "similar papers": each paper's passages' average
+  vector (kept per model), compared together with its title and abstract's
+  (0.7 to 0.3). SPECTER2 (precomputed by Semantic Scholar) was the earlier
+  idea; not needed so far.
 
 Rough cost: a 10-page paper ≈ 8,000 tokens ≈ 20–40 chunks; a 10,000-paper
 library is a one-off job of a few hours on CPU. One embedding (1,024 dims) is
 4 KB as float32, 1–2 KB as float16/int8.
 
-## Related papers (later)
+## Related papers
 
-Compute on ingest: nearest SPECTER2 neighbours above a threshold plus direct
-citations from OpenAlex. Show a "Related" list per item first; a graph view per
+"Similar papers" on each paper's page (and `find_similar` over MCP): the
+closest papers by meaning (see Models), among those the person can see.
+Citations are shown on their own (references, cited by). A graph view per
 collection later (Cytoscape.js or Sigma.js).
 
 ## Results UI
@@ -522,3 +534,94 @@ Possible next steps: render each figure for the model at a fixed size
 near 500 px); link a figure to the passages that mention it ("Fig. 3
 shows …") so concept questions find it through the paragraph that
 explains it; keyword search over captions as today.
+
+### Multimodal search in paperus (#36, 2026-11-14)
+
+What came into paperus from the trial above, and how it measured on the
+dev library (404 PDFs, 40,265 passages, 3,193 captioned figures).
+
+- **The models**: Qwen3-VL-Embedding-2B and Qwen3-VL-Reranker-2B exported
+  to ONNX by us (huggingface.co/headtrick/Qwen3-VL-2B-Retrieval-ONNX):
+  the vision encoder and token table shared by both, decoders with 8-bit
+  weights (cosine 0.996-0.999 against the originals; plain 4-bit lost too
+  much). Image preparation, positions and token sequences in numpy in the
+  ML service (`paperus_ml/qwen3_vl.py`). Both loaded: 3.7 GB of GPU
+  memory; a query 45 ms; ONNX no faster than PyTorch on a GPU (±10 %).
+- **The figures**: each captioned figure of a PDF's layouts drawn once at
+  the scale that makes its page's text width 768 px (a full-width figure
+  about 768 px wide, a column's about half; labels equally legible), kept
+  in `figures` with its vector. A caption passage is found by the better
+  of its text's vector and its figure's.
+- **Real pipeline, the 91 figure questions** (hybrid search, "Figures and
+  tables only", ten hits): right figure first / in the top five / in the
+  top ten.
+
+  | reranked                          | look (65)          | concept (20)       | mixed (6)          | per search |
+  | --------------------------------- | ------------------ | ------------------ | ------------------ | ---------- |
+  | none                              | 0.32 / 0.55 / 0.62 | 0.20 / 0.45 / 0.55 | 0.50 / 0.83 / 0.83 | 0.11 s     |
+  | best 5                            | 0.40 / 0.55 / 0.62 | 0.30 / 0.45 / 0.55 | 0.83 / 0.83 / 0.83 | 0.55 s     |
+  | best 10                           | 0.46 / 0.62 / 0.62 | 0.25 / 0.45 / 0.55 | 0.83 / 0.83 / 0.83 | 0.95 s     |
+  | 40 (8 of them as images)          | 0.45 / 0.68 / 0.68 | 0.20 / 0.50 / 0.55 | 0.83 / 1.00 / 1.00 | 2.25 s     |
+  | 20, all as images (100,000 px)    | 0.46 / 0.71 / 0.71 | 0.25 / 0.35 / 0.65 | 0.83 / 1.00 / 1.00 | 2.0 s      |
+
+  Below the trial's 0.62 first: hybrid search (keywords pull in
+  captions with the question's words) and fewer candidates reranked.
+- **The 200 text questions** with the pair (hybrid, one hit a paper):
+
+  | reranked | right paper first | in the top five | MRR@10 | per search |
+  | -------- | ----------------- | --------------- | ------ | ---------- |
+  | none     | 0.895             | 0.995           | 0.941  | 0.41 s     |
+  | 5        | 0.940             | 0.995           | 0.964  | 0.75 s     |
+  | 10       | 0.960             | 1.000           | 0.976  | 1.06 s     |
+  | 20       | 0.960             | 0.990           | 0.974  | 1.63 s     |
+  | 40       | 0.955             | 0.990           | 0.971  | 2.67 s     |
+
+- **The reranker's time**: 60-80 ms a passage of about 1,100 characters,
+  about 60 ms a figure, 23 ms a short caption (RTX 2080 SUPER); it reads
+  about 4,000-5,000 tokens a second, the card's limit: fp16 decoders
+  instead of 8-bit and larger batches changed nothing, nor did smaller
+  images (most figures are small already: median 74,000 pixels; capped
+  at about 200 tokens for the reranker so a large one costs no more).
+  Hence a time budget instead of a fixed number of hits: 0.5 s, 5 to 20
+  hits, as many as it reads in that time at its measured speed (about 7
+  on that card); more than 10 never ranked better.
+- **The database's time** (search without reranking): psycopg prepares a
+  query after five runs, and PostgreSQL then chose a generic plan for the
+  search, knowing neither the vector nor the filters: 0.47 s instead of
+  0.06 s for figures, 0.96 s instead of 0.37 s for all text. Planned anew
+  each time now. Taking the nearest 1,000 passages of all first, then
+  checking access (instead of joining every visible passage before
+  comparing), all text 0.34 s → 0.15 s with the same hits on 120
+  searches; most of the rest is reading the 2,048-dimensional vectors
+  (0.1 s for 39,000).
+- **A vector index** (HNSW, partial per model) did not pay at this size:
+  PostgreSQL kept reading all vectors (105 ms), and forced through the
+  index (304 MB, more than its 128 MB of shared buffers) the nearest
+  1,000 took 93-200 ms. Built from 100,000 vectors; where it starts to
+  pay and how much is #61's measurement (also: per-library indexes,
+  VectorChord set aside).
+
+### Similar papers (2026-11-14)
+
+"Similar papers" averaged every visible paper's passage vectors on each
+click: 0.75 s on the dev library, growing with it. Each paper's average
+is now kept (`paper_vectors`, valid while the paper's change number
+holds) and compared with title and abstract added in. Measured with
+papers citing each other within the library as the ground truth (281
+papers with such a related paper, 841 pairs; Qwen3-VL-Embedding):
+
+| per paper                                          | related in top 10 | related first | MRR   |
+| -------------------------------------------------- | ----------------- | ------------- | ----- |
+| average of the passages (before)                   | 0.515             | 0.463         | 0.610 |
+| title and abstract only                            | 0.510             | 0.480         | 0.599 |
+| average and title/abstract, one vector (0.7 / 0.3) | 0.559             | 0.527         | 0.652 |
+| similarities of both, 0.7 / 0.3 (**now**)          | 0.561             | 0.559         | 0.675 |
+| up to 5 topic centres (k-means), weighted best match | 0.558           | 0.456         | 0.617 |
+| … and title/abstract, 0.7 / 0.3                    | 0.582             | 0.523         | 0.657 |
+| up to 5 topic centres, best single match           | 0.515             | 0.420         | 0.575 |
+| topic centres with the figures                     | 0.527             | 0.423         | 0.583 |
+
+Topic centres (a paper's passages grouped, at most five, at least 20
+passages each) did no better than the average; the best single match
+lets generic topics (introductions, methods) match everything; figures
+in the centres made it worse. 27 ms for the request now (6 ms the query).

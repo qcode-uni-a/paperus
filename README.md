@@ -45,9 +45,9 @@ look around in: uploads, changes and search by meaning don't work there).
   paper, note and annotation, together with keyword search, computed on
   the server with small open models (and reranked, on a GPU).
 - **Figure search**: figures and tables are found by their captions and
-  shown in the results, opening the paper at the figure. Searching them by
-  what they show (multimodal search: a heatmap with a ring, two crossing
-  bands) is being tried out ([#36](https://github.com/qcode-uni-a/paperus/issues/36)).
+  shown in the results, opening the paper at the figure. With a GPU,
+  multimodal search finds them by what they show too (a heatmap with a
+  ring, two crossing bands): one switch for the administrator.
 - **PDFs that fit your phone**: fluent mode turns two columns into one,
   figures whole, highlights and notes as on the page.
 - **Preprints that get published**: the published version is found by
