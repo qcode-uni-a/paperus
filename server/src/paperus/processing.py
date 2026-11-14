@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session
 from paperus import abstracts, annotations, layouts, pdf
 from paperus.covers import cover_pages
 from paperus.identify import identify
-from paperus.models import Chunk, File, FileChunk, OcrPage, OcrStatus, TextStatus
+from paperus.models import (
+    Chunk,
+    EmbeddedFile,
+    File,
+    FileChunk,
+    OcrPage,
+    OcrStatus,
+    TextStatus,
+)
 from paperus.page_layout import Part, figure_label
 from paperus.storage import BlobStore
 from paperus.text import (
@@ -153,6 +161,8 @@ def recut(db: Session, sha256: bytes, read: pdf.Read) -> list[uuid.UUID]:
 
 
 def _store_manifest(db: Session, file: File, chunks: list[TextChunk]) -> None:
+    # New passages: embedded anew (those whose text stayed keep their vectors).
+    db.execute(delete(EmbeddedFile).where(EmbeddedFile.file_id == file.id))
     rows = []
     for position, chunk in enumerate(chunks):
         sha256 = hashlib.sha256(chunk.text.encode()).digest()
@@ -190,6 +200,7 @@ def _copy_manifest(db: Session, file: File) -> bool:
         return False
     file.ocr_status = source.ocr_status
     file.cover_pages = source.cover_pages
+    db.execute(delete(EmbeddedFile).where(EmbeddedFile.file_id == file.id))
     for row in db.scalars(select(FileChunk).where(FileChunk.file_id == source.id)):
         db.add(
             FileChunk(

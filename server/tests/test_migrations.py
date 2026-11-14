@@ -484,3 +484,55 @@ def test_0025_gives_papers_their_average_vectors(
         ("a", 2, "[0.5,0.5]", True),
         ("b", 1, "[0,1]", True),
     ]
+
+
+def test_0026_marks_the_files_embedded_with_each_model(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """A file read, whose passages outside its reference list all have a
+    model's vectors, is marked embedded with that model."""
+    made = logged_in.post("/api/items", json={"metadata": {"title": "Floquet"}})
+    item = made.json()["id"]
+    upload = ("p.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")
+    file = logged_in.post(f"/api/items/{item}/files", files={"upload": upload}).json()
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0025")
+    passages = [
+        ("Driven chains.", False, ("a", "b")),
+        ("Quasienergies.", False, ("a",)),
+        ("[1] A reference.", True, ()),
+    ]
+    for position, (words, references, models) in enumerate(passages):
+        sha = hashlib.sha256(words.encode()).digest()
+        db.execute(
+            text("INSERT INTO chunks (sha256, text) VALUES (:sha, :text)"),
+            {"sha": sha, "text": words},
+        )
+        db.execute(
+            text(
+                "INSERT INTO file_chunks (file_id, position, chunk_sha256, page,"
+                " in_references) VALUES (:file, :n, :sha, 1, :refs)"
+            ),
+            {"file": file["id"], "n": position, "sha": sha, "refs": references},
+        )
+        for model in models:
+            db.execute(
+                text(
+                    "INSERT INTO embeddings (chunk_sha256, model, embedding)"
+                    " VALUES (:sha, :model, CAST('[1,0]' AS halfvec))"
+                ),
+                {"sha": sha, "model": model},
+            )
+    db.execute(
+        text("UPDATE files SET text_status = 'done' WHERE id = :id"), {"id": file["id"]}
+    )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+    marked = db.execute(
+        text("SELECT model FROM embedded_files WHERE file_id = :id ORDER BY model"),
+        {"id": file["id"]},
+    ).scalars()
+    assert list(marked) == ["a"]

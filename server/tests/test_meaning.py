@@ -83,6 +83,25 @@ def test_embed_file_once_per_chunk(
     assert count == 1
 
 
+def test_files_to_embed_known_without_their_passages(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    """The sweep looks at files not marked embedded with the model; read
+    again, a file's passages are new, so it is embedded again (vectors of
+    text that stayed are kept)."""
+    file_id = uuid.UUID(add_file(logged_in, "A")["id"])
+    process_file(db, blobs, file_id)
+    assert files_missing_embeddings(db, MODEL) == [file_id]
+    assert embed_file(db, fake_ml.client(), MODEL, file_id) > 0
+    assert files_missing_embeddings(db, MODEL) == []
+    assert files_missing_embeddings(db, "another-model") == [file_id]
+    logged_in.post(f"/api/files/{file_id}/read-again")
+    process_file(db, blobs, file_id)
+    assert files_missing_embeddings(db, MODEL) == [file_id]
+    assert embed_file(db, fake_ml.client(), MODEL, file_id) == 0
+    assert files_missing_embeddings(db, MODEL) == []
+
+
 def test_hybrid_search_finds_by_meaning(
     logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
 ) -> None:

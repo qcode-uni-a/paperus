@@ -12,6 +12,7 @@ from paperus.db import absent
 from paperus.ml import MLClient
 from paperus.models import (
     Chunk,
+    EmbeddedFile,
     Embedding,
     File,
     FileChunk,
@@ -56,6 +57,11 @@ def embed_file(db: Session, ml: MLClient, model: str, file_id: uuid.UUID) -> int
         return 0
     vectors = ml.vectors_name(model)
     count = _embed(db, ml, model, vectors, missing_chunks(db, file_id, vectors))
+    db.execute(
+        insert(EmbeddedFile)
+        .values(file_id=file_id, model=vectors)
+        .on_conflict_do_nothing()
+    )
     # The paper's average (similar papers) with its passages' new vectors.
     item = db.scalar(select(Version.item_id).join(File).where(File.id == file_id))
     if item is not None:
@@ -110,19 +116,18 @@ def _embed(
 def files_missing_embeddings(
     db: Session, model: str, limit: int = 500
 ) -> list[uuid.UUID]:
-    """Readable, non-trashed files with chunks lacking a vector from ``model``."""
-    has_vector = select(Embedding.chunk_sha256).where(Embedding.model == model)
+    """Readable, non-trashed files not (yet) embedded with ``model`` (whose
+    passages are not all known to have its vectors: ``EmbeddedFile``). Looks
+    at the files, not at their passages: as quick for a large library."""
+    embedded = select(EmbeddedFile.file_id).where(EmbeddedFile.model == model)
     return list(
         db.scalars(
             select(File.id)
-            .join(FileChunk, FileChunk.file_id == File.id)
             .where(
                 File.text_status == TextStatus.DONE,
                 file_outside_trash(),
-                FileChunk.in_references.is_(False),
-                absent(FileChunk.chunk_sha256, has_vector),
+                absent(File.id, embedded),
             )
-            .group_by(File.id)
             .order_by(File.id)
             .limit(limit)
         )

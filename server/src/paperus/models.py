@@ -927,6 +927,20 @@ class FigureEmbedding(Base):
     embedding: Mapped[list[float]] = mapped_column(HALFVEC())
 
 
+class EmbeddedFile(Base):
+    """All of the file's passages (outside its reference list) have vectors
+    from ``model``: the sweep for missing vectors looks only at files
+    without this row. Dropped when its passages are written anew."""
+
+    __tablename__ = "embedded_files"
+
+    file_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(String(64), primary_key=True)
+    """What the vectors are stored as (``Embedding.model``)."""
+
+
 class PaperVector(Base):
     """A paper's passages' average vector from one model (``similar``): its
     files' passages outside the trash and the reference list. Valid while
