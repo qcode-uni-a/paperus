@@ -927,6 +927,19 @@ class FigureEmbedding(Base):
     embedding: Mapped[list[float]] = mapped_column(HALFVEC())
 
 
+class EmbeddedFigures(Base):
+    """All captioned figures of the PDF content's current layouts have
+    vectors from ``model``: the sweep looks only at PDFs without this row.
+    Dropped when the layouts are made anew (``figures.forget``)."""
+
+    __tablename__ = "embedded_figures"
+
+    blob_sha256: Mapped[bytes] = mapped_column(
+        ForeignKey("blobs.sha256", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
 class EmbeddedFile(Base):
     """All of the file's passages (outside its reference list) have vectors
     from ``model``: the sweep for missing vectors looks only at files

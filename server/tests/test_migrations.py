@@ -1,6 +1,7 @@
 """The migrations give the schema the models describe."""
 
 import hashlib
+import json
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -536,3 +537,60 @@ def test_0026_marks_the_files_embedded_with_each_model(
         {"id": file["id"]},
     ).scalars()
     assert list(marked) == ["a"]
+
+
+def test_0027_marks_the_pdfs_whose_figures_are_embedded(
+    db: Session, database_url: str
+) -> None:
+    """A PDF whose current layouts' captioned figures all have a model's
+    vectors is marked embedded with that model; outdated layouts are not."""
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0026")
+    figure = {"x": 0, "y": 0, "width": 1, "height": 1}
+    pages = [
+        {"figures": [{**figure, "caption": "FIG. 1"}, figure]},
+        {"figures": [{**figure, "caption": "FIG. 2"}]},
+    ]
+    current, old = b"\x01" * 32, b"\x02" * 32
+    for sha, version in ((current, 10), (old, 9)):
+        db.execute(
+            text("INSERT INTO blobs (sha256, size) VALUES (:sha, 1)"), {"sha": sha}
+        )
+        db.execute(
+            text(
+                "INSERT INTO page_layouts (blob_sha256, version, pages)"
+                " VALUES (:sha, :version, CAST(:pages AS jsonb))"
+            ),
+            {"sha": sha, "version": version, "pages": json.dumps(pages)},
+        )
+    for sha, page, label, model in (
+        (current, 1, "FIG. 1", "a"),
+        (current, 2, "FIG. 2", "a"),
+        (current, 1, "FIG. 1", "b"),
+        (old, 1, "FIG. 1", "a"),
+        (old, 2, "FIG. 2", "a"),
+    ):
+        db.execute(
+            text(
+                "INSERT INTO figures (blob_sha256, page, label, width, height, png)"
+                " VALUES (:sha, :page, :label, 1, 1, '') ON CONFLICT DO NOTHING"
+            ),
+            {"sha": sha, "page": page, "label": label},
+        )
+        db.execute(
+            text(
+                "INSERT INTO figure_embeddings (blob_sha256, page, label, model,"
+                " embedding) VALUES (:sha, :page, :label, :model,"
+                " CAST('[1,0]' AS halfvec))"
+            ),
+            {"sha": sha, "page": page, "label": label, "model": model},
+        )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+    marked = db.execute(
+        text("SELECT blob_sha256, model FROM embedded_figures ORDER BY model")
+    ).all()
+    assert [tuple(m) for m in marked] == [(current, "a")]

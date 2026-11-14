@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from paperus import page_layout, pdf
 from paperus.ml import MLClient, MLRejected, MLUnavailable
-from paperus.models import Figure, FigureEmbedding, PageLayouts
+from paperus.models import EmbeddedFigures, Figure, FigureEmbedding, PageLayouts
 from paperus.storage import BlobStore
 
 log = logging.getLogger(__name__)
@@ -73,6 +73,7 @@ def forget(db: Session, sha256: bytes) -> None:
     """A PDF's figures dropped (its layouts were made anew: boxes may have
     moved); drawn and embedded again by the sweep."""
     db.execute(delete(Figure).where(Figure.blob_sha256 == sha256))
+    db.execute(delete(EmbeddedFigures).where(EmbeddedFigures.blob_sha256 == sha256))
 
 
 def draw(db: Session, blobs: BlobStore, sha256: bytes) -> int:
@@ -157,12 +158,20 @@ def embed(
             .on_conflict_do_nothing()
         )
         db.commit()
+    layouts = db.get(PageLayouts, sha256)
+    if layouts is not None and layouts.version == page_layout.VERSION:
+        db.execute(
+            insert(EmbeddedFigures)
+            .values(blob_sha256=sha256, model=vectors)
+            .on_conflict_do_nothing()
+        )
+        db.commit()
     return len(figures)
 
 
-# PDFs (outside the trash, read, their layouts current) with captioned
-# figures that have no vector from the model yet: fewer vectors than the
-# layouts have captioned figures (drawn or not).
+# PDFs (outside the trash, read, their layouts current) not marked as
+# having all their captioned figures embedded with the model: looks at the
+# PDFs, not into their layouts, so as quick for a large library.
 _MISSING = text(
     """
     SELECT pl.blob_sha256
@@ -172,12 +181,9 @@ _MISSING = text(
           SELECT 1 FROM files f
           WHERE f.blob_sha256 = pl.blob_sha256 AND f.deleted_at IS NULL
             AND f.text_status = 'done')
-      AND (SELECT count(DISTINCT (p.n, fig->>'caption'))
-           FROM jsonb_array_elements(pl.pages) WITH ORDINALITY AS p(page, n),
-                jsonb_array_elements(coalesce(p.page->'figures', '[]')) AS fig
-           WHERE fig ? 'caption')
-          > (SELECT count(*) FROM figure_embeddings fe
-             WHERE fe.blob_sha256 = pl.blob_sha256 AND fe.model = :vectors)
+      AND NOT EXISTS (
+          SELECT 1 FROM embedded_figures ef
+          WHERE ef.blob_sha256 = pl.blob_sha256 AND ef.model = :vectors)
     ORDER BY pl.created_at DESC
     LIMIT :limit
     """
