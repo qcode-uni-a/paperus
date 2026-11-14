@@ -36,12 +36,18 @@ look around in: uploads, changes and search by meaning don't work there).
 - **AI first, on your terms**: no built-in chatbot and no AI vendor. Any
   assistant (Claude, ChatGPT, a self-hosted or local model) connects through
   an MCP server, sees only what the user may see, cites the exact passage
-  and asks before it changes anything. paperus finds, checks and keeps
-  track; the assistant does the thinking.
+  and asks before it changes anything: retrieval-augmented generation (RAG)
+  over your own papers. paperus finds, checks and keeps track; the
+  assistant does the thinking.
 - **One library for the group**, on your own server with your organisation's
   login (OIDC), groups inside groups, plus private space for each member.
-- **Search by meaning** across the full text of every paper, note and
-  annotation, computed on the server with a small open model.
+- **Semantic search**: search by meaning across the full text of every
+  paper, note and annotation, together with keyword search, computed on
+  the server with small open models (and reranked, on a GPU).
+- **Figure search**: figures and tables are found by their captions and
+  shown in the results, opening the paper at the figure. Searching them by
+  what they show (multimodal search: a heatmap with a ring, two crossing
+  bands) is being tried out ([#36](https://github.com/qcode-uni-a/paperus/issues/36)).
 - **PDFs that fit your phone**: fluent mode turns two columns into one,
   figures whole, highlights and notes as on the page.
 - **Preprints that get published**: the published version is found by
