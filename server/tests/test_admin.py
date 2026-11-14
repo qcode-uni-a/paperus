@@ -6,6 +6,7 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from paperus import system
 from paperus.config import Settings
 from paperus.embedding import embed_file
 from paperus.jobs import send_ml_config
@@ -39,6 +40,8 @@ def test_change_embedding_model(
     )
     assert response.status_code == 200
     assert load_config(db, settings).embedding_model == "multilingual-e5-small"
+    # The administrators are told when that is done (test_worker).
+    assert (system.reembedding(db) or {}).get("model") == "multilingual-e5-small"
     # The library is re-embedded in the background, and the ML service gets
     # the new settings (first in the worker's queue).
     assert queued(job_app) == [

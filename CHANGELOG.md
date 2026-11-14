@@ -16,6 +16,11 @@
   to it. Tables
   still show only their caption. PDFs' layouts are measured again once
   in the background after the update.
+- **Told when the library is embedded anew**: after another embedding
+  model is chosen (or the ML service moves to another file of it, e.g. to
+  a GPU), search by meaning covers more and more of the library while the
+  worker embeds it again; administrators now get a notification when it
+  covers all of it, with how long that took.
 - **The PDF icon for journal versions without their PDF**: a paper whose
   journal version is shown but whose PDF is the preprint's now has its
   PDF icon in the list, as its page already had.

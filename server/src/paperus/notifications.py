@@ -13,8 +13,9 @@ people: once it has papers, else the papers' own notice says it), and, for
 a group's admins, someone added to it; their own papers added from OpenAlex
 by the daily job (to their library or a group's); each zip of their export
 as it is written (or the export failing); and the end of their imports,
-which may take long. Read ones go after ``KEEP_READ``, all after ``KEEP``
-(the nightly tidy-up).
+which may take long; for administrators, the library embedded anew (after
+another embedding model was chosen) being done. Read ones go after
+``KEEP_READ``, all after ``KEEP`` (the nightly tidy-up).
 
 Papers reaching a group are noticed on the session (as ``details`` does),
 so every way of adding them counts; the person who did it is the one who
@@ -68,6 +69,7 @@ CITED = "cited"
 MILESTONE = "milestone"
 MEMBER_ADDED = "member_added"
 ADMIN_NAMED = "admin_named"
+EMBEDDED = "embedded"
 
 
 def people_of(db: Session, library_id: uuid.UUID) -> list[uuid.UUID]:
@@ -565,6 +567,17 @@ def import_finished(db: Session, record: Import) -> None:
             },
         )
     )
+
+
+def reembedded(db: Session, model: str, since: str, passages: int) -> None:
+    """The library is embedded anew with ``model`` (search by meaning
+    covers it all again): told to every active administrator."""
+    admins = db.scalars(
+        select(User.id).where(User.is_admin, User.deactivated_at.is_(None))
+    )
+    data = {"model": model, "since": since, "passages": passages}
+    for user_id in admins:
+        db.add(Notification(user_id=user_id, kind=EMBEDDED, data=data))
 
 
 def prune(db: Session, now: datetime | None = None) -> int:

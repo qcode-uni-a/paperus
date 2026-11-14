@@ -228,6 +228,20 @@
 			].filter(Boolean);
 			return { text: `Import of ${d.filename} done: ${told.join(', ')}`, href };
 		}
+		// For administrators: the library embedded anew after another
+		// embedding model (or another file of it) was chosen.
+		if (notice.kind === 'embedded') {
+			const took = (Date.parse(notice.at) - Date.parse(String(d.since))) / 60_000;
+			const time = !(took > 0)
+				? ''
+				: took < 90
+					? `, in ${Math.max(1, Math.round(took))} min`
+					: `, in ${Math.round(took / 60)} h`;
+			return {
+				text: `Search by meaning covers the whole library again: ${Number(d.passages ?? 0).toLocaleString()} passages embedded with ${d.model}${time}`,
+				href: resolve('/admin/server')
+			};
+		}
 		if (notice.kind === 'export_failed') {
 			return {
 				text: 'Your export failed: see why, and start it again',

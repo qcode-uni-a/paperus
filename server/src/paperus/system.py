@@ -5,10 +5,12 @@ defaults; values saved here override them.
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Literal, Self
 
 import httpx2
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from sqlalchemy import delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -265,6 +267,24 @@ def vectors_in_use(db: Session, model: str) -> str:
 def save_vectors_in_use(db: Session, model: str, vectors: str) -> None:
     row = db.get(SystemSetting, VECTORS_KEY)
     _save(db, VECTORS_KEY, {**(row.value if row else {}), model: vectors})
+
+
+REEMBEDDING_KEY = "reembedding"
+
+
+def start_reembedding(db: Session, model: str) -> None:
+    """The library is embedded anew (another model, or another file of it):
+    its administrators are told when that is done (``jobs``)."""
+    _save(db, REEMBEDDING_KEY, {"model": model, "since": datetime.now(UTC).isoformat()})
+
+
+def reembedding(db: Session) -> dict[str, Any] | None:
+    row = db.get(SystemSetting, REEMBEDDING_KEY)
+    return dict(row.value) if row else None
+
+
+def end_reembedding(db: Session) -> None:
+    db.execute(delete(SystemSetting).where(SystemSetting.key == REEMBEDDING_KEY))
 
 
 BACKUPS_KEY = "backups"

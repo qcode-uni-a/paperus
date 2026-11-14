@@ -217,6 +217,8 @@ def set_config(
     if body.ocr != current.ocr:
         ocr.switch(db, body.ocr)
     system.save_config(db, body)
+    if model_changed:
+        system.start_reembedding(db, body.embedding_model)
     db.commit()
     system.apply(
         body,

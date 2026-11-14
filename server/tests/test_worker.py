@@ -277,6 +277,10 @@ def test_missing_embeddings_and_another_model_file(
     }
     # The file's passage, the note's, the paper's details.
     assert embedded(db) == 3
+    # Papers embedded as they come: nobody is told.
+    root.post("/api/admin/jobs/embeddings")
+    run_jobs(worker)
+    assert root.get("/api/me/notifications").json()["notifications"] == []
 
     # The ML service now runs another file of the model (a GPU's): its
     # vectors differ, so everything is embedded again.
@@ -285,8 +289,17 @@ def test_missing_embeddings_and_another_model_file(
     run_jobs(worker)
     assert embedded(db, "bge-m3@fp16") == 3
     assert system.vectors_in_use(db, "bge-m3") == "bge-m3@fp16"
+    assert root.get("/api/me/notifications").json()["notifications"] == []
     root.post("/api/admin/jobs/embeddings")
     assert run_jobs(worker) == {"queue_missing_embeddings succeeded": 1}
+    # Done: the administrators are told, once; others not.
+    [done] = root.get("/api/me/notifications").json()["notifications"]
+    assert done["kind"] == "embedded"
+    assert (done["data"]["model"], done["data"]["passages"]) == ("bge-m3", 3)
+    assert ada.get("/api/me/notifications").json()["notifications"] == []
+    root.post("/api/admin/jobs/embeddings")
+    run_jobs(worker)
+    assert len(root.get("/api/me/notifications").json()["notifications"]) == 1
 
 
 def test_every_file_read_again(client: TestClient, db: Session, worker: App) -> None:

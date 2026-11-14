@@ -68,6 +68,7 @@ from paperus.metadata import make_http_client
 from paperus.ml import MLClient, MLRejected, MLUnavailable, make_ml_client
 from paperus.models import (
     Blob,
+    Embedding,
     File,
     FileChunk,
     Import,
@@ -333,7 +334,8 @@ def embed_papers_details() -> None:
     pass_context=True,
 )
 def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
-    """Also re-embeds the library after the embedding model changed."""
+    """Also re-embeds the library after the embedding model changed, and
+    tells the administrators when that is done."""
     context = _worker_context()
     with context.sessions() as db:
         model = load_config(db, context.settings).embedding_model
@@ -346,13 +348,27 @@ def queue_missing_embeddings(job: JobContext, timestamp: int) -> None:
             return
         if vectors != system.vectors_in_use(db, model):
             system.save_vectors_in_use(db, model, vectors)
+            system.start_reembedding(db, model)
             db.commit()
-        for file_id in files_missing_embeddings(db, vectors):
+        files = files_missing_embeddings(db, vectors)
+        notes = notes_missing_embeddings(db, vectors)
+        details = details_missing_embeddings(db, vectors, limit=1)
+        for file_id in files:
             queue_embedding(job.app, file_id)
-        for note_id in notes_missing_embeddings(db, vectors):
+        for note_id in notes:
             queue_note_embedding(job.app, note_id)
-        if details_missing_embeddings(db, vectors, limit=1):
+        if details:
             _queue(job.app, "embed_details", "embed-details")
+        anew = system.reembedding(db)
+        if anew and anew.get("model") == model and not (files or notes or details):
+            passages = db.scalar(
+                select(func.count())
+                .select_from(Embedding)
+                .where(Embedding.model == vectors)
+            )
+            notifications.reembedded(db, model, anew["since"], passages or 0)
+            system.end_reembedding(db)
+            db.commit()
 
 
 def queue_embedding_sweep(app: App) -> None:
