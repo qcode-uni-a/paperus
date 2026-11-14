@@ -11,6 +11,7 @@ from procrastinate.testing import InMemoryConnector
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from paperus.api import search as search_api
 from paperus.embedding import (
     embed_file,
     embed_note,
@@ -318,3 +319,32 @@ def test_similar_papers(
     logged_in.put(f"/api/items/{rainfall}/archive")
     found = logged_in.get(f"/api/items/{rain}/similar").json()
     assert [f["title"] for f in found] == ["Qubits"]
+
+
+def test_nearest_first_or_all_alike(
+    logged_in: TestClient,
+    db: Session,
+    blobs: BlobStore,
+    fake_ml: FakeML,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Search by meaning takes the nearest passages of all first: the same
+    hits whether enough of them may be read, or too few are (then every
+    passage is compared)."""
+    texts = [b"Rain fell all week.", b"Snow lay on the hills.", b"Fog over the lake."]
+    for n, content in enumerate(texts):
+        file_id = uuid.UUID(add_file(logged_in, f"Weather {n}", content)["id"])
+        process_file(db, blobs, file_id)
+        embed_file(db, fake_ml.client(), MODEL, file_id)
+
+    def found() -> list[str]:
+        hits = search(logged_in, "drizzle", mode="meaning")[0]
+        return [h["passage_id"] for h in hits]
+
+    every = found()  # the nearest are all there are
+    assert len(every) == 3
+    monkeypatch.setattr(search_api, "NEAREST", 2)
+    monkeypatch.setattr(search_api, "CANDIDATES", 2)
+    assert found() == every[:2]  # the two nearest suffice
+    monkeypatch.setattr(search_api, "CANDIDATES", 3)
+    assert found() == every  # too few: all compared

@@ -98,13 +98,10 @@ class Passage(BaseModel):
     """Ordered by the reranker (``score`` is then its score)."""
 
 
-# Keyword and meaning candidates are ranked separately, then fused by
-# reciprocal rank (scores of the two methods are not comparable). Text is
-# HTML-escaped before ts_headline adds <mark>, so snippets are safe as HTML.
-_SEARCH = text(
-    f"""
-    WITH q AS (SELECT websearch_to_tsquery('simple', :query) AS tsq),
-    visible AS NOT MATERIALIZED (
+# The passages the person may read (papers' passages, notes', papers'
+# details), narrowed by ``{papers}``, ``{notes}`` and ``{details}``: all of
+# them, or only some (by index, without going through all).
+_VISIBLE = """
         SELECT 'paper' AS kind, fc.file_id AS source_id, fc.position, fc.page,
                fc.chunk_sha256, fc.in_references, f.version_id,
                i.id AS item_id, i.title AS item_title, fc.caption,
@@ -124,6 +121,7 @@ _SEARCH = text(
           AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
           -- Figures (their captions) only, if asked.
           AND (NOT :figures OR fc.caption)
+          AND {papers}
         UNION ALL
         SELECT 'note', nc.note_id, nc.position, NULL, nc.chunk_sha256, false,
                NULL, NULL, n.title, false, NULL, NULL
@@ -134,6 +132,7 @@ _SEARCH = text(
                OR 'note' = ANY(CAST(:types AS text[])))
           AND CAST(:item AS uuid) IS NULL
           AND NOT :figures
+          AND {notes}
         UNION ALL
         -- A paper's details: its title and abstract, with or without a file.
         SELECT 'details', i.id, 0, NULL, ic.chunk_sha256, false,
@@ -146,7 +145,34 @@ _SEARCH = text(
                OR i.type = ANY(CAST(:types AS text[])))
           AND (CAST(:item AS uuid) IS NULL OR i.id = CAST(:item AS uuid))
           AND NOT :figures
-    ),
+          AND {details}
+"""
+_ALL = _VISIBLE.format(papers="true", notes="true", details="true")
+_NEAR = _VISIBLE.format(
+    papers="(fc.chunk_sha256 IN (SELECT chunk_sha256 FROM near)"
+    " OR (f.blob_sha256, fc.page, fc.figure)"
+    " IN (SELECT blob_sha256, page, label FROM near_figures))",
+    notes="nc.chunk_sha256 IN (SELECT chunk_sha256 FROM near)",
+    details="ic.chunk_sha256 IN (SELECT chunk_sha256 FROM near)",
+)
+_HITS = _VISIBLE.format(
+    papers="(fc.file_id, fc.position) IN (SELECT source_id, position FROM fused)",
+    notes="(nc.note_id, nc.position) IN (SELECT source_id, position FROM fused)",
+    details="(i.id, 0) IN (SELECT source_id, position FROM fused)",
+)
+NEAREST = 1000
+"""Search by meaning compares with the nearest so many passages' vectors
+(and figures') of all first, then keeps those the person may read: the same
+hits as comparing with every passage they may read, as long as enough of
+them are among those (else it does that)."""
+
+# Keyword and meaning candidates are ranked separately, then fused by
+# reciprocal rank (scores of the two methods are not comparable). Text is
+# HTML-escaped before ts_headline adds <mark>, so snippets are safe as HTML.
+_SEARCH = text(
+    f"""
+    WITH q AS (SELECT websearch_to_tsquery('simple', :query) AS tsq),
+    visible AS NOT MATERIALIZED ({_ALL}    ),
     keyword AS (
         SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
                    ORDER BY ts_rank_cd(c.tsv, q.tsq) DESC, vis.source_id, vis.position
@@ -155,22 +181,58 @@ _SEARCH = text(
         WHERE :use_keyword AND c.tsv @@ q.tsq
         ORDER BY rank LIMIT :candidates
     ),
+    near AS MATERIALIZED (
+        SELECT chunk_sha256, embedding <=> CAST(:vector AS halfvec) AS distance
+        FROM embeddings
+        WHERE :use_meaning AND model = :model
+        ORDER BY distance LIMIT :nearest
+    ),
+    near_figures AS MATERIALIZED (
+        SELECT blob_sha256, page, label,
+               embedding <=> CAST(:vector AS halfvec) AS distance
+        FROM figure_embeddings
+        WHERE :use_meaning AND model = :model
+        ORDER BY distance LIMIT :nearest
+    ),
+    by_nearest AS MATERIALIZED (
+        SELECT vis.source_id, vis.position, vis.kind,
+               n.distance IS NOT NULL AS near_text,
+               least(coalesce(n.distance, 2), coalesce(nf.distance, 2)) AS distance
+        FROM ({_NEAR}) AS vis
+             LEFT JOIN near n ON n.chunk_sha256 = vis.chunk_sha256
+             LEFT JOIN near_figures nf
+               ON nf.blob_sha256 = vis.blob_sha256 AND nf.page = vis.page
+                  AND nf.label = vis.figure
+        WHERE NOT vis.in_references
+    ),
+    -- The nearest suffice if enough of them may be read (or they are all).
+    enough AS MATERIALIZED (
+        SELECT (SELECT count(*) FROM by_nearest WHERE near_text) >= :candidates
+               OR (SELECT count(*) FROM near) < :nearest AS yes
+    ),
     meaning AS (
         -- A caption by the better of its text's vector and its figure's
         -- (a model that takes images: multimodal search).
-        SELECT vis.source_id, vis.position, vis.kind, row_number() OVER (
-                   ORDER BY least(
-                       e.embedding <=> CAST(:vector AS halfvec),
-                       coalesce(fe.embedding <=> CAST(:vector AS halfvec), 2)),
-                   vis.source_id, vis.position
+        SELECT source_id, position, kind, row_number() OVER (
+                   ORDER BY distance, source_id, position
                ) AS rank
-        FROM visible vis
-             JOIN embeddings e
-               ON e.chunk_sha256 = vis.chunk_sha256 AND e.model = :model
-             LEFT JOIN figure_embeddings fe
-               ON fe.blob_sha256 = vis.blob_sha256 AND fe.page = vis.page
-                  AND fe.label = vis.figure AND fe.model = :model
-        WHERE :use_meaning AND NOT vis.in_references
+        FROM (
+            SELECT source_id, position, kind, distance
+            FROM by_nearest
+            WHERE (SELECT yes FROM enough)
+            UNION ALL
+            SELECT vis.source_id, vis.position, vis.kind, least(
+                       e.embedding <=> CAST(:vector AS halfvec),
+                       coalesce(fe.embedding <=> CAST(:vector AS halfvec), 2))
+            FROM visible vis
+                 JOIN embeddings e
+                   ON e.chunk_sha256 = vis.chunk_sha256 AND e.model = :model
+                 LEFT JOIN figure_embeddings fe
+                   ON fe.blob_sha256 = vis.blob_sha256 AND fe.page = vis.page
+                      AND fe.label = vis.figure AND fe.model = :model
+            WHERE :use_meaning AND NOT vis.in_references
+              AND NOT (SELECT yes FROM enough)
+        ) AS compared
         ORDER BY rank LIMIT :candidates
     ),
     fused AS (
@@ -187,13 +249,14 @@ _SEARCH = text(
         ) AS candidates
         GROUP BY source_id, position
     ),
+    visible_hits AS MATERIALIZED ({_HITS}    ),
     -- The best few per paper (or note), so one paper cannot fill the list.
     capped AS (
         SELECT fused.*, row_number() OVER (
                    PARTITION BY coalesce(vis.item_id, vis.source_id)
                    ORDER BY fused.score DESC, source_id, position
                ) AS nth
-        FROM fused JOIN visible vis USING (source_id, position)
+        FROM fused JOIN visible_hits vis USING (source_id, position)
     )
     SELECT vis.kind, vis.source_id, vis.position, vis.page, vis.in_references,
            vis.caption, vis.blob_sha256, vis.figure AS figure_label,
@@ -216,7 +279,7 @@ _SEARCH = text(
                '&', '&amp;'), '<', '&lt;'), '>', '&gt;')
            END AS snippet
     FROM capped fused
-         JOIN visible vis USING (source_id, position)
+         JOIN visible_hits vis USING (source_id, position)
          JOIN chunks c ON c.sha256 = vis.chunk_sha256,
          q
     WHERE fused.nth <= :per_item
@@ -304,6 +367,8 @@ def run_search(
                 "figures": figures,
                 "per_item": per_item or limit,
                 "candidates": CANDIDATES * 4 if per_item else CANDIDATES,
+                # Narrow searches compare with every passage at once.
+                "nearest": 0 if figures or item_id else NEAREST,
             },
         )
         .mappings()
