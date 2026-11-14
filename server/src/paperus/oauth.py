@@ -24,6 +24,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from paperus import tokens
+from paperus.db import absent
 from paperus.models import AccessToken, OAuthClient, OAuthCode, OAuthGrant, User
 from paperus.tokens import Scope
 
@@ -101,7 +102,7 @@ def register_client(db: Session, name: str, redirect_uris: list[str]) -> OAuthCl
     db.execute(
         delete(OAuthClient).where(
             OAuthClient.created_at < datetime.now(UTC) - UNUSED_CLIENT,
-            OAuthClient.id.not_in(used),
+            absent(OAuthClient.id, used),
         )
     )
     client = OAuthClient(

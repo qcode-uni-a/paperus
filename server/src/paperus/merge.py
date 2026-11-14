@@ -17,10 +17,11 @@ from typing import Literal
 
 from sqlalchemy import delete, literal, select, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from paperus import library
 from paperus.access import Access
+from paperus.db import absent
 from paperus.models import (
     CollectionItem,
     Favourite,
@@ -284,13 +285,15 @@ def _move_notes_and_stars(
     whoever can see them; those in ``leave`` stay with the paper in the
     trash), and everyone's star moves along."""
     db.flush()
+    target_notes = aliased(NoteItem)
     db.execute(
         update(NoteItem)
         .where(
             NoteItem.item_id == source.id,
             NoteItem.note_id.not_in(list(leave)),
-            NoteItem.note_id.not_in(
-                select(NoteItem.note_id).where(NoteItem.item_id == target.id)
+            absent(
+                NoteItem.note_id,
+                select(target_notes.note_id).where(target_notes.item_id == target.id),
             ),
         )
         .values(item_id=target.id)

@@ -21,7 +21,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from procrastinate import App
 from procrastinate.testing import InMemoryConnector
-from sqlalchemy import Engine, make_url, text
+from sqlalchemy import Engine, event, make_url, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -61,6 +61,28 @@ def _recreate_database(url: str) -> None:
             connection.execute(text(f'CREATE DATABASE "{name}"'))
     finally:
         admin.dispose()
+
+
+# ``x NOT IN (SELECT …)``: PostgreSQL collects the whole subquery's result
+# for it on every run, and compares row by row once that no longer fits in
+# memory; ``NOT EXISTS`` is looked up (``paperus.db.absent``).
+NOT_IN_SUBQUERY = re.compile(r"\bNOT\s+IN\s*\(\s*SELECT\b", re.IGNORECASE)
+
+
+@event.listens_for(Engine, "before_cursor_execute")
+def no_not_in_subqueries(
+    conn: object,
+    cursor: object,
+    statement: str,
+    parameters: object,
+    context: object,
+    executemany: bool,
+) -> None:
+    """Every statement any test sends, by any engine (the app's, the
+    worker's): none with ``NOT IN`` and a subquery."""
+    if NOT_IN_SUBQUERY.search(statement):
+        message = "NOT IN with a subquery; use NOT EXISTS (paperus.db.absent)"
+        raise AssertionError(f"{message}:\n{statement}")
 
 
 @pytest.fixture(scope="session", autouse=True)

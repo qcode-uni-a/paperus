@@ -33,6 +33,7 @@ from sqlalchemy import delete, event, func, insert, inspect, or_, select, update
 from sqlalchemy.orm import Session, UOWTransaction
 
 from paperus.access import Access
+from paperus.db import absent
 from paperus.models import (
     Author,
     Authorship,
@@ -206,7 +207,7 @@ def _authors_here(
     return set(
         db.scalars(
             select(User.id).where(
-                User.id.in_(people), User.orcid.in_(authors), User.id.not_in(told)
+                User.id.in_(people), User.orcid.in_(authors), absent(User.id, told)
             )
         )
     )
@@ -292,7 +293,7 @@ def milestone(db: Session, item: Item, passed: int, count: int) -> None:
     )
     for user_id in db.scalars(
         select(User.id).where(
-            User.id.in_(people), User.orcid.in_(authors), User.id.not_in(told)
+            User.id.in_(people), User.orcid.in_(authors), absent(User.id, told)
         )
     ):
         db.add(

@@ -34,6 +34,11 @@ close them from commits with "Fixes #n".
 
 ## Checking a change
 
+- Queries: the SQL of the most used and the periodic ones is kept in
+  `server/sql/` (`tests/test_sql.py`); after changing one, write them anew
+  (`PAPERUS_WRITE_SQL=1 uv run pytest tests/test_sql.py`) and read the
+  diff. No `NOT IN` with a subquery (the tests refuse it): `NOT EXISTS`,
+  `paperus.db.absent`.
 - Others (people and agents) push to main too: `git pull --rebase` before
   pushing, and after pulling check that a new migration's number is free.
 - Web changes: look at them before committing, in light and dark and at
