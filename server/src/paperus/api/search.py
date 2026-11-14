@@ -273,6 +273,10 @@ def run_search(
     libraries = access.readable
     if library_id is not None:
         libraries = [library_id] if access.can_read(library_id) else []
+    # A plan for these parameters each time: psycopg prepares the query
+    # after a few runs, and PostgreSQL's generic plan for it (not knowing
+    # the vector, the filters) took 0.47 s instead of 0.06 s.
+    db.execute(text("SET LOCAL plan_cache_mode = force_custom_plan"))
     rows = (
         db.execute(
             _SEARCH,
