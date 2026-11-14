@@ -476,7 +476,14 @@ right figure first / in the top five / in the top ten, by kind:
   matches. Qwen3-VL-2B-Instruct asked for each panel's box returns round
   guesses (an even 2×2 grid, a box over the top 60 %), at 3.3 s a figure:
   not usable. The misses are mostly composite figures described panel by
-  panel and small figures with tiny text.
+  panel and small figures with tiny text. Nor do panels bring more right
+  figures to the reranker (the right one among the first 20 / 40 for look
+  questions: image 0.74 / 0.77, image or a panel 0.74 / 0.80; image or
+  caption 0.77 / 0.82, for concept questions 0.40 → 0.75 in the first 20
+  with the caption). Detectors trained for panels are not open enough to
+  ship: EXSCLAIM! (materials science) is GPL-3.0, YOLO-based ones AGPL,
+  biomedical ones mostly for research only. Parked; making small panels
+  legible (rendering every figure at the same scale) is the better lever.
 - Speed (RTX 2080 SUPER, fp16): the image vectors 105 ms a figure, once at
   import; the reranker 67 ms a candidate at 384 px, of which preparing
   the image is half (0.76 of 1.5 s for 20), which needs no question and
