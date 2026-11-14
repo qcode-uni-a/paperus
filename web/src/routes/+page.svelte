@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
-	import { listItems, search, type Item, type Passage } from '#lib/api/client.ts';
+	import { apiHref, listItems, search, type Item, type Passage } from '#lib/api/client.ts';
 	import { organize } from '#lib/organize.svelte.ts';
 	import GettingStarted from '#lib/GettingStarted.svelte';
 	import HandedOver from '#lib/HandedOver.svelte';
@@ -29,6 +29,15 @@
 	// this paper" fetches the rest of that one.
 	const SEARCH_PASSAGES = 60;
 	const PER_PAPER = 3;
+
+	/** A passage in its paper: at its page, marked there. */
+	function passageHref(id: string, passage: Passage): string {
+		const query = new URLSearchParams({
+			...(passage.page ? { page: String(passage.page) } : {}),
+			...(passage.file_id ? { file: passage.file_id, passage: String(passage.position) } : {})
+		});
+		return `${resolve('/items/[id]', { id })}?${query}`;
+	}
 	/** Paper id → all its passages, once fetched. */
 	let allOf = $state<Record<string, Passage[]>>({});
 	let loadingMore = $state<string | null>(null);
@@ -307,15 +316,7 @@
 											>Title, abstract</a
 										>
 									{:else if group.kind === 'paper'}
-										<a
-											class="where"
-											href="{resolve('/items/[id]', { id: group.id })}?{new URLSearchParams({
-												...(passage.page ? { page: String(passage.page) } : {}),
-												...(passage.file_id
-													? { file: passage.file_id, passage: String(passage.position) }
-													: {})
-											})}"
-										>
+										<a class="where" href={passageHref(group.id, passage)}>
 											{passage.page ? `Page ${passage.page}` : 'Open'}
 										</a>
 									{/if}
@@ -327,8 +328,32 @@
 									{:else if !passage.matched.includes('keyword')}
 										<span class="badge">Similar meaning</span>
 									{/if}
-									<!-- Snippets are HTML-escaped on the server; only <mark> is added. -->
-									<blockquote>{@html passage.snippet}</blockquote>
+									{#if passage.figure_image && passage.file_id && passage.page && passage.figure}
+										{@const width = passage.figure_width ?? 4}
+										{@const height = passage.figure_height ?? 3}
+										<!-- A tall figure beside its caption, a wide one above it. -->
+										<div class="figure-passage" class:tall={height > width}>
+											<a class="figure-image" href={passageHref(group.id, passage)}>
+												<img
+													src={apiHref(
+														`/api/files/${passage.file_id}/figure?${new URLSearchParams({
+															page: String(passage.page),
+															label: passage.figure
+														})}`
+													)}
+													alt="{passage.figure} of “{group.title}”"
+													{width}
+													{height}
+													loading="lazy"
+												/>
+											</a>
+											<!-- Snippets are HTML-escaped on the server; only <mark> is added. -->
+											<blockquote>{@html passage.snippet}</blockquote>
+										</div>
+									{:else}
+										<!-- Snippets are HTML-escaped on the server; only <mark> is added. -->
+										<blockquote>{@html passage.snippet}</blockquote>
+									{/if}
 								</li>
 							{/each}
 						</ul>
@@ -516,6 +541,38 @@
 	}
 	.passages blockquote {
 		grid-column: 1 / -1;
+	}
+	.figure-passage {
+		grid-column: 1 / -1;
+		display: grid;
+		gap: 8px 16px;
+		align-items: start;
+	}
+	.figure-passage.tall {
+		grid-template-columns: fit-content(45%) minmax(0, 72ch);
+	}
+	.passages .figure-passage blockquote {
+		grid-column: auto;
+	}
+	/* The figure as on its page: on white (papers are), framed. */
+	.figure-image {
+		justify-self: start;
+		max-width: 100%;
+		margin: 4px 0;
+		padding: 6px;
+		border: 1px solid var(--rule);
+		border-radius: 8px;
+		background: #fff;
+	}
+	.figure-image img {
+		display: block;
+		max-width: 100%;
+		max-height: 320px;
+		width: auto;
+		height: auto;
+	}
+	.tall .figure-image img {
+		max-height: 440px;
 	}
 	blockquote {
 		margin: 0;

@@ -24,6 +24,7 @@ person ticks changes. See "Connected apps" below. Tools: `search`
 (papers, best first, each with its best passages; compact JSON, optional
 abstracts), `get_abstracts`, `get_annotations` (the person's highlights, comments and drawings on a paper, and those shared with them), `get_passage`, `get_document` (details with file download links, or text by
 pages), `get_file` (the PDF itself as an embedded resource, up to 20 MB),
+`get_figure` (a figure as a picture, for passages of its caption),
 `list_collections`, `list_documents`, `find_similar` (papers closest in
 meaning, by the average of their passages' vectors), `get_references` (a
 paper's reference list, each reference a `paper` in the library, a `link`

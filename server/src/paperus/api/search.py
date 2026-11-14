@@ -1,22 +1,21 @@
 """Search: by keyword, by meaning, or both (hybrid, the default)."""
 
 import logging
-import re
 import time
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from paperus import library, metrics
+from paperus import library, metrics, page_layout
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.config import Settings
 from paperus.ml import MLClient, MLRejected, MLUnavailable
-from paperus.models import Item
+from paperus.models import File, Item, PageLayouts
 from paperus.system import SystemConfig, load_config
 
 log = logging.getLogger(__name__)
@@ -71,6 +70,13 @@ class Passage(BaseModel):
     figure: str | None = None
     """For a caption: what it labels, as the paper writes it ("FIG. 3",
     "Table I")."""
+    figure_image: bool = False
+    """Its figure was found on the page: drawn at
+    ``/api/files/{file_id}/figure?page=…&label=…``."""
+    figure_width: int | None = None
+    figure_height: int | None = None
+    """Its size on the page (points): tall ones are shown beside their
+    caption, wide ones above it."""
     reranked: bool = False
     """Ordered by the reranker (``score`` is then its score)."""
 
@@ -194,18 +200,6 @@ _SEARCH = text(
 )
 
 
-_FIGURE = re.compile(
-    r"^\W*((?:fig(?:ure)?|table|tab|abb(?:ildung)?)\.?\s*(?:\d+|[IVX]+)[a-z]?)",
-    re.IGNORECASE,
-)
-
-
-def figure_label(caption: str) -> str | None:
-    """What a caption labels, as written: "FIG. 3", "Table I"."""
-    match = _FIGURE.match(caption)
-    return " ".join(match.group(1).split()) if match else None
-
-
 def _query_vector(ml: MLClient, model: str, query: str) -> tuple[str, str] | None:
     """The query's vector as pgvector text, and what the passages' vectors
     to compare with are stored as; None if the ML service is down."""
@@ -300,7 +294,9 @@ def run_search(
             score=float(row["score"]),
             in_references=row["in_references"],
             caption=row["caption"],
-            figure=figure_label(row["chunk_text"]) if row["caption"] else None,
+            figure=page_layout.figure_label(row["chunk_text"])
+            if row["caption"]
+            else None,
             matched=[
                 m
                 for m, hit in (
@@ -317,6 +313,7 @@ def run_search(
         passages = _rerank(ml, reranker, q, passages, texts, per_paper)
     passages = passages[:asked]
     _add_authors(db, passages)
+    _add_figures(db, passages)
     metrics.SEARCHES.labels(used).inc()
     metrics.SEARCH_SECONDS.observe(time.perf_counter() - started)
     return used, passages
@@ -382,6 +379,30 @@ def _add_authors(db: Session, passages: list[Passage]) -> None:
         known = found.get(passage.item_id) if passage.item_id else None
         if known is not None:
             passage.item_authors, passage.item_year = known
+
+
+def _add_figures(db: Session, passages: list[Passage]) -> None:
+    """Whether a caption's figure was found on its page (its image then at
+    ``/api/files/{file_id}/figure``)."""
+    files = {p.file_id for p in passages if p.figure and p.file_id is not None}
+    if not files:
+        return
+    layouts: dict[uuid.UUID, list[dict[str, Any]]] = {
+        file_id: pages
+        for file_id, pages in db.execute(
+            select(File.id, PageLayouts.pages)
+            .join(PageLayouts, PageLayouts.blob_sha256 == File.blob_sha256)
+            .where(File.id.in_(files))
+        )
+    }
+    for passage in passages:
+        pages = layouts.get(passage.file_id) if passage.file_id else None
+        if pages and passage.page and passage.figure:
+            figure = page_layout.captioned(pages, passage.page, passage.figure)
+            if figure is not None:
+                passage.figure_image = True
+                passage.figure_width = figure["width"]
+                passage.figure_height = figure["height"]
 
 
 @router.get("/api/search")

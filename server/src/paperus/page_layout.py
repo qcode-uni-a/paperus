@@ -27,7 +27,7 @@ import numpy as np
 import pypdfium2
 import pypdfium2.raw as pdfium_c
 
-VERSION = 9
+VERSION = 10
 """The layouts this code makes (stored with them)."""
 
 # Narrower ink at a page's side is a margin note (arXiv's stamp, line
@@ -122,6 +122,13 @@ FIGURE_LINE = 0.6
 # Lines further apart than this many times their type size (from middle to
 # middle) have blank space between them: a caption ends there.
 CAPTION_GAP = 1.6
+# A caption's figure is this close above or below it (points), and reaches
+# at least this far over or under it (a share of the narrower's width).
+CAPTION_REACH = 60
+CAPTION_OVERLAP = 0.3
+# A captioned figure's box stops this short of its caption (drawn with a
+# little of the page around it, no part of the caption).
+CAPTION_CLEAR = 3
 # A character this many times its size above or below the one before is on
 # another line (sub- and superscripts are less).
 NEXT_LINE = 0.7
@@ -149,6 +156,9 @@ class Figure(TypedDict):
     y: int
     width: int
     height: int
+    caption: NotRequired[str]
+    """What its caption labels ("FIG. 3", ``figure_label``; since version
+    10), if it has one."""
 
 
 class PageLayout(TypedDict):
@@ -1401,6 +1411,25 @@ _CAPTION_START = re.compile(
     r"^\W*(?:fig(?:ure)?|table|tab|abb(?:ildung)?)\.?\s*(?:\d+|[IVX]+)[a-z]?\s*[.:|]",
     re.IGNORECASE,
 )
+_LABEL = re.compile(
+    r"^\W*((?:fig(?:ure)?|table|tab|abb(?:ildung)?)\.?\s*(?:\d+|[IVX]+)[a-z]?)",
+    re.IGNORECASE,
+)
+
+
+def figure_label(caption: str) -> str | None:
+    """What a caption labels, as written: "FIG. 3", "Table I"."""
+    match = _LABEL.match(caption)
+    return " ".join(match.group(1).split()) if match else None
+
+
+def captioned(pages: list[dict[str, Any]], page: int, label: str) -> Figure | None:
+    """The figure on ``page`` (from 1) of stored layouts whose caption
+    labels ``label``, if one was found."""
+    if not 1 <= page <= len(pages):
+        return None
+    figures: list[Figure] = pages[page - 1].get("figures", [])
+    return next((f for f in figures if f.get("caption") == label), None)
 
 
 @dataclass
@@ -1408,6 +1437,7 @@ class _Line:
     chars: list[str]
     ys: list[float]
     """Its characters' middles (where it has them)."""
+    xs: list[float]
     sizes: list[float]
     in_figure: int = 0
 
@@ -1426,13 +1456,15 @@ def pieces_text(
     after a gap, to the next gap), kept whole however close to their
     figures."""
     lines: list[list[_Line]] = [[] for _ in pieces]
+    found: list[list[_Line]] = []
+    labels: list[_Line] = []
     reach = FIGURE_LABEL_REACH
     last: int | None = None
     for char, x, y, size in chars:
         if x is None or y is None or size is None:
             if last is not None and lines[last]:
                 if char in "\r\n":
-                    lines[last].append(_Line([], [], []))
+                    lines[last].append(_Line([], [], [], []))
                 else:
                     lines[last][-1].chars.append(char)
             continue
@@ -1457,12 +1489,13 @@ def pieces_text(
         ):
             # Its text went on elsewhere in between, or on the next line: a
             # new line here.
-            lines[piece].append(_Line([], [], []))
+            lines[piece].append(_Line([], [], [], []))
         last = piece
         if piece is None:
             continue
         line = lines[piece][-1]
         line.chars.append(char)
+        line.xs.append(x)
         line.ys.append(y)
         line.sizes.append(size)
         line.in_figure += any(
@@ -1474,7 +1507,7 @@ def pieces_text(
     for own in lines:
         placed = [line for line in own if line.ys]
         text: list[str] = []
-        captions: list[list[str]] = []
+        captions: list[list[_Line]] = []
         in_caption = False
         for i, line in enumerate(placed):
             if i == 0 or _gap(placed[i - 1], line):
@@ -1482,13 +1515,121 @@ def pieces_text(
                 if in_caption:
                     captions.append([])
             if in_caption:
-                captions[-1].append(line.text)
+                captions[-1].append(line)
             elif _kept(line):
                 text.append(line.text)
+            else:
+                labels.append(line)
         if text:
             parts.append(("\n".join(text), False))
-        parts += [("\n".join(caption), True) for caption in captions]
+        parts += [("\n".join(line.text for line in c), True) for c in captions]
+        found += captions
+    _take_in(labels, drawings)
+    _pair(found, drawings)
     return parts
+
+
+def _take_in(labels: list[_Line], drawings: list[Figure]) -> None:
+    """Each figure's box widened to its labels (an axis's numbers and name,
+    a panel's "(a)": text, not drawn)."""
+    reach = FIGURE_LABEL_REACH
+    for line in labels:
+        x, y = _middle(line.xs), _middle(line.ys)
+        figure = next(
+            (
+                f
+                for f in drawings
+                if f["x"] - reach <= x < f["x"] + f["width"] + reach
+                and f["y"] - reach <= y < f["y"] + f["height"] + reach
+            ),
+            None,
+        )
+        if figure is None:
+            continue
+        size = _middle(line.sizes)
+        x0 = min(figure["x"], _round(min(line.xs) - size / 2))
+        y0 = min(figure["y"], _round(min(line.ys) - size / 2))
+        x1 = max(figure["x"] + figure["width"], _round(max(line.xs) + size / 2))
+        y1 = max(figure["y"] + figure["height"], _round(max(line.ys) + size / 2))
+        figure.update(x=x0, y=y0, width=x1 - x0, height=y1 - y0)
+
+
+def _pair(captions: list[list[_Line]], drawings: list[Figure]) -> None:
+    """Each caption's figure, the nearest above or below it that it reaches
+    over (one caption a figure), labelled with what it labels; its box
+    ends where the caption begins (drawn ink near a caption can join it)."""
+    pairs: list[tuple[float, int, int]] = []
+    edges: list[tuple[float, float]] = []
+    for c, lines in enumerate(captions):
+        xs = [x for line in lines for x in line.xs]
+        ys = [y for line in lines for y in line.ys]
+        x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+        size = max(_middle(line.sizes) for line in lines)
+        edges.append((y0 - size / 2, y1 + size / 2))
+        for f, figure in enumerate(drawings):
+            left, right = figure["x"], figure["x"] + figure["width"]
+            over = min(x1, right) - max(x0, left)
+            if over < CAPTION_OVERLAP * min(x1 - x0, right - left):
+                continue
+            # Under it (from its first line's middle) or over it (from its
+            # last); its box may reach into the caption a little.
+            middle = figure["y"] + figure["height"] / 2
+            if y0 > middle:
+                gap = y0 - figure["y"] - figure["height"]
+            elif y1 < middle:
+                gap = figure["y"] - y1
+            else:
+                continue
+            if gap <= CAPTION_REACH:
+                pairs.append((max(gap, 0), c, f))
+    taken: set[int] = set()
+    joined: set[int] = set()
+    for _, c, f in sorted(pairs):
+        label = figure_label(captions[c][0].text)
+        if c in taken or f in joined or "caption" in drawings[f] or label is None:
+            continue
+        figure = drawings[f]
+        figure["caption"] = label
+        taken.add(c)
+        top, bottom = edges[c][0] - CAPTION_CLEAR, edges[c][1] + CAPTION_CLEAR
+        end = figure["y"] + figure["height"]
+        below = top + bottom > 2 * figure["y"] + figure["height"]
+        if below and figure["y"] < top < end:
+            figure["height"] = _round(top) - figure["y"]
+        elif not below and figure["y"] < bottom < end:
+            figure["height"] = end - _round(bottom)
+            figure["y"] = _round(bottom)
+        joined |= _join_panels(f, drawings, joined, below=below)
+    drawings[:] = [d for i, d in enumerate(drawings) if i not in joined]
+
+
+def _join_panels(
+    f: int, drawings: list[Figure], joined: set[int], below: bool
+) -> set[int]:
+    """Figure ``f`` joined by the panels over or under it without a caption
+    of their own (measured apart): above it if its caption is below, else
+    below it. (Panels side by side are measured as one; a drawing beside
+    it may be the other column's figure.) The ones it took in."""
+    figure = drawings[f]
+    took: set[int] = set()
+    more = True
+    while more:
+        more = False
+        for i, other in enumerate(drawings):
+            if i == f or i in joined or i in took or "caption" in other:
+                continue
+            x0, y0 = figure["x"], figure["y"]
+            x1, y1 = x0 + figure["width"], y0 + figure["height"]
+            ox1, oy1 = other["x"] + other["width"], other["y"] + other["height"]
+            gap = y0 - oy1 if below else other["y"] - y1
+            if min(x1, ox1) <= max(x0, other["x"]) or not 0 <= gap <= FIGURE_GAP:
+                continue
+            x0, y0 = min(x0, other["x"]), min(y0, other["y"])
+            x1, y1 = max(x1, ox1), max(y1, oy1)
+            figure.update(x=x0, y=y0, width=x1 - x0, height=y1 - y0)
+            took.add(i)
+            more = True
+    return took
 
 
 def _gap(above: _Line, line: _Line) -> bool:

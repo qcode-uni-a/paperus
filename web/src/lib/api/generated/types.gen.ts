@@ -3692,6 +3692,18 @@ export type Passage = {
      */
     figure?: string | null;
     /**
+     * Figure Image
+     */
+    figure_image?: boolean;
+    /**
+     * Figure Width
+     */
+    figure_width?: number | null;
+    /**
+     * Figure Height
+     */
+    figure_height?: number | null;
+    /**
      * Reranked
      */
     reranked?: boolean;
@@ -7799,6 +7811,43 @@ export type FileLayoutResponses = {
 };
 
 export type FileLayoutResponse = FileLayoutResponses[keyof FileLayoutResponses];
+
+export type FigureImageData = {
+    body?: never;
+    path: {
+        /**
+         * File Id
+         */
+        file_id: string;
+    };
+    query: {
+        /**
+         * Page
+         */
+        page: number;
+        /**
+         * Label
+         */
+        label: string;
+    };
+    url: '/api/files/{file_id}/figure';
+};
+
+export type FigureImageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type FigureImageError = FigureImageErrors[keyof FigureImageErrors];
+
+export type FigureImageResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type PassageTextData = {
     body?: never;

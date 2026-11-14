@@ -7,6 +7,16 @@
   "Table 2"), and "Figures and tables only" in the search options finds
   nothing else. Assistants over MCP get the same (`figures` in `search`).
   Papers read before are marked by the update itself.
+- **…and shown**: the figure itself appears with its caption in the
+  results, a tall one beside it and a wide one above it (a click opens
+  the paper at its page), as the page's layout
+  found it, labels and stacked panels with it; drawn from the PDF when
+  asked, nothing stored. Assistants see it with `get_figure`. Tables
+  still show only their caption. PDFs' layouts are measured again once
+  in the background after the update.
+- **The PDF icon for journal versions without their PDF**: a paper whose
+  journal version is shown but whose PDF is the preprint's now has its
+  PDF icon in the list, as its page already had.
 
 ## 0.1.5 (2026-11-14)
 

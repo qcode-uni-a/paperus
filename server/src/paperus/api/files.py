@@ -13,6 +13,7 @@ from fastapi import (
     APIRouter,
     Form,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -23,7 +24,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from paperus import library, open_access, page_layout, system
+from paperus import library, open_access, page_layout, pdf, system
 from paperus.access import Access
 from paperus.api.deps import DB, CurrentAccess
 from paperus.jobs import LAYOUT_ASKED, queue_layout, queue_text_extraction
@@ -431,6 +432,41 @@ def file_layout(
     if not known.pages:
         raise HTTPException(404, "the PDF's pages could not be read")
     return PageLayoutsOut(version=known.version, current=current, pages=known.pages)
+
+
+@router.get(
+    "/api/files/{file_id}/figure",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}},
+)
+def figure_image(
+    file_id: uuid.UUID,
+    page: Annotated[int, Query(ge=1)],
+    label: Annotated[str, Query(max_length=40)],
+    request: Request,
+    db: DB,
+    access: CurrentAccess,
+) -> Response:
+    """A figure of a PDF drawn as found in its layout, by the label of its
+    caption ("FIG. 3", as search results give it) on its page (from 1)."""
+    file = _get_file(db, access, file_id)
+    known = db.get(PageLayouts, file.blob_sha256) if file.media_type == PDF else None
+    figure = page_layout.captioned(known.pages, page, label) if known else None
+    if known is None or figure is None:
+        raise HTTPException(404, "no such figure")
+    # Drawn again only when its file or layout changed; browsers ask each
+    # time (as for the file itself), so one out of reach is never shown.
+    etag = f'"{file.blob_sha256.hex()}-{known.version}-{page}-{quote(label)}"'
+    headers = {"ETag": etag, "Cache-Control": "private, no-cache"}
+    if etag in request.headers.get("If-None-Match", "").split(", "):
+        return Response(status_code=304, headers=headers)
+    blobs: BlobStore = request.app.state.blobs
+    try:
+        with blobs.local_file(file.blob_sha256) as path:
+            image = pdf.figure(path, page - 1, figure)
+    except (pdf.PdfError, FileNotFoundError) as error:
+        raise HTTPException(404, "the figure could not be drawn") from error
+    return Response(image, media_type="image/png", headers=headers)
 
 
 class PassageText(BaseModel):

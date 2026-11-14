@@ -3734,6 +3734,66 @@
         }
       }
     },
+    "/api/files/{file_id}/figure": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Figure Image",
+        "description": "A figure of a PDF drawn as found in its layout, by the label of its\ncaption (\"FIG. 3\", as search results give it) on its page (from 1).",
+        "operationId": "figure_image",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "title": "Label"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "image/png": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files/{file_id}/passages/{position}": {
       "get": {
         "tags": [
@@ -15790,6 +15850,33 @@
               }
             ],
             "title": "Figure"
+          },
+          "figure_image": {
+            "type": "boolean",
+            "title": "Figure Image",
+            "default": false
+          },
+          "figure_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Width"
+          },
+          "figure_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Height"
           },
           "reranked": {
             "type": "boolean",

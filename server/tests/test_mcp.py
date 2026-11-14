@@ -14,6 +14,7 @@ from paperus.storage import BlobStore
 from tests.conftest import FakeDOIRegistry
 from tests.pdfs import make_pdf
 from tests.people import Person, group
+from tests.test_page_text import paper as two_columns
 
 ACCEPT = "application/json, text/event-stream"
 
@@ -122,6 +123,7 @@ def test_handshake_and_tools(client: TestClient, ada: Person) -> None:
         "get_annotations",
         "get_document",
         "get_file",
+        "get_figure",
         "export_citations",
         "my_access",
         "list_collections",
@@ -391,3 +393,34 @@ def test_short_authors() -> None:
     assert _short_authors(["Lovelace, Ada", "Babbage, C."]) == "Lovelace and Babbage"
     three = ["He, X.", "Jiang, Y.", "Wu, Z."]
     assert _short_authors(three) == "He, Jiang et al."
+
+
+def test_a_figure_found_by_its_caption_and_shown(
+    client: TestClient, db: Session, blobs: BlobStore
+) -> None:
+    ada = Person(client, db, "ada")
+    paper = ada.post("/api/items", json={"metadata": {"title": "Columns"}}).json()
+    file = ada.post(
+        f"/api/items/{paper['id']}/files",
+        files={"upload": ("columns.pdf", two_columns(), "application/pdf")},
+    ).json()
+    process_file(db, blobs, uuid.UUID(file["id"]))
+    assistant = Assistant(client, token(ada, "search", "files.read"))
+    [found] = assistant.call(
+        "search", query="figure of tests", mode="keyword", figures=True
+    )["papers"]
+    [passage] = found["passages"]
+    assert (passage["figure"], passage["image"]) == ("FIG. 1", True)
+    result = assistant.rpc(
+        "tools/call",
+        {
+            "name": "get_figure",
+            "arguments": {"file_id": file["id"], "page": 1, "figure": "FIG. 1"},
+        },
+    )
+    note, image = result["content"]
+    assert note["text"] == "FIG. 1 on page 1 of “Columns”."
+    assert image["mimeType"] == "image/png"
+    assert base64.b64decode(image["data"]).startswith(b"\x89PNG")
+    with pytest.raises(ToolFailed, match="No such figure"):
+        assistant.call("get_figure", file_id=file["id"], page=1, figure="FIG. 2")

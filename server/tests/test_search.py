@@ -1,3 +1,4 @@
+import struct
 import uuid
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from paperus.processing import process_file
 from paperus.storage import BlobStore
 from tests.pdfs import make_pdf
+from tests.people import Person
 from tests.test_page_text import paper as two_columns
 
 PAPER = make_pdf(
@@ -233,3 +235,25 @@ def test_figures_found_by_their_captions(
         "/api/search", params={"q": "tests", "mode": "keyword", "figures": True}
     ).json()
     assert [p["passage_id"] for p in only] == [figure["passage_id"]]
+
+    # Its figure found on the page, drawn for the result (without its
+    # caption); the browser's copy is still it.
+    assert figure["figure_image"] is True
+    assert 200 <= figure["figure_width"] <= 220 <= 2 * figure["figure_height"]
+    url = f"/api/files/{figure['file_id']}/figure"
+    drawn = logged_in.get(url, params={"page": 1, "label": "FIG. 1"})
+    assert drawn.status_code == 200, drawn.text
+    assert drawn.headers["content-type"] == "image/png"
+    assert drawn.content.startswith(b"\x89PNG")
+    width, height = struct.unpack(">II", drawn.content[16:24])
+    assert 400 <= width <= 450 and 230 <= height <= 260  # 216 x 119 points, twice
+    again = logged_in.get(
+        url,
+        params={"page": 1, "label": "FIG. 1"},
+        headers={"If-None-Match": drawn.headers["etag"]},
+    )
+    assert again.status_code == 304
+    for params in ({"page": 1, "label": "FIG. 2"}, {"page": 9, "label": "FIG. 1"}):
+        assert logged_in.get(url, params=params).status_code == 404
+    other = Person(logged_in, db, "other")
+    assert other.get(f"{url}?page=1&label=FIG.%201").status_code == 404

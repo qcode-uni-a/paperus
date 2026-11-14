@@ -105,7 +105,7 @@ _RULES: list[tuple[tuple[str, ...], re.Pattern[str], Scope]] = [
     (_READ, re.compile(r"/api/search"), Scope.SEARCH),
     (
         _READ,
-        re.compile(r"/api/files/[^/]+/(content|annotated|layout)"),
+        re.compile(r"/api/files/[^/]+/(content|annotated|layout|figure)"),
         Scope.FILES_READ,
     ),
     (_READ, re.compile(r"/api/files/[^/]+/passages/[^/]+"), Scope.FILES_READ),

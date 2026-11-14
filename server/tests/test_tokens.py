@@ -287,6 +287,7 @@ ROUTES = {
     ("POST", "/api/files/{file_id}/download-again"): "papers.write",
     ("GET", "/api/files/{file_id}/content"): "files.read",
     ("GET", "/api/files/{file_id}/layout"): "files.read",
+    ("GET", "/api/files/{file_id}/figure"): "files.read",
     ("POST", "/api/files/{file_id}/restore"): "papers.write",
     ("GET", "/api/groups"): "groups.read",
     ("POST", "/api/groups"): None,

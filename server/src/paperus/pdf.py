@@ -47,6 +47,11 @@ TASKS_PER_HELPER = 50
 # longer side (posters).
 OCR_DPI = 200
 OCR_MAX_SIDE = 4000
+# A figure drawn for the screen: twice as sharp as the page, at most this
+# wide or tall (pixels), with this much of the page around it (points).
+FIGURE_SCALE = 2
+FIGURE_MAX_SIDE = 1600
+FIGURE_MARGIN = 2
 
 
 class PdfError(Exception):
@@ -139,6 +144,12 @@ def render(path: Path, index: int) -> bytes:
     return _run(_render, path, index)
 
 
+def figure(path: Path, index: int, box: page_layout.Figure) -> bytes:
+    """A part of page ``index`` (from 0; ``box`` in points from its top
+    left, as in its layout) as a colour PNG, for the screen."""
+    return _run(_figure, path, index, box)
+
+
 @dataclass
 class Read:
     """A PDF read with its layouts."""
@@ -159,17 +170,23 @@ def read(path: Path) -> Read:
     return Read(*_run(_read, path))
 
 
-def png(width: int, height: int, pixels: bytes, stride: int) -> bytes:
-    """An 8-bit greyscale PNG of rows of pixels (``stride`` bytes apart)."""
+def png(
+    width: int, height: int, pixels: bytes, stride: int, channels: int = 1
+) -> bytes:
+    """An 8-bit greyscale (or, with three ``channels``, RGB) PNG of rows of
+    pixels (``stride`` bytes apart)."""
+    row = width * channels
     rows = b"".join(
-        b"\0" + pixels[y * stride : y * stride + width] for y in range(height)
+        b"\0" + pixels[y * stride : y * stride + row] for y in range(height)
     )
 
     def chunk(kind: bytes, data: bytes) -> bytes:
         body = kind + data
         return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
 
-    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    header = struct.pack(
+        ">IIBBBBB", width, height, 8, 2 if channels == 3 else 0, 0, 0, 0
+    )
     return (
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", header)
@@ -250,6 +267,39 @@ def _render(path: str, index: int) -> bytes:
         bitmap.close()
         page.close()
         return image
+
+
+def _figure(path: str, index: int, box: page_layout.Figure) -> bytes:
+    with _open(path) as pdf:
+        page = pdf[index]
+        try:
+            width, height = page.get_size()
+            if page.get_rotation() % 180:
+                width, height = height, width
+            m = FIGURE_MARGIN
+            left = max(box["x"] - m, 0)
+            top = max(box["y"] - m, 0)
+            right = max(width - box["x"] - box["width"] - m, 0)
+            bottom = max(height - box["y"] - box["height"] - m, 0)
+            side = max(width - left - right, height - top - bottom, 1)
+            bitmap = page.render(
+                scale=min(FIGURE_SCALE, FIGURE_MAX_SIDE / side),
+                crop=(left, bottom, right, top),
+                rev_byteorder=True,
+                may_draw_forms=False,
+            )
+            try:
+                return png(
+                    bitmap.width,
+                    bitmap.height,
+                    bytes(bitmap.buffer),
+                    bitmap.stride,
+                    bitmap.n_channels,
+                )
+            finally:
+                bitmap.close()
+        finally:
+            page.close()
 
 
 # PDF annotation subtypes as paperus's kinds (squiggly as underline).
