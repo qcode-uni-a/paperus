@@ -11,6 +11,7 @@ Qwen3-VL's ``get_rope_index``); see THIRD_PARTY.md.
 import math
 import threading
 import time
+import weakref
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,7 +22,7 @@ import numpy.typing as npt
 from tokenizers import Tokenizer
 
 from paperus_ml import metrics
-from paperus_ml.device import Device
+from paperus_ml.device import Device, run_options
 from paperus_ml.encoder import open_session
 from paperus_ml.models import Kind, ModelSpec
 
@@ -240,6 +241,36 @@ def batch_inputs(
     }
 
 
+class _Shared:
+    """The vision encoder, token table and tokenizer both models use."""
+
+    def __init__(self, directory: Path, intra_op_threads: int, device: Device) -> None:
+        shared = directory / "shared"
+        self.vision, self.device = open_session(
+            shared / "vision_encoder_fp16.onnx", intra_op_threads, device
+        )
+        self.table = np.load(shared / "embed_tokens_fp16.npy", mmap_mode="r")
+        self.tokenizer = Tokenizer.from_file(str(shared / "tokenizer.json"))
+
+
+_shared: weakref.WeakValueDictionary[tuple[str, ...], _Shared] = (
+    weakref.WeakValueDictionary()
+)
+"""Loaded once while either model of a pair is (same files, same device)."""
+_shared_lock = threading.Lock()
+
+
+def _shared_parts(
+    key: tuple[str, ...], directory: Path, intra_op_threads: int, device: Device
+) -> _Shared:
+    with _shared_lock:
+        found = _shared.get(key)
+        if found is None:
+            found = _Shared(directory, intra_op_threads, device)
+            _shared[key] = found
+        return found
+
+
 class Runtime:
     """One of the pair, from the model's download: the shared vision encoder,
     token table and tokenizer (``shared/``) and the task's decoder
@@ -253,16 +284,19 @@ class Runtime:
         intra_op_threads: int = 0,
         device: Device = "cpu",
         max_batch_tokens: int = 8192,
+        shared_key: tuple[str, ...] | None = None,
     ) -> None:
-        shared = directory / "shared"
-        self.vision, self.device = open_session(
-            shared / "vision_encoder_fp16.onnx", intra_op_threads, device
-        )
+        """``shared_key``: models with the same key (repository, revision,
+        device) share the vision encoder, table and tokenizer."""
+        key = shared_key or (str(directory), str(intra_op_threads), device)
+        self.shared = _shared_parts(key, directory, intra_op_threads, device)
+        self.vision, self.device = self.shared.vision, self.shared.device
+        # Each run's working memory given back afterwards (as other models).
+        self.run_options = run_options(self.device)
         self.decoder, _ = open_session(
             directory / decoder_file, intra_op_threads, device
         )
-        self.table = np.load(shared / "embed_tokens_fp16.npy", mmap_mode="r")
-        self.tokenizer = Tokenizer.from_file(str(shared / "tokenizer.json"))
+        self.table, self.tokenizer = self.shared.table, self.shared.tokenizer
         self.max_batch_tokens = max_batch_tokens
 
     def tokens(self, text: str, limit: int | None = None) -> list[int]:
@@ -284,7 +318,9 @@ class Runtime:
         for sequence in sequences:
             for piece in sequence:
                 if isinstance(piece, Image) and id(piece) not in found:
-                    features, deepstack = self.vision.run(None, grid_inputs(piece))
+                    features, deepstack = self.vision.run(
+                        None, grid_inputs(piece), self.run_options
+                    )
                     found[id(piece)] = (np.asarray(features), np.asarray(deepstack))
         return found
 
@@ -303,7 +339,7 @@ class Runtime:
                 feeds = batch_inputs(
                     [sequences[i] for i in batch], self.table, features
                 )
-                result = np.asarray(self.decoder.run(None, feeds)[0])
+                result = np.asarray(self.decoder.run(None, feeds, self.run_options)[0])
                 for i, value in zip(batch, list(result), strict=True):
                     out[i] = np.asarray(value, dtype=np.float32)
                 batch = []
@@ -369,6 +405,7 @@ class MultimodalEncoder:
             intra_op_threads=intra_op_threads,
             device=device,
             max_batch_tokens=max_batch_tokens,
+            shared_key=(spec.repo, spec.revision, str(intra_op_threads), device),
         )
         self.device = self.runtime.device
         self.running = threading.RLock()
@@ -408,6 +445,7 @@ class MultimodalReranker:
             intra_op_threads=intra_op_threads,
             device=device,
             max_batch_tokens=max_batch_tokens,
+            shared_key=(spec.repo, spec.revision, str(intra_op_threads), device),
         )
         self.device = self.runtime.device
         self.running = threading.RLock()

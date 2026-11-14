@@ -291,6 +291,29 @@ MODELS = {
             licence="Apache-2.0",
             download_mb=620,
         ),
+        # Qwen3-VL-Embedding 2B (Apache-2.0): texts and figures in one
+        # space (multimodal search), in our own ONNX export with 8-bit
+        # weights (paperus_ml.qwen3_vl; docs/search.md). Needs a GPU.
+        ModelSpec(
+            name="qwen3-vl-embedding-2b",
+            parameters=2_127_532_032,
+            released="2026-01",
+            repo="headtrick/Qwen3-VL-2B-Retrieval-ONNX",
+            revision="0dfd62f79c9924f4db0dc5e69563bdc1fc613a8e",
+            onnx_file="embedding/decoder_int8.onnx",
+            tokenizer_file="shared/tokenizer.json",
+            pooling="last",
+            dimensions=2048,
+            max_tokens=1024,
+            layout="qwen3-vl",
+            images=True,
+            description=(
+                "Qwen3-VL-Embedding 2B: texts and figures in one space, many"
+                " languages; needs a GPU."
+            ),
+            licence="Apache-2.0",
+            download_mb=2900,
+        ),
         # EmbeddingGemma 2 (Apache-2.0): text, images, video and sound in
         # one space; here its text model (the others' features empty), its
         # pooling in the ONNX file. On our questions worse than
@@ -394,6 +417,29 @@ MODELS = {
             # Not on a CPU: too slow there, and the recommended embedding
             # model gains little from it (docs/search.md).
             recommended=("cuda",),
+        ),
+        # Qwen3-VL-Reranker 2B (Apache-2.0): reranks passages and figures,
+        # sharing its vision encoder with Qwen3-VL-Embedding (one download).
+        ModelSpec(
+            name="qwen3-vl-reranker-2b",
+            parameters=2_127_532_032,
+            released="2026-01",
+            repo="headtrick/Qwen3-VL-2B-Retrieval-ONNX",
+            revision="0dfd62f79c9924f4db0dc5e69563bdc1fc613a8e",
+            onnx_file="reranker/decoder_int8.onnx",
+            tokenizer_file="shared/tokenizer.json",
+            pooling="last",
+            dimensions=1,
+            max_tokens=1024,
+            task="rerank",
+            layout="qwen3-vl",
+            images=True,
+            description=(
+                "Qwen3-VL-Reranker 2B: passages and figures, many languages;"
+                " needs a GPU."
+            ),
+            licence="Apache-2.0",
+            download_mb=2900,
         ),
         ModelSpec(
             name="gte-multilingual-reranker-base",

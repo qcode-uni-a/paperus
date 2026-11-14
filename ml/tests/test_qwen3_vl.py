@@ -5,7 +5,9 @@ figures. The arithmetic was checked against transformers on real figures
 values worked out by hand and the tiny pair (tests/tiny_model.py)."""
 
 import base64
+import gc
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import cv2
@@ -283,3 +285,21 @@ def test_figures_refused(client: TestClient) -> None:
     assert "takes no images" in text_only.text
     rerank = {"model": "bge-reranker-v2-m3", "query": "rain", "images": figure}
     assert client.post("/rerank", json=rerank).status_code == 422
+
+
+def test_the_pair_shares_its_vision_encoder(tmp_path: Path) -> None:
+    """Both models of a pair, loaded together, use one vision encoder and
+    token table (on a GPU 0.8 GB less); unloaded, it goes."""
+    # A revision of its own: other tests' pairs may still be alive.
+    embedding, reranker = (
+        replace(spec, revision=str(tmp_path)) for spec in write_tiny_qwen3_vl(tmp_path)
+    )
+    encoder = q.MultimodalEncoder(embedding, tmp_path)
+    ranker = q.MultimodalReranker(reranker, tmp_path)
+    assert encoder.runtime.vision is ranker.runtime.vision
+    assert encoder.runtime.table is ranker.runtime.table
+    key = (embedding.repo, embedding.revision, "0", "cpu")
+    assert key in q._shared
+    del encoder, ranker
+    gc.collect()
+    assert key not in q._shared
