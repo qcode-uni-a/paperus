@@ -21,6 +21,13 @@
   a GPU), search by meaning covers more and more of the library while the
   worker embeds it again; administrators now get a notification when it
   covers all of it, with how long that took.
+- **Similar papers, better and at once**: they now weigh a paper's title
+  and abstract too, besides all its text: on a test library the paper's
+  closest related one (by citations) comes first more often (56 % of
+  papers, before 46 %). And each paper's average is kept instead of
+  worked out anew for every paper on each click: 0.03 s instead of
+  0.75 s there, the same however large the library. Filled in by the
+  update itself.
 - **The PDF icon for journal versions without their PDF**: a paper whose
   journal version is shown but whose PDF is the preprint's now has its
   PDF icon in the list, as its page already had.

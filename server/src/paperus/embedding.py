@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from paperus import similar
 from paperus.db import absent
 from paperus.ml import MLClient
 from paperus.models import (
@@ -19,6 +20,7 @@ from paperus.models import (
     Note,
     NoteChunk,
     TextStatus,
+    Version,
 )
 from paperus.trash import file_in_trash, file_outside_trash
 
@@ -53,7 +55,13 @@ def embed_file(db: Session, ml: MLClient, model: str, file_id: uuid.UUID) -> int
     if file_in_trash(db, file_id):
         return 0
     vectors = ml.vectors_name(model)
-    return _embed(db, ml, model, vectors, missing_chunks(db, file_id, vectors))
+    count = _embed(db, ml, model, vectors, missing_chunks(db, file_id, vectors))
+    # The paper's average (similar papers) with its passages' new vectors.
+    item = db.scalar(select(Version.item_id).join(File).where(File.id == file_id))
+    if item is not None:
+        similar.refresh(db, vectors, [item])
+        db.commit()
+    return count
 
 
 def embed_note(db: Session, ml: MLClient, model: str, note_id: uuid.UUID) -> int:

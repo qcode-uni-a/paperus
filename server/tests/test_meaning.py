@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from paperus.api import search as search_api
 from paperus.embedding import (
+    embed_details,
     embed_file,
     embed_note,
     files_missing_embeddings,
@@ -319,6 +320,45 @@ def test_similar_papers(
     logged_in.put(f"/api/items/{rainfall}/archive")
     found = logged_in.get(f"/api/items/{rain}/similar").json()
     assert [f["title"] for f in found] == ["Qubits"]
+
+
+def test_similar_papers_kept_current(
+    logged_in: TestClient, db: Session, blobs: BlobStore, fake_ml: FakeML
+) -> None:
+    """Papers' averages: computed anew once a paper changed (its file in the
+    trash) or its passages got vectors; their details (title and abstract)
+    decide between papers whose passages are alike."""
+
+    def paper(title: str, text: bytes, *, embed: bool = True) -> tuple[str, str]:
+        item = logged_in.post("/api/items", json={"metadata": {"title": title}})
+        item_id: str = item.json()["id"]
+        file = logged_in.post(
+            f"/api/items/{item_id}/files",
+            files={"upload": ("notes.md", text, "text/markdown")},
+        ).json()
+        process_file(db, blobs, uuid.UUID(file["id"]))
+        if embed:
+            embed_file(db, fake_ml.client(), MODEL, uuid.UUID(file["id"]))
+        return item_id, file["id"]
+
+    def similar(item_id: str) -> list[str]:
+        found = logged_in.get(f"/api/items/{item_id}/similar").json()
+        return [f["title"] for f in found]
+
+    rain, _ = paper("Rain gauges", b"Rain gauges measure rain every day.")
+    paper("Spin qubits", b"Daily gauges of rain and snow in the valley.")
+    _, alike = paper("Rain gauges", b"Daily gauges of rain and snow in the valley.")
+    late, late_file = paper("Snow", b"Rain gauges measure snow too.", embed=False)
+    # Same passages: their details decide (none embedded yet: a tie).
+    embed_details(db, fake_ml.client(), MODEL)
+    assert similar(rain) == ["Rain gauges", "Spin qubits"]
+    # Embedded later (above: left out, no vectors yet): its average with them.
+    embed_file(db, fake_ml.client(), MODEL, uuid.UUID(late_file))
+    assert "Snow" in similar(rain)
+    # A file in the trash: its paper's average anew (no passages left).
+    logged_in.delete(f"/api/files/{alike}")
+    assert "Rain gauges" not in similar(rain)
+    assert late
 
 
 def test_nearest_first_or_all_alike(

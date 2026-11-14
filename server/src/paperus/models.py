@@ -927,6 +927,25 @@ class FigureEmbedding(Base):
     embedding: Mapped[list[float]] = mapped_column(HALFVEC())
 
 
+class PaperVector(Base):
+    """A paper's passages' average vector from one model (``similar``): its
+    files' passages outside the trash and the reference list. Valid while
+    the paper's change number is ``change`` (trash, restore, merge move
+    it); recomputed after its passages are embedded."""
+
+    __tablename__ = "paper_vectors"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str] = mapped_column(String(64), primary_key=True)
+    """What the passages' vectors are stored as (``Embedding.model``)."""
+    change: Mapped[int] = mapped_column(BigInteger)
+    passages: Mapped[int] = mapped_column(Integer)
+    embedding: Mapped[list[float] | None] = mapped_column(HALFVEC())
+    """None: no passage with a vector (yet)."""
+
+
 class Embedding(Base):
     """A chunk's vector from one model; several models can coexist."""
 

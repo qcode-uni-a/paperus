@@ -423,3 +423,64 @@ def test_0024_labels_the_captions_of_files_read_before(
         "Table I",
         "Abbildung 4b",
     ]
+
+
+def test_0025_gives_papers_their_average_vectors(
+    logged_in: TestClient, db: Session, database_url: str
+) -> None:
+    """Each paper's passages' average per model, without its reference list
+    and its files in the trash, at its change number."""
+    made = logged_in.post("/api/items", json={"metadata": {"title": "Floquet"}})
+    item = made.json()["id"]
+    upload = ("p.pdf", b"%PDF-1.7\nx\n%%EOF\n", "application/pdf")
+    kept = logged_in.post(f"/api/items/{item}/files", files={"upload": upload}).json()
+    upload = ("q.pdf", b"%PDF-1.7\ny\n%%EOF\n", "application/pdf")
+    trashed = logged_in.post(f"/api/items/{item}/files", files={"upload": upload})
+    logged_in.delete(f"/api/files/{trashed.json()['id']}")
+    config = Config(SERVER_DIR / "alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    db.close()
+    command.downgrade(config, "0024")
+    passages = [
+        (kept["id"], "Driven chains.", False, {"a": "[1,0]", "b": "[0,1]"}),
+        (kept["id"], "Quasienergies.", False, {"a": "[0,1]"}),
+        (kept["id"], "[1] A reference.", True, {"a": "[1,1]"}),
+        (trashed.json()["id"], "Trashed text.", False, {"a": "[9,9]"}),
+    ]
+    for position, (file_id, words, references, vectors) in enumerate(passages):
+        sha = hashlib.sha256(words.encode()).digest()
+        db.execute(
+            text("INSERT INTO chunks (sha256, text) VALUES (:sha, :text)"),
+            {"sha": sha, "text": words},
+        )
+        db.execute(
+            text(
+                "INSERT INTO file_chunks (file_id, position, chunk_sha256, page,"
+                " in_references) VALUES (:file, :n, :sha, 1, :refs)"
+            ),
+            {"file": file_id, "n": position, "sha": sha, "refs": references},
+        )
+        for model, vector in vectors.items():
+            db.execute(
+                text(
+                    "INSERT INTO embeddings (chunk_sha256, model, embedding)"
+                    " VALUES (:sha, :model, CAST(:vector AS halfvec))"
+                ),
+                {"sha": sha, "model": model, "vector": vector},
+            )
+    db.commit()
+    db.close()
+    command.upgrade(config, "head")
+    rows = db.execute(
+        text(
+            "SELECT pv.model, pv.passages, pv.embedding::text,"
+            " pv.change = i.change AS current"
+            " FROM paper_vectors pv JOIN items i ON i.id = pv.item_id"
+            " WHERE pv.item_id = :id ORDER BY pv.model"
+        ),
+        {"id": item},
+    ).all()
+    assert [tuple(r) for r in rows] == [
+        ("a", 2, "[0.5,0.5]", True),
+        ("b", 1, "[0,1]", True),
+    ]
