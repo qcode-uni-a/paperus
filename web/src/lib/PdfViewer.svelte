@@ -53,7 +53,7 @@
 		 * when the page is hidden or left): to go on from there. */
 		onplace?: (place: Place, leaving: boolean) => void;
 		/** A passage to mark on its page (e.g. from a search result). */
-		highlight?: { page: number; text: string } | null;
+		highlight?: { page: number; text: string; scroll?: boolean } | null;
 		/** With these, the file's annotations are shown and made. */
 		fileId?: string | null;
 		/** The file's content: with ``fileId``, kept in the browser to show
@@ -422,7 +422,8 @@
 				first ??= span;
 			}
 		});
-		(first as HTMLElement | null)?.scrollIntoView({ block: 'center' });
+		if (highlight?.scroll !== false)
+			(first as HTMLElement | null)?.scrollIntoView({ block: 'center' });
 	}
 
 	/** The PDF's own annotations taken in as paperus's (found by where they

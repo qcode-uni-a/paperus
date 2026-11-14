@@ -240,6 +240,7 @@ def test_figures_found_by_their_captions(
     # caption); the browser's copy is still it.
     assert figure["figure_image"] is True
     assert 200 <= figure["figure_width"] <= 220 <= 2 * figure["figure_height"]
+    assert 295 <= figure["figure_top"] <= 300 and 322 <= figure["figure_left"] <= 326
     url = f"/api/files/{figure['file_id']}/figure"
     drawn = logged_in.get(url, params={"page": 1, "label": "FIG. 1"})
     assert drawn.status_code == 200, drawn.text

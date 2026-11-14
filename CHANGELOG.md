@@ -9,9 +9,11 @@
   Papers read before are marked by the update itself.
 - **…and shown**: the figure itself appears with its caption in the
   results, beside it if squarish or taller (on a phone always above it;
-  a click opens the paper at its page), as the page's layout
+  a click opens the paper at the figure, also in fluent mode, its
+  caption marked), as the page's layout
   found it, labels and stacked panels with it; drawn from the PDF when
-  asked, nothing stored. Assistants see it with `get_figure`. Tables
+  asked, nothing stored. Assistants see it with `get_figure`, and link
+  to it. Tables
   still show only their caption. PDFs' layouts are measured again once
   in the background after the update.
 - **The PDF icon for journal versions without their PDF**: a paper whose

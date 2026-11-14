@@ -33,10 +33,18 @@
 	 * caption on a wider screen. */
 	const UPRIGHT = 0.8;
 
-	/** A passage in its paper: at its page, marked there. */
-	function passageHref(id: string, passage: Passage): string {
+	/** A passage in its paper: at its page, marked there; ``at``: opened at
+	 * that place of the page (points from its top left), e.g. its figure's,
+	 * with a little room above it. */
+	function passageHref(
+		id: string,
+		passage: Passage,
+		at?: { top?: number | null; left?: number | null }
+	): string {
 		const query = new URLSearchParams({
 			...(passage.page ? { page: String(passage.page) } : {}),
+			...(at?.top != null ? { top: String(Math.max(0, at.top - 24)) } : {}),
+			...(at?.left != null ? { left: String(at.left) } : {}),
 			...(passage.file_id ? { file: passage.file_id, passage: String(passage.position) } : {})
 		});
 		return `${resolve('/items/[id]', { id })}?${query}`;
@@ -337,7 +345,13 @@
 										<!-- Beside its caption if squarish or taller (on a wider
 										     screen; on a phone above it, as wide ones always). -->
 										<div class="figure-passage" class:upright={height >= UPRIGHT * width}>
-											<a class="figure-image" href={passageHref(group.id, passage)}>
+											<a
+												class="figure-image"
+												href={passageHref(group.id, passage, {
+													top: passage.figure_top,
+													left: passage.figure_left
+												})}
+											>
 												<img
 													src={apiHref(
 														`/api/files/${passage.file_id}/figure?${new URLSearchParams({

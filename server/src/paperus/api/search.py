@@ -73,9 +73,13 @@ class Passage(BaseModel):
     figure_image: bool = False
     """Its figure was found on the page: drawn at
     ``/api/files/{file_id}/figure?page=…&label=…``."""
+    figure_top: int | None = None
+    figure_left: int | None = None
+    """Where it begins on its page (points from the top left): its link
+    opens the paper there."""
     figure_width: int | None = None
     figure_height: int | None = None
-    """Its size on the page (points): tall ones are shown beside their
+    """Its size on the page (points): upright ones are shown beside their
     caption, wide ones above it."""
     reranked: bool = False
     """Ordered by the reranker (``score`` is then its score)."""
@@ -401,6 +405,8 @@ def _add_figures(db: Session, passages: list[Passage]) -> None:
             figure = page_layout.captioned(pages, passage.page, passage.figure)
             if figure is not None:
                 passage.figure_image = True
+                passage.figure_top = figure["y"]
+                passage.figure_left = figure["x"]
                 passage.figure_width = figure["width"]
                 passage.figure_height = figure["height"]
 

@@ -3696,6 +3696,14 @@ export type Passage = {
      */
     figure_image?: boolean;
     /**
+     * Figure Top
+     */
+    figure_top?: number | null;
+    /**
+     * Figure Left
+     */
+    figure_left?: number | null;
+    /**
      * Figure Width
      */
     figure_width?: number | null;

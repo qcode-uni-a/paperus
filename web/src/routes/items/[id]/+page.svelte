@@ -201,6 +201,15 @@
 				if (item_id === id) reading = data ?? null;
 			});
 	});
+	/** A place on the start page asked for (points from its top and left,
+	 * e.g. a figure's; the left picks the column in fluent mode): opened
+	 * there, the passage marked without moving to it. */
+	const askedTop = $derived(
+		page.url.searchParams.has('top') ? Number(page.url.searchParams.get('top')) || 0 : null
+	);
+	const askedLeft = $derived(
+		page.url.searchParams.has('left') ? Number(page.url.searchParams.get('left')) || 0 : null
+	);
 	const resume = $derived(
 		!page.url.searchParams.has('page') && reading && pdfFile && reading.file_id === pdfFile.id
 			? reading
@@ -709,11 +718,11 @@
 					title={plainTitle(item.title)}
 					startPage={resume?.page ?? startPage}
 					coverPages={pdfFile.cover_pages ?? []}
-					startTop={resume?.top ?? null}
-					startLeft={resume?.left ?? null}
+					startTop={resume?.top ?? askedTop}
+					startLeft={resume?.left ?? askedLeft}
 					onplace={saveReading}
 					highlight={highlight && page.url.searchParams.get('file') === pdfFile.id
-						? highlight
+						? { ...highlight, scroll: askedTop === null }
 						: null}
 				/>
 			{/key}{/if}

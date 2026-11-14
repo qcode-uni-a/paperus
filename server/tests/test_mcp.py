@@ -411,6 +411,10 @@ def test_a_figure_found_by_its_caption_and_shown(
     )["papers"]
     [passage] = found["passages"]
     assert (passage["figure"], passage["image"]) == ("FIG. 1", True)
+    assert passage["link"].startswith(
+        f"https://testserver/items/{paper['id']}?page=1&top="
+    )
+    assert f"&file={file['id']}&passage={passage['n']}" in passage["link"]
     result = assistant.rpc(
         "tools/call",
         {

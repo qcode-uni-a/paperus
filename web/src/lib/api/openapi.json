@@ -15856,6 +15856,28 @@
             "title": "Figure Image",
             "default": false
           },
+          "figure_top": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Top"
+          },
+          "figure_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Figure Left"
+          },
           "figure_width": {
             "anyOf": [
               {
