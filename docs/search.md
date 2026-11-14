@@ -422,3 +422,96 @@ a CPU slower than Qwen3-Embedding): the weakest here without reranking,
 German especially (arctic-embed-m-v2 wins 52 : 6), and with it no better
 (177 first; 12 : 5 for arctic with reranking, p = 0.14). Not adopted.
 Whether the export loses quality was not checked.
+
+### Figures by what they show (#36, 2026-11-14)
+
+The dev library's PDFs after layout version 10: 3,198 figures found with
+their captions (404 PDFs). 91 questions, written by looking at 66 figures
+picked at random: 65 describe only the look (plot type, panels, colours,
+markers, insets: "two stacked colormaps versus tunnel coupling, the top one
+striped"), 20 name a concept ("a 1/f charge noise spectrum", "a honeycomb
+charge stability diagram"), 6 mix both. Each question has one right
+figure; meaning only (no keyword search, so the models compare fairly);
+right figure first / in the top five / in the top ten, by kind:
+
+| figures as vectors                                | look (65)          | concept (20)       | mixed (6)          |
+| ------------------------------------------------- | ------------------ | ------------------ | ------------------ |
+| caption (arctic-embed-m-v2: today's search)       | 0.09 / 0.22 / 0.26 | 0.15 / 0.35 / 0.35 | 0.33 / 0.67 / 0.67 |
+| description written by Qwen3-VL-2B-Instruct       | 0.23 / 0.43 / 0.49 | 0.00 / 0.05 / 0.15 | 0.33 / 0.50 / 0.67 |
+| SigLIP 2 so400m, image                            | 0.26 / 0.48 / 0.54 | 0.10 / 0.20 / 0.20 | 0.67 / 0.67 / 0.67 |
+| Qwen3-VL-Embedding-2B, image                      | 0.40 / 0.63 / 0.68 | 0.10 / 0.15 / 0.25 | 0.67 / 0.67 / 0.83 |
+| … image and caption in one vector                 | 0.28 / 0.49 / 0.54 | 0.20 / 0.45 / 0.55 | 0.83 / 0.83 / 0.83 |
+| … the same, "caption only as context"             | 0.23 / 0.58 / 0.65 | 0.15 / 0.40 / 0.55 | 0.50 / 0.83 / 0.83 |
+| … caption alone                                   | 0.17 / 0.35 / 0.43 | 0.25 / 0.45 / 0.55 | 0.50 / 0.67 / 0.67 |
+| … best of image and caption (two vectors)         | 0.26 / 0.65 / 0.68 | 0.25 / 0.50 / 0.50 | 0.67 / 0.83 / 0.83 |
+| … best of image and its panels                    | 0.35 / 0.58 / 0.68 | 0.05 / 0.10 / 0.20 | 0.67 / 0.67 / 0.83 |
+| best of image and caption, top 20 reranked by Qwen3-VL-Reranker-2B on the image | **0.62 / 0.72 / 0.72** | 0.15 / 0.40 / 0.55 | 0.50 / 1.00 / 1.00 |
+| … reranked on image and caption                   | 0.54 / 0.72 / 0.72 | 0.25 / 0.45 / 0.55 | 0.83 / 1.00 / 1.00 |
+
+(The first 1,237 figures alone gave Qwen3-VL on the image 0.48 / 0.69 /
+0.74 for the look questions: more figures, more lookalikes.)
+
+- Captions hardly say how a figure looks: today's search finds the right
+  one first for 9% of the look questions. Qwen3-VL-Embedding on the image
+  is far ahead of SigLIP 2 (trained on photos) and of descriptions
+  written by a small vision model and embedded as text.
+- The reranker looking at each candidate with the question is the big
+  step (0.40 → 0.62 first): it checks colours, layout and markers where
+  one vector blurs them. The image size it sees (384, 512 or 768 px)
+  makes no difference; it reorders only the 20 it gets, and every
+  figure that reached them ended in the top five.
+- Concept questions look weak, but a quantum-dot library has dozens of
+  charge stability diagrams and band structures: looked at, the figure
+  put first fits the question in about 7 of 10 (another paper's addition
+  spectrum, another Chern-number phase diagram). One right figure per
+  question undercounts them; keyword search (not used here) would add
+  the captions' terms.
+- The caption in the figure's vector helps concept questions and costs
+  look questions; kept as a vector of its own (the caption's passage,
+  as now) and the figure scored by the better of the two, both hold up.
+  An instruction to use the caption "only as context" changes little.
+- Panels: figures cut at blank rows and columns (1,228 of them, into
+  4,130 panels, colour bars and legends kept with their panel) and each
+  panel a vector of its own did not help: more lookalikes than focused
+  matches. Qwen3-VL-2B-Instruct asked for each panel's box returns round
+  guesses (an even 2×2 grid, a box over the top 60 %), at 3.3 s a figure:
+  not usable. The misses are mostly composite figures described panel by
+  panel and small figures with tiny text.
+- Speed (RTX 2080 SUPER, fp16): the image vectors 105 ms a figure, once at
+  import; the reranker 67 ms a candidate at 384 px, of which preparing
+  the image is half (0.76 of 1.5 s for 20), which needs no question and
+  could be done at import: about 0.5 s for 20 candidates, less with the
+  vision encoder's output kept too (not measured).
+
+The same pair on text: the 200 questions on a copy of the model trials'
+database (its passages cut by page; Qwen3-VL-Embedding's vectors of
+2026-11-12, the questions encoded the same way), hybrid search, the
+reranker's pool of 40 passages (at most two a paper) kept and reranked.
+Right paper first / in the top five / MRR@10:
+
+| embedding             | without            | bge-reranker-v2-m3 | Qwen3-VL-Reranker-2B |
+| --------------------- | ------------------ | ------------------ | -------------------- |
+| arctic-embed-m-v2     | 0.90 / 0.99 / 0.94 | 0.91 / 1.00 / 0.95 | 0.96 / 0.99 / 0.98   |
+| Qwen3-VL-Embedding-2B | 0.88 / 0.99 / 0.93 | 0.93 / 0.99 / 0.96 | 0.97 / 0.99 / 0.98   |
+
+Qwen3-VL-Embedding is as good as arctic-embed-m-v2 on text (as before,
+within the noise), and its reranker better than bge on either: 0.96 to
+0.97 first. It takes 56 ms a passage (RTX 2080 SUPER, fp16, PyTorch
+without flash attention): 2.2 s for 40, but reranking only the first 10
+keeps 0.96 / 0.99 / 0.97 in 0.56 s.
+
+So one pair, Qwen3-VL-Embedding and Qwen3-VL-Reranker, could serve text
+and figures in one space on a server with a GPU: text as good or better
+than today, figures found by what they show (0.62 first, 0.72 in the top
+five, against 0.09 / 0.22 by caption). Both are 2B models (about 4.4 GB
+each at fp16): two at once need int4 weights on an 8 GB card. The ML
+service runs ONNX only; the text part of the embedding model is exported
+(`data/ocr-test/export_qwen3vl.py`), the vision part and the reranker are
+not yet (onnx-community/Qwen3-VL-2B-Instruct-ONNX shows the split: vision
+encoder, token embeddings, decoder).
+
+Possible next steps: render each figure for the model at a fixed size
+(longest side about 1,000 px; small single-column figures now come out
+near 500 px); link a figure to the passages that mention it ("Fig. 3
+shows …") so concept questions find it through the paragraph that
+explains it; keyword search over captions as today.
