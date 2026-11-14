@@ -286,3 +286,123 @@ def write_tiny_ocr(directory: Path) -> ModelSpec:
             folder="det",
         ),
     )
+
+
+# A tiny Qwen3-VL pair (paperus_ml.qwen3_vl): the vision encoder turns each
+# block of 2 by 2 patches into one token by a matrix product; the decoders
+# add up all tokens (plus their first DeepStack features): the embedding
+# model normalized, the reranker the sum of that as the score.
+VL_DIMENSIONS = 8
+VL_SPECIAL = {
+    "<|endoftext|>": 151643,
+    "<|im_start|>": 151644,
+    "<|im_end|>": 151645,
+    "<|vision_start|>": 151652,
+    "<|vision_end|>": 151653,
+    "<|image_pad|>": 151655,
+}
+
+
+def _value(name: str, kind: int, shape: list[str | int]) -> onnx.ValueInfoProto:
+    return helper.make_tensor_value_info(name, kind, shape)
+
+
+def write_tiny_qwen3_vl(directory: Path) -> tuple[ModelSpec, ModelSpec]:
+    """The pair's files in their layout; their specs (embedding, reranker)."""
+    rng = np.random.default_rng(1)
+    shared = directory / "shared"
+    shared.mkdir(parents=True, exist_ok=True)
+    f16 = TensorProto.FLOAT16
+    vision = helper.make_graph(
+        [
+            helper.make_node("Reshape", ["pixel_values", "merged_shape"], ["merged"]),
+            helper.make_node("MatMul", ["merged", "w"], ["image_features"]),
+            helper.make_node("Unsqueeze", ["image_features", "zero"], ["one"]),
+            helper.make_node(
+                "Concat", ["one", "one", "one"], ["deepstack_features"], axis=0
+            ),
+        ],
+        "tiny_vision",
+        inputs=[
+            _value("pixel_values", f16, ["p", 1536]),
+            _value("interp_indices", TensorProto.INT64, ["p", 4]),
+            _value("interp_weights", f16, ["p", 4]),
+            _value("position_ids", TensorProto.INT64, ["p", 2]),
+        ],
+        outputs=[
+            _value("image_features", f16, ["t", VL_DIMENSIONS]),
+            _value("deepstack_features", f16, [3, "t", VL_DIMENSIONS]),
+        ],
+        initializer=[
+            numpy_helper.from_array(np.array([-1, 4 * 1536], np.int64), "merged_shape"),
+            numpy_helper.from_array(
+                (rng.normal(size=(4 * 1536, VL_DIMENSIONS)) / 50).astype(np.float16),
+                "w",
+            ),
+            numpy_helper.from_array(np.array([0], np.int64), "zero"),
+        ],
+    )
+    save(vision, shared / "vision_encoder_fp16.onnx")
+    np.save(
+        shared / "embed_tokens_fp16.npy",
+        rng.normal(size=(151656, VL_DIMENSIONS)).astype(np.float16),
+    )
+    words = {w: i for i, w in enumerate(WORDS)} | VL_SPECIAL
+    tokenizer = Tokenizer(models.WordLevel(words, unk_token="[UNK]"))
+    tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+    tokenizer.add_special_tokens(list(VL_SPECIAL))
+    tokenizer.save(str(shared / "tokenizer.json"))
+
+    specs = []
+    for task, folder in (("embedding", "embedding"), ("rerank", "reranker")):
+        (directory / folder).mkdir(exist_ok=True)
+        nodes = [
+            helper.make_node("Gather", ["deepstack", "first"], ["layer"], axis=0),
+            helper.make_node("Add", ["inputs_embeds", "layer"], ["tokens16"]),
+            helper.make_node("Cast", ["tokens16"], ["tokens"], to=TensorProto.FLOAT),
+            # All tokens' sum: padding (zeros) changes nothing.
+            helper.make_node("ReduceSum", ["tokens", "axis"], ["sum"], keepdims=0),
+        ]
+        if task == "embedding":
+            nodes += [
+                helper.make_node("ReduceL2", ["sum"], ["norm"], axes=[1], keepdims=1),
+                helper.make_node("Div", ["sum", "norm"], ["embedding"]),
+            ]
+            output = _value("embedding", TensorProto.FLOAT, ["b", VL_DIMENSIONS])
+        else:
+            nodes.append(
+                helper.make_node("ReduceSum", ["sum", "axis"], ["score"], keepdims=0)
+            )
+            output = _value("score", TensorProto.FLOAT, ["b"])
+        decoder = helper.make_graph(
+            nodes,
+            f"tiny_{folder}",
+            inputs=[
+                _value("inputs_embeds", f16, ["b", "s", VL_DIMENSIONS]),
+                _value("attention_mask", TensorProto.INT64, ["b", "s"]),
+                _value("position_ids", TensorProto.INT64, [3, "b", "s"]),
+                _value("deepstack", f16, [3, "b", "s", VL_DIMENSIONS]),
+            ],
+            outputs=[output],
+            initializer=[
+                numpy_helper.from_array(np.array(0, np.int64), "first"),
+                numpy_helper.from_array(np.array([1], np.int64), "axis"),
+            ],
+        )
+        save(decoder, directory / folder / "decoder.onnx")
+        specs.append(
+            ModelSpec(
+                name=f"tiny-vl-{folder}",
+                repo="local/tiny-vl",
+                revision="0",
+                onnx_file=f"{folder}/decoder.onnx",
+                tokenizer_file="shared/tokenizer.json",
+                pooling="last",
+                dimensions=VL_DIMENSIONS,
+                max_tokens=1024,
+                task=task,
+                layout="qwen3-vl",
+                images=True,
+            )
+        )
+    return specs[0], specs[1]

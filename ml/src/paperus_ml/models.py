@@ -26,6 +26,10 @@ the last token's (decoder models: Qwen3-Embedding), or the model's own
 ``sentence_embedding`` output (EmbeddingGemma: its pooling and dense layers
 are in the ONNX file)."""
 Kind = Literal["query", "passage"]
+Layout = Literal["onnx", "qwen3-vl"]
+"""How a model's files are laid out: one ONNX file and its tokenizer, or
+Qwen3-VL's (``paperus_ml.qwen3_vl``): a vision encoder, token table and
+tokenizer shared in ``shared/``, the task's decoder in a folder of its own."""
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,10 @@ class ModelSpec:
     recommended: tuple[str, ...] = ()
     """Where it is the one to use for its task ("cpu", "cuda"), from our
     question set (docs/search.md)."""
+    layout: Layout = "onnx"
+    images: bool = False
+    """Takes images (figures) too, in the same space as texts (embedding) or
+    as candidates (reranking)."""
 
     def onnx_file_for(self, device: str) -> str:
         return (

@@ -15,6 +15,7 @@ come from others and keep their own licences.
 | [Literata](https://github.com/googlefonts/literata) | Website, homepage and logo: titles, headings, wordmark | SIL Open Font License 1.1, [text](licenses/Literata-OFL-1.1.txt) |
 | [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) | Website and homepage: interface text | SIL Open Font License 1.1, [text](licenses/Atkinson-Hyperlegible-Next-OFL-1.1.txt) |
 | [Procrastinate](https://github.com/procrastinate-org/procrastinate) database schema, copied into `server/src/paperus/migrations/procrastinate_3.10.0.sql` | Server: job queue tables | MIT |
+| Code ported from [Hugging Face transformers](https://github.com/huggingface/transformers) to numpy in `ml/src/paperus_ml/qwen3_vl.py`: the Qwen2-VL image processor's `smart_resize` and patch layout, `vision_utils` (position-embedding interpolation, vision positions) and Qwen3-VL's `get_rope_index` | ML service: preparing images and positions for Qwen3-VL | Apache-2.0 |
 
 The container images and packages also contain their Python and JavaScript
 dependencies, each under its own licence; they are listed in
@@ -36,6 +37,7 @@ they are not part of paperus.
 | BGE reranker v2 m3 | [onnx-community/bge-reranker-v2-m3-ONNX](https://huggingface.co/onnx-community/bge-reranker-v2-m3-ONNX) (ONNX export of BAAI/bge-reranker-v2-m3) | Apache-2.0 |
 | GTE multilingual reranker base | [onnx-community/gte-multilingual-reranker-base](https://huggingface.co/onnx-community/gte-multilingual-reranker-base) | Apache-2.0 |
 | ms-marco-MiniLM-L-6-v2 | [cross-encoder/ms-marco-MiniLM-L-6-v2](https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2) | Apache-2.0 |
+| Qwen3-VL-Embedding-2B, Qwen3-VL-Reranker-2B | [headtrick/Qwen3-VL-2B-Retrieval-ONNX](https://huggingface.co/headtrick/Qwen3-VL-2B-Retrieval-ONNX) (our ONNX export of [Qwen/Qwen3-VL-Embedding-2B](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B) and [Qwen/Qwen3-VL-Reranker-2B](https://huggingface.co/Qwen/Qwen3-VL-Reranker-2B)) | Apache-2.0 |
 | PP-OCRv6 small (text lines, reading) | [PaddlePaddle/PP-OCRv6_small_det_onnx](https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx), [PaddlePaddle/PP-OCRv6_small_rec_onnx](https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx) | Apache-2.0 |
 
 The OCR steps in `ml/src/paperus_ml/ocr.py` (finding and reading lines)

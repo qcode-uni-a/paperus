@@ -8,18 +8,20 @@ configuration.
 """
 
 import asyncio
+import binascii
 import contextlib
 import os
 import secrets
 import time
+from base64 import b64decode
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Self
 
 import onnxruntime
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from paperus_ml import memory, metrics
 from paperus_ml.config import Settings
@@ -34,20 +36,38 @@ from paperus_ml.manager import (
 )
 from paperus_ml.models import MODELS, SCORES, Kind
 from paperus_ml.ocr import NotAnImage, Reader
+from paperus_ml.qwen3_vl import Item, MultimodalEncoder, MultimodalReranker, decode
 from paperus_ml.rerank import Reranker
 from paperus_ml.samples import sample_page, sample_passages
 
 MAX_TEXTS = 256
 MAX_IMAGE_BYTES = 64 * 1024 * 1024
+MAX_IMAGES = 64
 UNLOAD_CHECK_SECONDS = 30
 OCR_SPEED_PAGES = 3
+
+
+class ImageIn(BaseModel):
+    """A figure for a model that takes images: the image file (PNG, JPEG)
+    in base64, and text with it if any (its caption)."""
+
+    data: str = Field(max_length=MAX_IMAGE_BYTES * 4 // 3 + 4)
+    text: str = ""
 
 
 class EmbedRequest(BaseModel):
     model: str
     kind: Kind = "passage"
     """Queries and passages get different prefixes in some models."""
-    texts: list[str] = Field(min_length=1, max_length=MAX_TEXTS)
+    texts: list[str] = Field(default_factory=list, max_length=MAX_TEXTS)
+    images: list[ImageIn] = Field(default_factory=list, max_length=MAX_IMAGES)
+    """For models that take images: vectors after the texts', in order."""
+
+    @model_validator(mode="after")
+    def something(self) -> Self:
+        if not self.texts and not self.images:
+            raise ValueError("give texts or images")
+        return self
 
 
 class EmbedResponse(BaseModel):
@@ -63,14 +83,33 @@ class EmbedResponse(BaseModel):
 class RerankRequest(BaseModel):
     model: str
     query: str = Field(min_length=1, max_length=2000)
-    passages: list[str] = Field(min_length=1, max_length=200)
+    passages: list[str] = Field(default_factory=list, max_length=200)
+    images: list[ImageIn] = Field(default_factory=list, max_length=MAX_IMAGES)
+    """For rerankers that take images: scored after the passages, in order."""
+
+    @model_validator(mode="after")
+    def something(self) -> Self:
+        if not self.passages and not self.images:
+            raise ValueError("give passages or images")
+        return self
 
 
 class RerankResponse(BaseModel):
     model: str
     scores: list[float]
-    """One per passage, in their order: higher fits better (only the order
-    means something)."""
+    """One per passage (then per image), in their order: higher fits better
+    (only the order means something)."""
+
+
+def _items(images: list[ImageIn]) -> list[Item]:
+    """The request's images, decoded; 422 for one that is none."""
+    items = []
+    for index, image in enumerate(images):
+        try:
+            items.append(Item(text=image.text, image=decode(b64decode(image.data))))
+        except (ValueError, binascii.Error) as error:
+            raise HTTPException(422, f"images[{index}]: {error}") from error
+    return items
 
 
 class OcrLine(BaseModel):
@@ -121,6 +160,8 @@ class ModelInfo(BaseModel):
     need some more for a moment."""
     benchmarks: dict[str, str] = Field(default_factory=lambda: dict(SCORES))
     """What the score keys mean."""
+    images: bool = False
+    """Takes images (figures) too: multimodal search."""
 
 
 class ServiceConfig(BaseModel):
@@ -263,6 +304,7 @@ def create_app(
                 released=s.released,
                 recommended=models.device in s.recommended,
                 memory_bytes=models.measured.get(s.vectors(models.device)),
+                images=s.images,
             )
             for s in MODELS.values()
         ]
@@ -329,7 +371,7 @@ def create_app(
                     seconds=round(seconds, 2),
                     passages_per_second=round(OCR_SPEED_PAGES / max(seconds, 1e-6), 2),
                 )
-            if isinstance(model, Reranker):
+            if isinstance(model, Reranker | MultimodalReranker):
                 # Search hits: one query against all passages.
                 model.score("what did the measurements show", passages[:2])
                 started = time.monotonic()
@@ -360,7 +402,9 @@ def create_app(
                 502, f"loading model {name!r} failed: {error.args[1]}"
             ) from error
 
-    def _model[M: Model](name: str, kind: str, task: type[M], what: str) -> M:
+    def _model[M: Model](
+        name: str, kind: str, task: type[M] | tuple[type[M], ...], what: str
+    ) -> M:
         """The model for a request, of the task it needs; failed requests
         are counted (as "loading" while it loads)."""
         try:
@@ -376,10 +420,20 @@ def create_app(
     @app.post("/embed", dependencies=[Depends(check_token)])
     def embed(body: EmbedRequest) -> EmbedResponse:
         """Runs in FastAPI's thread pool; ONNX Runtime releases the GIL."""
-        model = _model(body.model, body.kind, Encoder, "an embedding model")
-        vectors = model.embed(body.texts, body.kind)
+        model = _model(
+            body.model, body.kind, (Encoder, MultimodalEncoder), "an embedding model"
+        )
+        if body.images:
+            if not isinstance(model, MultimodalEncoder):
+                raise HTTPException(422, f"{body.model!r} takes no images")
+            items = [Item(text=t) for t in body.texts] + _items(body.images)
+            vectors = model.embed_items(items, body.kind)
+        else:
+            vectors = model.embed(body.texts, body.kind)
         metrics.REQUESTS.labels(body.model, body.kind, "ok").inc()
-        metrics.TEXTS.labels(body.model, body.kind).inc(len(body.texts))
+        metrics.TEXTS.labels(body.model, body.kind).inc(
+            len(body.texts) + len(body.images)
+        )
         return EmbedResponse(
             model=body.model,
             vectors=MODELS[body.model].vectors(models.device),
@@ -391,10 +445,20 @@ def create_app(
     def rerank(body: RerankRequest) -> RerankResponse:
         """Score how well each passage answers the query, for reordering
         search hits. Runs in FastAPI's thread pool, like /embed."""
-        model = _model(body.model, "rerank", Reranker, "a reranker")
-        scores = model.score(body.query, body.passages)
+        model = _model(
+            body.model, "rerank", (Reranker, MultimodalReranker), "a reranker"
+        )
+        if body.images:
+            if not isinstance(model, MultimodalReranker):
+                raise HTTPException(422, f"{body.model!r} takes no images")
+            items = [Item(text=p) for p in body.passages] + _items(body.images)
+            scores = model.score_items(body.query, items)
+        else:
+            scores = model.score(body.query, body.passages)
         metrics.REQUESTS.labels(body.model, "rerank", "ok").inc()
-        metrics.TEXTS.labels(body.model, "rerank").inc(len(body.passages))
+        metrics.TEXTS.labels(body.model, "rerank").inc(
+            len(body.passages) + len(body.images)
+        )
         return RerankResponse(model=body.model, scores=scores)
 
     @app.post("/ocr/{name}", dependencies=[Depends(check_token)])

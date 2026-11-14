@@ -14,7 +14,12 @@ def fetch(spec: ModelSpec, device: str, directory: Path) -> None:
         spec.repo,
         revision=spec.revision,
         local_dir=directory,
-        allow_patterns=[f"{spec.onnx_file_for(device)}*", spec.tokenizer_file],
+        allow_patterns=[
+            f"{spec.onnx_file_for(device)}*",
+            spec.tokenizer_file,
+            # Qwen3-VL: the vision encoder and token table both models share.
+            *(["shared/*"] if spec.layout == "qwen3-vl" else []),
+        ],
     )
     if spec.detector is not None:
         snapshot_download(

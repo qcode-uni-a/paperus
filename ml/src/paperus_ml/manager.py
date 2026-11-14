@@ -15,11 +15,12 @@ from paperus_ml.download import fetch
 from paperus_ml.encoder import Encoder
 from paperus_ml.models import MODELS, ModelSpec
 from paperus_ml.ocr import Reader
+from paperus_ml.qwen3_vl import MultimodalEncoder, MultimodalReranker
 from paperus_ml.rerank import Reranker
 
 log = logging.getLogger(__name__)
 
-Model = Encoder | Reranker | Reader
+Model = Encoder | Reranker | Reader | MultimodalEncoder | MultimodalReranker
 Loader = Callable[[ModelSpec, Device], Model]
 
 
@@ -106,7 +107,11 @@ class ModelManager:
     def _download_and_load(self, spec: ModelSpec, device: Device) -> Model:
         model_dir = self.model_dir(spec)
         fetch(spec, device, model_dir)
-        kinds = {"embedding": Encoder, "rerank": Reranker, "ocr": Reader}
+        kinds: dict[str, type[Model]] = {
+            "embedding": MultimodalEncoder if spec.layout == "qwen3-vl" else Encoder,
+            "rerank": MultimodalReranker if spec.layout == "qwen3-vl" else Reranker,
+            "ocr": Reader,
+        }
         encoder = kinds[spec.task](
             spec,
             model_dir,
