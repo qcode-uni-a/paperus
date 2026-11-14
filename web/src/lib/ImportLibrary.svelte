@@ -98,9 +98,11 @@
 
 	/** A whole folder, sent file by file (``#lib/folderImport.ts``). */
 	async function chooseFolder(event: Event & { currentTarget: HTMLInputElement }) {
+		// The input is left as it is while its change is handled (cleared on
+		// the next click instead, so the same folder can be chosen again):
+		// browsers' test drivers wait on it (WebKit's hung, #57).
 		const chosen = [...(event.currentTarget.files ?? [])];
-		event.currentTarget.value = '';
-		if (!chosen.length) return;
+		if (!chosen.length || sending !== null) return;
 		error = '';
 		sending = 0;
 		try {
@@ -307,7 +309,16 @@
 				<button class="primary" disabled={!file || sending !== null}>Import</button>
 				<label class="button folder" class:disabled={sending !== null}>
 					Choose a folder…
-					<input type="file" webkitdirectory disabled={sending !== null} onchange={chooseFolder} />
+					<input
+						type="file"
+						webkitdirectory
+						aria-disabled={sending !== null}
+						onclick={(event) => {
+							if (sending !== null) event.preventDefault();
+							else event.currentTarget.value = '';
+						}}
+						onchange={chooseFolder}
+					/>
 				</label>
 			</div>
 			<p class="muted hint">
@@ -498,6 +509,7 @@
 	.folder.disabled {
 		opacity: 0.5;
 		cursor: default;
+		pointer-events: none;
 	}
 	.folder input {
 		position: absolute;
