@@ -51,8 +51,11 @@ test('Back from a paper returns to the same place in the library', async ({
 	await expect(row).toBeInViewport();
 	expect(Math.abs((await top()) - before)).toBeLessThan(40);
 
-	// The library opened anew (not Back) starts at the top.
+	// The library opened anew (not Back) starts at the top. From the paper's
+	// page: right after the click WebKit may still be on the library, and
+	// opening it again there counts as a reload, which keeps the place.
 	await page.getByRole('link', { name: `${word} paper 30`, exact: true }).click();
+	await expect(page).toHaveURL(/\/items\//);
 	await page.goto('/');
 	await expect(page.getByRole('link', { name: `${word} paper 123`, exact: true })).toBeVisible();
 	expect(await page.evaluate(() => window.scrollY)).toBe(0);

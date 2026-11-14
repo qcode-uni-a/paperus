@@ -148,9 +148,25 @@
 	// latest request may update the list.
 	let latest = 0;
 
-	async function loadItems(before?: string, limit = PAGE) {
-		if (before && loading) return;
-		const request = ++latest;
+	/** Rows a load of the first rows brings at least: as many as Back
+	 * brought back (``keepPlace``). Loads started meanwhile (the list's own
+	 * first one, one for a change elsewhere) win as the latest and would
+	 * otherwise cut the list short, losing the place (#58). */
+	let keep = 0;
+
+	/** The latest request's load: one overtaken waits for it, so whoever
+	 * awaits a load (Back's ``keepPlace``) finds the rows shown (#58). */
+	let latestLoad: Promise<void> = Promise.resolve();
+
+	function loadItems(before?: string, limit = PAGE): Promise<void> {
+		if (before && loading) return latestLoad;
+		const load = loadRequest(++latest, before, limit);
+		latestLoad = load;
+		return load;
+	}
+
+	async function loadRequest(request: number, before?: string, limit = PAGE) {
+		if (!before) limit = Math.min(Math.max(limit, keep), MOST);
 		loading = true;
 		const asked = filtered;
 		const { data, response } = await listItems({
@@ -163,7 +179,7 @@
 				...sortQuery(sort)
 			}
 		});
-		if (request !== latest) return;
+		if (request !== latest) return latestLoad;
 		loading = false;
 		if (!data) return;
 		items = before ? [...items, ...data] : data;
@@ -194,6 +210,7 @@
 		'library',
 		() => items.length,
 		async (count) => {
+			keep = count;
 			await Promise.all([loadUpTo(count), searching]);
 		}
 	);
@@ -214,10 +231,15 @@
 
 	// The list for the current filter (reloads when it changes).
 	const filterKey = $derived(JSON.stringify([toQuery(filter), sortQuery(sort)]));
+	let listed: string | undefined;
 	$effect(() => {
-		void collectionId;
-		void filterKey;
-		untrack(() => loadItems());
+		const key = JSON.stringify([collectionId, filterKey]);
+		untrack(() => {
+			// Another list: no place to keep in it.
+			if (listed !== undefined && key !== listed) keep = 0;
+			listed = key;
+			loadItems();
+		});
 	});
 
 	// Results for the searched words.
