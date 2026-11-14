@@ -51,6 +51,10 @@
   worked out anew for every paper on each click: 0.03 s instead of
   0.75 s there, the same however large the library. Filled in by the
   update itself.
+- **Back keeps your place, also while papers are added**: coming back
+  from a paper to the library could land at the top when colleagues (or
+  the browser extension) added papers meanwhile; now it returns to the
+  paper you left from.
 - **The PDF icon for journal versions without their PDF**: a paper whose
   journal version is shown but whose PDF is the preprint's now has its
   PDF icon in the list, as its page already had.
