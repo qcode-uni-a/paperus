@@ -938,9 +938,12 @@ async def run_workers(
                     log.info("%s: %d jobs at once (was %d)", queue, number, current[0])
                     current[1].cancel()
                     stopping.append(current[1])
-                elif current is not None and not current[1].cancelled():
-                    if error := current[1].exception():
-                        log.error("the %s worker stopped: %r", queue, error)
+                elif (
+                    current is not None
+                    and not current[1].cancelled()
+                    and (error := current[1].exception())
+                ):
+                    log.error("the %s worker stopped: %r", queue, error)
                 running[queue] = (
                     number,
                     asyncio.create_task(
