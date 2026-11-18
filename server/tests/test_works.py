@@ -55,7 +55,7 @@ def test_an_authors_works(client: TestClient, db: Session) -> None:
     record.openalex_id = "A123"
     db.commit()
     asked: list[str] = []
-    client.app.state.http = openalex(ENTRIES, asked)  # ty: ignore[unresolved-attribute]
+    client.app.state.http = openalex(ENTRIES, asked)  # ty: ignore[missing-attribute]
 
     found = ada.get(f"/api/authors/{benito}/works").json()
     assert [(w["doi"], w["item_id"]) for w in found] == [
@@ -81,7 +81,7 @@ def test_an_authors_works(client: TestClient, db: Session) -> None:
 def test_ones_own_works(client: TestClient, db: Session) -> None:
     ada = Person(client, db, "ada")
     asked: list[str] = []
-    client.app.state.http = openalex(ENTRIES, asked)  # ty: ignore[unresolved-attribute]
+    client.app.state.http = openalex(ENTRIES, asked)  # ty: ignore[missing-attribute]
     assert ada.get("/api/me/works").json() == []
     ada.put("/api/auth/profile", {"orcid": ORCID})
     found = ada.get("/api/me/works").json()
@@ -96,7 +96,7 @@ def test_openalex_down(client: TestClient, db: Session) -> None:
     def down(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(503)
 
-    client.app.state.http = httpx2.Client(transport=httpx2.MockTransport(down))  # ty: ignore[unresolved-attribute]
+    client.app.state.http = httpx2.Client(transport=httpx2.MockTransport(down))  # ty: ignore[missing-attribute]
     assert ada.get("/api/me/works").status_code == 502
     http = httpx2.Client(transport=httpx2.MockTransport(down))
     assert works.works_of(http) == []

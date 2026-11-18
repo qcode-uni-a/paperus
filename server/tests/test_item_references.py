@@ -179,7 +179,7 @@ def worker(
     )
     monkeypatch.setattr(jobs, "_context", context)
     monkeypatch.setattr(item_references, "PACERS", NO_PAUSE)
-    client.app.state.http = http  # ty: ignore[unresolved-attribute]
+    client.app.state.http = http  # ty: ignore[missing-attribute]
     return job_app
 
 
@@ -619,7 +619,7 @@ def library(
     paper(bob, "The difference engine", arxiv="2401.00002")
     sources.e_prints["2611.00001"] = tar_gz({"main.bbl": BBL.encode()})
     check(db, http, preprint)
-    client.app.state.http = http  # ty: ignore[unresolved-attribute]
+    client.app.state.http = http  # ty: ignore[missing-attribute]
     return {"ada": ada, "bob": bob, "preprint": preprint, "lovelace": lovelace}
 
 
