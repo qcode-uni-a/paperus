@@ -7,7 +7,7 @@
 # when the container gets one (see docs/operations.md), else the CPU.
 
 # uv, from its own image (a FROM line, so Dependabot keeps it current).
-FROM ghcr.io/astral-sh/uv:0.13.8 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
 # The dependencies' files with the project's own version as 0: each release
 # changes only that, and the dependencies' layer stays the same layer, which
